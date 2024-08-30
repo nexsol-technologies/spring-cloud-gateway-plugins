@@ -1,0 +1,251 @@
+/*
+ * Copyright 2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.nexsol.gateway.filter.factory;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.PathNotFoundException;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+
+import org.springframework.cloud.gateway.filter.GatewayFilter;
+import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.cloud.gateway.route.Route;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.server.ResponseStatusException;
+
+import static ch.nexsol.gateway.filter.common.Constants.UNKNOWN_VALUE;
+import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
+
+public class AuthorizationTokenGatewayFilterFactory
+		extends AbstractGatewayFilterFactory<AuthorizationTokenGatewayFilterFactory.Config> {
+
+	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory
+		.getLogger(AuthorizationTokenGatewayFilterFactory.class);
+
+	/**
+	 * Issuers key.
+	 */
+	public static final String ISSUERS_KEY = "issuers";
+
+	/**
+	 * ClientIds key.
+	 */
+	public static final String CLIENT_IDS_KEY = "clientIds";
+
+	/**
+	 * GrantAccesses key.
+	 */
+	public static final String GRANT_ACCESSES_KEY = "grantAccesses";
+
+	public AuthorizationTokenGatewayFilterFactory() {
+		super(AuthorizationTokenGatewayFilterFactory.Config.class);
+	}
+
+	@Override
+	public List<String> shortcutFieldOrder() {
+		return Arrays.asList(ISSUERS_KEY, CLIENT_IDS_KEY, GRANT_ACCESSES_KEY);
+	}
+
+	@Override
+	public GatewayFilter apply(Config config) {
+		return (exchange, chain) -> {
+			return exchange.getPrincipal()
+				.filter((principal) -> (principal) instanceof JwtAuthenticationToken)
+				.cast(JwtAuthenticationToken.class)
+				.map(JwtAuthenticationToken::getToken)
+				.map((jwt) -> {
+					String issuerId = jwt.getClaimAsString(IdTokenClaimNames.ISS);
+					String clientId = jwt.getClaimAsString(IdTokenClaimNames.AZP);
+					Route route = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
+					String routeId = UNKNOWN_VALUE;
+					if (route != null) {
+						routeId = Optional.ofNullable(route.getId()).orElse(UNKNOWN_VALUE);
+					}
+					if (config.checkIssuer()) {
+						if (!config.getIssuers().contains(issuerId)) {
+							LOG.debug(
+									"Authorization failed : route {} is not allowed for the client {} : issuer forbidden",
+									routeId, clientId);
+							throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+						}
+						else {
+							LOG.debug("issuer authorized {}", issuerId);
+						}
+					}
+					if (config.checkClientId()) {
+						if (!config.getClientIds().contains(clientId)) {
+							LOG.debug("Authorization failed : route {} is not allowed for the client {}", routeId,
+									clientId);
+							throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+						}
+						else {
+							LOG.debug("clientId authorized {}", clientId);
+						}
+					}
+					if (config.checkGrantAccess()) {
+						if (!hasAuthority(jwt.getClaims(), config.getGrantAccesses())) {
+							LOG.debug(
+									"Authorization failed : route {} is not allowed for the client {} : resource access forbidden",
+									routeId, clientId);
+							throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+						}
+						else {
+							LOG.debug("resource access authorized {}", config.getGrantAccesses());
+						}
+					}
+					return exchange;
+				})
+				.defaultIfEmpty(exchange)
+				.flatMap(chain::filter);
+		};
+	}
+
+	public boolean hasAuthority(Map<String, Object> claims, List<GrantAccess> grantAccesses) {
+		return grantAccesses.stream().allMatch((grantAccess) -> hasAuthority(claims, grantAccess));
+	}
+
+	public boolean hasAuthority(Map<String, Object> claims, GrantAccess grantAccess) {
+
+		Collection<String> claimValues = null;
+		String path = grantAccess.getJsonPath();
+		Object claim;
+		try {
+			claim = JsonPath.read(claims, path);
+		}
+		catch (PathNotFoundException ex) {
+			claim = null;
+		}
+		if (claim == null) {
+			return false;
+		}
+		if (claim instanceof String claimStr) {
+			claimValues = Arrays.asList(claimStr.split(","));
+		}
+		if (claim instanceof String[] claimArr) {
+			claimValues = Arrays.asList(claimArr);
+		}
+		if (Collection.class.isAssignableFrom(claim.getClass())) {
+			final var iterator = ((Collection) claim).iterator();
+			if (!iterator.hasNext()) {
+				claimValues = Collections.emptyList();
+			}
+			final var firstItem = iterator.next();
+			if (firstItem instanceof String) {
+				claimValues = (Collection<String>) claim;
+			}
+			if (Collection.class.isAssignableFrom(firstItem.getClass())) {
+				claimValues = ((Collection) claim).stream()
+					.flatMap((colItem) -> ((Collection) colItem).stream())
+					.map(String.class::cast)
+					.toList();
+			}
+		}
+		final Collection<String> claimValuesFinal = claimValues;
+		return grantAccess.getRoles().stream().allMatch((value) -> claimValuesFinal.contains(value));
+	}
+
+	@Validated
+	public static class Config {
+
+		@Valid
+		private List<@NotEmpty String> issuers = new ArrayList<>(0);
+
+		@Valid
+		private List<@NotEmpty String> clientIds = new ArrayList<>(0);
+
+		@Valid
+		private List<@NotNull GrantAccess> grantAccesses = new ArrayList<>(0);
+
+		public List<String> getIssuers() {
+			return this.issuers;
+		}
+
+		public void setIssuers(List<String> issuers) {
+			this.issuers = issuers;
+		}
+
+		public List<String> getClientIds() {
+			return this.clientIds;
+		}
+
+		public void setClientIds(List<String> clientIds) {
+			this.clientIds = clientIds;
+		}
+
+		public List<GrantAccess> getGrantAccesses() {
+			return this.grantAccesses;
+		}
+
+		public void setGrantAccesses(List<GrantAccess> grantAccesses) {
+			this.grantAccesses = grantAccesses;
+		}
+
+		public boolean checkIssuer() {
+			return this.issuers != null && !this.issuers.isEmpty();
+		}
+
+		public boolean checkClientId() {
+			return this.clientIds != null && !this.clientIds.isEmpty();
+		}
+
+		public boolean checkGrantAccess() {
+			return this.grantAccesses != null && !this.grantAccesses.isEmpty();
+		}
+
+	}
+
+	@Validated
+	public static class GrantAccess {
+
+		@NotEmpty
+		private String jsonPath;
+
+		@NotEmpty
+		@Valid
+		private List<@NotEmpty String> roles;
+
+		public String getJsonPath() {
+			return this.jsonPath;
+		}
+
+		public void setJsonPath(String jsonPath) {
+			this.jsonPath = jsonPath;
+		}
+
+		public List<String> getRoles() {
+			return this.roles;
+		}
+
+		public void setRoles(List<String> roles) {
+			this.roles = roles;
+		}
+
+	}
+
+}

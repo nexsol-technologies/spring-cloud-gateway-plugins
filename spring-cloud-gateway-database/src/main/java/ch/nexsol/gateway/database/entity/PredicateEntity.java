@@ -1,0 +1,76 @@
+/*
+ * Copyright 2024 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.nexsol.gateway.database.entity;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Table;
+
+@Table("predicate")
+public class PredicateEntity {
+
+	@Id
+	private Long id;
+
+	private Long routeRefId;
+
+	private String name;
+
+	private String args;
+
+	public PredicateEntity() {
+
+	}
+
+	public Long getId() {
+		return this.id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
+
+	public Long getRouteRefId() {
+		return this.routeRefId;
+	}
+
+	public void setRouteRefId(Long routeRefId) {
+		this.routeRefId = routeRefId;
+	}
+
+	public String getName() {
+		return this.name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getArgs() {
+		return this.args;
+	}
+
+	public void setArgs(String args) {
+		this.args = args;
+	}
+
+	@Override
+	public String toString() {
+		return "PredicateEntity [id=" + this.id + ", routeRefId=" + this.routeRefId + ", name=" + this.name + ", args="
+				+ this.args + "]";
+	}
+
+}
