@@ -20,20 +20,22 @@ import java.util.Arrays;
 import java.util.List;
 
 import jakarta.validation.constraints.NotNull;
+import reactor.core.publisher.Mono;
 
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.validation.annotation.Validated;
 
-public class ConvertHttpMethodGatewayFilter
-		extends AbstractGatewayFilterFactory<ConvertHttpMethodGatewayFilter.Config> {
+public class ConvertHttpMethodGatewayFilterFactory
+		extends AbstractGatewayFilterFactory<ConvertHttpMethodGatewayFilterFactory.Config> {
 
-	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(ConvertHttpMethodGatewayFilter.class);
+	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory
+		.getLogger(ConvertHttpMethodGatewayFilterFactory.class);
 
 	private static final String REPLACEMENT_KEY = "replacement";
 
-	public ConvertHttpMethodGatewayFilter() {
+	public ConvertHttpMethodGatewayFilterFactory() {
 		super(Config.class);
 	}
 
@@ -45,19 +47,12 @@ public class ConvertHttpMethodGatewayFilter
 	@Override
 	public GatewayFilter apply(Config config) {
 		return (exchange, chain) -> {
-			var request = exchange.getRequest();
-			LOG.debug("changing method from {} to {}", request.getMethod().toString(),
-					config.getReplacement().toString());
-			var mutatedExchange = exchange.mutate()
-				.request(request.mutate().method(config.getReplacement()).build())
-				.build();
-			return chain.filter(mutatedExchange);
+			return Mono.just(exchange.getRequest())
+				.doOnNext((req) -> LOG.debug("changing method from {} to {}", req.getMethod().toString(),
+						config.getReplacement().toString()))
+				.map((req) -> exchange.mutate().request(req.mutate().method(config.getReplacement()).build()).build())
+				.flatMap(chain::filter);
 		};
-	}
-
-	@Override
-	public String name() {
-		return "ConvertHttpMethod";
 	}
 
 	@Validated

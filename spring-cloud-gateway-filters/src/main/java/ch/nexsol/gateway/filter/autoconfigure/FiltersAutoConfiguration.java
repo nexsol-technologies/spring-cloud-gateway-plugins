@@ -18,7 +18,7 @@ package ch.nexsol.gateway.filter.autoconfigure;
 
 import ch.nexsol.gateway.filter.factory.AuthorizationGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.AuthorizationTokenGatewayFilterFactory;
-import ch.nexsol.gateway.filter.factory.ConvertHttpMethodGatewayFilter;
+import ch.nexsol.gateway.filter.factory.ConvertHttpMethodGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.RecaptchaGatewayFilterFactory;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -39,8 +39,8 @@ public class FiltersAutoConfiguration {
 	}
 
 	@Bean
-	ConvertHttpMethodGatewayFilter convertHttpMethodGatewayFilter() {
-		return new ConvertHttpMethodGatewayFilter();
+	ConvertHttpMethodGatewayFilterFactory convertHttpMethodGatewayFilter() {
+		return new ConvertHttpMethodGatewayFilterFactory();
 	}
 
 	@Bean

@@ -20,12 +20,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
+import com.nimbusds.jwt.JWT;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.JWTParser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -33,11 +37,16 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.cloud.gateway.route.Route;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.MappedJwtClaimSetConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.server.ServerWebExchange;
 
 import static ch.nexsol.gateway.filter.common.Constants.UNKNOWN_VALUE;
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
@@ -63,8 +72,11 @@ public class AuthorizationTokenGatewayFilterFactory
 	 */
 	public static final String GRANT_ACCESSES_KEY = "grantAccesses";
 
+	private final Converter<Map<String, Object>, Map<String, Object>> claimSetConverter;
+
 	public AuthorizationTokenGatewayFilterFactory() {
 		super(AuthorizationTokenGatewayFilterFactory.Config.class);
+		this.claimSetConverter = MappedJwtClaimSetConverter.withDefaults(Collections.emptyMap());
 	}
 
 	@Override
@@ -79,6 +91,11 @@ public class AuthorizationTokenGatewayFilterFactory
 				.filter((principal) -> (principal) instanceof JwtAuthenticationToken)
 				.cast(JwtAuthenticationToken.class)
 				.map(JwtAuthenticationToken::getToken)
+				.map((jwt) -> Optional.of(jwt))
+				// in case if there not Spring Security, find JWT manually
+				.defaultIfEmpty(extractBearer(exchange))
+				.filter(jwt -> jwt.isPresent())
+				.map(Optional::get)
 				.map((jwt) -> {
 					String issuerId = jwt.getClaimAsString(IdTokenClaimNames.ISS);
 					String clientId = jwt.getClaimAsString(IdTokenClaimNames.AZP);
@@ -126,6 +143,23 @@ public class AuthorizationTokenGatewayFilterFactory
 		};
 	}
 
+	/**
+	 * @param exchange
+	 * @return
+	 */
+	private Optional<Jwt> extractBearer(ServerWebExchange exchange) {
+		return exchange.getRequest()
+			.getHeaders()
+			.entrySet()
+			.stream()
+			.filter((entry) -> HttpHeaders.AUTHORIZATION.equals(entry.getKey()) && !entry.getValue().isEmpty())
+			.findFirst()
+			.map((entry) -> entry.getValue().get(0))
+			.filter((header) -> header.startsWith("Bearer "))
+			.map((s) -> s.replaceFirst("Bearer ", ""))
+			.flatMap(this::createJwt);
+	}
+
 	public boolean hasAuthority(Map<String, Object> claims, List<GrantAccess> grantAccesses) {
 		return grantAccesses.stream().allMatch((grantAccess) -> hasAuthority(claims, grantAccess));
 	}
@@ -168,6 +202,23 @@ public class AuthorizationTokenGatewayFilterFactory
 		}
 		final Collection<String> claimValuesFinal = claimValues;
 		return grantAccess.getRoles().stream().allMatch((value) -> claimValuesFinal.contains(value));
+	}
+
+	private Optional<Jwt> createJwt(String bearer) {
+		try {
+			JWT parsedJwt = JWTParser.parse(bearer);
+			JWTClaimsSet jwtClaimsSet = parsedJwt.getJWTClaimsSet();
+			Map<String, Object> headers = new LinkedHashMap<>(parsedJwt.getHeader().toJSONObject());
+			Map<String, Object> claims = this.claimSetConverter.convert(jwtClaimsSet.getClaims());
+			return Optional.of(Jwt.withTokenValue(parsedJwt.getParsedString())
+				.headers((h) -> h.putAll(headers))
+				.claims((c) -> c.putAll(claims))
+				.build());
+		}
+		catch (Exception ex) {
+			LOG.error("Error when parsing bearer", ex);
+			return Optional.empty();
+		}
 	}
 
 	@Validated
