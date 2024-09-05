@@ -4,5 +4,8 @@
   <em>Plugins for Spring Cloud Gateway.</em>
   <br>
 </p>
+<br>
+<hr>
+<br>
 
 # spring-cloud-gateway-plugins
