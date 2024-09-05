@@ -39,8 +39,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class RouteService {
 
-	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(RouteService.class);
-
 	private final RouteRepository routeRepository;
 
 	private final PredicateService predicateService;

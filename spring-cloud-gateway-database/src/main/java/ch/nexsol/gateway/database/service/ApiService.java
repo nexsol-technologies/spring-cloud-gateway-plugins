@@ -28,9 +28,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+/**
+ * This service translate Database Entities to API Models
+ */
 @Service
 public class ApiService {
 
@@ -42,15 +44,12 @@ public class ApiService {
 
 	private final ArgumentService argumentService;
 
-	private final ApplicationEventPublisher publisher;
-
 	public ApiService(RouteService routeService, PredicateService predicateService, FilterService filterService,
-			ArgumentService argumentService, ApplicationEventPublisher publisher) {
+			ArgumentService argumentService) {
 		this.routeService = routeService;
 		this.predicateService = predicateService;
 		this.filterService = filterService;
 		this.argumentService = argumentService;
-		this.publisher = publisher;
 	}
 
 	public Mono<RouteResponseModel> findById(Long id) {
