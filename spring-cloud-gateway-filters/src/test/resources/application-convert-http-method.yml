@@ -1,0 +1,17 @@
+spring.cloud.gateway:
+  routes:
+  - id: convert-http-method-post
+    uri: forward:/convert-http-method
+    predicates:
+    - Method=GET
+    - Host=www.converthttpmethod.ch
+    filters:
+    - ConvertHttpMethod=POST
+  - id: convert-http-method-get
+    uri: forward:/convert-http-method
+    predicates:
+    - Method=POST
+    - Host=www.converthttpmethod.ch
+    filters:
+    - ConvertHttpMethod=GET
+

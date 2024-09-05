@@ -1,0 +1,47 @@
+spring.cloud.gateway:
+  routes:
+  - id: validate-authorization-token
+    uri: ${test.uri}
+    predicates:
+    - Path=/authorization-token
+    filters:
+    - name: AuthorizationToken
+      args:
+        grant_accesses:
+        - jsonPath: "$.resource_access.*.roles"
+          roles: "role1"
+  - id: validate-authorization-token-all
+    uri: ${test.uri}
+    predicates:
+    - Path=/authorization-token-all
+    filters:
+    - name: AuthorizationToken
+      args:
+        issuers:
+        - https://nexsol.tech
+        clientIds:
+        - my-client
+        grant_accesses:
+        - jsonPath: '$.resource_access.*.roles'
+          roles: "role1"
+
+  - id: authorization-token-with-bad-grant-access
+    uri: ${test.uri}
+    predicates:
+    - Path=/authorization-token-with-bad-grant-access
+    filters:
+    - name: AuthorizationToken
+      args:
+        grant_accesses:
+        - jsonPath: '$.resource_access.*.roles'
+          roles: "__bad_role"
+
+  - id: authorization-token-with-bad-issuer
+    uri: ${test.uri}
+    predicates:
+    - Path=/authorization-token-with-bad-issuer
+    filters:
+    - name: AuthorizationToken
+      args:
+        issuers:
+        - http://bad.issuer.com

@@ -237,6 +237,9 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 
 	}
 
+	/**
+	 * recapatcha versions managed by the filter (And Google also).
+	 */
 	public enum Version {
 
 		V2, V3
@@ -249,6 +252,9 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 
 	}
 
+	/**
+	 * Documentation from : https://developers.google.com/recaptcha/docs/v3
+	 */
 	public static class RecaptchaResponseV2 implements RecaptchaResponseIdentifier {
 
 		/**
@@ -308,6 +314,9 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 
 	}
 
+	/**
+	 * Documentation from : https://developers.google.com/recaptcha/docs/v3
+	 */
 	public static class RecaptchaResponseV3 extends RecaptchaResponseV2 {
 
 		/**
