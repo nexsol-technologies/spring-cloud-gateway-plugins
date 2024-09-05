@@ -34,7 +34,7 @@
 		<maven.compiler.source>${java.version}</maven.compiler.source>
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 
-		<spring-boot.version>3.3.2</spring-boot.version>
+		<spring-boot.version>3.3.3</spring-boot.version>
 		<spring-cloud.version>2023.0.3</spring-cloud.version>
 		<revision>0.0.1-SNAPSHOT</revision>
 
@@ -74,6 +74,7 @@
 	<modules>
 		<module>spring-cloud-gateway-database</module>
 		<module>spring-cloud-gateway-filters</module>
+		<module>spring-cloud-gateway-oauth2</module>
 	</modules>
 
 	<dependencyManagement>
