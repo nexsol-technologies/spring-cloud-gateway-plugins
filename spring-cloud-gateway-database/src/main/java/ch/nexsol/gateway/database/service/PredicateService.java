@@ -30,7 +30,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
+import org.springframework.stereotype.Service;
 
+@Service
 public class PredicateService {
 
 	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(PredicateService.class);
