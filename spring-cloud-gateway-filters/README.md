@@ -78,3 +78,27 @@ spring.cloud.gateway:
     filters:
     - ConvertHttpMethod=POST
 ```
+
+
+### Recaptcha
+
+The filter `Recaptcha` validate a reCAPTCHA from Google.
+
+usage: 
+
+```yaml
+spring.cloud.gateway:
+  routes:
+  - id: test-recaptcha
+    uri: http://localhost:8080
+    predicates:
+    - Path=/test
+    filters:
+    - name: Recaptcha
+      args:
+        verify-url: the url of the site to validate the captcha.
+        version: # (optional) the version of reCAPTCHA : V2 or V3. Default is V3.
+        secretKey: # the secret key to use to validate captcha. It is generated at Google reCAPTCHA.
+        recaptcha-http-header: #(optional) where to retreive the captcha in the http header. Default is 'recaptcha'
+        score: # (optional) the minimal score to have for the request. (0 - 100). Default is '90'
+```

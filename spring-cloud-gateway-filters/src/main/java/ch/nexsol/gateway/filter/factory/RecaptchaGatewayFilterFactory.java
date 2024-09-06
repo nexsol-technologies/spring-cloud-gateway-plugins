@@ -189,7 +189,7 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 
 		@Min(0)
 		@Max(100)
-		private short score;
+		private short score = 90;
 
 		Class<?> getRecaptchaResponseVersion() {
 			return (this.getVersion() == Version.V3) ? RecaptchaResponseV3.class : RecaptchaResponseV2.class;
