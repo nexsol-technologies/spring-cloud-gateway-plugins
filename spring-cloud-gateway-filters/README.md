@@ -20,7 +20,7 @@ This project provides filters for Spring Cloud Gateway
 
 ### Authorization
 
-The filter `Authorization` validate Spring security `GrantedAuthority`, if Role Based Access Control (RBAC) is activated. 
+The filter `Authorization` validates Spring security `GrantedAuthority`, when Role Based Access Control (RBAC) is activated. 
 
 usage: 
 
@@ -39,8 +39,7 @@ spring.cloud.gateway:
 
 ### AuthorizationToken
 
-The filter `AuthorizationToken` validate a access token (JWT). The filter take the principal provide by Spring Security or directly in Authorization header. 
-The filter return http status 403 (Forbidden) if the token is not validated with the rules configured for the route. 
+The filter `AuthorizationToken` validates an access token (JWT). The filter takes the Principal provided by Spring Security or directly in the Authorization header. If the token is not validated with the rules configured for the route it will return http status 403 (Forbidden).
 
 usage: 
 
@@ -63,7 +62,7 @@ spring.cloud.gateway:
 
 ### ConvertHttpMethod
 
-The filter `ConvertHttpMethod` convert an http method to an other. ex GET to POST 
+The filter `ConvertHttpMethod` converts a http method to another. ex GET to POST
 
 usage: 
 
@@ -82,7 +81,8 @@ spring.cloud.gateway:
 
 ### Recaptcha
 
-The filter `Recaptcha` validate a reCAPTCHA from Google.
+The filter `Recaptcha` verifies and validates a CAPTCHA score using Google's reCAPTCHA.
+Useful to non authenticated AIP's, offering a simple layer of protection with CAPTCHA.
 
 usage: 
 
