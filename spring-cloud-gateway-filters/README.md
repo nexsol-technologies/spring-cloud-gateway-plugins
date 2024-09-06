@@ -8,11 +8,11 @@ This project provides filters for Spring Cloud Gateway
     </properties>
     
     <dependencies>
-		<dependency>
-			<groupId>ch.nexsol.gateway</groupId>
-			<artifactId>spring-cloud-gateway-filters</artifactId>
-			<version>${spring-cloud-gateway-plugins.version}</version>
-		</dependency>
+        <dependency>
+           <groupId>ch.nexsol.gateway</groupId>
+           <artifactId>spring-cloud-gateway-filters</artifactId>
+           <version>${spring-cloud-gateway-plugins.version}</version>
+        </dependency>
     </dependencies>
 ```
 
