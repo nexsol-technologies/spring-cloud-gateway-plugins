@@ -20,3 +20,6 @@ CREATE TABLE IF NOT EXISTS filter (
     args TEXT,
     FOREIGN KEY (route_ref_id) REFERENCES route(id) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS predicate_route_ref_id_idx ON predicate(route_ref_id);
+CREATE INDEX IF NOT EXISTS filter_route_ref_id_idx ON filter(route_ref_id);
