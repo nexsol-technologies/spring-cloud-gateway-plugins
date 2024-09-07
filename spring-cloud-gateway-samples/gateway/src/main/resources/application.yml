@@ -1,0 +1,67 @@
+server.port: 8181
+spring.application.name: gateway
+
+spring.cloud.gateway:
+  routes:
+  - id: test-authorization
+    uri: http://localhost:8080
+    predicates:
+    - Path=/test-authorization/sample
+    filters:
+    - name: Authorization
+      args:
+        authorities: READ
+    - RewritePath=/test-authorization/?(?<segment>.*), /$\{segment}
+
+  - id: test-authorization-token-OK
+    uri: http://localhost:8080
+    predicates:
+    - Path=/test-authorization-token/sample
+    filters:
+    - name: AuthorizationToken
+      args:
+        issuers: ''
+        client-ids:
+        grant-accesses:
+        - jsonPath: '$.roles'
+          roles: 'READ'
+    - RewritePath=/test-authorization-token/?(?<segment>.*), /$\{segment}
+
+  - id: test-authorization-token-KO
+    uri: http://localhost:8080
+    predicates:
+    - Path=/test-authorization-token-ko/sample
+    filters:
+    - name: AuthorizationToken
+      args:
+        issuers: 
+        client-ids:
+        grant-accesses:
+        - jsonPath: '$.roles'
+          roles: '_UNKNOWN_ROLE_'
+    - RewritePath=/test-authorization-token/?(?<segment>.*), /$\{segment}
+    
+    
+spring.r2dbc:
+  url: r2dbc:h2:mem:///test_db;MODE=PostgreSQL
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9090
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - '*'
+  endpoint:
+    gateway:
+      enabled: true
+
+logging:
+  level:
+    '[ch.nexsol]': debug
