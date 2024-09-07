@@ -7,7 +7,7 @@ spring.cloud.gateway:
     filters:
     - name: AuthorizationToken
       args:
-        grant_accesses:
+        grant-accesses:
         - jsonPath: "$.resource_access.*.roles"
           roles: "role1"
   - id: validate-authorization-token-all
@@ -19,9 +19,9 @@ spring.cloud.gateway:
       args:
         issuers:
         - https://nexsol.tech
-        clientIds:
+        client-ids:
         - my-client
-        grant_accesses:
+        grant-accesses:
         - jsonPath: '$.resource_access.*.roles'
           roles: "role1"
 
@@ -32,7 +32,7 @@ spring.cloud.gateway:
     filters:
     - name: AuthorizationToken
       args:
-        grant_accesses:
+        grant-accesses:
         - jsonPath: '$.resource_access.*.roles'
           roles: "__bad_role"
 
