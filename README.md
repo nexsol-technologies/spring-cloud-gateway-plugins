@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.jpg" alt="spring-cloud-gateway-plugins-logo"/>
+  <img src="logo.png" alt="spring-cloud-gateway-plugins-logo"/>
   <br>
   <em>Plugins for Spring Cloud Gateway.</em>
   <br>
