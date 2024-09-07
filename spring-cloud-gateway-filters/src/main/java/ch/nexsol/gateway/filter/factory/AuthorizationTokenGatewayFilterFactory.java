@@ -98,7 +98,8 @@ public class AuthorizationTokenGatewayFilterFactory
 				.map(Optional::get)
 				.map((jwt) -> {
 					String issuerId = jwt.getClaimAsString(IdTokenClaimNames.ISS);
-					String clientId = jwt.getClaimAsString(IdTokenClaimNames.AZP);
+					String clientId = Optional.ofNullable(jwt.getClaimAsString(IdTokenClaimNames.AZP))
+						.orElse(jwt.getClaimAsString(IdTokenClaimNames.AUD));
 					Route route = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
 					String routeId = UNKNOWN_VALUE;
 					if (route != null) {
@@ -107,33 +108,33 @@ public class AuthorizationTokenGatewayFilterFactory
 					if (config.checkIssuer()) {
 						if (!config.getIssuers().contains(issuerId)) {
 							LOG.debug(
-									"Authorization failed : route {} is not allowed for the client {} : issuer forbidden",
+									"Authorization Forbidden : route {} is not allowed for the client {} : issuer forbidden",
 									routeId, clientId);
 							throw new ResponseStatusException(HttpStatus.FORBIDDEN);
 						}
 						else {
-							LOG.debug("issuer authorized {}", issuerId);
+							LOG.trace("issuer authorized {}", issuerId);
 						}
 					}
 					if (config.checkClientId()) {
 						if (!config.getClientIds().contains(clientId)) {
-							LOG.debug("Authorization failed : route {} is not allowed for the client {}", routeId,
+							LOG.debug("Authorization Forbidden : route {} is not allowed for the client {}", routeId,
 									clientId);
 							throw new ResponseStatusException(HttpStatus.FORBIDDEN);
 						}
 						else {
-							LOG.debug("clientId authorized {}", clientId);
+							LOG.trace("clientId authorized {}", clientId);
 						}
 					}
 					if (config.checkGrantAccess()) {
 						if (!hasAuthority(jwt.getClaims(), config.getGrantAccesses())) {
 							LOG.debug(
-									"Authorization failed : route {} is not allowed for the client {} : resource access forbidden",
+									"Authorization Forbidden : route {} is not allowed for the client {} : resource access forbidden",
 									routeId, clientId);
 							throw new ResponseStatusException(HttpStatus.FORBIDDEN);
 						}
 						else {
-							LOG.debug("resource access authorized {}", config.getGrantAccesses());
+							LOG.trace("resource access authorized");
 						}
 					}
 					return exchange;
