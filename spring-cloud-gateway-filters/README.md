@@ -54,8 +54,8 @@ spring.cloud.gateway:
     - name: AuthorizationToken
       args:
         issuers: # (optional) List of issuers (iss) to validate
-        client_ids:  # (optional) List of client id (azp) to validate
-        grant_accesses: # (optional) List of roles to validate. If many grant_access is provided, it is an AND validation: The token MUST have all the rules
+        client-ids:  # (optional) List of client id (azp) to validate
+        grant-accesses: # (optional) List of roles to validate. If many grant_access is provided, it is an AND validation: The token MUST have all the rules
         - jsonPath: '$.resource_access.*.roles'
           roles: "role-1,role-2"
 ```
