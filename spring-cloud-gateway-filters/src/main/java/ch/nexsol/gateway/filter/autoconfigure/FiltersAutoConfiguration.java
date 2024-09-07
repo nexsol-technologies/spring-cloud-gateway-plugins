@@ -22,6 +22,7 @@ import ch.nexsol.gateway.filter.factory.ConvertHttpMethodGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.RecaptchaGatewayFilterFactory;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -46,6 +47,12 @@ public class FiltersAutoConfiguration {
 	@Bean
 	RecaptchaGatewayFilterFactory recaptchaGatewayFilterFactory(WebClient webClient) {
 		return new RecaptchaGatewayFilterFactory(webClient);
+	}
+
+	@Bean
+	@ConditionalOnMissingBean(WebClient.class)
+	WebClient webClientForRecaptcha(WebClient.Builder builder) {
+		return builder.build();
 	}
 
 }
