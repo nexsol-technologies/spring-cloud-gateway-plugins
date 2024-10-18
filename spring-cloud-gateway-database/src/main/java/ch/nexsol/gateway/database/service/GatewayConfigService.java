@@ -38,22 +38,34 @@ public class GatewayConfigService {
 
 	public Flux<CharSequence> getAvailablePredicates() {
 		return Flux.fromIterable(this.applicationContext.getBeansOfType(RoutePredicateFactory.class).values())
-			.map(factory -> factory.name());
+			.map((factory) -> factory.name());
 	}
 
 	public Flux<CharSequence> getAvailableFilters() {
 		return Flux.fromIterable(this.applicationContext.getBeansOfType(GatewayFilterFactory.class).values())
-			.map(factory -> factory.name());
+			.map((factory) -> factory.name());
 	}
 
 	public Flux<Map<String, Object>> getAvailablePredicatesWithArgs() {
 		return Flux.fromIterable(this.applicationContext.getBeansOfType(RoutePredicateFactory.class).values())
-			.map(factory -> Map.of("name", factory.name(), "args", factory.shortcutFieldOrder()));
+			.map((factory) -> Map.of("name", factory.name(), "args", factory.shortcutFieldOrder()));
 	}
 
 	public Flux<Map<String, Object>> getAvailableFiltersWithArgs() {
 		return Flux.fromIterable(this.applicationContext.getBeansOfType(GatewayFilterFactory.class).values())
-			.map(factory -> Map.of("name", factory.name(), "args", factory.shortcutFieldOrder()));
+			.map((factory) -> Map.of("name", factory.name(), "args", factory.shortcutFieldOrder()));
+	}
+
+	public Flux<CharSequence> getArgsForPredicate(String predicate) {
+		return Flux.fromIterable(this.applicationContext.getBeansOfType(RoutePredicateFactory.class).values())
+			.filter((factory) -> factory.name().equals(predicate))
+			.flatMapIterable((factory) -> factory.shortcutFieldOrder());
+	}
+
+	public Flux<CharSequence> getArgsForFilter(String filter) {
+		return Flux.fromIterable(this.applicationContext.getBeansOfType(GatewayFilterFactory.class).values())
+			.filter((factory) -> factory.name().equals(filter))
+			.flatMapIterable((factory) -> factory.shortcutFieldOrder());
 	}
 
 	public Mono<Boolean> validateFilter(String name, Map<String, String> args) {
