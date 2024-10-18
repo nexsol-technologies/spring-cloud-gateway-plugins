@@ -4,7 +4,10 @@ import java.util.List;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.cloud.gateway.config.GlobalCorsProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
@@ -14,6 +17,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.CorsWebFilter;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 
@@ -22,6 +28,21 @@ public class ApiGatewayApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(ApiGatewayApplication.class, args);
+	}
+
+	@Bean
+	@Order(Ordered.HIGHEST_PRECEDENCE)
+	@RefreshScope
+	CorsWebFilter corsWebFilter(CorsConfigurationSource corsConfigurationSource) {
+		return new CorsWebFilter(corsConfigurationSource);
+	}
+
+	@Bean
+	@RefreshScope
+	CorsConfigurationSource corsConfigurationSource(GlobalCorsProperties globalCorsProperties) {
+		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+		globalCorsProperties.getCorsConfigurations().forEach(source::registerCorsConfiguration);
+		return source;
 	}
 
 	@Bean
@@ -47,7 +68,12 @@ public class ApiGatewayApplication {
 		http.csrf(ServerHttpSecurity.CsrfSpec::disable);
 		http.authorizeExchange((spec) -> {
 			spec.pathMatchers("/actuator/**").permitAll();
-			spec.anyExchange().authenticated();
+			spec.pathMatchers("/ui/**").permitAll();
+			spec.pathMatchers("/api/gateway/**").permitAll();
+			spec.pathMatchers("/v3/api-docs", "/v3/api-docs/**", "/configuration/ui", "/swagger-resources/**",
+					"/configuration/security", "/swagger-ui.html", "/webjars/**", "/v3/api-docs/swagger-config")
+				.permitAll();
+			spec.anyExchange().permitAll();
 		});
 		http.oauth2ResourceServer((oauth2) -> oauth2.jwt(Customizer.withDefaults()));
 		return http.build();

@@ -76,6 +76,7 @@
 		<module>spring-cloud-gateway-database</module>
 		<module>spring-cloud-gateway-filters</module>
 		<module>spring-cloud-gateway-oauth2</module>
+		<module>spring-cloud-gateway-openapi</module>
 	</modules>
 
 	<dependencyManagement>
