@@ -130,6 +130,12 @@ public class RouteService {
 			.subscribeOn(Schedulers.boundedElastic());
 	}
 
+	public Mono<Void> deleteRoute(Long routeId) {
+		return this.findById(routeId)
+			.switchIfEmpty(Mono.error(new RouteNotFoundException()))
+			.flatMap(r -> this.routeRepository.deleteById(routeId));
+	}
+
 	private Function<RouteEntity, Mono<RouteEntity>> deletePredicates() {
 		return r -> this.predicateService.deleteByRouteId(r.getId()).map(__ -> r).switchIfEmpty(Mono.just(r));
 	}

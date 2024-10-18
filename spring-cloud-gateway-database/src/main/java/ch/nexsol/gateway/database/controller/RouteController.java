@@ -25,6 +25,7 @@ import reactor.core.publisher.Mono;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,8 +51,8 @@ public class RouteController {
 	}
 
 	@GetMapping("/{id}")
-	public Mono<RouteResponseModel> getRoute(@PathVariable Long id) {
-		return this.apiService.findById(id);
+	public Mono<ResponseEntity<RouteResponseModel>> getRoute(@PathVariable Long id) {
+		return this.apiService.findById(id).map(ResponseEntity::ok).defaultIfEmpty(ResponseEntity.notFound().build());
 	}
 
 	@PostMapping
@@ -63,6 +64,11 @@ public class RouteController {
 	public Mono<ResponseEntity<RouteResponseModel>> updateRoute(@PathVariable Long id,
 			@RequestBody @Valid RouteCreateModel routeModel) {
 		return this.apiService.updateRoute(id, routeModel).map(ResponseEntity::ok);
+	}
+
+	@DeleteMapping("/{id}")
+	public Mono<ResponseEntity<RouteResponseModel>> deleteRoute(@PathVariable Long id) {
+		return this.apiService.deleteRoute(id).then(Mono.just(ResponseEntity.ok().build()));
 	}
 
 }

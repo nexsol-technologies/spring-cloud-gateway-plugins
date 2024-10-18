@@ -78,6 +78,10 @@ public class ApiService {
 		return this.routeService.updateRoute(id, routeModel).flatMap(this::toRouteResponseModel);
 	}
 
+	public Mono<Void> deleteRoute(Long id) {
+		return this.routeService.deleteRoute(id);
+	}
+
 	private Mono<RouteResponseModel> toRouteResponseModel(RouteEntity route) {
 		return this.predicateService.findByRouteId(route.getId())
 			.flatMap(this::toPredicateResponseModel)
