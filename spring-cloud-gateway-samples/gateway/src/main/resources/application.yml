@@ -1,7 +1,18 @@
 server.port: 8181
 spring.application.name: gateway
 
+openapi.gateway.uri: http://localhost:${server.port}
+
 spring.cloud.gateway:
+  globalcors:
+    cors-configurations:
+      '[/**]':
+        allowedOrigins: '*'
+        allowedHeaders: '*'
+        allowedMethods:
+        - GET
+        - POST
+        - OPTIONS
   routes:
   - id: test-authorization
     uri: http://localhost:8080
@@ -65,3 +76,17 @@ management:
 logging:
   level:
     '[ch.nexsol]': debug
+---
+spring:
+  config:
+    activate:
+      on-profile:
+      - eureka
+eureka:
+  client:
+    enabled: true
+    fetch-registry: true
+spring.cloud.gateway:
+  discovery:
+    locator:
+      enabled: true
