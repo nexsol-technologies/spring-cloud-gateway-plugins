@@ -12,6 +12,13 @@ launch service-a: this will start a simple app with a controller.
 ### gateway
 launch gateway. in its application.yml some route are configured to test the filter provided in the spring-cloud-gateway-filters
 
+| Url | Description |
+| --- | --- |
 | http://localhost:8181/test-authorization/sample | the validation of a basic authentification |
 | http://localhost:8181/test-authorization-token/sample | the validation of jwt with 'user:user' is successful |
 | http://localhost:8181/test-authorization-token-ko/sample | the validation of jwt with 'user:user' is failed |
+
+### eureka
+launch Eureka service discovery to test SCGateway Openapi discovery with service-a.
+
+you need to run the gateway and service-a with the profile "eureka"
