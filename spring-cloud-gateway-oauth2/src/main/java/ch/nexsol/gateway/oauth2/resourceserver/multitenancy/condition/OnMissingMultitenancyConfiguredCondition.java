@@ -19,7 +19,7 @@ package ch.nexsol.gateway.oauth2.resourceserver.multitenancy.condition;
 import java.util.Collections;
 import java.util.List;
 
-import ch.nexsol.gateway.oauth2.resourceserver.multitenancy.ResourceServerMultiTenantProperties.OAuth2ResourceServerProperties;
+import ch.nexsol.gateway.oauth2.resourceserver.ResourceServerPluginsProperties.OAuth2ResourceServerProperties;
 
 import org.springframework.boot.autoconfigure.condition.ConditionMessage;
 import org.springframework.boot.autoconfigure.condition.ConditionOutcome;

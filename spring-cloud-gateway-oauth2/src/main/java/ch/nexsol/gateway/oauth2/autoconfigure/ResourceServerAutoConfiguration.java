@@ -16,8 +16,11 @@
 
 package ch.nexsol.gateway.oauth2.autoconfigure;
 
-import ch.nexsol.gateway.oauth2.resourceserver.DefaultJwtGrantedAuthoritiesConverter;
-import ch.nexsol.gateway.oauth2.resourceserver.multitenancy.ResourceServerMultiTenantProperties;
+import ch.nexsol.gateway.oauth2.resourceserver.ResourceServerPluginsProperties;
+import ch.nexsol.gateway.oauth2.resourceserver.authorities.ConfigurableJwtGrantedAuthoritiesConverter;
+import ch.nexsol.gateway.oauth2.resourceserver.authorities.DefaultJwtGrantedAuthoritiesConverter;
+import ch.nexsol.gateway.oauth2.resourceserver.authorities.condition.ConfigurableJwtGrantedAuthoritiesConfiguredCondition;
+import ch.nexsol.gateway.oauth2.resourceserver.authorities.condition.OnMissingConfigurableJwtGrantedAuthoritiesConfiguredCondition;
 import ch.nexsol.gateway.oauth2.resourceserver.multitenancy.TrustedIssuerJwtReactiveAuthenticationManagerResolver;
 import ch.nexsol.gateway.oauth2.resourceserver.multitenancy.condition.MultitenancyConfiguredCondition;
 import ch.nexsol.gateway.oauth2.resourceserver.multitenancy.condition.OnMissingMultitenancyConfiguredCondition;
@@ -26,7 +29,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.AllNestedConditions;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.IssuerUriCondition;
@@ -48,17 +50,23 @@ import org.springframework.web.server.ServerWebExchange;
 public class ResourceServerAutoConfiguration {
 
 	@Bean
-	@ConditionalOnMissingBean(Converter.class)
+	@Conditional(ConfigurableJwtGrantedAuthoritiesConfiguredCondition.class)
+	Converter<Jwt, AbstractAuthenticationToken> configurableJwtGrantedAuthoritiesConverter(
+			@Value("${spring.security.oauth2.resourceserver.name:${spring.application.name}}") String resourceName) {
+		return new ConfigurableJwtGrantedAuthoritiesConverter(null);
+	}
+
+	@Bean
+	@Conditional(OnMissingConfigurableJwtGrantedAuthoritiesConfiguredCondition.class)
 	Converter<Jwt, AbstractAuthenticationToken> defaultJwtGrantedAuthoritiesConverter(
-			@Value("${spring.application.name}") String resourceName) {
+			@Value("${spring.cloud.gateway.resourcename:${spring.application.name}}") String resourceName) {
 		return new DefaultJwtGrantedAuthoritiesConverter(resourceName);
 	}
 
 	@Bean
-	@Conditional(MultitenancyConfiguredCondition.class)
 	@ConfigurationProperties("spring.security.oauth2.resourceserver")
-	ResourceServerMultiTenantProperties defaultOAuth2ResourceServerMultiTenantProperties() {
-		return new ResourceServerMultiTenantProperties();
+	ResourceServerPluginsProperties resourceServerPluginsProperties() {
+		return new ResourceServerPluginsProperties();
 	}
 
 	@Configuration(proxyBeanMethods = false)
@@ -69,7 +77,7 @@ public class ResourceServerAutoConfiguration {
 		@Bean
 		@Conditional(MultitenancyConfiguredCondition.class)
 		ReactiveAuthenticationManagerResolver<ServerWebExchange> jwtIssuerReactiveAuthenticationManagerResolver(
-				ResourceServerMultiTenantProperties resourceServerMultiTenantProperties,
+				ResourceServerPluginsProperties resourceServerMultiTenantProperties,
 				DefaultJwtGrantedAuthoritiesConverter converter) {
 
 			return new JwtIssuerReactiveAuthenticationManagerResolver(

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.oauth2.resourceserver.multitenancy;
+package ch.nexsol.gateway.oauth2.resourceserver;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -29,12 +29,17 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.validation.annotation.Validated;
 
 @Validated
-public class ResourceServerMultiTenantProperties {
+public class ResourceServerPluginsProperties {
+
+	/**
+	 * List of json path for mapping to Spring Security GrantedAuthority
+	 */
+	@Valid
+	private JsonPathGrantedAuthorityProperties grantedAuthoritesMapping;
 
 	/**
 	 * List of multi-tenant
 	 */
-	@NotEmpty
 	@Valid
 	private List<@NotNull OAuth2ResourceServerProperties> multitenant = new ArrayList<>();
 
@@ -72,6 +77,14 @@ public class ResourceServerMultiTenantProperties {
 		return !this.multitenant.isEmpty();
 	}
 
+	public JsonPathGrantedAuthorityProperties getGrantedAuthoritesMapping() {
+		return this.grantedAuthoritesMapping;
+	}
+
+	public void setGrantedAuthoritesMapping(JsonPathGrantedAuthorityProperties grantedAuthoritesMapping) {
+		this.grantedAuthoritesMapping = grantedAuthoritesMapping;
+	}
+
 	public static class OAuth2ResourceServerProperties {
 
 		/**
@@ -83,7 +96,7 @@ public class ResourceServerMultiTenantProperties {
 		/**
 		 * the issuer uri of the tenant
 		 */
-		@NotEmpty
+		@NotNull
 		private URI issuerUri;
 
 		/**
@@ -112,6 +125,24 @@ public class ResourceServerMultiTenantProperties {
 		 */
 		public void setIssuerUri(URI issuerUri) {
 			this.issuerUri = issuerUri;
+		}
+
+	}
+
+	public static class JsonPathGrantedAuthorityProperties {
+
+		private List<String> jsonPath = new ArrayList<>();
+
+		public List<String> getJsonPath() {
+			return this.jsonPath;
+		}
+
+		public void setJsonPath(List<String> jsonPath) {
+			this.jsonPath = jsonPath;
+		}
+
+		public boolean isEnabledDefault() {
+			return this.jsonPath == null || this.jsonPath.isEmpty();
 		}
 
 	}

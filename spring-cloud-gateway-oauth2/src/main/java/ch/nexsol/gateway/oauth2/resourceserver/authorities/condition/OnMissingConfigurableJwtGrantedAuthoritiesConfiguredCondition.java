@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.oauth2.resourceserver.multitenancy.condition;
+package ch.nexsol.gateway.oauth2.resourceserver.authorities.condition;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
-import ch.nexsol.gateway.oauth2.resourceserver.ResourceServerPluginsProperties.OAuth2ResourceServerProperties;
+import ch.nexsol.gateway.oauth2.resourceserver.ResourceServerPluginsProperties.JsonPathGrantedAuthorityProperties;
 
 import org.springframework.boot.autoconfigure.condition.ConditionMessage;
 import org.springframework.boot.autoconfigure.condition.ConditionOutcome;
@@ -31,27 +30,29 @@ import org.springframework.context.annotation.ConditionContext;
 import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 
-public class MultitenancyConfiguredCondition extends SpringBootCondition {
+/**
+ * @author guerricmerle
+ */
+public class OnMissingConfigurableJwtGrantedAuthoritiesConfiguredCondition extends SpringBootCondition {
 
-	private static final Bindable<List<OAuth2ResourceServerProperties>> STRING_REGISTRATION_LIST = Bindable
-		.listOf(OAuth2ResourceServerProperties.class);
+	private static final Bindable<List<JsonPathGrantedAuthorityProperties>> STRING_REGISTRATION_LIST = Bindable
+		.listOf(JsonPathGrantedAuthorityProperties.class);
 
 	@Override
 	public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
-		ConditionMessage.Builder message = ConditionMessage.forCondition("OAUTH2 Multitenancy registered");
-		List<OAuth2ResourceServerProperties> registrations = getRegistrations(context.getEnvironment());
-		if (!registrations.isEmpty()) {
-			return ConditionOutcome.match(message.because(registrations.size() + " clients : "
-					+ registrations.stream()
-						.map(OAuth2ResourceServerProperties::getId)
-						.collect(Collectors.joining(", "))));
+		ConditionMessage.Builder message = ConditionMessage
+			.forCondition("ConfigurableJwtGrantedAuthorities registered");
+		List<JsonPathGrantedAuthorityProperties> registrations = getRegistrations(context.getEnvironment());
+		if (registrations.isEmpty()) {
+			return ConditionOutcome.match(message.because("no registered granted authorites mapping with jsonpath"));
 		}
-		return ConditionOutcome.noMatch(message.notAvailable(registrations.size() + " clients"));
+		return ConditionOutcome
+			.noMatch(message.because(registrations.size() + " granted authorites mapping with jsonpath registered"));
 	}
 
-	private List<OAuth2ResourceServerProperties> getRegistrations(Environment environment) {
+	private List<JsonPathGrantedAuthorityProperties> getRegistrations(Environment environment) {
 		return Binder.get(environment)
-			.bind("spring.security.oauth2.resourceserver.multitenant", STRING_REGISTRATION_LIST)
+			.bind("spring.security.oauth2.resourceserver.granted-authorites-mapping", STRING_REGISTRATION_LIST)
 			.orElse(Collections.emptyList());
 	}
 
