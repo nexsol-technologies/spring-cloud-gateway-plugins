@@ -20,6 +20,7 @@ import java.net.URI;
 import java.util.Set;
 
 import ch.nexsol.gateway.openapi.hub.OpenapiService;
+import ch.nexsol.gateway.openapi.hub.SpringDocOpenapiRoutes;
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
 import ch.nexsol.gateway.openapi.hub.filter.OpenapiModifyResponseBodyGatewayFilterFactory;
 import org.springdoc.core.properties.SwaggerUiConfigParameters;
@@ -27,16 +28,25 @@ import org.springdoc.core.properties.SwaggerUiConfigParameters;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
 import org.springframework.cloud.gateway.config.conditional.ConditionalOnEnabledFilter;
 import org.springframework.cloud.gateway.discovery.DiscoveryLocatorProperties;
 import org.springframework.cloud.gateway.filter.factory.rewrite.MessageBodyDecoder;
 import org.springframework.cloud.gateway.filter.factory.rewrite.MessageBodyEncoder;
+import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.codec.ServerCodecConfigurer;
 
 @AutoConfiguration
+@ConditionalOnProperty(prefix = "spring.cloud.gateway.openapi.hub.enabled", matchIfMissing = false)
 public class HubApiAutoConfiguration {
+
+	@Bean
+	SpringDocOpenapiRoutes springDocOpenapiRoutes(RouteLocator routeLocator,
+			SwaggerUiConfigParameters swaggerUiConfigParameters) {
+		return new SpringDocOpenapiRoutes(routeLocator, swaggerUiConfigParameters);
+	}
 
 	@Bean
 	@ConditionalOnClass(ReactiveDiscoveryClient.class)
@@ -47,9 +57,8 @@ public class HubApiAutoConfiguration {
 	@Bean
 	@ConditionalOnClass(ReactiveDiscoveryClient.class)
 	HubDiscoveryRouteLocator hubDiscoveryRouteLocator(ReactiveDiscoveryClient discoveryClient,
-			DiscoveryLocatorProperties properties, OpenapiService openapiService,
-			SwaggerUiConfigParameters swaggerUiConfigParameters) {
-		return new HubDiscoveryRouteLocator(discoveryClient, properties, openapiService, swaggerUiConfigParameters);
+			DiscoveryLocatorProperties properties, OpenapiService openapiService) {
+		return new HubDiscoveryRouteLocator(discoveryClient, properties, openapiService);
 	}
 
 	@Bean
