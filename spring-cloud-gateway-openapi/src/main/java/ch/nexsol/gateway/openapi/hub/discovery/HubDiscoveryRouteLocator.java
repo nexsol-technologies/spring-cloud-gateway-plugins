@@ -23,29 +23,23 @@ import java.util.Map;
 import ch.nexsol.gateway.openapi.hub.OpenapiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springdoc.core.models.GroupedOpenApi;
-import org.springdoc.core.properties.SwaggerUiConfigParameters;
 import reactor.core.publisher.Flux;
 
 import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
 import org.springframework.cloud.gateway.discovery.DiscoveryClientRouteDefinitionLocator;
 import org.springframework.cloud.gateway.discovery.DiscoveryLocatorProperties;
-import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
 import org.springframework.cloud.gateway.filter.FilterDefinition;
 import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinition;
-import org.springframework.context.event.EventListener;
 import org.springframework.util.StringUtils;
 
 public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLocator {
 
+	public static final String ROUTE_ID_PREFIX = "openapi-docs-discovery-";
+
 	private static final Logger LOG = LoggerFactory.getLogger(HubDiscoveryRouteLocator.class);
 
 	private static final String API_DOCS_URL = "/v3/api-docs";
-
-	private static final String ROUTE_ID_PREFIX = "openapi-docs-discovery-";
-
-	private final SwaggerUiConfigParameters swaggerUiConfigParameters;
 
 	private final OpenapiService openapiService;
 
@@ -53,10 +47,9 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 	private final String routeIdPrefix;
 
 	public HubDiscoveryRouteLocator(ReactiveDiscoveryClient discoveryClient, DiscoveryLocatorProperties properties,
-			OpenapiService openapiService, SwaggerUiConfigParameters swaggerUiConfigParameters) {
+			OpenapiService openapiService) {
 		super(discoveryClient, properties);
 		this.openapiService = openapiService;
-		this.swaggerUiConfigParameters = swaggerUiConfigParameters;
 
 		if (StringUtils.hasText(properties.getRouteIdPrefix())) {
 			this.routeIdPrefix = properties.getRouteIdPrefix();
@@ -110,20 +103,6 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 
 				return r;
 			});
-	}
-
-	@EventListener
-	public void handleContextStart(RefreshRoutesEvent event) {
-
-		this.swaggerUiConfigParameters.setUrls(new java.util.HashSet<>());
-		this.swaggerUiConfigParameters.addGroup("-- Choose --");
-
-		this.getRouteDefinitions().filter((route) -> route.getId().startsWith(ROUTE_ID_PREFIX)).doOnNext((route) -> {
-			String name = (String) route.getMetadata().get("name");
-			GroupedOpenApi.builder().pathsToMatch("/" + name + "/**").group(name).build();
-			this.swaggerUiConfigParameters.addGroup(name);
-		}).subscribe();
-
 	}
 
 }
