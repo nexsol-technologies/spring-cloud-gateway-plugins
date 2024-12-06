@@ -3,19 +3,20 @@
 ## Getting start
 
 ### auth-server
-launch auth-server: this will start an esay config of oauth2 authorization server.
-to log-in, use these two user:password : `user:user` with role 'USER'  or `admin:admin` with role 'ADMIN'
+Launch auth-server: this will start an esay config of oauth2 authorization server. 
+To log-in, use these two user:password : `user:user` with role 'USER'  or `admin:admin` with role 'ADMIN'
 
 ### eureka
-launch Eureka service discovery to test SCGateway Openapi discovery with service-a.
-
-you need to run the gateway and service-a with the profile "eureka"
+Launch Eureka service discovery to test SCGateway Openapi discovery with service-a.
 
 ### service-a
-launch service-a: this will start a simple app with a controller.
+Launch service-a: this will start a simple app with a controller.
 
 ### gateway
-launch gateway. in its application.yml some route are configured to test the filter provided in the spring-cloud-gateway-filters
+Launch gateway. 
+
+#### spring-cloud-gateway-filters
+In the application.yml some routes are configured to test the filters provided by the plugin
 
 | Url | Description |
 | --- | --- |
@@ -24,5 +25,12 @@ launch gateway. in its application.yml some route are configured to test the fil
 | http://localhost:8181/test-authorization-token-ko/sample | the validation of jwt with 'user:user' is failed |
 
 
+#### spring-cloud-gateway-openapi
+<i>For the demo, you need to run the gateway and service-a with the profile "eureka".</i>
+<br>
+To test, go to http://localhost:8181/swagger-ui.html and you should have access to swagger interface with SERVICE-A api's:
+<p align="center">
+  <img src="doc/spring-cloud-gateway-openapi.png" alt="spring-cloud-gateway-openapi" width="50%"/>
+</p>
 
 
