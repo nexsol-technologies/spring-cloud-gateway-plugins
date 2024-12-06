@@ -39,7 +39,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.codec.ServerCodecConfigurer;
 
 @AutoConfiguration
-@ConditionalOnProperty(prefix = "spring.cloud.gateway.openapi.hub.enabled", matchIfMissing = false)
+@ConditionalOnProperty(name = "spring.cloud.gateway.openapi.hub.enabled", havingValue = "true", matchIfMissing = false)
 public class HubApiAutoConfiguration {
 
 	@Bean
