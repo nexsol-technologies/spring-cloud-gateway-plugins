@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.oauth2.resourceserver.multitenancy;
 
+import ch.nexsol.gateway.oauth2.resourceserver.ResourceServerPluginsProperties;
 import reactor.core.publisher.Mono;
 
 import org.springframework.core.convert.converter.Converter;
@@ -48,12 +49,12 @@ public class ReactiveMultiTenant {
 
 	public static class ReactiveMultiTenantBuilder {
 
-		private ResourceServerMultiTenantProperties resourceServerMultiTenantProperties;
+		private ResourceServerPluginsProperties resourceServerMultiTenantProperties;
 
 		private Converter<Jwt, Mono<AbstractAuthenticationToken>> converter;
 
 		public ReactiveMultiTenantBuilder resourceServerMultiTenantProperties(
-				ResourceServerMultiTenantProperties resourceServerMultiTenantProperties) {
+				ResourceServerPluginsProperties resourceServerMultiTenantProperties) {
 			this.resourceServerMultiTenantProperties = resourceServerMultiTenantProperties;
 			return this;
 		}

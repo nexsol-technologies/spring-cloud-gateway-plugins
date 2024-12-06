@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.oauth2.resourceserver;
+package ch.nexsol.gateway.oauth2.resourceserver.authorities;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -24,6 +26,7 @@ import java.util.stream.Stream;
 
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
+import jakarta.validation.constraints.NotEmpty;
 
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -38,33 +41,15 @@ import org.springframework.util.StringUtils;
 /**
  * Default JWT granted authorities converter.
  */
-public class DefaultJwtGrantedAuthoritiesConverter implements Converter<Jwt, AbstractAuthenticationToken> {
+public class ConfigurableJwtGrantedAuthoritiesConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
-	private static final String JSONPATH_KEYCLOAK_REALM_ACCESS = "$.realm_access.roles";
-
-	private static final String JSONPATH_KEYCLOAK_RESOURCE_ACCESS_START = "$.resource_access.";
-
-	private static final String JSONPATH_KEYCLOAK_RESOURCE_ACCESS_END = ".roles";
-
-	private static final String JSONPATH_PERMISSIONS_ROLES = "$.permissions";
-
-	private static final String JSONPATH_DEFAULT_ROLES = "$.roles";
-
-	private final String jsonPathKeycloakResourceAccess;
+	private final List<JsonPath> jsonPath;
 
 	private final JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
 
-	private final String keycloakResourceName;
-
-	public DefaultJwtGrantedAuthoritiesConverter(String resourceName) {
-		this.keycloakResourceName = resourceName;
-		if (resourceName != null) {
-			this.jsonPathKeycloakResourceAccess = JSONPATH_KEYCLOAK_RESOURCE_ACCESS_START + this.keycloakResourceName
-					+ JSONPATH_KEYCLOAK_RESOURCE_ACCESS_END;
-		}
-		else {
-			this.jsonPathKeycloakResourceAccess = "";
-		}
+	public ConfigurableJwtGrantedAuthoritiesConverter(@NotEmpty List<@NotEmpty String> jsonPaths) {
+		this.jsonPath = jsonPaths != null ? jsonPaths.stream().map((jsonPath) -> JsonPath.compile(jsonPath)).toList()
+				: Collections.emptyList();
 	}
 
 	@Override
@@ -83,8 +68,7 @@ public class DefaultJwtGrantedAuthoritiesConverter implements Converter<Jwt, Abs
 	}
 
 	private Collection<? extends GrantedAuthority> extractResourceRoles(Jwt jwt) {
-		return this.getByJsonPath(jwt.getClaims(), JSONPATH_KEYCLOAK_REALM_ACCESS, this.jsonPathKeycloakResourceAccess,
-				JSONPATH_PERMISSIONS_ROLES, JSONPATH_DEFAULT_ROLES);
+		return this.getByJsonPath(jwt.getClaims(), this.jsonPath.toArray(new String[] {}));
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
