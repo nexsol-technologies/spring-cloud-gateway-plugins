@@ -82,7 +82,7 @@ spring.cloud.gateway:
 ### Recaptcha
 
 The filter `Recaptcha` verifies and validates a CAPTCHA score using Google's reCAPTCHA.
-Useful to non authenticated AIP's, offering a simple layer of protection with CAPTCHA.
+Useful to non authenticated API's, offering a simple layer of protection with CAPTCHA.
 
 usage: 
 
