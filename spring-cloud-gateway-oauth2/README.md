@@ -30,7 +30,7 @@ Search in access token these claims to create GrantedAuthority :
 | `$.roles`                    |  | 
 
 
-### Custom configurable converte
+### Configurable converter
 You can't declare your own paths to find claims in Jwt to extract Spring Security GrantedAuthority.
 ```yaml
 spring:
