@@ -30,13 +30,10 @@ import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
 import org.springframework.cloud.gateway.route.RouteDefinitionRouteLocator;
 import org.springframework.cloud.gateway.support.ConfigurationService;
-import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
 @Service
 public class GatewayConfigService {
-
-	private final ApplicationContext applicationContext;
 
 	private final ConfigurationService configurationService;
 
@@ -46,9 +43,8 @@ public class GatewayConfigService {
 
 	private final Map<String, GatewayFilterFactory> gatewayFilterFactories = new HashMap<>();
 
-	public GatewayConfigService(ApplicationContext applicationContext, ConfigurationService configurationService,
-			List<GatewayFilterFactory> gatewayFilters, List<RoutePredicateFactory> predicates) {
-		this.applicationContext = applicationContext;
+	public GatewayConfigService(ConfigurationService configurationService, List<GatewayFilterFactory> gatewayFilters,
+			List<RoutePredicateFactory> predicates) {
 		this.configurationService = configurationService;
 		gatewayFilters.forEach(factory -> this.gatewayFilterFactories.put(factory.name(), factory));
 		predicates.forEach(factory -> this.predicates.put(factory.name(), factory));
