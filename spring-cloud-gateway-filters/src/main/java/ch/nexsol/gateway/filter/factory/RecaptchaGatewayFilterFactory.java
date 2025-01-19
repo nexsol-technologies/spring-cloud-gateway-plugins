@@ -24,6 +24,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import org.springframework.cloud.gateway.filter.GatewayFilter;
@@ -46,7 +48,7 @@ import static ch.nexsol.gateway.filter.common.Constants.HTTP_SCHEME;
 
 public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<RecaptchaGatewayFilterFactory.Config> {
 
-	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(RecaptchaGatewayFilterFactory.class);
+	private static final Logger LOG = LoggerFactory.getLogger(RecaptchaGatewayFilterFactory.class);
 
 	/**
 	 * VerifyUrl key.

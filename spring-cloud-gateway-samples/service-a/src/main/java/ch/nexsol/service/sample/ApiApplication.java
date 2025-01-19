@@ -1,5 +1,7 @@
 package ch.nexsol.service.sample;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.http.HttpStatus;
@@ -15,7 +17,6 @@ import org.springframework.web.server.ServerWebInputException;
 
 @SpringBootApplication
 public class ApiApplication {
-
 	public static void main(String[] args) {
 		SpringApplication.run(ApiApplication.class, args);
 	}
@@ -32,8 +33,7 @@ public class ApiApplication {
 	@ControllerAdvice
 	public class ConstraintViolationExceptionHandler {
 
-		private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory
-			.getLogger(ConstraintViolationExceptionHandler.class);
+		private static final Logger LOG = LoggerFactory.getLogger(ConstraintViolationExceptionHandler.class);
 
 		public ConstraintViolationExceptionHandler() {
 			LOG.info("Initialize default @ControllerAdvice");

@@ -20,6 +20,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import jakarta.validation.constraints.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import org.springframework.cloud.gateway.filter.GatewayFilter;
@@ -30,8 +32,7 @@ import org.springframework.validation.annotation.Validated;
 public class ConvertHttpMethodGatewayFilterFactory
 		extends AbstractGatewayFilterFactory<ConvertHttpMethodGatewayFilterFactory.Config> {
 
-	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory
-		.getLogger(ConvertHttpMethodGatewayFilterFactory.class);
+	private static final Logger LOG = LoggerFactory.getLogger(ConvertHttpMethodGatewayFilterFactory.class);
 
 	private static final String REPLACEMENT_KEY = "replacement";
 

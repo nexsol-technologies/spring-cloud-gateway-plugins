@@ -33,6 +33,8 @@ import com.nimbusds.jwt.JWTParser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
@@ -54,8 +56,7 @@ import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.G
 public class AuthorizationTokenGatewayFilterFactory
 		extends AbstractGatewayFilterFactory<AuthorizationTokenGatewayFilterFactory.Config> {
 
-	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory
-		.getLogger(AuthorizationTokenGatewayFilterFactory.class);
+	private static final Logger LOG = LoggerFactory.getLogger(AuthorizationTokenGatewayFilterFactory.class);
 
 	/**
 	 * Issuers key.
