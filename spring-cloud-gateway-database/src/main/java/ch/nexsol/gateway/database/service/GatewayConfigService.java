@@ -16,14 +16,20 @@
 
 package ch.nexsol.gateway.database.service;
 
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import org.springframework.boot.context.properties.bind.BindException;
 import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
+import org.springframework.cloud.gateway.route.RouteDefinitionRouteLocator;
+import org.springframework.cloud.gateway.support.ConfigurationService;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
@@ -32,38 +38,50 @@ public class GatewayConfigService {
 
 	private final ApplicationContext applicationContext;
 
-	public GatewayConfigService(ApplicationContext applicationContext) {
+	private final ConfigurationService configurationService;
+
+	private RouteDefinitionRouteLocator routeDefinitionRouteLocator;
+
+	private final Map<String, RoutePredicateFactory> predicates = new LinkedHashMap<>();
+
+	private final Map<String, GatewayFilterFactory> gatewayFilterFactories = new HashMap<>();
+
+	public GatewayConfigService(ApplicationContext applicationContext, ConfigurationService configurationService,
+			List<GatewayFilterFactory> gatewayFilters, List<RoutePredicateFactory> predicates) {
 		this.applicationContext = applicationContext;
+		this.configurationService = configurationService;
+		gatewayFilters.forEach(factory -> this.gatewayFilterFactories.put(factory.name(), factory));
+		predicates.forEach(factory -> this.predicates.put(factory.name(), factory));
 	}
 
 	public Flux<CharSequence> getAvailablePredicates() {
-		return Flux.fromIterable(this.applicationContext.getBeansOfType(RoutePredicateFactory.class).values())
-			.map((factory) -> factory.name());
+		return Flux.fromIterable(this.predicates.values()).map((factory) -> factory.name());
 	}
 
 	public Flux<CharSequence> getAvailableFilters() {
-		return Flux.fromIterable(this.applicationContext.getBeansOfType(GatewayFilterFactory.class).values())
-			.map((factory) -> factory.name());
+		return Flux.fromIterable(this.gatewayFilterFactories.values()).map((factory) -> factory.name());
 	}
 
 	public Flux<Map<String, Object>> getAvailablePredicatesWithArgs() {
-		return Flux.fromIterable(this.applicationContext.getBeansOfType(RoutePredicateFactory.class).values())
-			.map((factory) -> Map.of("name", factory.name(), "args", factory.shortcutFieldOrder()));
+		return Flux.fromIterable(this.predicates.values())
+			.map((factory) -> Map.of("name", factory.name(), "args", factory.shortcutFieldOrder()))
+			.sort(Comparator.comparing(map -> (String) map.get("name")));
 	}
 
 	public Flux<Map<String, Object>> getAvailableFiltersWithArgs() {
-		return Flux.fromIterable(this.applicationContext.getBeansOfType(GatewayFilterFactory.class).values())
-			.map((factory) -> Map.of("name", factory.name(), "args", factory.shortcutFieldOrder()));
+		return Flux.fromIterable(this.gatewayFilterFactories.values())
+			.map((factory) -> Map.of("name", factory.name(), "args", factory.shortcutFieldOrder()))
+			.sort(Comparator.comparing(map -> (String) map.get("name")));
 	}
 
 	public Flux<CharSequence> getArgsForPredicate(String predicate) {
-		return Flux.fromIterable(this.applicationContext.getBeansOfType(RoutePredicateFactory.class).values())
+		return Flux.fromIterable(this.predicates.values())
 			.filter((factory) -> factory.name().equals(predicate))
 			.flatMapIterable((factory) -> factory.shortcutFieldOrder());
 	}
 
 	public Flux<CharSequence> getArgsForFilter(String filter) {
-		return Flux.fromIterable(this.applicationContext.getBeansOfType(GatewayFilterFactory.class).values())
+		return Flux.fromIterable(this.gatewayFilterFactories.values())
 			.filter((factory) -> factory.name().equals(filter))
 			.flatMapIterable((factory) -> factory.shortcutFieldOrder());
 	}
@@ -84,6 +102,9 @@ public class GatewayConfigService {
 	}
 
 	public Mono<Boolean> validatePredicate(String name, Map<String, String> args) {
+		if (!this.predicates.containsKey(name)) {
+			return Mono.error(new PredicateNotFoundException(name));
+		}
 		return this.getAvailablePredicatesWithArgs()
 			.filter(predicate -> predicate.get("name").equals(name))
 			.next() // Récupère le premier (et unique) élément correspondant
@@ -92,7 +113,19 @@ public class GatewayConfigService {
 				var validArgs = (List<String>) predicate.get("args");
 				return Mono.just(validArgs.stream().allMatch(a -> args.keySet().contains(a)));
 			})
-			.defaultIfEmpty(false); // Si aucun prédicat trouvé avec ce nom, renvoie false
+			.map((isValid) -> {
+				if (isValid) {
+					try {
+						RoutePredicateFactory factory = this.predicates.get(name);
+						this.configurationService.with(factory).name(name).properties(args).bind();
+					}
+					catch (BindException ex) {
+						throw new PredicateArgsFormatException(ex.getMessage());
+					}
+					return true;
+				}
+				return false;
+			});
 	}
 
 }

@@ -17,6 +17,8 @@
 package ch.nexsol.gateway.database.controller.error;
 
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +32,7 @@ import org.springframework.web.server.ServerWebInputException;
 // @ConditionalOnMissingBean(annotation = ControllerAdvice.class)
 public class ControllerExceptionHandler {
 
-	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(ControllerExceptionHandler.class);
+	private static final Logger LOG = LoggerFactory.getLogger(ControllerExceptionHandler.class);
 
 	public ControllerExceptionHandler() {
 		LOG.info("Initialize default @ControllerAdvice");

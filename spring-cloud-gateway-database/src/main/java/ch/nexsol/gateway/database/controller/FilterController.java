@@ -22,6 +22,7 @@ import ch.nexsol.gateway.database.service.GatewayConfigService;
 import reactor.core.publisher.Flux;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,6 +39,11 @@ public class FilterController {
 	@GetMapping(path = "/available-filters")
 	public Flux<Map<String, Object>> getAvailableFiltersWithArgs() {
 		return this.gatewayConfigService.getAvailableFiltersWithArgs();
+	}
+
+	@GetMapping(path = "/available-filters/{filter}/args")
+	public Flux<CharSequence> getArgs(@PathVariable() String filter) {
+		return this.gatewayConfigService.getArgsForFilter(filter);
 	}
 
 }

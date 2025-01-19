@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,12 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.database.repository;
+package ch.nexsol.gateway.database.service;
 
-import ch.nexsol.gateway.database.entity.RouteEntity;
-import reactor.core.publisher.Mono;
+public class PredicateNotFoundException extends RuntimeException {
 
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
-
-public interface RouteRepository extends ReactiveCrudRepository<RouteEntity, Long> {
-
-	Mono<RouteEntity> findByRouteId(String routeId);
-
-	Mono<Boolean> existsByRouteId(String routeId);
+	public PredicateNotFoundException(String name) {
+		super(name + " does't exist");
+	}
 
 }

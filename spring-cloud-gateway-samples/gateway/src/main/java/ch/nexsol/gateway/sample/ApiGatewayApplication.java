@@ -2,6 +2,8 @@ package ch.nexsol.gateway.sample;
 
 import java.util.List;
 
+import reactor.core.publisher.Hooks;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
@@ -27,6 +29,7 @@ import static org.springframework.security.config.Customizer.withDefaults;
 public class ApiGatewayApplication {
 
 	public static void main(String[] args) {
+		Hooks.onOperatorDebug();
 		SpringApplication.run(ApiGatewayApplication.class, args);
 	}
 

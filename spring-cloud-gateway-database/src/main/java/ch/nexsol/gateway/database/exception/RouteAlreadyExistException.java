@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2019-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.database.repository;
+package ch.nexsol.gateway.database.exception;
 
-import ch.nexsol.gateway.database.entity.RouteEntity;
-import reactor.core.publisher.Mono;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+@ResponseStatus(code = HttpStatus.CONFLICT)
+public class RouteAlreadyExistException extends RuntimeException {
 
-public interface RouteRepository extends ReactiveCrudRepository<RouteEntity, Long> {
-
-	Mono<RouteEntity> findByRouteId(String routeId);
-
-	Mono<Boolean> existsByRouteId(String routeId);
+	public RouteAlreadyExistException() {
+		super();
+	}
 
 }

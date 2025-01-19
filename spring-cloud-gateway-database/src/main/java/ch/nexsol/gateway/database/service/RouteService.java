@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.function.Function;
 
 import ch.nexsol.gateway.database.entity.RouteEntity;
+import ch.nexsol.gateway.database.exception.RouteAlreadyExistException;
 import ch.nexsol.gateway.database.exception.RouteNotFoundException;
 import ch.nexsol.gateway.database.model.RouteCreateModel;
 import ch.nexsol.gateway.database.repository.RouteRepository;
@@ -96,16 +97,27 @@ public class RouteService {
 	}
 
 	public Mono<RouteEntity> createRoute(@Valid RouteCreateModel routeModel) {
-		return Mono
-			.zip(this.predicateService.validatePredicatesArgs(routeModel.predicates()),
-					this.filterService.validateFiltersArgs(routeModel.filters()))
-			.flatMap(__ -> {
-				RouteEntity routeEntity = new RouteEntity();
-				routeEntity.setRouteId(routeModel.routeId());
-				routeEntity.setUri(routeModel.uri().toASCIIString());
-				routeEntity.setOrder(routeModel.order());
-				return this.save(routeEntity).flatMap(createPredicates(routeModel)).flatMap(createFilters(routeModel));
-			})
+		return this.routeRepository.existsByRouteId(routeModel.routeId()).flatMap(exists -> {
+			if (exists) {
+				return Mono.error(new RouteAlreadyExistException());
+			}
+			else {
+				return Mono
+					.zip(this.predicateService.validatePredicatesArgs(routeModel.predicates()),
+							this.filterService.validateFiltersArgs(routeModel.filters()))
+					.flatMap(tuple -> {
+						// Crée l'entité après validation des arguments
+						RouteEntity routeEntity = new RouteEntity();
+						routeEntity.setRouteId(routeModel.routeId());
+						routeEntity.setUri(routeModel.uri().toASCIIString());
+						routeEntity.setOrder(routeModel.order());
+
+						return this.save(routeEntity)
+							.flatMap(createPredicates(routeModel))
+							.flatMap(createFilters(routeModel));
+					});
+			}
+		})
 			.doOnNext(routeEntity -> this.publisher.publishEvent(new RefreshRoutesEvent(this)))
 			.subscribeOn(Schedulers.boundedElastic());
 	}
