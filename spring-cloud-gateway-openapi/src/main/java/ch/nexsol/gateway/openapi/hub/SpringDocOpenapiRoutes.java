@@ -16,8 +16,12 @@
 
 package ch.nexsol.gateway.openapi.hub;
 
-import org.springdoc.core.models.GroupedOpenApi;
-import org.springdoc.core.properties.SwaggerUiConfigParameters;
+import java.util.HashSet;
+import java.util.Set;
+
+import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
+import org.springdoc.core.properties.AbstractSwaggerUiConfigProperties.SwaggerUrl;
+import org.springdoc.core.properties.SwaggerUiConfigProperties;
 
 import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
 import org.springframework.cloud.gateway.route.RouteLocator;
@@ -29,25 +33,22 @@ public class SpringDocOpenapiRoutes {
 
 	private final RouteLocator routeLocator;
 
-	private final SwaggerUiConfigParameters swaggerUiConfigParameters;
+	private SwaggerUiConfigProperties swaggerUiConfigProperties;
 
-	public SpringDocOpenapiRoutes(RouteLocator routeLocator, SwaggerUiConfigParameters swaggerUiConfigParameters) {
+	public SpringDocOpenapiRoutes(RouteLocator routeLocator, SwaggerUiConfigProperties swaggerUiConfigProperties) {
 		this.routeLocator = routeLocator;
-		this.swaggerUiConfigParameters = swaggerUiConfigParameters;
+		this.swaggerUiConfigProperties = swaggerUiConfigProperties;
 	}
 
 	@EventListener
 	public void handleContextStart(RefreshRoutesEvent event) {
-
-		this.swaggerUiConfigParameters.setUrls(new java.util.HashSet<>());
-		this.swaggerUiConfigParameters.addGroup("-- Choose --");
-
+		Set<SwaggerUrl> urls = new HashSet<>();
 		this.routeLocator.getRoutes().filter((route) -> route.getId().startsWith(ROUTE_ID_PREFIX)).doOnNext((route) -> {
 			String name = (String) route.getMetadata().get("name");
-			GroupedOpenApi.builder().pathsToMatch("/" + name + "/**").group(name).build();
-			this.swaggerUiConfigParameters.addGroup(name);
+			SwaggerUrl swaggerUrl = new SwaggerUrl(name, HubDiscoveryRouteLocator.API_DOCS_URL + "/" + name, null);
+			urls.add(swaggerUrl);
 		}).subscribe();
-
+		this.swaggerUiConfigProperties.setUrls(urls);
 	}
 
 }
