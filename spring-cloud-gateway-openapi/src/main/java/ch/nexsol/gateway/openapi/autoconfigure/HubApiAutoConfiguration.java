@@ -23,7 +23,7 @@ import ch.nexsol.gateway.openapi.hub.OpenapiService;
 import ch.nexsol.gateway.openapi.hub.SpringDocOpenapiRoutes;
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
 import ch.nexsol.gateway.openapi.hub.filter.OpenapiModifyResponseBodyGatewayFilterFactory;
-import org.springdoc.core.properties.SwaggerUiConfigParameters;
+import org.springdoc.core.properties.SwaggerUiConfigProperties;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -44,8 +44,8 @@ public class HubApiAutoConfiguration {
 
 	@Bean
 	SpringDocOpenapiRoutes springDocOpenapiRoutes(RouteLocator routeLocator,
-			SwaggerUiConfigParameters swaggerUiConfigParameters) {
-		return new SpringDocOpenapiRoutes(routeLocator, swaggerUiConfigParameters);
+			SwaggerUiConfigProperties swaggerUiConfigProperties) {
+		return new SpringDocOpenapiRoutes(routeLocator, swaggerUiConfigProperties);
 	}
 
 	@Bean

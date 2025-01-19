@@ -39,7 +39,7 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 
 	private static final Logger LOG = LoggerFactory.getLogger(HubDiscoveryRouteLocator.class);
 
-	private static final String API_DOCS_URL = "/v3/api-docs";
+	public static final String API_DOCS_URL = "/v3/api-docs";
 
 	private final OpenapiService openapiService;
 
