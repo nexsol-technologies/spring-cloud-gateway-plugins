@@ -20,6 +20,8 @@ import ch.nexsol.gateway.database.model.RouteCreateModel;
 import ch.nexsol.gateway.database.model.RouteResponseModel;
 import ch.nexsol.gateway.database.service.ApiService;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -39,6 +41,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 public class RouteController {
 
+	private static final Logger LOG = LoggerFactory.getLogger(RouteController.class);
+
 	private final ApiService apiService;
 
 	public RouteController(ApiService apiService) {
@@ -57,13 +61,17 @@ public class RouteController {
 
 	@PostMapping
 	public Mono<ResponseEntity<RouteResponseModel>> createRoute(@RequestBody @Valid RouteCreateModel routeModel) {
-		return this.apiService.createRoute(routeModel).map(ResponseEntity::ok);
+		return this.apiService.createRoute(routeModel)
+			.map(ResponseEntity::ok)
+			.doOnError((error) -> LOG.error(error.getMessage(), error));
 	}
 
 	@PutMapping("/{id}")
 	public Mono<ResponseEntity<RouteResponseModel>> updateRoute(@PathVariable Long id,
 			@RequestBody @Valid RouteCreateModel routeModel) {
-		return this.apiService.updateRoute(id, routeModel).map(ResponseEntity::ok);
+		return this.apiService.updateRoute(id, routeModel)
+			.map(ResponseEntity::ok)
+			.doOnError((error) -> LOG.error(error.getMessage(), error));
 	}
 
 	@DeleteMapping("/{id}")

@@ -26,6 +26,8 @@ import ch.nexsol.gateway.database.exception.FiltersNotValidException;
 import ch.nexsol.gateway.database.model.FilterCreateModel;
 import ch.nexsol.gateway.database.repository.FilterRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -33,7 +35,7 @@ import org.springframework.cloud.gateway.filter.FilterDefinition;
 
 public class FilterService {
 
-	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(FilterService.class);
+	private static final Logger LOG = LoggerFactory.getLogger(FilterService.class);
 
 	private final GatewayConfigService gatewayConfigService;
 

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestion des Routes</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/flowbite@1.6.0/dist/flowbite.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/flowbite@1.6.0/dist/flowbite.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+	<div id="app" class="container mx-auto p-6">
+	  <!-- Page Header -->
+	  <header class="mb-6">
+	    <h1 class="text-3xl font-extrabold text-gray-900">Routes Management</h1>
+	    <p class="text-gray-600">Manage your routes dynamically with efficiency.</p>
+	  </header>
+
+	  <!-- Layout en Grid -->
+	  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+	    <!-- Liste des Routes -->
+		<section>
+		  <div class="bg-white shadow-md rounded-lg p-6">
+		    <h2 class="text-xl font-semibold text-gray-800 mb-4">Existing routes</h2>
+		    <div v-if="routes.length > 0" class="grid gap-6">
+				<div 
+				  v-for="route in routes" 
+				  :key="route.id" 
+				  class="bg-gray-50 border border-gray-200 rounded-lg shadow-md p-4 transition-transform transform hover:scale-105"
+				>
+				  <div class="flex justify-between items-center mb-3">
+				    <!-- Titre de la route -->
+				    <h3 class="text-lg font-medium text-gray-900">{{ route.routeId }}</h3>
+				    <!-- Boutons -->
+				    <div class="flex gap-2">
+				      <button @click="loadRouteForEditing(route.id)" class="px-4 py-2 text-white bg-blue-500 hover:bg-blue-600 rounded-md">
+				        Edit
+				      </button>
+				      <button @click="deleteRoute(route.id)" class="px-4 py-2 text-white bg-red-500 hover:bg-red-600 rounded-md">
+				        Delete
+				      </button>
+				    </div>
+				  </div>
+
+				  <!-- URI et ordre -->
+				  <p class="text-sm text-gray-500">URI: {{ route.uri }} / order: {{ route.order }}</p>
+
+				  <!-- Prédicats -->
+				  <div class="mb-2">
+				    <span class="font-semibold text-gray-800">Predicates:</span>
+				    <ul class="list-disc pl-5">
+				      <li v-for="(predicate, index) in route.predicates" :key="'predicate-' + index" class="text-sm text-gray-600">
+				        {{ predicate.name }} : {{ predicate.args }}
+				      </li>
+				    </ul>
+				  </div>
+
+				  <!-- Filtres -->
+				  <div class="mb-2">
+				    <span class="font-semibold text-gray-800">Filters:</span>
+				    <ul class="list-disc pl-5">
+				      <li v-for="(filter, index) in route.filters" :key="'filter-' + index" class="text-sm text-gray-600">
+				        {{ filter.name }} : {{ filter.args }}
+				      </li>
+				    </ul>
+				  </div>
+				</div>
+
+		    </div>
+		    <p v-else class="text-gray-500">No route configured.</p>
+		  </div>
+		</section>
+
+
+	    <!-- Formulaire de Création/Édition -->
+	    <section>
+	      <div class="bg-white shadow-md rounded-lg p-6">
+	        <h2 class="text-xl font-semibold text-gray-800 mb-4">
+	          {{ isEditing ? 'Edit route' : 'Create a new route' }}
+	        </h2>
+	        <form @submit.prevent="isEditing ? updateRoute() : createRoute()">
+	          <!-- Route Name -->
+	          <div class="mb-4">
+	            <label for="routeName" class="block text-sm font-medium text-gray-700">Name</label>
+	            <input id="routeName" v-model="newRoute.routeId" type="text" required
+	              class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+	          </div>
+
+	          <!-- Route URI -->
+	          <div class="mb-4">
+	            <label for="routePath" class="block text-sm font-medium text-gray-700">URI</label>
+	            <input id="routePath" v-model="newRoute.uri" type="text" required
+	              class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+	          </div>
+			  <!-- Route order -->
+  	          <div class="mb-4">
+  	            <label for="routeName" class="block text-sm font-medium text-gray-700">Order</label>
+  	            <input id="routeName" v-model="newRoute.order" type="text" required
+  	              class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+  	          </div>
+
+	          <!-- Prédicats -->
+	          <div class="mb-6">
+	            <h3 class="text-lg font-semibold text-gray-800">Predicates</h3>
+	            <div v-for="(predicate, index) in newRoute.predicates" :key="index" class="mt-4">
+	              <label for="predicate" class="block text-sm font-medium text-gray-700">Predicate</label>
+	              <div class="flex items-center gap-4">
+	                <select v-model="predicate.name" @change="fetchPredicateArgs(index)"
+	                  class="block w-full mt-1 border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+	                  <option value="" disabled selected>Choose a predicate</option>
+	                  <option v-for="pred in predicates" :key="pred.name" :value="pred.name">{{ pred.name }}</option>
+	                </select>
+	                <button @click="removePredicate(index)" type="button"
+	                  class="px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600">
+	                  Delete
+	                </button>
+	              </div>
+	              <p v-if="predicateErrors[index]" class="text-red-500 text-sm mt-1">Le prédicat est requis.</p>
+
+	              <!-- Arguments des prédicats -->
+	              <div v-if="predicateArgs[index]?.length > 0" class="mt-4">
+	                <h4 class="text-sm font-medium text-gray-800">Arguments :</h4>
+	                <div v-for="arg in predicateArgs[index]" :key="arg" class="mt-2">
+	                  <label :for="'arg-' + arg" class="block text-sm font-medium text-gray-700">{{ arg }}</label>
+	                  <input :id="'arg-' + arg" v-model="predicate.args[arg]" type="text"
+	                    class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm">
+	                </div>
+	              </div>
+	            </div>
+	            <button @click="addPredicate" type="button"
+	              class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+	              Add a predicate
+	            </button>
+	          </div>
+
+	          <!-- Filtres -->
+	          <div class="mb-6">
+	            <h3 class="text-lg font-semibold text-gray-800">Filtres</h3>
+	            <div v-for="(filter, index) in newRoute.filters" :key="'filter-' + index" class="mt-4">
+	              <label for="filter" class="block text-sm font-medium text-gray-700">Filter</label>
+	              <div class="flex items-center gap-4">
+	                <select v-model="filter.name" @change="fetchFilterArgs(index)"
+	                  class="block w-full mt-1 border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+	                  <option value="" disabled selected>Choisissez un filtre</option>
+	                  <option v-for="filterOption in filters" :key="filterOption.name" :value="filterOption.name">
+	                    {{ filterOption.name }}
+	                  </option>
+	                </select>
+	                <button @click="removeFilter(index)" type="button"
+	                  class="px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600">
+	                  Delete
+	                </button>
+	              </div>
+
+	              <!-- Arguments des filtres -->
+	              <div v-if="filterArgs[index]?.length > 0" class="mt-4">
+	                <h4 class="text-sm font-medium text-gray-800">Arguments :</h4>
+	                <div v-for="arg in filterArgs[index]" :key="arg" class="mt-2">
+	                  <label :for="'filter-arg-' + arg" class="block text-sm font-medium text-gray-700">{{ arg }}</label>
+	                  <input :id="'filter-arg-' + arg" v-model="filter.args[arg]" type="text"
+	                    class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm">
+	                </div>
+	              </div>
+	            </div>
+	            <button @click="addFilter" type="button"
+	              class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+	              Add a filter
+	            </button>
+	          </div>
+
+			  <!-- Submit & Cancel Buttons -->
+			  <div class="flex justify-between mt-6">
+				<button 
+		          v-if="isEditing" 
+		          @click="resetForm" 
+		          type="button" 
+		          class="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500">
+		          Cancel
+		        </button>
+				<button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+						          {{ isEditing ? 'Update route' : 'Create the route' }}
+						        </button>
+			  </div>
+	        </form>
+	      </div>
+	    </section>
+	  </div>
+	</div>
+
+<script>
+const app = Vue.createApp({
+	data() {
+	    return {
+	        routes: [], // List of existing routes
+	        predicates: [], // List of available predicates
+	        filters: [], // List of available filters
+	        predicateArgs: [], // Arguments for the selected predicate
+	        filterArgs: [], // Arguments for the selected filter
+	        newRoute: {
+	            routeId: '', // Name of the route
+	            uri: '', // URI of the route
+				order: '0', // Default value for the order
+	            predicates: [{ name: '', args: {} }], // List of predicates
+	            filters: [{ name: '', args: {} }], // List of filters
+	        },
+	        isEditing: false, // Flag to indicate whether editing mode is active
+	        currentRouteId: null, // ID of the route currently being edited
+	        predicateErrors: [] // Array of errors for predicates
+	    };
+	},
+    methods: {
+        async fetchRoutes() {
+            try {
+                const response = await axios.get('/api/gateway/routes');
+                this.routes = response.data;
+				console.log('fetch routes', this.routes)
+            } catch (error) {
+                console.error('Error retrieving routes', error);
+            }
+        },
+        async fetchPredicates() {
+            try {
+                const response = await axios.get('/api/gateway/routes/available-predicates');
+                this.predicates = response.data;
+            } catch (error) {
+                console.error('Error retrieving predicates', error);
+            }
+        },
+        async fetchFilters() {
+            try {
+                const response = await axios.get('/api/gateway/routes/available-filters');
+                this.filters = response.data;
+            } catch (error) {
+                console.error('Error retrieving filters', error);
+            }
+        },
+        async fetchPredicateArgs(index) {
+            const predicateName = this.newRoute.predicates[index].name;
+            if (!predicateName) return;
+            try {
+                const response = await axios.get(`/api/gateway/routes/available-predicates/${predicateName}/args`);
+                this.predicateArgs[index] = response.data;
+                this.newRoute.predicates[index].args = {};
+                this.predicateArgs[index].forEach(arg => {
+                    this.newRoute.predicates[index].args[arg] = ''; // Initialize each argument to an empty value
+                });
+            } catch (error) {
+                console.error('Error retrieving predicate arguments', error);
+            }
+        },
+        async fetchFilterArgs(index) {
+            const filterName = this.newRoute.filters[index].name;
+            if (!filterName) return;
+            try {
+                const response = await axios.get(`/api/gateway/routes/available-filters/${filterName}/args`);
+                this.filterArgs[index] = response.data;
+                this.newRoute.filters[index].args = {};
+                this.filterArgs[index].forEach(arg => {
+                    this.newRoute.filters[index].args[arg] = ''; // Initialize each argument to an empty value
+                });
+            } catch (error) {
+                console.error('Error retrieving filter arguments', error);
+            }
+        },
+        addPredicate() {
+            this.newRoute.predicates.push({ name: '', args: {} });
+            this.predicateArgs.push([]);
+        },
+        addFilter() {
+            this.newRoute.filters.push({ name: '', args: {} });
+            this.filterArgs.push([]);
+        },
+		removePredicate(index) {
+	        this.newRoute.predicates.splice(index, 1);
+	        this.predicateArgs.splice(index, 1); // Also removes associated arguments
+	    },
+	    removeFilter(index) {
+	        this.newRoute.filters.splice(index, 1);
+	        this.filterArgs.splice(index, 1); // Also removes associated arguments
+	    },
+		validatePredicates() {
+		    // Vérifie si la liste des prédicats est vide ou inexistante
+		    if (!this.newRoute.predicates || this.newRoute.predicates.length === 0) {
+		        this.predicateErrors = [];
+		        return false; // Returns false because there is no predicate
+		    }
+
+		    // Réinitialise et valide chaque prédicat
+		    this.predicateErrors = this.newRoute.predicates.map(predicate => !predicate.name);
+
+		    // Vérifie s'il y a des erreurs
+		    return this.predicateErrors.every(error => !error);
+		},
+    	async createRoute() {
+			if (!this.validatePredicates()) {
+	            alert('Please correct any errors before submitting the form.');
+	            return;
+	        }
+            try {
+                const routeData = {
+                    routeId: this.newRoute.routeId,
+                    uri: this.newRoute.uri,
+					order: this.newRoute.order,
+                    predicates: this.newRoute.predicates,
+                    filters: this.newRoute.filters.filter(f => f.name), // Filter empty filters
+                };
+                await axios.post('/api/gateway/routes', routeData);
+				this.showSnackbar('success', 'Route created successfully');
+                this.fetchRoutes(); // Refresh route list after creation
+                this.resetNewRoute(); // Reset form
+            } catch (error) {
+                console.error('Error creating the route', error);
+				if (error.response && error.response.status === 409) {
+		            // Affichage du message d'erreur dans la snackbar
+		            this.showSnackbar('error', 'A route with this identifier already exists. Please enter another name.');
+		        } else {
+		            this.showSnackbar('error', 'An error occurred while creating the route.');
+		        }
+            }
+        },
+        async deleteRoute(id) {
+            try {
+                await axios.delete(`/api/gateway/routes/${id}`);
+                alert('Route supprimée avec succès !');
+                this.fetchRoutes(); // Refresh route list after deletion
+            } catch (error) {
+                console.error('Error deleting route', error);
+            }
+        },
+        async loadRouteForEditing(id) {
+            try {
+                const response = await axios.get(`/api/gateway/routes/${id}`);
+                const route = response.data;
+                console.log('loadRouteForEditing route', route)
+                this.newRoute = {
+                    routeId: route.routeId,
+                    uri: route.uri,
+					order: route.order,
+                    predicates: route.predicates || [{ name: '', args: {} }],
+                    filters: route.filters || [{ name: '', args: {} }],
+                };
+                this.isEditing = true;
+                this.currentRouteId = id;
+				this.predicateArgs = this.newRoute.predicates.map(predicate =>
+				    Object.keys(predicate.args || {})
+				);
+				this.filterArgs = this.newRoute.filters.map(filter =>
+				    Object.keys(filter.args || {})
+				);
+
+            } catch (error) {
+                console.error('Error loading the route to edit', error);
+            }
+        },
+        async updateRoute() {
+			if (!this.validatePredicates()) {
+	            alert('Please correct any errors before submitting the form.');
+	            return;
+	        }
+            try {
+                const routeData = {
+                    routeId: this.newRoute.routeId,
+                    uri: this.newRoute.uri,
+					order: this.newRoute.order,
+                    predicates: this.newRoute.predicates,
+                    filters: this.newRoute.filters.filter(f => f.name), // Filter empty filters
+                };
+                await axios.put(`/api/gateway/routes/${this.currentRouteId}`, routeData);
+				this.showSnackbar('success', 'Route updated successfully');
+                this.fetchRoutes(); // Refresh route list after update
+                this.resetNewRoute(); // Reset form
+                this.isEditing = false; // Exit edit mode
+                this.currentRouteId = null;
+            } catch (error) {
+                console.error('Error updating route', error);
+				this.showSnackbar('success', 'Error updating route.');
+            }
+        },
+        resetNewRoute() {
+            this.newRoute = {
+                routeId: '',
+                uri: '',
+                predicates: [{ name: '', args: {} }],
+                filters: [{ name: '', args: {} }],
+            };
+            this.predicateArgs = [];
+            this.filterArgs = [];
+        },
+		resetForm() {
+		    this.newRoute = {
+		        routeId: '',
+		        uri: '',
+		        order: '0',
+		        predicates: [{ name: '', args: {} }],
+		        filters: [{ name: '', args: {} }],
+		    };
+		    this.predicateArgs = [];
+		    this.filterArgs = [];
+		    this.isEditing = false; // Quitte le mode édition si activé
+		},
+		showSnackbar(status, message) {
+				colorBg = "bg-red-500"
+				if(status == 'info')
+					colorBg = "bg-blue-500"
+				else if(status == 'success')
+					colorBg = "bg-green-500"
+				else if(status == 'warning')
+					colorBg = "bg-orange-500"
+					
+		        const snackbar = document.createElement('div');
+		        snackbar.className = 'fixed bottom-5 left-1/2 transform -translate-x-1/2 p-4 ' + colorBg + ' text-white rounded-lg shadow-md';
+		        snackbar.innerText = message;
+
+		        document.body.appendChild(snackbar);
+
+		        // Disparition automatique après 5 secondes
+		        setTimeout(() => {
+		            snackbar.remove();
+		        }, 5000);
+		    }
+    },
+    mounted() {
+        this.fetchRoutes();
+        this.fetchPredicates();
+        this.fetchFilters();
+    }
+});
+app.mount("#app");
+</script>
+</body>
+</html>

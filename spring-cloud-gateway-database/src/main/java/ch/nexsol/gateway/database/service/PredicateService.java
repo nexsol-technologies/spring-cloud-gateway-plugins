@@ -26,6 +26,8 @@ import ch.nexsol.gateway.database.exception.PredicatesNotValidException;
 import ch.nexsol.gateway.database.model.PredicateCreateModel;
 import ch.nexsol.gateway.database.repository.PredicateRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -35,7 +37,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class PredicateService {
 
-	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(PredicateService.class);
+	private static final Logger LOG = LoggerFactory.getLogger(PredicateService.class);
 
 	private final GatewayConfigService gatewayConfigService;
 

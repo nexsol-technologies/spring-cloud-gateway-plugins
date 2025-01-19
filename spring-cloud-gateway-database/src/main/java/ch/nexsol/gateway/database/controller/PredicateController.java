@@ -22,6 +22,7 @@ import ch.nexsol.gateway.database.service.GatewayConfigService;
 import reactor.core.publisher.Flux;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,6 +39,11 @@ public class PredicateController {
 	@GetMapping(path = "/available-predicates")
 	public Flux<Map<String, Object>> getAvailablePredicatesWithArgs() {
 		return this.gatewayConfigService.getAvailablePredicatesWithArgs();
+	}
+
+	@GetMapping(path = "/available-predicates/{predicate}/args")
+	public Flux<CharSequence> getArgs(@PathVariable() String predicate) {
+		return this.gatewayConfigService.getArgsForPredicate(predicate);
 	}
 
 }
