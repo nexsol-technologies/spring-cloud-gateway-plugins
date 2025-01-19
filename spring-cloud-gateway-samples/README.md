@@ -33,4 +33,9 @@ To test, go to http://localhost:8181/swagger-ui.html and you should have access 
   <img src="doc/spring-cloud-gateway-openapi.png" alt="spring-cloud-gateway-openapi" width="50%"/>
 </p>
 
+#### spring-cloud-gateway-database
 
+To test, go to http://localhost:8181/routes.html and you should have access to the basic gui to manage routes:
+<p align="center">
+  <img src="../spring-cloud-gateway-database/doc/spring-cloud-gateway-database-ui.png" alt="spring-cloud-gateway-openapi" width="50%"/>
+</p>
