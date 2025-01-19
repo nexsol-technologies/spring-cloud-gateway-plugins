@@ -56,8 +56,10 @@ spring:
     oauth2:
       resourceserver:
         multitenant:
-          - https://keycloakhost:keycloakport/realms/{realm}
-          - https://{yourOktaOrg}
+          - id: keycloak
+            issuer-uri: https://keycloakhost:keycloakport/realms/{realm}
+          - id: okta
+            issuer-uri: https://{yourOktaOrg}
 ```
 <br><br>
 
