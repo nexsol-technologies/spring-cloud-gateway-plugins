@@ -20,7 +20,7 @@ This project provides filters for Spring Cloud Gateway
 
 ### Authorization
 
-The filter `Authorization` validates Spring security `GrantedAuthority`, when Role Based Access Control (RBAC) is activated. 
+The `Authorization` filter validates Spring security `GrantedAuthority`, when Role Based Access Control (RBAC) is activated. 
 
 usage: 
 
@@ -39,7 +39,7 @@ spring.cloud.gateway:
 
 ### AuthorizationToken
 
-The filter `AuthorizationToken` validates an access token (JWT). The filter takes the Principal provided by Spring Security or directly in the Authorization header. If the token is not validated with the rules configured for the route it will return http status 403 (Forbidden).
+The `AuthorizationToken` filter validates an access token (JWT). It retrieves the `Principal` from Spring Security or the `Authorization` header. If the token does not meet the validation rules for the route, the filter responds with HTTP status 403 Forbidden.
 
 usage: 
 
@@ -62,7 +62,7 @@ spring.cloud.gateway:
 
 ### ConvertHttpMethod
 
-The filter `ConvertHttpMethod` converts a http method to another. ex GET to POST
+The `ConvertHttpMethod` filter converts a http method to another. ex GET to POST
 
 usage: 
 
@@ -79,17 +79,20 @@ spring.cloud.gateway:
 ```
 
 ### CorrelationId
-The filter `CorrelationId` add the `x-correlation-id` in http header : the value is the traceId of Micrometer tracing observation.
+The `CorrelationId` filter adds the `x-correlation-id` header to the HTTP response. Its value is the `traceId` from Micrometer Tracing observation.
 ```yaml
 spring.cloud.gateway:
   webfilter:
     correlation-id.enabled: true
 ```
 
+This filter relies on Micrometer Tracing observation, so you need to include `spring-boot-starter-actuator` and provide a [tracer implementation](https://docs.spring.io/spring-boot/reference/actuator/tracing.html) in your classpath.
+
+
 ### Recaptcha
 
-The filter `Recaptcha` verifies and validates a CAPTCHA score using Google's reCAPTCHA.
-Useful to non authenticated API's, offering a simple layer of protection with CAPTCHA.
+The `Recaptcha` filter verifies and validates a CAPTCHA score using Google's reCAPTCHA.
+It provides a simple layer of protection for non-authenticated APIs.
 
 usage: 
 
