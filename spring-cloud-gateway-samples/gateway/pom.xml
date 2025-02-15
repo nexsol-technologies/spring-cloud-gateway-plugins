@@ -4,7 +4,7 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
-		<groupId>ch.nexsol.gateway</groupId>
+		<groupId>ch.nexsol-tech.gateway</groupId>
 		<artifactId>spring-cloud-gateway-samples</artifactId>
 		<version>${revision}</version>
 		<relativePath>../pom.xml </relativePath>
@@ -42,22 +42,22 @@
 		</dependency>
 
 		<dependency>
-			<groupId>ch.nexsol.gateway</groupId>
+			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-filters</artifactId>
 			<version>${revision}</version>
 		</dependency>
 		<dependency>
-			<groupId>ch.nexsol.gateway</groupId>
+			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-database</artifactId>
 			<version>${revision}</version>
 		</dependency>
 		<dependency>
-			<groupId>ch.nexsol.gateway</groupId>
+			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-oauth2</artifactId>
 			<version>${revision}</version>
 		</dependency>
 		<dependency>
-			<groupId>ch.nexsol.gateway</groupId>
+			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-openapi</artifactId>
 			<version>${revision}</version>
 		</dependency>
