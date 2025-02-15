@@ -89,7 +89,7 @@ jobs:
           body: |
             Grab the new version from Maven central https://repo1.maven.org/maven2/ch/nexsol-tech/
 
-            Current docs at https://nexsol-technologies.github.io/spring-parent/${{ github.event.inputs.releaseversion }}/
+            Current docs at https://nexsol-technologies.github.io/spring-cloud-gateway-plugins/${{ github.event.inputs.releaseversion }}/
 
             ### Things that changed in this release
             ${{ steps.changelog.outputs.changelog }}
