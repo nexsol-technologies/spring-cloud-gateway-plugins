@@ -23,3 +23,4 @@ CREATE TABLE IF NOT EXISTS filter (
 
 CREATE INDEX IF NOT EXISTS predicate_route_ref_id_idx ON predicate(route_ref_id);
 CREATE INDEX IF NOT EXISTS filter_route_ref_id_idx ON filter(route_ref_id);
+CREATE INDEX IF NOT EXISTS route_id_idx ON route(route_id);
