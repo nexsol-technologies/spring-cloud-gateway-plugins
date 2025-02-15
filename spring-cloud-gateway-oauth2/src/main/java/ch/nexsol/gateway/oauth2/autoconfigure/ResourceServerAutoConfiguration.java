@@ -52,8 +52,9 @@ public class ResourceServerAutoConfiguration {
 	@Bean
 	@Conditional(ConfigurableJwtGrantedAuthoritiesConfiguredCondition.class)
 	Converter<Jwt, AbstractAuthenticationToken> configurableJwtGrantedAuthoritiesConverter(
-			@Value("${spring.security.oauth2.resourceserver.name:${spring.application.name}}") String resourceName) {
-		return new ConfigurableJwtGrantedAuthoritiesConverter(null);
+			ResourceServerPluginsProperties resourceServerPluginsProperties) {
+		return new ConfigurableJwtGrantedAuthoritiesConverter(
+				resourceServerPluginsProperties.getGrantedAuthoritiesMapping().getJsonPath());
 	}
 
 	@Bean

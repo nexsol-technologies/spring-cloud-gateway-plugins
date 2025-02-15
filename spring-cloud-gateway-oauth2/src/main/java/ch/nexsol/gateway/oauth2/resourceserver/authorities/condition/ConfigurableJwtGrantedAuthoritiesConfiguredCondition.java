@@ -53,7 +53,7 @@ public class ConfigurableJwtGrantedAuthoritiesConfiguredCondition extends Spring
 
 	private List<JsonPathGrantedAuthorityProperties> getRegistrations(Environment environment) {
 		return Binder.get(environment)
-			.bind("spring.security.oauth2.resourceserver.granted-authorites-mapping", STRING_REGISTRATION_LIST)
+			.bind("spring.security.oauth2.resourceserver.granted-authorities-mapping", STRING_REGISTRATION_LIST)
 			.orElse(Collections.emptyList());
 	}
 
