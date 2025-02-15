@@ -107,7 +107,7 @@
 		<snapshotRepository>
 			<id>github</id>
 			<name>GitHub Packages</name>
-			<url>https://maven.pkg.github.com/nexsol-technologies/spring-parent</url>
+			<url>https://maven.pkg.github.com/nexsol-technologies/spring-cloud-gateway-plugins</url>
 		</snapshotRepository>
 		<repository>
 			<id>ossrh</id>
