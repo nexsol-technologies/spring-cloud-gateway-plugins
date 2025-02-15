@@ -58,7 +58,7 @@ spring:
   security:
     oauth2:
       resourceserver:
-        granted-authorites-mapping:
+        granted-authorities-mapping:
           json-path:
           - '$.my-custom-roles'
         multitenant:
