@@ -12,17 +12,25 @@
 
 ## Getting Started
 
-[spring-cloud-gateway-database](spring-cloud-gateway-database/README.md)
+[spring-cloud-gateway-database](spring-cloud-gateway-database/README.md) <br>
+This plugin provides database management for routes for Spring Cloud Gateway with a simple GUI to add, update or delete routes.
 
-[spring-cloud-gateway-filters](spring-cloud-gateway-filters/README.md)
+[spring-cloud-gateway-filters](spring-cloud-gateway-filters/README.md)<br>
+This plugin provides some custom filters for Spring Cloud Gateway like Authorization, AuthorizationToken, ConvertHttpMethod, Recaptcha
 
-[spring-cloud-gateway-oauth2](spring-cloud-gateway-oauth2/README.md)
+[spring-cloud-gateway-oauth2](spring-cloud-gateway-oauth2/README.md)<br>
+This plugin provides OAuth2 support for Spring Cloud Gateway.<br>
+This plugin simplifies the implementation of multi-tenant OAuth2 authentication and JWT validation in Spring Cloud Gateway.
 
-[spring-cloud-gateway-openapi](spring-cloud-gateway-openapi/README.md)
+
+[spring-cloud-gateway-openapi](spring-cloud-gateway-openapi/README.md)<br>
+This plugin provides openapi support for Spring Cloud Gateway
+
 
 ## samples
 
 [spring-cloud-gateway-samples](spring-cloud-gateway-samples/README.md)
+This projet provides some examples.
 
 ## Getting Help
 
