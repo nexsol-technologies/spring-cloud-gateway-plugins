@@ -67,6 +67,14 @@ public class SpringAppConfiguration {
 			return result;
 		}
 
+		@RequestMapping(path = { "/correlation-id-header" }, method = { RequestMethod.GET, RequestMethod.POST },
+				produces = MediaType.APPLICATION_JSON_VALUE)
+		public Map<String, Object> correlationIdHeader(ServerWebExchange exchange) {
+			Map<String, Object> result = new HashMap<>();
+			result.put("headers", exchange.getRequest().getHeaders());
+			return result;
+		}
+
 	}
 
 }

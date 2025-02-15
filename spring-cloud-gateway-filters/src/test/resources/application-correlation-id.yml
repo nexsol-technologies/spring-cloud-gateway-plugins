@@ -1,0 +1,20 @@
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - '*'
+  endpoint:
+    gateway:
+      access: read-only
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1
+
+spring.cloud.gateway:
+  routes:
+  - id: validate-correlation-id-header
+    uri: ${test.uri}
+    predicates:
+    - Path=/correlation-id-header

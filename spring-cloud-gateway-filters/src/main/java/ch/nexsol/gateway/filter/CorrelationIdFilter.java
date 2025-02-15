@@ -22,7 +22,6 @@ import io.micrometer.tracing.Span;
 import io.micrometer.tracing.handler.TracingObservationHandler.TracingContext;
 import reactor.core.publisher.Mono;
 
-import org.springframework.cloud.gateway.filter.NettyWriteResponseFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.http.server.reactive.observation.ServerRequestObservationContext;
@@ -40,7 +39,7 @@ public class CorrelationIdFilter implements WebFilter, Ordered {
 
 	@Override
 	public int getOrder() {
-		return NettyWriteResponseFilter.WRITE_RESPONSE_FILTER_ORDER + 1;
+		return Ordered.HIGHEST_PRECEDENCE + 3;
 	}
 
 	@Override
