@@ -8,20 +8,18 @@
 <hr>
 <br>
 
-# Spring cloud Gateway plugins by [neXsol technologies](https://nexsol.tech)
+# Spring Cloud Gateway plugins by [neXsol technologies](https://nexsol.tech)
 
 ## Getting Started
 
 [spring-cloud-gateway-database](spring-cloud-gateway-database/README.md) <br>
-This plugin provides database management for routes for Spring Cloud Gateway with a simple GUI to add, update or delete routes.
+This plugin enables database-driven route management in Spring Cloud Gateway and includes a simple GUI for adding, updating, and deleting routes.
 
 [spring-cloud-gateway-filters](spring-cloud-gateway-filters/README.md)<br>
-This plugin provides some custom filters for Spring Cloud Gateway like Authorization, AuthorizationToken, ConvertHttpMethod, Recaptcha
+This plugin provides various custom filters for Spring Cloud Gateway, including Authorization, AuthorizationToken, ConvertHttpMethod, and Recaptcha.
 
 [spring-cloud-gateway-oauth2](spring-cloud-gateway-oauth2/README.md)<br>
-This plugin provides OAuth2 support for Spring Cloud Gateway.<br>
-This plugin simplifies the implementation of multi-tenant OAuth2 authentication and JWT validation in Spring Cloud Gateway.
-
+This plugin adds OAuth2 support to Spring Cloud Gateway, making it easier to implement multi-tenant OAuth2 authentication and JWT validation.
 
 [spring-cloud-gateway-openapi](spring-cloud-gateway-openapi/README.md)<br>
 This plugin provides openapi support for Spring Cloud Gateway
@@ -34,7 +32,7 @@ This projet provides some examples.
 
 ## Getting Help
 
-Having trouble with  Spring cloud Gateway plugins by Nexsol? We’d like to help!
+Having trouble with Spring cloud Gateway plugins by Nexsol? We’d like to help!
 
  * Report bugs at https://github.com/nexsol-technologies/spring-cloud-gateway-plugins/issues
  
