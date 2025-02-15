@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.filter.autoconfigure;
 
+import ch.nexsol.gateway.filter.CorrelationIdFilter;
 import ch.nexsol.gateway.filter.factory.AuthorizationGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.AuthorizationTokenGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.ConvertHttpMethodGatewayFilterFactory;
@@ -23,6 +24,7 @@ import ch.nexsol.gateway.filter.factory.RecaptchaGatewayFilterFactory;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -47,6 +49,12 @@ public class FiltersAutoConfiguration {
 	@Bean
 	RecaptchaGatewayFilterFactory recaptchaGatewayFilterFactory(WebClient webClient) {
 		return new RecaptchaGatewayFilterFactory(webClient);
+	}
+
+	@Bean
+	@ConditionalOnProperty(name = "spring.cloud.gateway.webfilter.correlation-id.enabled", matchIfMissing = true)
+	CorrelationIdFilter correlationIdFilter() {
+		return new CorrelationIdFilter();
 	}
 
 	@Bean

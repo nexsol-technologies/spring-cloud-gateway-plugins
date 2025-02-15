@@ -78,6 +78,13 @@ spring.cloud.gateway:
     - ConvertHttpMethod=POST
 ```
 
+### CorrelationId
+The filter `CorrelationId` add the `x-correlation-id` in http header : the value is the traceId of Micrometer tracing observation.
+```yaml
+spring.cloud.gateway:
+  webfilter:
+    correlation-id.enabled: true
+```
 
 ### Recaptcha
 
