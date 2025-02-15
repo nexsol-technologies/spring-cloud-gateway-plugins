@@ -35,7 +35,7 @@ public class ResourceServerPluginsProperties {
 	 * List of json path for mapping to Spring Security GrantedAuthority
 	 */
 	@Valid
-	private JsonPathGrantedAuthorityProperties grantedAuthoritesMapping;
+	private JsonPathGrantedAuthorityProperties grantedAuthoritiesMapping;
 
 	/**
 	 * List of multi-tenant
@@ -77,12 +77,12 @@ public class ResourceServerPluginsProperties {
 		return !this.multitenant.isEmpty();
 	}
 
-	public JsonPathGrantedAuthorityProperties getGrantedAuthoritesMapping() {
-		return this.grantedAuthoritesMapping;
+	public JsonPathGrantedAuthorityProperties getGrantedAuthoritiesMapping() {
+		return this.grantedAuthoritiesMapping;
 	}
 
-	public void setGrantedAuthoritesMapping(JsonPathGrantedAuthorityProperties grantedAuthoritesMapping) {
-		this.grantedAuthoritesMapping = grantedAuthoritesMapping;
+	public void setGrantedAuthoritiesMapping(JsonPathGrantedAuthorityProperties grantedAuthoritiesMapping) {
+		this.grantedAuthoritiesMapping = grantedAuthoritiesMapping;
 	}
 
 	public static class OAuth2ResourceServerProperties {
