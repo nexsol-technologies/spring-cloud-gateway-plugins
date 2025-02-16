@@ -47,13 +47,11 @@ public class ConvertHttpMethodGatewayFilterFactory
 
 	@Override
 	public GatewayFilter apply(Config config) {
-		return (exchange, chain) -> {
-			return Mono.just(exchange.getRequest())
-				.doOnNext((req) -> LOG.debug("changing method from {} to {}", req.getMethod().toString(),
-						config.getReplacement().toString()))
-				.map((req) -> exchange.mutate().request(req.mutate().method(config.getReplacement()).build()).build())
-				.flatMap(chain::filter);
-		};
+		return (exchange, chain) -> Mono.just(exchange.getRequest())
+			.doOnNext((req) -> LOG.debug("changing method from {} to {}", req.getMethod().toString(),
+					config.getReplacement().toString()))
+			.map((req) -> exchange.mutate().request(req.mutate().method(config.getReplacement()).build()).build())
+			.flatMap(chain::filter);
 	}
 
 	@Validated

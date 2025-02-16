@@ -58,13 +58,13 @@ public class ApiService {
 
 	public Flux<RouteResponseModel> getAllRoutes() {
 		return this.routeService.getAllRoutes()
-			.flatMap(route -> this.predicateService.findByRouteId(route.getId())
+			.flatMap((route) -> this.predicateService.findByRouteId(route.getId())
 				.flatMap(this::toPredicateResponseModel)
 				.collectList()
-				.flatMap(predicates -> this.filterService.findByRouteId(route.getId())
+				.flatMap((predicates) -> this.filterService.findByRouteId(route.getId())
 					.flatMap(this::toFilterResponseModel)
 					.collectList()
-					.map(filters -> new RouteResponseModel(route.getId(), route.getRouteId(), route.getUri(),
+					.map((filters) -> new RouteResponseModel(route.getId(), route.getRouteId(), route.getUri(),
 							route.getOrder(), predicates, filters))
 
 				));
@@ -86,10 +86,10 @@ public class ApiService {
 		return this.predicateService.findByRouteId(route.getId())
 			.flatMap(this::toPredicateResponseModel)
 			.collectList()
-			.flatMap(predicates -> this.filterService.findByRouteId(route.getId())
+			.flatMap((predicates) -> this.filterService.findByRouteId(route.getId())
 				.flatMap(this::toFilterResponseModel)
 				.collectList()
-				.map(filters -> new RouteResponseModel(route.getId(), route.getRouteId(), route.getUri(),
+				.map((filters) -> new RouteResponseModel(route.getId(), route.getRouteId(), route.getUri(),
 						route.getOrder(), predicates, filters))
 
 			);
@@ -101,7 +101,7 @@ public class ApiService {
 					this.argumentService.jsonStringArgumentsToMap(predicate.getArgs()), predicate.getRouteRefId());
 			return Mono.just(model);
 		}
-		catch (JsonProcessingException e) {
+		catch (JsonProcessingException ex) {
 			return Mono.error(new PredicateArgsNotReadableException());
 		}
 	}
@@ -112,7 +112,7 @@ public class ApiService {
 					this.argumentService.jsonStringArgumentsToMap(filter.getArgs()), filter.getRouteRefId());
 			return Mono.just(model);
 		}
-		catch (JsonProcessingException e) {
+		catch (JsonProcessingException ex) {
 			return Mono.error(new PredicateArgsNotReadableException());
 		}
 	}

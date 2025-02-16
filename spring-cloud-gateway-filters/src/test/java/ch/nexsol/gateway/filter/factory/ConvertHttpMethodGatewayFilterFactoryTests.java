@@ -37,10 +37,10 @@ class ConvertHttpMethodGatewayFilterFactoryTests extends BaseWebClientTests {
 
 	@Test
 	void convertHttpMethodGetToPostWorks() {
-		this.testClient.get().uri("/foo-post").headers(headers -> {
+		this.testClient.get().uri("/foo-post").headers((headers) -> {
 			headers.set("x-method", HttpMethod.GET.name());
 			headers.set("Host", "www.converthttpmethod.ch");
-		}).exchange().expectBody(Map.class).consumeWith(result -> {
+		}).exchange().expectBody(Map.class).consumeWith((result) -> {
 			assertThat(result.getStatus()).isEqualTo(HttpStatus.OK);
 			Map<?, ?> response = result.getResponseBody();
 			assertThat(response).isNotNull();
@@ -57,10 +57,10 @@ class ConvertHttpMethodGatewayFilterFactoryTests extends BaseWebClientTests {
 
 	@Test
 	void convertHttpMethodPostToGettWorks() {
-		this.testClient.post().uri("/foo-get").headers(headers -> {
+		this.testClient.post().uri("/foo-get").headers((headers) -> {
 			headers.set("x-method", HttpMethod.POST.name());
 			headers.set("Host", "www.converthttpmethod.ch");
-		}).exchange().expectBody(Map.class).consumeWith(result -> {
+		}).exchange().expectBody(Map.class).consumeWith((result) -> {
 			assertThat(result.getStatus()).isEqualTo(HttpStatus.OK);
 			Map<?, ?> response = result.getResponseBody();
 			assertThat(response).isNotNull();

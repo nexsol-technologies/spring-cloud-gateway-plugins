@@ -46,7 +46,7 @@ public class SpringAppConfiguration {
 	}
 
 	@RestController
-	@RequestMapping()
+	@RequestMapping
 	public class Controller {
 
 		@RequestMapping(path = { "/authorization-token", "/authorization-token-all" },

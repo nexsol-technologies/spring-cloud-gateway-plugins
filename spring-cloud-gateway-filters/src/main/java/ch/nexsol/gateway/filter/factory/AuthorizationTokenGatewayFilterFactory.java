@@ -95,7 +95,7 @@ public class AuthorizationTokenGatewayFilterFactory
 				.map((jwt) -> Optional.of(jwt))
 				// in case if there not Spring Security, find JWT manually
 				.defaultIfEmpty(extractBearer(exchange))
-				.filter(jwt -> jwt.isPresent())
+				.filter((jwt) -> jwt.isPresent())
 				.map(Optional::get)
 				.map((jwt) -> {
 					String issuerId = jwt.getClaimAsString(IdTokenClaimNames.ISS);
@@ -145,10 +145,6 @@ public class AuthorizationTokenGatewayFilterFactory
 		};
 	}
 
-	/**
-	 * @param exchange
-	 * @return
-	 */
 	private Optional<Jwt> extractBearer(ServerWebExchange exchange) {
 		return exchange.getRequest()
 			.getHeaders()

@@ -16,7 +16,7 @@
 
 package ch.nexsol.gateway.filter.common;
 
-public class Constants {
+public final class Constants {
 
 	public static final String NONE_VALUE = "_none_";
 
@@ -25,5 +25,9 @@ public class Constants {
 	public static final String HTTP_SCHEME = "http";
 
 	public static final String HTTPS_SCHEME = "https";
+
+	private Constants() {
+
+	}
 
 }
