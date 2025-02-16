@@ -42,7 +42,7 @@ public class FilterController {
 	}
 
 	@GetMapping(path = "/available-filters/{filter}/args")
-	public Flux<CharSequence> getArgs(@PathVariable() String filter) {
+	public Flux<CharSequence> getArgs(@PathVariable String filter) {
 		return this.gatewayConfigService.getArgsForFilter(filter);
 	}
 

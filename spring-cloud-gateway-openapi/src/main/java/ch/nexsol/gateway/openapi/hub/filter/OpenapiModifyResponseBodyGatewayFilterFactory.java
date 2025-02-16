@@ -88,22 +88,6 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 		return gatewayFilter;
 	}
 
-	public static class Config {
-
-		private String path;
-
-		public String getPath() {
-			return this.path;
-		}
-
-		public Config setPath(String path) {
-			Assert.hasText(path, "path must have a value");
-			this.path = path;
-			return this;
-		}
-
-	}
-
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private RewriteFunction<LinkedHashMap, String> rewriteServersWithGatewayUrl(String path) {
 		return (serverWebExchange, openAPI) -> {
@@ -123,6 +107,22 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 				return Mono.empty();
 			}
 		};
+	}
+
+	public static class Config {
+
+		private String path;
+
+		public String getPath() {
+			return this.path;
+		}
+
+		public Config setPath(String path) {
+			Assert.hasText(path, "path must have a value");
+			this.path = path;
+			return this;
+		}
+
 	}
 
 }

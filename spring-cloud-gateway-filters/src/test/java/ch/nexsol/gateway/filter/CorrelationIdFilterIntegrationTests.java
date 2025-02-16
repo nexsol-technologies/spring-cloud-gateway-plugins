@@ -37,11 +37,13 @@ public class CorrelationIdFilterIntegrationTests extends BaseWebClientTests {
 
 	@Test
 	public void testAddCustomTraceHeader_ShouldAddHeaderWhenTraceIdExists() {
-		this.testClient.get().uri("/correlation-id-header").headers(headers -> {
-			headers.set("Host", "www.validatecorrelationidheader.ch");
-		}).exchange().expectBody(Map.class).consumeWith(result -> {
-			assertThat(result.getResponseHeaders().containsKey("x-correlation-id")).isEqualTo(true);
-		});
+		this.testClient.get()
+			.uri("/correlation-id-header")
+			.headers((headers) -> headers.set("Host", "www.validatecorrelationidheader.ch"))
+			.exchange()
+			.expectBody(Map.class)
+			.consumeWith((result) -> assertThat(result.getResponseHeaders().containsKey("x-correlation-id"))
+				.isEqualTo(true));
 	}
 
 }

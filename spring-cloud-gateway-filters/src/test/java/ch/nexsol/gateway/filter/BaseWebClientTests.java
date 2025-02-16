@@ -24,7 +24,9 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * @see https://github.com/spring-cloud/spring-cloud-gateway/blob/main/spring-cloud-gateway-server/src/test/java/org/springframework/cloud/gateway/test/BaseWebClientTests.java
+ * @see <a href=
+ * "https://github.com/spring-cloud/spring-cloud-gateway/blob/main/spring-cloud-gateway-server/src/test/java/org/springframework/cloud/gateway/test/BaseWebClientTests.java">spring-cloud-gateway
+ * BaseWebClientTests</a>
  */
 public class BaseWebClientTests {
 

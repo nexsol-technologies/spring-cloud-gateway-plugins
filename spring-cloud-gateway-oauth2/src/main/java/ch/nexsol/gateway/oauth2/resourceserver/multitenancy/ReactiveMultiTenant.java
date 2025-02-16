@@ -29,7 +29,7 @@ import org.springframework.util.Assert;
  * Class to build an JwtIssuerReactiveAuthenticationManagerResolver to manage
  * multi-tenancy
  */
-public class ReactiveMultiTenant {
+public final class ReactiveMultiTenant {
 
 	private ReactiveMultiTenant() {
 	}

@@ -112,9 +112,7 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 							.flatMap((resultV2) -> validateV2(resultV2))
 							.map((__) -> result)
 							.cast(RecaptchaResponseIdentifier.class))))
-				.map((recaptchaResponse) -> {
-					return exchange;
-				})
+				.map((recaptchaResponse) -> exchange)
 				.defaultIfEmpty(exchange)
 				.flatMap(chain::filter);
 

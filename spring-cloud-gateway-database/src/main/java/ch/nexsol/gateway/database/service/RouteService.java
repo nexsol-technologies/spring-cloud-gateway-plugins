@@ -61,7 +61,7 @@ public class RouteService {
 	}
 
 	public Flux<RouteDefinition> loadSpringCloudGatewayRouteDefinition() {
-		return this.routeRepository.findAll().flatMap(routeEntity -> {
+		return this.routeRepository.findAll().flatMap((routeEntity) -> {
 
 			Mono<List<PredicateDefinition>> predicates = this.predicateService
 				.loadSpringCloudGatewayPredicateDefinition(routeEntity.getId());
@@ -69,7 +69,7 @@ public class RouteService {
 			Mono<List<FilterDefinition>> filters = this.filterService
 				.loadSpringCloudGatewayFilterDefinition(routeEntity.getId());
 
-			return Mono.zip(Mono.just(routeEntity), predicates, filters).map(tuple -> {
+			return Mono.zip(Mono.just(routeEntity), predicates, filters).map((tuple) -> {
 				RouteEntity route = tuple.getT1();
 				List<PredicateDefinition> predicateDefinitions = tuple.getT2();
 				List<FilterDefinition> filterDefinitions = tuple.getT3();
@@ -97,7 +97,7 @@ public class RouteService {
 	}
 
 	public Mono<RouteEntity> createRoute(@Valid RouteCreateModel routeModel) {
-		return this.routeRepository.existsByRouteId(routeModel.routeId()).flatMap(exists -> {
+		return this.routeRepository.existsByRouteId(routeModel.routeId()).flatMap((exists) -> {
 			if (exists) {
 				return Mono.error(new RouteAlreadyExistException());
 			}
@@ -105,7 +105,7 @@ public class RouteService {
 				return Mono
 					.zip(this.predicateService.validatePredicatesArgs(routeModel.predicates()),
 							this.filterService.validateFiltersArgs(routeModel.filters()))
-					.flatMap(tuple -> {
+					.flatMap((tuple) -> {
 						// Crée l'entité après validation des arguments
 						RouteEntity routeEntity = new RouteEntity();
 						routeEntity.setRouteId(routeModel.routeId());
@@ -118,7 +118,7 @@ public class RouteService {
 					});
 			}
 		})
-			.doOnNext(routeEntity -> this.publisher.publishEvent(new RefreshRoutesEvent(this)))
+			.doOnNext((routeEntity) -> this.publisher.publishEvent(new RefreshRoutesEvent(this)))
 			.subscribeOn(Schedulers.boundedElastic());
 	}
 
@@ -127,7 +127,7 @@ public class RouteService {
 			.zip(this.findById(routeId).switchIfEmpty(Mono.error(new RouteNotFoundException())),
 					this.predicateService.validatePredicatesArgs(routeModel.predicates()),
 					this.filterService.validateFiltersArgs(routeModel.filters()))
-			.flatMap(tuple3 -> {
+			.flatMap((tuple3) -> {
 				RouteEntity routeEntity = tuple3.getT1();
 				routeEntity.setRouteId(routeModel.routeId());
 				routeEntity.setUri(routeModel.uri().toASCIIString());
@@ -137,7 +137,7 @@ public class RouteService {
 					.flatMap(deleteFilters())
 					.flatMap(createPredicates(routeModel))
 					.flatMap(createFilters(routeModel))
-					.doOnNext(r -> this.publisher.publishEvent(new RefreshRoutesEvent(this)));
+					.doOnNext((r) -> this.publisher.publishEvent(new RefreshRoutesEvent(this)));
 			})
 			.subscribeOn(Schedulers.boundedElastic());
 	}
@@ -145,29 +145,33 @@ public class RouteService {
 	public Mono<Void> deleteRoute(Long routeId) {
 		return this.findById(routeId)
 			.switchIfEmpty(Mono.error(new RouteNotFoundException()))
-			.flatMap(r -> this.routeRepository.deleteById(routeId));
+			.flatMap((routeEntity) -> this.routeRepository.deleteById(routeId));
 	}
 
 	private Function<RouteEntity, Mono<RouteEntity>> deletePredicates() {
-		return r -> this.predicateService.deleteByRouteId(r.getId()).map(__ -> r).switchIfEmpty(Mono.just(r));
+		return (routeEntity) -> this.predicateService.deleteByRouteId(routeEntity.getId())
+			.map((__) -> routeEntity)
+			.switchIfEmpty(Mono.just(routeEntity));
 	}
 
 	private Function<RouteEntity, Mono<RouteEntity>> deleteFilters() {
-		return r -> this.filterService.deleteByRouteId(r.getId()).map(__ -> r).switchIfEmpty(Mono.just(r));
+		return (routeEntity) -> this.filterService.deleteByRouteId(routeEntity.getId())
+			.map((__) -> routeEntity)
+			.switchIfEmpty(Mono.just(routeEntity));
 	}
 
 	private Function<RouteEntity, Mono<RouteEntity>> createFilters(RouteCreateModel routeModel) {
-		return r -> this.filterService.createFilters(r, routeModel.filters())
+		return (routeEntity) -> this.filterService.createFilters(routeEntity, routeModel.filters())
 			.collectList()
-			.map(l -> r)
-			.defaultIfEmpty(r);
+			.map((l) -> routeEntity)
+			.defaultIfEmpty(routeEntity);
 	}
 
 	private Function<RouteEntity, Mono<RouteEntity>> createPredicates(RouteCreateModel routeModel) {
-		return r -> this.predicateService.createPredicates(r, routeModel.predicates())
+		return (routeEntity) -> this.predicateService.createPredicates(routeEntity, routeModel.predicates())
 			.collectList()
-			.map(l -> r)
-			.defaultIfEmpty(r);
+			.map((l) -> routeEntity)
+			.defaultIfEmpty(routeEntity);
 	}
 
 }

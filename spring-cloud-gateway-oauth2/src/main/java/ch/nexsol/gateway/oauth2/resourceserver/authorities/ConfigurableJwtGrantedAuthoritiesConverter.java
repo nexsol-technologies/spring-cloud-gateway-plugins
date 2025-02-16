@@ -48,7 +48,7 @@ public class ConfigurableJwtGrantedAuthoritiesConverter implements Converter<Jwt
 	private final JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
 
 	public ConfigurableJwtGrantedAuthoritiesConverter(@NotEmpty List<@NotEmpty String> jsonPaths) {
-		this.jsonPath = jsonPaths != null ? jsonPaths.stream().map((jsonPath) -> JsonPath.compile(jsonPath)).toList()
+		this.jsonPath = (jsonPaths != null) ? jsonPaths.stream().map((jsonPath) -> JsonPath.compile(jsonPath)).toList()
 				: Collections.emptyList();
 	}
 

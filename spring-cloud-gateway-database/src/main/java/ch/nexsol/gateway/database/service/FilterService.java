@@ -57,9 +57,9 @@ public class FilterService {
 	public Mono<Boolean> validateFiltersArgs(List<FilterCreateModel> filters) {
 		if (filters != null && !filters.isEmpty()) {
 			return Flux.fromIterable(filters)
-				.flatMap(filter -> this.gatewayConfigService.validateFilter(filter.name(), filter.args()))
-				.all(valid -> valid)
-				.flatMap(validFilters -> {
+				.flatMap((filter) -> this.gatewayConfigService.validateFilter(filter.name(), filter.args()))
+				.all((valid) -> valid)
+				.flatMap((validFilters) -> {
 					if (!validFilters) {
 						LOG.error("Some filters have bad arguments");
 						return Mono.error(new FiltersNotValidException());
@@ -70,14 +70,13 @@ public class FilterService {
 				});
 		}
 		else {
-
 			return Mono.just(true);
 		}
 	}
 
 	public Flux<FilterEntity> createFilters(RouteEntity routeEntity, List<FilterCreateModel> filters) {
 		if (filters != null && !filters.isEmpty()) {
-			return Flux.fromIterable(filters).flatMap(f -> {
+			return Flux.fromIterable(filters).flatMap((f) -> {
 				try {
 					FilterEntity filterEntity = new FilterEntity();
 					filterEntity.setName(f.name());
@@ -85,9 +84,9 @@ public class FilterService {
 					filterEntity.setRouteRefId(routeEntity.getId());
 					return this.filterRepository.save(filterEntity);
 				}
-				catch (JsonProcessingException e) {
+				catch (JsonProcessingException ex) {
 					LOG.error("Predicate {} has arguments '{}' which are not readable", f.name(), f.args());
-					return Mono.error(new FilterArgsNotReadableException(e));
+					return Mono.error(new FilterArgsNotReadableException(ex));
 				}
 			});
 		}
@@ -105,15 +104,15 @@ public class FilterService {
 	}
 
 	private Function<FilterEntity, FilterDefinition> toFilterDefinition() {
-		return filter -> {
+		return (filter) -> {
 			try {
 				FilterDefinition filterDefinition = new FilterDefinition();
 				filterDefinition.setName(filter.getName());
 				filterDefinition.setArgs(this.argumentService.jsonStringArgumentsToMap(filter.getArgs()));
 				return filterDefinition;
 			}
-			catch (Exception e) {
-				throw new RuntimeException("Error deserializing predicate args", e);
+			catch (Exception ex) {
+				throw new RuntimeException("Error deserializing predicate args", ex);
 			}
 		};
 	}

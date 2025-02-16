@@ -42,7 +42,7 @@ public class PredicateController {
 	}
 
 	@GetMapping(path = "/available-predicates/{predicate}/args")
-	public Flux<CharSequence> getArgs(@PathVariable() String predicate) {
+	public Flux<CharSequence> getArgs(@PathVariable String predicate) {
 		return this.gatewayConfigService.getArgsForPredicate(predicate);
 	}
 

@@ -37,8 +37,8 @@ public record RouteCreateModel(@NotEmpty String routeId, @NotNull URI uri, Integ
 			// this.uri = new URL(uri.toASCIIString()).toURI();
 			this.uri = new URI(uri.toASCIIString()).toURL().toURI();
 		}
-		catch (MalformedURLException | URISyntaxException e) {
-			throw new UnsupportedOperationException("URI not valid", e);
+		catch (MalformedURLException | URISyntaxException ex) {
+			throw new UnsupportedOperationException("URI not valid", ex);
 		}
 		this.order = order;
 		this.predicates = predicates;

@@ -40,8 +40,8 @@ class GatewayConfigServiceTests {
 	void shouldHaveSCGFilters() {
 		StepVerifier.create(this.gatewayConfigService.getAvailableFilters())
 			.recordWith(ArrayList::new)
-			.thenConsumeWhile(x -> true)
-			.expectRecordedMatches(elements -> !elements.isEmpty())
+			.thenConsumeWhile((x) -> true)
+			.expectRecordedMatches((elements) -> !elements.isEmpty())
 			.verifyComplete();
 
 	}
@@ -50,8 +50,8 @@ class GatewayConfigServiceTests {
 	void shouldHaveSCGPredicates() {
 		StepVerifier.create(this.gatewayConfigService.getAvailablePredicates())
 			.recordWith(ArrayList::new)
-			.thenConsumeWhile(x -> true)
-			.expectRecordedMatches(elements -> !elements.isEmpty())
+			.thenConsumeWhile((x) -> true)
+			.expectRecordedMatches((elements) -> !elements.isEmpty())
 			.verifyComplete();
 
 	}
@@ -62,7 +62,7 @@ class GatewayConfigServiceTests {
 		StepVerifier
 			.create(this.gatewayConfigService.validateFilter(factory.name(),
 					Map.of(GatewayFilter.NAME_KEY, "X-Request-red", GatewayFilter.VALUE_KEY, "blue")))
-			.assertNext(b -> assertThat(b).isTrue())
+			.assertNext((b) -> assertThat(b).isTrue())
 			.verifyComplete();
 	}
 
@@ -72,14 +72,14 @@ class GatewayConfigServiceTests {
 		StepVerifier
 			.create(this.gatewayConfigService.validateFilter(factory.name(),
 					Map.of(GatewayFilter.NAME_KEY, "X-Request-red")))
-			.assertNext(b -> assertThat(b).isFalse())
+			.assertNext((b) -> assertThat(b).isFalse())
 			.verifyComplete();
 		StepVerifier
 			.create(this.gatewayConfigService.validateFilter(factory.name(), Map.of("_unknown_", "X-Request-red")))
-			.assertNext(b -> assertThat(b).isFalse())
+			.assertNext((b) -> assertThat(b).isFalse())
 			.verifyComplete();
 		StepVerifier.create(this.gatewayConfigService.validateFilter(factory.name(), Map.of()))
-			.assertNext(b -> assertThat(b).isFalse())
+			.assertNext((b) -> assertThat(b).isFalse())
 			.verifyComplete();
 	}
 
@@ -89,7 +89,7 @@ class GatewayConfigServiceTests {
 		StepVerifier
 			.create(this.gatewayConfigService.validatePredicate(factory.name(),
 					Map.of(MethodRoutePredicateFactory.METHODS_KEY, "GET")))
-			.assertNext(b -> assertThat(b).isTrue())
+			.assertNext((b) -> assertThat(b).isTrue())
 			.verifyComplete();
 	}
 
@@ -97,10 +97,10 @@ class GatewayConfigServiceTests {
 	void shouldPredicateArgsValidationFailed() {
 		MethodRoutePredicateFactory factory = new MethodRoutePredicateFactory();
 		StepVerifier.create(this.gatewayConfigService.validatePredicate(factory.name(), Map.of("_unknown_", "GET")))
-			.assertNext(b -> assertThat(b).isFalse())
+			.assertNext((b) -> assertThat(b).isFalse())
 			.verifyComplete();
 		StepVerifier.create(this.gatewayConfigService.validatePredicate(factory.name(), Map.of()))
-			.assertNext(b -> assertThat(b).isFalse())
+			.assertNext((b) -> assertThat(b).isFalse())
 			.verifyComplete();
 	}
 

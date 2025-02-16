@@ -46,8 +46,8 @@ public class GatewayConfigService {
 	public GatewayConfigService(ConfigurationService configurationService, List<GatewayFilterFactory> gatewayFilters,
 			List<RoutePredicateFactory> predicates) {
 		this.configurationService = configurationService;
-		gatewayFilters.forEach(factory -> this.gatewayFilterFactories.put(factory.name(), factory));
-		predicates.forEach(factory -> this.predicates.put(factory.name(), factory));
+		gatewayFilters.forEach((factory) -> this.gatewayFilterFactories.put(factory.name(), factory));
+		predicates.forEach((factory) -> this.predicates.put(factory.name(), factory));
 	}
 
 	public Flux<CharSequence> getAvailablePredicates() {
@@ -61,13 +61,13 @@ public class GatewayConfigService {
 	public Flux<Map<String, Object>> getAvailablePredicatesWithArgs() {
 		return Flux.fromIterable(this.predicates.values())
 			.map((factory) -> Map.of("name", factory.name(), "args", factory.shortcutFieldOrder()))
-			.sort(Comparator.comparing(map -> (String) map.get("name")));
+			.sort(Comparator.comparing((map) -> (String) map.get("name")));
 	}
 
 	public Flux<Map<String, Object>> getAvailableFiltersWithArgs() {
 		return Flux.fromIterable(this.gatewayFilterFactories.values())
 			.map((factory) -> Map.of("name", factory.name(), "args", factory.shortcutFieldOrder()))
-			.sort(Comparator.comparing(map -> (String) map.get("name")));
+			.sort(Comparator.comparing((map) -> (String) map.get("name")));
 	}
 
 	public Flux<CharSequence> getArgsForPredicate(String predicate) {
@@ -84,15 +84,15 @@ public class GatewayConfigService {
 
 	public Mono<Boolean> validateFilter(String name, Map<String, String> args) {
 		return this.getAvailableFiltersWithArgs()
-			.filter(filter -> filter.get("name").equals(name))
+			.filter((filter) -> filter.get("name").equals(name))
 			.next() // Récupère le premier (et unique) élément correspondant
-			.flatMap(filter -> {
+			.flatMap((filter) -> {
 				@SuppressWarnings("unchecked")
 				List<String> validArgs = (List<String>) filter.get("args");
 				if (!validArgs.isEmpty() && args.keySet().isEmpty()) {
 					return Mono.just(false);
 				}
-				return Mono.just(validArgs.stream().allMatch(a -> args.keySet().contains(a)));
+				return Mono.just(validArgs.stream().allMatch((a) -> args.keySet().contains(a)));
 			})
 			.defaultIfEmpty(false); // Si aucun filtre trouvé avec ce nom, renvoie false
 	}
@@ -102,12 +102,12 @@ public class GatewayConfigService {
 			return Mono.error(new PredicateNotFoundException(name));
 		}
 		return this.getAvailablePredicatesWithArgs()
-			.filter(predicate -> predicate.get("name").equals(name))
+			.filter((predicate) -> predicate.get("name").equals(name))
 			.next() // Récupère le premier (et unique) élément correspondant
-			.flatMap(predicate -> {
+			.flatMap((predicate) -> {
 				@SuppressWarnings("unchecked")
 				var validArgs = (List<String>) predicate.get("args");
-				return Mono.just(validArgs.stream().allMatch(a -> args.keySet().contains(a)));
+				return Mono.just(validArgs.stream().allMatch((a) -> args.keySet().contains(a)));
 			})
 			.map((isValid) -> {
 				if (isValid) {

@@ -59,9 +59,9 @@ public class PredicateService {
 	public Mono<Boolean> validatePredicatesArgs(List<PredicateCreateModel> predicates) {
 		if (predicates != null && !predicates.isEmpty()) {
 			return Flux.fromIterable(predicates)
-				.flatMap(predicate -> this.gatewayConfigService.validatePredicate(predicate.name(), predicate.args()))
-				.all(valid -> valid)
-				.flatMap(validPredicates -> {
+				.flatMap((predicate) -> this.gatewayConfigService.validatePredicate(predicate.name(), predicate.args()))
+				.all((valid) -> valid)
+				.flatMap((validPredicates) -> {
 					if (!validPredicates) {
 						LOG.error("Some predicates have bad arguments");
 						return Mono.error(new PredicatesNotValidException());
@@ -72,14 +72,13 @@ public class PredicateService {
 				});
 		}
 		else {
-
 			return Mono.just(true);
 		}
 	}
 
 	public Flux<PredicateEntity> createPredicates(RouteEntity routeEntity, List<PredicateCreateModel> predicates) {
 		if (predicates != null && !predicates.isEmpty()) {
-			return Flux.fromIterable(predicates).flatMap(p -> {
+			return Flux.fromIterable(predicates).flatMap((p) -> {
 				try {
 					PredicateEntity predicateEntity = new PredicateEntity();
 					predicateEntity.setName(p.name());
@@ -87,9 +86,9 @@ public class PredicateService {
 					predicateEntity.setRouteRefId(routeEntity.getId());
 					return this.predicateRepository.save(predicateEntity);
 				}
-				catch (JsonProcessingException e) {
+				catch (JsonProcessingException ex) {
 					LOG.error("Filter {} has arguments '{}' which are not readable", p.name(), p.args());
-					return Mono.error(new PredicateArgsNotReadableException(e));
+					return Mono.error(new PredicateArgsNotReadableException(ex));
 				}
 			});
 		}
@@ -106,19 +105,16 @@ public class PredicateService {
 		return this.findByRouteId(routeId).map(toPredicateDefinition()).collectList();
 	}
 
-	/**
-	 * @return
-	 */
 	private Function<PredicateEntity, PredicateDefinition> toPredicateDefinition() {
-		return predicate -> {
+		return (predicate) -> {
 			try {
 				PredicateDefinition predicateDefinition = new PredicateDefinition();
 				predicateDefinition.setName(predicate.getName());
 				predicateDefinition.setArgs(this.argumentService.jsonStringArgumentsToMap(predicate.getArgs()));
 				return predicateDefinition;
 			}
-			catch (Exception e) {
-				throw new RuntimeException("Error deserializing predicate args", e);
+			catch (Exception ex) {
+				throw new RuntimeException("Error deserializing predicate args", ex);
 			}
 		};
 	}

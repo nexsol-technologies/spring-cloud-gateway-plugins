@@ -56,7 +56,9 @@ public class OpenapiService {
 	}
 
 	public Mono<OpenapiDiscover> discoverOpenapiUrl(String routeId, RouteDefinition routeDefinition) {
-		return this.discoveryClient.getInstances(routeId).last().flatMap(si -> discoverOpenapiUrl(si, routeDefinition));
+		return this.discoveryClient.getInstances(routeId)
+			.last()
+			.flatMap((si) -> discoverOpenapiUrl(si, routeDefinition));
 	}
 
 	private Mono<OpenapiDiscover> discoverOpenapiUrl(ServiceInstance serviceInstance, RouteDefinition routeDefinition) {
@@ -67,9 +69,9 @@ public class OpenapiService {
 			paths = Flux.just(openapiPath);
 		}
 
-		return paths.flatMap(path -> callOpenapi(serviceInstance.getUri(), path, routeDefinition))
+		return paths.flatMap((path) -> callOpenapi(serviceInstance.getUri(), path, routeDefinition))
 			.next()
-			.map(openapiResponse -> {
+			.map((openapiResponse) -> {
 				if (!serviceInstance.getMetadata().containsKey(METADATA_SERVICE_INSTANCE_OPENAPI_PATH_KEY)) {
 					serviceInstance.getMetadata()
 						.put(METADATA_SERVICE_INSTANCE_OPENAPI_PATH_KEY, openapiResponse.path());
@@ -77,7 +79,7 @@ public class OpenapiService {
 				if (!serviceInstance.getMetadata().containsKey(METADATA_SERVICE_INSTANCE_OPENAPI_CONTENT_TYPE_KEY)) {
 					serviceInstance.getMetadata()
 						.put(METADATA_SERVICE_INSTANCE_OPENAPI_CONTENT_TYPE_KEY,
-								openapiResponse.contentType().map(m -> m.toString()).orElse(""));
+								openapiResponse.contentType().map((m) -> m.toString()).orElse(""));
 				}
 
 				routeDefinition.setMetadata(new LinkedHashMap<>(serviceInstance.getMetadata()));
@@ -86,12 +88,13 @@ public class OpenapiService {
 	}
 
 	private Mono<OpenapiDiscover> callOpenapi(URI uri, String path, RouteDefinition routeDefinition) {
-		return this.webClient.get().uri(uri + path).exchangeToMono(response -> {
+		return this.webClient.get().uri(uri + path).exchangeToMono((response) -> {
 			if (response.statusCode().equals(HttpStatus.OK)) {
 				LOG.debug("url {} found for route {} : {}", uri + path, routeDefinition, response.statusCode());
 				return response.bodyToMono(byte[].class)
 					.map(ByteArrayResource::new)
-					.map(b -> new OpenapiDiscover(path, response.headers().contentType(), b, routeDefinition));
+					.map((byteResource) -> new OpenapiDiscover(path, response.headers().contentType(), byteResource,
+							routeDefinition));
 			}
 			else {
 				LOG.debug("url {} not found for route {} : {}", uri + path, routeDefinition, response.statusCode());
@@ -100,7 +103,7 @@ public class OpenapiService {
 		}).onErrorComplete();
 	}
 
-	public static record OpenapiDiscover(String path, Optional<MediaType> contentType, Resource resource,
+	public record OpenapiDiscover(String path, Optional<MediaType> contentType, Resource resource,
 			RouteDefinition routeDefinition) {
 	}
 

@@ -178,14 +178,14 @@ class RouteControllerTests {
 
 		assertThat(result2.get(1).routeId()).isEqualTo("test-create-with-predicate-and-filter");
 		assertThat(result2.get(1).uri()).isEqualTo("http://localhost-create");
-		assertThat(result2.get(1).predicates()).allMatch(p -> "Method".equals(p.name()));
-		assertThat(result2.get(1).filters()).allMatch(p -> "AddRequestHeader".equals(p.name()));
+		assertThat(result2.get(1).predicates()).allMatch((p) -> "Method".equals(p.name()));
+		assertThat(result2.get(1).filters()).allMatch((p) -> "AddRequestHeader".equals(p.name()));
 		System.out.println(result2);
 
 	}
 
 	@Test
-	void shouldRouteUpdateSuccessWithPredicateAndFilter() throws InterruptedException {
+	void shouldRouteUpdateSuccessWithPredicateAndFilter() {
 		RouteCreateModel model = new RouteCreateModel("test-create-and-update-with-predicate-and-filter",
 				URI.create("http://localhost-create"), null,
 				List.of(new PredicateCreateModel("Method", Map.of(MethodRoutePredicateFactory.METHODS_KEY, "GET"))),
@@ -233,8 +233,8 @@ class RouteControllerTests {
 
 		assertThat(resultGet.routeId()).isEqualTo("test-update-with-predicate-and-filter");
 		assertThat(resultGet.uri()).isEqualTo("http://localhost-create");
-		assertThat(resultGet.predicates()).allMatch(p -> "Method".equals(p.name()));
-		assertThat(resultGet.filters()).allMatch(p -> "AddRequestHeader".equals(p.name()));
+		assertThat(resultGet.predicates()).allMatch((p) -> "Method".equals(p.name()));
+		assertThat(resultGet.filters()).allMatch((p) -> "AddRequestHeader".equals(p.name()));
 		System.out.println(resultGet);
 
 	}
