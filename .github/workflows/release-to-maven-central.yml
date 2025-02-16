@@ -65,6 +65,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: free disk space
+        continue-on-error: true
         run: |
           df -h
           sudo swapoff -a
