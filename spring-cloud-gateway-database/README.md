@@ -24,3 +24,12 @@ This project provides a database management for routes for Spring Cloud Gateway
   <em>Manage routes saved in database.</em>
   <br>
 </p>
+
+## API Gateway Routes Management
+
+This project provides an API for managing gateway routes in a reactive environment using **Spring WebFlux**.
+
+### Features
+
+- Dynamic Route Management: Supports CRUD operations on routes. <br>
+- Predicate & Filter Support: Routes can be defined with predicates (conditions to match requests) and filters (modifications to requests/responses).
