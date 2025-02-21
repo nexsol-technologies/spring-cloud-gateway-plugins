@@ -60,7 +60,8 @@ jobs:
   publish-github-release:
     needs: publish-central-and-pages
     runs-on: ubuntu-latest
-
+    env:
+      ACTIONS_STEP_DEBUG: true
     steps:
       - uses: actions/checkout@v4
 
