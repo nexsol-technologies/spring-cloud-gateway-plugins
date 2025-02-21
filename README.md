@@ -30,6 +30,12 @@ This plugin provides openapi support for Spring Cloud Gateway
 [spring-cloud-gateway-samples](spring-cloud-gateway-samples/README.md)
 This projet provides some examples.
 
+## Spring Cloud Gateway documentation
+
+[reference documentation](https://docs.spring.io/spring-cloud-gateway/docs/current/reference/html/)
+
+
+
 ## Getting Help
 
 Having trouble with Spring cloud Gateway plugins by Nexsol? We’d like to help!
