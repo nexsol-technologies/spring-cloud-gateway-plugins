@@ -4,7 +4,7 @@ This project provides filters for Spring Cloud Gateway
 
 ```xml
     <properties>
-        <spring-cloud-gateway-plugins.version>0.0.1</spring-cloud-gateway-plugins.version>
+        <spring-cloud-gateway-plugins.version>1.0.0</spring-cloud-gateway-plugins.version>
     </properties>
     
     <dependencies>
