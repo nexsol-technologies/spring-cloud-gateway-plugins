@@ -83,7 +83,7 @@
 			<plugin>
 				<groupId>io.spring.javaformat</groupId>
 				<artifactId>spring-javaformat-maven-plugin</artifactId>
-				<version>0.0.42</version>
+				<version>${spring-javaformat-checkstyle.version}</version>
 				<executions>
 					<execution>
 						<phase>validate</phase>

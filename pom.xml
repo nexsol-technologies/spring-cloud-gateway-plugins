@@ -40,8 +40,8 @@
 		<maven.compiler.source>${java.version}</maven.compiler.source>
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 
-		<spring-boot.version>3.4.3</spring-boot.version>
-		<spring-cloud.version>2024.0.0</spring-cloud.version>
+		<spring-boot.version>3.4.4</spring-boot.version>
+		<spring-cloud.version>2024.0.1</spring-cloud.version>
 		<revision>1.0.1-SNAPSHOT</revision>
 
 		<!-- plugin versions -->
