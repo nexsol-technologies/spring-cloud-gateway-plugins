@@ -14,13 +14,13 @@
 	<description>Plugin to expose facilites for Spring Cloud Gateway's Openapi</description>
 	
 	<properties>
-		<springdoc-openapi.version>2.8.3</springdoc-openapi.version>
+		<springdoc-openapi.version>2.8.9</springdoc-openapi.version>
 	</properties>
 	
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-gateway</artifactId>
+			<artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

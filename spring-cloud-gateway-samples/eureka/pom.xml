@@ -13,6 +13,7 @@
 	<name>eureka</name>
 	<description>Service Registry : Netflix Eureka</description>
 	<properties>
+		<java.version>24</java.version>
 	</properties>
 	<dependencies>
 		<dependency>
