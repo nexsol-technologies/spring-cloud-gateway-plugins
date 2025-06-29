@@ -6,6 +6,7 @@ spring.application.name: gateway
 spring.cloud.gateway:
   webfilter:
     correlation-id.enabled: true
+spring.cloud.gateway.server.webflux:
   globalcors:
     cors-configurations:
       '[/**]':
@@ -88,6 +89,7 @@ logging:
   level:
     '[ch.nexsol]': debug
     '[org.springframework]': info
+    '[org.springframework.boot]': info
 ---
 spring:
   config:
@@ -109,7 +111,7 @@ eureka:
   client:
     enabled: true
     fetch-registry: true
-spring.cloud.gateway:
+spring.cloud.gateway.server.webflux:
   discovery:
     locator:
       enabled: true

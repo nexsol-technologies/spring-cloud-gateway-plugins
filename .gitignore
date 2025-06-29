@@ -39,3 +39,6 @@ build/
 
 .jython_cache
 /${GIT_DIRECTORY}
+
+.checkstyle
+
