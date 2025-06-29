@@ -13,6 +13,7 @@
 	<name>sample-auth-server</name>
 	<description>Spring Security Auth Server for sample</description>
 	<properties>
+		<java.version>24</java.version>
 	</properties>
 	<dependencies>
 		<dependency>
