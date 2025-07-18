@@ -79,7 +79,7 @@ public class ResourceServerAutoConfiguration {
 		@Conditional(MultitenancyConfiguredCondition.class)
 		ReactiveAuthenticationManagerResolver<ServerWebExchange> jwtIssuerReactiveAuthenticationManagerResolver(
 				ResourceServerPluginsProperties resourceServerMultiTenantProperties,
-				DefaultJwtGrantedAuthoritiesConverter converter) {
+				Converter<Jwt, AbstractAuthenticationToken> converter) {
 
 			return new JwtIssuerReactiveAuthenticationManagerResolver(
 					new TrustedIssuerJwtReactiveAuthenticationManagerResolver(
