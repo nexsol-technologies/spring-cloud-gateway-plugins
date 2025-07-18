@@ -42,7 +42,7 @@
 
 		<spring-boot.version>3.5.3</spring-boot.version>
 		<spring-cloud.version>2025.0.0</spring-cloud.version>
-		<revision>1.2.1-SNAPSHOT</revision>
+		<revision>1.2.2-SNAPSHOT</revision>
 
 		<!-- plugin versions -->
 		<build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
