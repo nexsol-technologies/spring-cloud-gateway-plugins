@@ -4,7 +4,7 @@ This plugin provides openapi support for Spring Cloud Gateway
 
 ```xml
     <properties>
-        <spring-cloud-gateway-plugins.version>1.0.0</spring-cloud-gateway-plugins.version>
+        <spring-cloud-gateway-plugins.version>1.2.2-SNAPSHOT</spring-cloud-gateway-plugins.version>
     </properties>
     
     <dependencies>
@@ -21,7 +21,7 @@ This plugin provides openapi support for Spring Cloud Gateway
 If Spring Cloud Gateway use route locator with discovery client (like eureka), this plugin search for openapi documentation in down stream client (with default path `/v3/api-docs`).
 
 ```yaml
-spring.cloud.gateway:
+spring.cloud.gateway.server.webflux:
   discovery:
     locator:
       enabled: true

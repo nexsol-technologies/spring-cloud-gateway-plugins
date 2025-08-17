@@ -4,7 +4,7 @@ This plugin provides OAuth2 support for Spring Cloud Gateway.
 
 ```xml
 <properties>
-    <spring-cloud-gateway-plugins.version>1.0.0</spring-cloud-gateway-plugins.version>
+    <spring-cloud-gateway-plugins.version>1.2.2-SNAPSHOT</spring-cloud-gateway-plugins.version>
 </properties>
 
 <dependencies>

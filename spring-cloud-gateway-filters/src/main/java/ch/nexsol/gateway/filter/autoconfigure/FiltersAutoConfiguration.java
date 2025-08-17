@@ -52,7 +52,8 @@ public class FiltersAutoConfiguration {
 	}
 
 	@Bean
-	@ConditionalOnProperty(name = "spring.cloud.gateway.webfilter.correlation-id.enabled", matchIfMissing = true)
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.webfilter.correlation-id.enabled",
+			matchIfMissing = true)
 	CorrelationIdFilter correlationIdFilter() {
 		return new CorrelationIdFilter();
 	}

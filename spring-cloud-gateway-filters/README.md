@@ -4,7 +4,7 @@ This project provides filters for Spring Cloud Gateway
 
 ```xml
     <properties>
-        <spring-cloud-gateway-plugins.version>1.0.0</spring-cloud-gateway-plugins.version>
+        <spring-cloud-gateway-plugins.version>1.2.2-SNAPSHOT</spring-cloud-gateway-plugins.version>
     </properties>
     
     <dependencies>
@@ -25,7 +25,7 @@ The `Authorization` filter validates Spring security `GrantedAuthority`, when Ro
 usage: 
 
 ```yaml
-spring.cloud.gateway:
+spring.cloud.gateway.server.webflux:
   routes:
   - id: test-authorization
     uri: http://localhost:8080
@@ -44,7 +44,7 @@ The `AuthorizationToken` filter validates an access token (JWT). It retrieves th
 usage: 
 
 ```yaml
-spring.cloud.gateway:
+spring.cloud.gateway.server.webflux:
   routes:
   - id: test-authorization-token
     uri: http://localhost:8080
@@ -67,7 +67,7 @@ The `ConvertHttpMethod` filter converts a http method to another. ex GET to POST
 usage: 
 
 ```yaml
-spring.cloud.gateway:
+spring.cloud.gateway.server.webflux:
   routes:
   - id: test-convert-http-method
     uri: http://localhost:8080
@@ -81,7 +81,7 @@ spring.cloud.gateway:
 ### CorrelationId
 The `CorrelationId` filter adds the `x-correlation-id` header to the HTTP response. Its value is the `traceId` from Micrometer Tracing observation.
 ```yaml
-spring.cloud.gateway:
+spring.cloud.gateway.server.webflux:
   webfilter:
     correlation-id.enabled: true
 ```
@@ -97,7 +97,7 @@ It provides a simple layer of protection for non-authenticated APIs.
 usage: 
 
 ```yaml
-spring.cloud.gateway:
+spring.cloud.gateway.server.webflux:
   routes:
   - id: test-recaptcha
     uri: http://localhost:8080
