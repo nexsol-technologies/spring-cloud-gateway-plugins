@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.filter.factory;
+package ch.nexsol.gateway.oauth2.filter.factory;
 
 import java.text.ParseException;
 import java.util.List;
 
-import ch.nexsol.gateway.filter.factory.AuthorizationTokenGatewayFilterFactory.GrantAccess;
+import ch.nexsol.gateway.oauth2.filter.factory.AuthorizationTokenGatewayFilterFactory.GrantAccess;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTParser;
 import org.junit.jupiter.api.Test;

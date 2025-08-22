@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.filter.factory;
+package ch.nexsol.gateway.oauth2.filter.factory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,7 +32,6 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,13 +49,15 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 
-import static ch.nexsol.gateway.filter.common.Constants.UNKNOWN_VALUE;
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
 
+@Valid
 public class AuthorizationTokenGatewayFilterFactory
 		extends AbstractGatewayFilterFactory<AuthorizationTokenGatewayFilterFactory.Config> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(AuthorizationTokenGatewayFilterFactory.class);
+
+	public static final String UNKNOWN_VALUE = "unknown";
 
 	/**
 	 * Issuers key.
@@ -229,7 +230,7 @@ public class AuthorizationTokenGatewayFilterFactory
 		private List<@NotEmpty String> clientIds = new ArrayList<>(0);
 
 		@Valid
-		private List<@NotNull GrantAccess> grantAccesses = new ArrayList<>(0);
+		private List<@Valid GrantAccess> grantAccesses = new ArrayList<>(0);
 
 		public List<String> getIssuers() {
 			return this.issuers;
@@ -283,7 +284,7 @@ public class AuthorizationTokenGatewayFilterFactory
 			return this.jsonPath;
 		}
 
-		public void setJsonPath(String jsonPath) {
+		public void setJsonPath(@NotEmpty String jsonPath) {
 			this.jsonPath = jsonPath;
 		}
 

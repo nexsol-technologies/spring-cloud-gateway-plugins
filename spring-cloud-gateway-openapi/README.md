@@ -3,10 +3,6 @@
 This plugin provides openapi support for Spring Cloud Gateway
 
 ```xml
-    <properties>
-        <spring-cloud-gateway-plugins.version>1.2.2-SNAPSHOT</spring-cloud-gateway-plugins.version>
-    </properties>
-    
     <dependencies>
         <dependency>
            <groupId>ch.nexsol.gateway</groupId>

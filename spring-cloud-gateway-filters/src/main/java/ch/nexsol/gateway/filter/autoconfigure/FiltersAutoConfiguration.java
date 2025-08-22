@@ -18,7 +18,6 @@ package ch.nexsol.gateway.filter.autoconfigure;
 
 import ch.nexsol.gateway.filter.CorrelationIdFilter;
 import ch.nexsol.gateway.filter.factory.AuthorizationGatewayFilterFactory;
-import ch.nexsol.gateway.filter.factory.AuthorizationTokenGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.ConvertHttpMethodGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.RecaptchaGatewayFilterFactory;
 
@@ -34,11 +33,6 @@ public class FiltersAutoConfiguration {
 	@Bean
 	AuthorizationGatewayFilterFactory authorizationGatewayFilterFactory() {
 		return new AuthorizationGatewayFilterFactory();
-	}
-
-	@Bean
-	AuthorizationTokenGatewayFilterFactory authorizationTokenGatewayFilterFactory() {
-		return new AuthorizationTokenGatewayFilterFactory();
 	}
 
 	@Bean

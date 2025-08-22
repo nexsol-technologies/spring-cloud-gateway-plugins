@@ -64,7 +64,7 @@
 			<plugin>
 				<groupId>io.spring.javaformat</groupId>
 				<artifactId>spring-javaformat-maven-plugin</artifactId>
-				<version>${spring-javaformat-checkstyle.version}</version>
+                <version>${spring-javaformat-maven-plugin.version}</version>
 				<executions>
 					<execution>
 						<phase>validate</phase>
