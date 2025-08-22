@@ -12,7 +12,7 @@ management:
     sampling:
       probability: 1
 
-spring.cloud.gateway:
+spring.cloud.gateway.server.webflux:
   routes:
   - id: validate-correlation-id-header
     uri: ${test.uri}

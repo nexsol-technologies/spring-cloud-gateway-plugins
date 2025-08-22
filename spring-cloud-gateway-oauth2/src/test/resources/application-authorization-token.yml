@@ -1,4 +1,4 @@
-spring.cloud.gateway:
+spring.cloud.gateway.server.webflux:
   routes:
   - id: validate-authorization-token
     uri: ${test.uri}

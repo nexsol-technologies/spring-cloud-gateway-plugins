@@ -1,0 +1,4 @@
+spring.application.name: spring-cloud-gateway-oauth2
+test:
+  hostport: httpbin.org:80
+  uri: lb://testservice

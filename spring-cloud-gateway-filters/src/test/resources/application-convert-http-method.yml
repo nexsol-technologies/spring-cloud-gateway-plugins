@@ -1,4 +1,4 @@
-spring.cloud.gateway:
+spring.cloud.gateway.server.webflux:
   routes:
   - id: convert-http-method-post
     uri: forward:/convert-http-method
