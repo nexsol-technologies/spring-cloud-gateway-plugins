@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.filter.factory;
+package ch.nexsol.gateway.oauth2.filter.factory;
 
 import java.util.Map;
 
-import ch.nexsol.gateway.filter.BaseWebClientTests;
+import ch.nexsol.gateway.oauth2.filter.BaseWebClientTests;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.test.context.SpringBootTest;
