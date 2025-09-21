@@ -14,7 +14,7 @@
 	<description>Plugin to expose facilites for Spring Cloud Gateway's Openapi</description>
 	
 	<properties>
-		<springdoc-openapi.version>2.8.9</springdoc-openapi.version>
+		<springdoc-openapi.version>2.8.13</springdoc-openapi.version>
 	</properties>
 	
 	<dependencies>
