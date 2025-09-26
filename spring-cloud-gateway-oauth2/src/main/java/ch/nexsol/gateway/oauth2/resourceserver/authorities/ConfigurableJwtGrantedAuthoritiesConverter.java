@@ -43,12 +43,13 @@ import org.springframework.util.StringUtils;
  */
 public class ConfigurableJwtGrantedAuthoritiesConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
-	private final List<JsonPath> jsonPath;
+	private final List<String> jsonPath;
 
 	private final JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
 
 	public ConfigurableJwtGrantedAuthoritiesConverter(@NotEmpty List<@NotEmpty String> jsonPaths) {
-		this.jsonPath = (jsonPaths != null) ? jsonPaths.stream().map((jsonPath) -> JsonPath.compile(jsonPath)).toList()
+		this.jsonPath = (jsonPaths != null)
+				? jsonPaths.stream().map((jsonPath) -> JsonPath.compile(jsonPath).getPath()).toList()
 				: Collections.emptyList();
 	}
 
