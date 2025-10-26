@@ -16,6 +16,8 @@
 
 package ch.nexsol.gateway.oauth2.filter;
 
+import java.time.Duration;
+
 import org.junit.jupiter.api.BeforeEach;
 
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -38,13 +40,16 @@ public class BaseWebClientTests {
 	protected WebTestClient testClient;
 
 	@BeforeEach
-	public void setup() throws Exception {
+	public void setup() {
 		setup(new ReactorClientHttpConnector(), "http://localhost:" + this.port);
 	}
 
 	protected void setup(ClientHttpConnector httpConnector, String baseUri) {
 		this.baseUri = baseUri;
-		this.testClient = WebTestClient.bindToServer(httpConnector).baseUrl(this.baseUri).build();
+		this.testClient = WebTestClient.bindToServer(httpConnector)
+			.responseTimeout(Duration.ofMinutes(1))
+			.baseUrl(this.baseUri)
+			.build();
 	}
 
 }

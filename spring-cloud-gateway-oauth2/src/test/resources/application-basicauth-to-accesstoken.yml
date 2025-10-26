@@ -1,0 +1,10 @@
+spring.cloud.gateway.server.webflux:
+  webfilter:
+    basicauth-exchange-oauth2:
+      token-uris:
+        my-client: http://localhost:${custom.port}
+
+logging:
+  level:
+    '[org.springframework.boot]': debug
+    '[ch]': trace

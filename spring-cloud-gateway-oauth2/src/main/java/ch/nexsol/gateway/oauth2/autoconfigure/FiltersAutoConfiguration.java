@@ -17,9 +17,16 @@
 package ch.nexsol.gateway.oauth2.autoconfigure;
 
 import ch.nexsol.gateway.oauth2.filter.factory.AuthorizationTokenGatewayFilterFactory;
+import ch.nexsol.gateway.oauth2.filter.webfilter.BasicAuthExchangeToAccessTokenGatewayWebFilter;
+import ch.nexsol.gateway.oauth2.filter.webfilter.condition.BasicAuthExchangeConfiguredCondition;
+import ch.nexsol.gateway.oauth2.properties.BasicAuthExchangeToAccessTokenProperties;
+import io.micrometer.observation.ObservationRegistry;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 
 @AutoConfiguration
 public class FiltersAutoConfiguration {
@@ -27,6 +34,21 @@ public class FiltersAutoConfiguration {
 	@Bean
 	AuthorizationTokenGatewayFilterFactory authorizationTokenGatewayFilterFactory() {
 		return new AuthorizationTokenGatewayFilterFactory();
+	}
+
+	@Bean
+	@Conditional(BasicAuthExchangeConfiguredCondition.class)
+	@ConfigurationProperties(prefix = "spring.cloud.gateway.server.webflux.webfilter.basicauth-exchange-oauth2")
+	BasicAuthExchangeToAccessTokenProperties basicAuthForClientCredentialsProperties() {
+		return new BasicAuthExchangeToAccessTokenProperties();
+	}
+
+	@Bean
+	@Conditional(BasicAuthExchangeConfiguredCondition.class)
+	BasicAuthExchangeToAccessTokenGatewayWebFilter basicAuthExchangeGatewayWebFilter(
+			BasicAuthExchangeToAccessTokenProperties properties, CacheManager cacheManager,
+			ObservationRegistry registry) {
+		return new BasicAuthExchangeToAccessTokenGatewayWebFilter(properties, cacheManager, registry);
 	}
 
 }

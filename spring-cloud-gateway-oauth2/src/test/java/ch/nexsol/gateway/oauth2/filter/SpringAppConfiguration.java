@@ -16,15 +16,21 @@
 
 package ch.nexsol.gateway.oauth2.filter;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+
+import okhttp3.mockwebserver.MockWebServer;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,6 +51,23 @@ public class SpringAppConfiguration {
 		return WebClient.builder().build();
 	}
 
+	@Bean
+	CacheManager cacheManager() {
+		return new ConcurrentMapCacheManager("basicauth-token-exchange.cache");
+	}
+
+	@Bean(destroyMethod = "shutdown")
+	MockWebServer mockWebServer() throws IOException {
+		MockWebServer mockOAuthServer = new MockWebServer();
+		mockOAuthServer.start();
+		return mockOAuthServer;
+	}
+
+	@Bean
+	DynamicPropertyRegistrar apiPropertiesRegistrar(MockWebServer mockWebServer) {
+		return (registry) -> registry.add("custom.port", mockWebServer::getPort);
+	}
+
 	@RestController
 	@RequestMapping
 	public class Controller {
@@ -57,19 +80,9 @@ public class SpringAppConfiguration {
 			return result;
 		}
 
-		// not working with PostMapping and GetMapping
-		@RequestMapping(path = { "/convert-http-method" }, method = { RequestMethod.POST, RequestMethod.GET },
-				produces = MediaType.APPLICATION_JSON_VALUE)
-		public Map<String, Object> post(ServerWebExchange exchange) {
-			Map<String, Object> result = new HashMap<>();
-			result.put("method", exchange.getRequest().getMethod().name());
-			result.put("old-method", exchange.getRequest().getHeaders().getFirst("x-method"));
-			return result;
-		}
-
-		@RequestMapping(path = { "/correlation-id-header" }, method = { RequestMethod.GET, RequestMethod.POST },
-				produces = MediaType.APPLICATION_JSON_VALUE)
-		public Map<String, Object> correlationIdHeader(ServerWebExchange exchange) {
+		@RequestMapping(path = { "/api/resource", "/actuator/health", "/ws/test" },
+				method = { RequestMethod.GET, RequestMethod.POST }, produces = MediaType.APPLICATION_JSON_VALUE)
+		public Map<String, Object> basicAuthToAccessToken(ServerWebExchange exchange) {
 			Map<String, Object> result = new HashMap<>();
 			result.put("headers", exchange.getRequest().getHeaders());
 			return result;
