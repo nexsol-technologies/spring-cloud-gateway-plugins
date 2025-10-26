@@ -163,7 +163,7 @@ public class AuthorizationTokenGatewayFilterFactory
 		return grantAccesses.stream().allMatch((grantAccess) -> hasAuthority(claims, grantAccess));
 	}
 
-	public boolean hasAuthority(Map<String, Object> claims, GrantAccess grantAccess) {
+	boolean hasAuthority(Map<String, Object> claims, GrantAccess grantAccess) {
 
 		Collection<String> claimValues = null;
 		String path = grantAccess.getJsonPath();
