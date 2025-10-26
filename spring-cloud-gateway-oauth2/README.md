@@ -12,7 +12,7 @@ This plugin provides OAuth2 support for Spring Cloud Gateway.
     </dependencies>
 ```
 
-## Filters
+## GatewayFilter Factories
 
 ### AuthorizationToken
 
@@ -35,6 +35,30 @@ spring.cloud.gateway.server.webflux:
         grant-accesses: # (optional) List of roles to validate. If many grant_access is provided, it is an AND validation: The token MUST have all the rules
         - jsonPath: '$.resource_access.*.roles'
           roles: "role-1,role-2"
+```
+
+## WebFilter
+
+### BasicAuthExchangeToAccessToken
+
+This Spring Cloud Gateway filter is designed to intercept incoming requests containing a Basic authentication header, exchange it for a Bearer token (Access Token) from an OAuth2 server, and replace the Basic header with the Bearer token for transmission to downstream services.
+It implements a token expiration-based caching mechanism to optimize performance and minimize calls to the authorization server.
+<h3> 🚀 Key Features </h3> 
+<ul>
+<li>Basic to Bearer Conversion: Replaces Basic authentication with Bearer authentication for downstream services.</li>
+<li>Client Credentials Flow: Uses the standard OAuth 2.0 Client Credentials Grant flow.</li>
+<li>Caching: Caches the access token in memory, relying on the JWT expiration date (exp) to ensure only valid tokens are used.</li>
+</ul>  
+
+usage:
+```yaml
+spring.cloud.gateway.server.webflux:
+  webfilter:
+    basicauth-exchange-oauth2:
+      token-uri:
+        user1: https://my-authorization-server/protocol/openid-connect/token
+        user2: https://keycloak/realms/test/protocol/openid-connect/token
+        user3: https://keycloak/realms/test/protocol/openid-connect/token
 ```
 
 ## Converter for GrantedAuthority
