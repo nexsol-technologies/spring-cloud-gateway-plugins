@@ -44,9 +44,11 @@ spring.cloud.gateway.server.webflux:
 This Spring Cloud Gateway filter is designed to intercept incoming requests containing a Basic authentication header, exchange it for a Bearer token (Access Token) from an OAuth2 server, and replace the Basic header with the Bearer token for transmission to downstream services.
 It implements a token expiration-based caching mechanism to optimize performance and minimize calls to the authorization server.
 <h3> 🚀 Key Features </h3> 
-Basic to Bearer Conversion: Replaces Basic authentication with Bearer authentication for downstream services.
-Client Credentials Flow: Uses the standard OAuth 2.0 Client Credentials Grant flow.
-Caching: Caches the access token in memory, relying on the JWT expiration date (exp) to ensure only valid tokens are used.
+<ul>
+<li>Basic to Bearer Conversion: Replaces Basic authentication with Bearer authentication for downstream services.</li>
+<li>Client Credentials Flow: Uses the standard OAuth 2.0 Client Credentials Grant flow.</li>
+<li>Caching: Caches the access token in memory, relying on the JWT expiration date (exp) to ensure only valid tokens are used.</li>
+</ul>  
 
 usage:
 ```yaml
