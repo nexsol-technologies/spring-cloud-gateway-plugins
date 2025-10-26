@@ -54,11 +54,11 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 
+import static ch.nexsol.gateway.oauth2.utils.SecurityUtils.HEADER_AUTHORIZATION_BASIC;
+
 public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter, Ordered {
 
 	private static final Logger LOG = LoggerFactory.getLogger(BasicAuthExchangeToAccessTokenGatewayWebFilter.class);
-
-	private static final String HEADER_AUTHORIZATION_BASIC = "basic ";
 
 	private static final String HTTPS_SCHEME = "https";
 

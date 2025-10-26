@@ -61,6 +61,26 @@ spring.cloud.gateway.server.webflux:
         user3: https://keycloak/realms/test/protocol/openid-connect/token
 ```
 
+#### Spring Security Integration Example
+
+To integrate this filter into the Spring Security WebFlux chain, you typically define a security filter chain that is conditionally activated only when a Basic Authorization header is detected. The custom filter is then added before the standard authentication process.
+
+```
+@Bean
+@Order(1)
+@Conditional(BasicAuthExchangeConfiguredCondition.class)
+SecurityWebFilterChain basicWebFilterChain(ServerHttpSecurity http,
+        BasicAuthExchangeToAccessTokenProperties properties,
+        BasicAuthExchangeToAccessTokenGatewayWebFilter basicAuthExchangeGatewayWebFilter) {
+...
+    http.securityMatcher(SecurityUtils.authorizationHeaderBasicMatcher(properties));
+    http.addFilterBefore(basicAuthExchangeGatewayWebFilter, SecurityWebFiltersOrder.AUTHENTICATION);
+    return http.build();
+}
+
+```
+
+
 ## Converter for GrantedAuthority
 
 ### Default Converter
