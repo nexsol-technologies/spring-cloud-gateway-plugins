@@ -98,9 +98,8 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 			Server server = new Server();
 			server.setUrl(this.apiGatewayUri.toString() + path);
 			openAPI.put("servers", Collections.singletonList(server));
-			String result;
 			try {
-				result = this.objectMapper.writeValueAsString(openAPI);
+				String result = this.objectMapper.writeValueAsString(openAPI);
 				return Mono.just(result);
 			}
 			catch (JsonProcessingException ex) {
