@@ -16,7 +16,6 @@
 
 package ch.nexsol.gateway.openapi.hub.discovery;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -67,7 +66,6 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 			.flatMap((routeDefinition) -> {
 				String routeId = routeDefinition.getId().replace(this.routeIdPrefix, "");
 				return this.openapiService.discoverOpenapiUrl(routeId, routeDefinition);
-
 			})
 			.map((openapiDiscover) -> {
 				RouteDefinition routeDefinition = openapiDiscover.routeDefinition();
@@ -83,20 +81,9 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 				r.setId(ROUTE_ID_PREFIX + name);
 				r.setUri(routeDefinition.getUri());
 				r.setMetadata(Map.of("name", name));
-
-				// filter phase
-				List<FilterDefinition> filters = new ArrayList<>();
-				FilterDefinition f = new FilterDefinition("RewritePath=" + API_DOCS_URL + path + ", " + API_DOCS_URL);
-				filters.add(f);
-				f = new FilterDefinition("OpenapiModifyResponseBody=" + path);
-				filters.add(f);
-				r.setFilters(filters);
-
-				// predicate phase
-				List<PredicateDefinition> predicates = new ArrayList<>();
-				PredicateDefinition p = new PredicateDefinition("Path=" + API_DOCS_URL + path);
-				predicates.add(p);
-				r.setPredicates(predicates);
+				r.setFilters(List.of(new FilterDefinition("RewritePath=" + API_DOCS_URL + path + ", " + API_DOCS_URL),
+						new FilterDefinition("OpenapiModifyResponseBody=" + path)));
+				r.setPredicates(List.of(new PredicateDefinition("Path=" + API_DOCS_URL + path)));
 
 				LOG.debug("Create openapi route {} for existing discovery route {}", r.toString(),
 						routeDefinition.toString());
