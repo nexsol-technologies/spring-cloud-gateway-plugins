@@ -16,20 +16,20 @@
 
 package ch.nexsol.gateway.openapi.hub.filter;
 
-import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.swagger.v3.oas.models.servers.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.dataformat.yaml.YAMLMapper;
 
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
@@ -50,7 +50,9 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 
 	private static final Logger LOG = LoggerFactory.getLogger(OpenapiModifyResponseBodyGatewayFilterFactory.class);
 
-	private final ObjectMapper objectMapper;
+	private final JsonMapper jsonMapper;
+
+	private final YAMLMapper yamlMapper;
 
 	private final Set<MessageBodyDecoder> messageBodyDecoders;
 
@@ -88,8 +90,8 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 			URI apiGatewayUri) {
 		super(Config.class);
 
-		this.objectMapper = new ObjectMapper();
-		this.objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+		this.jsonMapper = JsonMapper.builder().build();
+		this.yamlMapper = YAMLMapper.builder().build();
 
 		this.messageReaders = messageReaders;
 		this.messageBodyDecoders = messageBodyDecoders;
@@ -122,29 +124,40 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 
 	/**
 	 * Rewrites the {@code servers} section of the given OpenAPI document so it advertises
-	 * the gateway URI. A document that cannot be parsed as JSON (for example a YAML
-	 * document) is returned unchanged rather than dropped, so the client always receives
-	 * a usable body.
+	 * the gateway URI. Both JSON and YAML documents are supported and re-serialized in
+	 * their original format. A document that can be parsed as neither is returned
+	 * unchanged rather than dropped, so the client always receives a usable body.
 	 * @param body the raw OpenAPI document, may be {@code null} or empty
 	 * @param path the path appended to the gateway URI in the rewritten servers
 	 * @return the rewritten document, or the original body when it could not be rewritten
 	 */
-	@SuppressWarnings({ "rawtypes", "unchecked" })
 	byte[] rewriteServers(byte[] body, String path) {
 		if (body == null || body.length == 0) {
 			return body;
 		}
-		try {
-			LinkedHashMap openAPI = this.objectMapper.readValue(body, LinkedHashMap.class);
-			Server server = new Server();
-			server.setUrl(this.apiGatewayUri.toString() + path);
-			openAPI.put("servers", Collections.singletonList(server));
-			return this.objectMapper.writeValueAsBytes(openAPI);
+		// JSON is a subset of YAML, so the format must be detected to be preserved: parse
+		// (and later re-serialize) with the JSON mapper first, falling back to YAML.
+		ObjectMapper mapper = this.jsonMapper;
+		LinkedHashMap<String, Object> document = parse(this.jsonMapper, body);
+		if (document == null) {
+			mapper = this.yamlMapper;
+			document = parse(this.yamlMapper, body);
 		}
-		catch (IOException ex) {
-			LOG.warn("Could not rewrite the OpenAPI servers for path {}; forwarding the document unchanged: {}", path,
-					ex.getMessage());
+		if (document == null) {
+			LOG.warn("Could not parse the OpenAPI document for path {} as JSON or YAML; forwarding it unchanged", path);
 			return body;
+		}
+		document.put("servers", List.of(Map.of("url", this.apiGatewayUri.toString() + path)));
+		return mapper.writeValueAsBytes(document);
+	}
+
+	@SuppressWarnings("unchecked")
+	private static LinkedHashMap<String, Object> parse(ObjectMapper mapper, byte[] body) {
+		try {
+			return mapper.readValue(body, LinkedHashMap.class);
+		}
+		catch (JacksonException ex) {
+			return null;
 		}
 	}
 
