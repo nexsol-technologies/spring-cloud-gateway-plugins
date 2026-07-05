@@ -84,6 +84,34 @@ class GatewayConfigServiceTests {
 	}
 
 	@Test
+	void shouldExposePredicateArgumentDefaults() {
+		Map<String, String> defaults = this.gatewayConfigService.getDefaultArgsForPredicate("Path");
+		assertThat(defaults).containsKeys("patterns", "matchTrailingSlash");
+		assertThat(defaults.get("matchTrailingSlash")).isEqualTo("true");
+		assertThat(defaults.get("patterns")).isEmpty();
+	}
+
+	@Test
+	void shouldExposeFilterArgumentDefaults() {
+		Map<String, String> defaults = this.gatewayConfigService.getDefaultArgsForFilter("StripPrefix");
+		assertThat(defaults).containsEntry("parts", "1");
+	}
+
+	@Test
+	void shouldFilterArgsValidationSuccessWithTypedArgument() {
+		StepVerifier.create(this.gatewayConfigService.validateFilter("StripPrefix", Map.of("parts", "2")))
+			.assertNext((b) -> assertThat(b).isTrue())
+			.verifyComplete();
+	}
+
+	@Test
+	void shouldFilterArgsValidationFailedOnTypeMismatch() {
+		StepVerifier.create(this.gatewayConfigService.validateFilter("StripPrefix", Map.of("parts", "notanint")))
+			.assertNext((b) -> assertThat(b).isFalse())
+			.verifyComplete();
+	}
+
+	@Test
 	void shouldPredicateArgsValidationSuccess() {
 		MethodRoutePredicateFactory factory = new MethodRoutePredicateFactory();
 		StepVerifier
@@ -102,6 +130,24 @@ class GatewayConfigServiceTests {
 		StepVerifier.create(this.gatewayConfigService.validatePredicate(factory.name(), Map.of()))
 			.assertNext((b) -> assertThat(b).isFalse())
 			.verifyComplete();
+	}
+
+	@Test
+	void shouldPredicateArgsValidationSuccessWithBoolean() {
+		StepVerifier
+			.create(this.gatewayConfigService.validatePredicate("Path",
+					Map.of("patterns", "/x/**", "matchTrailingSlash", "true")))
+			.assertNext((b) -> assertThat(b).isTrue())
+			.verifyComplete();
+	}
+
+	@Test
+	void shouldPredicateArgsValidationFailedOnTypeMismatch() {
+		StepVerifier
+			.create(this.gatewayConfigService.validatePredicate("Path",
+					Map.of("patterns", "/x/**", "matchTrailingSlash", "sadfsdf")))
+			.expectError(PredicateArgsFormatException.class)
+			.verify();
 	}
 
 }

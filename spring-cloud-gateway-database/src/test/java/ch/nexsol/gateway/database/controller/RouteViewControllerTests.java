@@ -219,6 +219,36 @@ class RouteViewControllerTests {
 	}
 
 	@Test
+	void shouldReturnFormWithErrorWhenPredicateArgumentTypeInvalid() {
+		MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+		form.add("id", "");
+		form.add("routeId", "bad-type");
+		form.add("uri", "http://localhost:9999");
+		form.add("order", "0");
+		form.add("predicates[0].name", "Path");
+		form.add("predicates[0].args[patterns]", "/x/**");
+		form.add("predicates[0].args[matchTrailingSlash]", "sadfsdf");
+
+		this.webTestClient.post()
+			.uri("/ui/routes")
+			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+			.body(BodyInserters.fromFormData(form))
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("missing or invalid arguments").contains("alert-danger"));
+
+		this.webTestClient.get()
+			.uri("/api/gateway/routes")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBodyList(RouteResponseModel.class)
+			.hasSize(1);
+	}
+
+	@Test
 	void shouldDeleteRouteFromList() {
 		Long id = this.routeRepository.findAll().blockFirst().getId();
 
