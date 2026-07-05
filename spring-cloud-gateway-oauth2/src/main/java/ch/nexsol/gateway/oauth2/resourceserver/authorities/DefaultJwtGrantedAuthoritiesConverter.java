@@ -33,6 +33,11 @@ public class DefaultJwtGrantedAuthoritiesConverter extends ConfigurableJwtGrante
 
 	private static final String JSONPATH_DEFAULT_ROLES = "$.roles";
 
+	/**
+	 * Create a converter with the default Keycloak-oriented JSON path expressions,
+	 * including the resource-specific roles for the given resource name.
+	 * @param resourceName the resource (client) name whose roles are resolved
+	 */
 	public DefaultJwtGrantedAuthoritiesConverter(String resourceName) {
 		super(List.of(JSONPATH_KEYCLOAK_REALM_ACCESS,
 				JSONPATH_KEYCLOAK_RESOURCE_ACCESS_START + resourceName + JSONPATH_KEYCLOAK_RESOURCE_ACCESS_END,

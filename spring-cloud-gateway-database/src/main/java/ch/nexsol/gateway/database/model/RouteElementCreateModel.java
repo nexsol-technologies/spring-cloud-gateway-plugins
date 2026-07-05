@@ -14,23 +14,26 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.filter.common;
+package ch.nexsol.gateway.database.model;
+
+import java.util.Map;
 
 /**
- * Shared constant values used across the gateway filters module.
+ * Common contract for the creation payload of a route element (predicate or filter),
+ * exposing the element name and its arguments.
  */
-public final class Constants {
+public interface RouteElementCreateModel {
 
-	public static final String NONE_VALUE = "_none_";
+	/**
+	 * Returns the name of the gateway predicate or filter to create.
+	 * @return the element name
+	 */
+	String name();
 
-	public static final String UNKNOWN_VALUE = "unknown";
-
-	public static final String HTTP_SCHEME = "http";
-
-	public static final String HTTPS_SCHEME = "https";
-
-	private Constants() {
-
-	}
+	/**
+	 * Returns the arguments of the gateway predicate or filter to create.
+	 * @return the element arguments keyed by argument name
+	 */
+	Map<String, String> args();
 
 }

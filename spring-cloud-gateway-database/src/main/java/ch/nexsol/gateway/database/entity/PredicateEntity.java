@@ -19,8 +19,11 @@ package ch.nexsol.gateway.database.entity;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Table;
 
+/**
+ * R2DBC entity mapping a route predicate row to its name, arguments and owning route.
+ */
 @Table("predicate")
-public class PredicateEntity {
+public class PredicateEntity implements RouteElementEntity {
 
 	@Id
 	private Long id;
@@ -31,42 +34,80 @@ public class PredicateEntity {
 
 	private String args;
 
+	/**
+	 * Creates an empty predicate entity.
+	 */
 	public PredicateEntity() {
 
 	}
 
+	/**
+	 * Returns the primary key of this predicate.
+	 * @return the predicate id
+	 */
 	public Long getId() {
 		return this.id;
 	}
 
+	/**
+	 * Sets the primary key of this predicate.
+	 * @param id the predicate id
+	 */
 	public void setId(Long id) {
 		this.id = id;
 	}
 
+	/**
+	 * {@return the id of the route this predicate belongs to}
+	 */
+	@Override
 	public Long getRouteRefId() {
 		return this.routeRefId;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
 	public void setRouteRefId(Long routeRefId) {
 		this.routeRefId = routeRefId;
 	}
 
+	/**
+	 * {@return the predicate name}
+	 */
+	@Override
 	public String getName() {
 		return this.name;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
 	public void setName(String name) {
 		this.name = name;
 	}
 
+	/**
+	 * {@return the serialized predicate arguments}
+	 */
+	@Override
 	public String getArgs() {
 		return this.args;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
 	public void setArgs(String args) {
 		this.args = args;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public String toString() {
 		return "PredicateEntity [id=" + this.id + ", routeRefId=" + this.routeRefId + ", name=" + this.name + ", args="

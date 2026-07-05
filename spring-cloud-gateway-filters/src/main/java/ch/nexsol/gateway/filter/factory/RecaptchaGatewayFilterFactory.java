@@ -47,6 +47,11 @@ import org.springframework.web.server.ResponseStatusException;
 import static ch.nexsol.gateway.filter.common.Constants.HTTPS_SCHEME;
 import static ch.nexsol.gateway.filter.common.Constants.HTTP_SCHEME;
 
+/**
+ * Gateway filter factory that verifies a Google reCAPTCHA token carried on the incoming
+ * request against the reCAPTCHA verification endpoint, supporting both v2 and v3
+ * responses, and rejects requests that fail validation.
+ */
 public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<RecaptchaGatewayFilterFactory.Config> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RecaptchaGatewayFilterFactory.class);
@@ -84,16 +89,32 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 
 	private final WebClient webClient;
 
+	/**
+	 * Creates the factory bound to its {@link Config} type.
+	 * @param webClient the web client used to call the reCAPTCHA verification endpoint
+	 */
 	public RecaptchaGatewayFilterFactory(WebClient webClient) {
 		super(Config.class);
 		this.webClient = webClient;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Maps the shortcut arguments, in order, to the verify URL, version, secret key,
+	 * reCAPTCHA header name and minimum score configuration fields.
+	 */
 	@Override
 	public List<String> shortcutFieldOrder() {
 		return Arrays.asList(VERIFY_URL_KEY, VERSION_KEY, SECRECT_KEY_KEY, RECAPTCHA_HTTP_HEADER_KEY, SCORE_KEY);
 	}
 
+	/**
+	 * Builds a filter that extracts the reCAPTCHA token, verifies it against the provider
+	 * and only forwards the request when validation succeeds, failing closed otherwise.
+	 * @param config the reCAPTCHA verification configuration
+	 * @return a gateway filter enforcing reCAPTCHA validation
+	 */
 	@Override
 	public GatewayFilter apply(Config config) {
 		return (exchange, chain) -> {
@@ -111,13 +132,11 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 						.filter((r) -> r instanceof RecaptchaResponseV3)
 						.cast(RecaptchaResponseV3.class)
 						.flatMap((resultV3) -> validateV3(resultV3, config.getScore()))
-						.map((__) -> result)
 						.cast(RecaptchaResponseIdentifier.class)
 						.switchIfEmpty(Mono.just(result)
 							.filter((r) -> r instanceof RecaptchaResponseV2)
 							.cast(RecaptchaResponseV2.class)
 							.flatMap((resultV2) -> validateV2(resultV2))
-							.map((__) -> result)
 							.cast(RecaptchaResponseIdentifier.class))))
 				.map((recaptchaResponse) -> exchange)
 				// Fail closed: if validation produced no result, deny rather than let the
@@ -183,6 +202,9 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 		return Mono.just(recaptchaResponse);
 	}
 
+	/**
+	 * Configuration for {@link RecaptchaGatewayFilterFactory}.
+	 */
 	@Validated
 	public static class Config {
 
@@ -206,42 +228,82 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 			return (this.getVersion() == Version.V3) ? RecaptchaResponseV3.class : RecaptchaResponseV2.class;
 		}
 
+		/**
+		 * Returns the reCAPTCHA verification endpoint URL.
+		 * @return the verify URL
+		 */
 		public String getVerifyUrl() {
 			return this.verifyUrl;
 		}
 
+		/**
+		 * Sets the reCAPTCHA verification endpoint URL.
+		 * @param verifyUrl the verify URL
+		 */
 		public void setVerifyUrl(String verifyUrl) {
 			this.verifyUrl = verifyUrl;
 		}
 
+		/**
+		 * Returns the configured reCAPTCHA version.
+		 * @return the reCAPTCHA version
+		 */
 		public Version getVersion() {
 			return this.version;
 		}
 
+		/**
+		 * Sets the reCAPTCHA version to validate against.
+		 * @param version the reCAPTCHA version
+		 */
 		public void setVersion(Version version) {
 			this.version = version;
 		}
 
+		/**
+		 * Returns the reCAPTCHA secret key.
+		 * @return the secret key
+		 */
 		public String getSecretKey() {
 			return this.secretKey;
 		}
 
+		/**
+		 * Sets the reCAPTCHA secret key.
+		 * @param secretKey the secret key
+		 */
 		public void setSecretKey(String secretKey) {
 			this.secretKey = secretKey;
 		}
 
+		/**
+		 * Returns the minimum score (0-100) required for a v3 token to be accepted.
+		 * @return the minimum score threshold
+		 */
 		public short getScore() {
 			return this.score;
 		}
 
+		/**
+		 * Sets the minimum score (0-100) required for a v3 token to be accepted.
+		 * @param score the minimum score threshold
+		 */
 		public void setScore(short score) {
 			this.score = score;
 		}
 
+		/**
+		 * Returns the name of the request header carrying the reCAPTCHA token.
+		 * @return the reCAPTCHA header name
+		 */
 		public String getRecaptchaHttpHeader() {
 			return this.recaptchaHttpHeader;
 		}
 
+		/**
+		 * Sets the name of the request header carrying the reCAPTCHA token.
+		 * @param recaptchaHttpHeader the reCAPTCHA header name
+		 */
 		public void setRecaptchaHttpHeader(String recaptchaHttpHeader) {
 			this.recaptchaHttpHeader = recaptchaHttpHeader;
 		}
@@ -257,8 +319,15 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 
 	}
 
+	/**
+	 * Common contract shared by the v2 and v3 reCAPTCHA response payloads.
+	 */
 	protected interface RecaptchaResponseIdentifier {
 
+		/**
+		 * Returns the hostname of the site where the reCAPTCHA was solved.
+		 * @return the reCAPTCHA hostname
+		 */
 		String getHostname();
 
 	}
@@ -290,35 +359,64 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 		@JsonProperty("error-codes")
 		private List<String> errorCodes;
 
+		/**
+		 * Returns whether the token was a valid reCAPTCHA response for the site.
+		 * @return {@code true} if the verification succeeded
+		 */
 		public boolean isSuccess() {
 			return this.success;
 		}
 
+		/**
+		 * Sets whether the token was a valid reCAPTCHA response for the site.
+		 * @param success the success flag
+		 */
 		public void setSuccess(boolean success) {
 			this.success = success;
 		}
 
+		/**
+		 * Returns the timestamp of the challenge load in ISO format.
+		 * @return the challenge timestamp
+		 */
 		public String getChallengeTs() {
 			return this.challengeTs;
 		}
 
+		/**
+		 * Sets the timestamp of the challenge load.
+		 * @param challengeTs the challenge timestamp
+		 */
 		public void setChallengeTs(String challengeTs) {
 			this.challengeTs = challengeTs;
 		}
 
+		/** {@inheritDoc} */
 		@Override
 		public String getHostname() {
 			return this.hostname;
 		}
 
+		/**
+		 * Sets the hostname of the site where the reCAPTCHA was solved.
+		 * @param hostname the reCAPTCHA hostname
+		 */
 		public void setHostname(String hostname) {
 			this.hostname = hostname;
 		}
 
+		/**
+		 * Returns the optional error codes returned by the verification endpoint.
+		 * @return the error codes, or {@code null} if none
+		 */
 		public List<String> getErrorCodes() {
 			return this.errorCodes;
 		}
 
+		/**
+		 * Sets the optional error codes returned by the verification endpoint.
+		 * @param errorCodes the error codes
+		 */
 		public void setErrorCodes(List<String> errorCodes) {
 			this.errorCodes = errorCodes;
 		}
@@ -340,18 +438,34 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 		 */
 		private String action;
 
+		/**
+		 * Returns the v3 score for this request (0.0 - 1.0).
+		 * @return the reCAPTCHA score
+		 */
 		public double getScore() {
 			return this.score;
 		}
 
+		/**
+		 * Sets the v3 score for this request.
+		 * @param score the reCAPTCHA score
+		 */
 		public void setScore(double score) {
 			this.score = score;
 		}
 
+		/**
+		 * Returns the action name associated with this request.
+		 * @return the action name
+		 */
 		public String getAction() {
 			return this.action;
 		}
 
+		/**
+		 * Sets the action name associated with this request.
+		 * @param action the action name
+		 */
 		public void setAction(String action) {
 			this.action = action;
 		}

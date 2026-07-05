@@ -26,14 +26,26 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher.MatchResult;
 
+/**
+ * Security-related helper methods shared across the OAuth 2.0 gateway plugins.
+ */
 public final class SecurityUtils {
 
+	/**
+	 * Lower-cased prefix of a Basic {@code Authorization} header value.
+	 */
 	public static final String HEADER_AUTHORIZATION_BASIC = "basic ";
 
 	private SecurityUtils() {
 
 	}
 
+	/**
+	 * Build a matcher that matches an exchange carrying a Basic {@code Authorization}
+	 * header whose user (client id) is configured for token exchange.
+	 * @param properties the Basic-auth exchange properties used to check the user
+	 * @return a matcher accepting configured Basic-auth requests
+	 */
 	public static ServerWebExchangeMatcher authorizationHeaderBasicMatcher(
 			BasicAuthExchangeToAccessTokenProperties properties) {
 		return (exchange) -> {

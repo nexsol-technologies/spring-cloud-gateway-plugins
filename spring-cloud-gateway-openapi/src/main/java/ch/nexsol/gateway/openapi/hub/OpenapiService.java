@@ -37,12 +37,23 @@ import org.springframework.http.MediaType;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 
+/**
+ * Discovers the OpenAPI documentation endpoint exposed by a discovered service instance
+ * by probing the well-known SpringDoc paths and returns the fetched document along with
+ * its metadata.
+ */
 public class OpenapiService {
 
 	private static final Logger LOG = LoggerFactory.getLogger(OpenapiService.class);
 
+	/**
+	 * Route metadata key holding the resolved OpenAPI document path.
+	 */
 	public static final String METADATA_SERVICE_INSTANCE_OPENAPI_PATH_KEY = "openapi_path";
 
+	/**
+	 * Route metadata key holding the content type of the resolved OpenAPI document.
+	 */
 	public static final String METADATA_SERVICE_INSTANCE_OPENAPI_CONTENT_TYPE_KEY = "openapi_content-type";
 
 	private final ReactiveDiscoveryClient discoveryClient;
@@ -51,11 +62,26 @@ public class OpenapiService {
 
 	private final List<String> paths = List.of("/v3/api-docs.json", "/v3/api-docs.yaml", "/v3/api-docs");
 
+	/**
+	 * Creates a new service backed by the given discovery client.
+	 * @param discoveryClient the reactive discovery client used to resolve service
+	 * instances
+	 */
 	public OpenapiService(ReactiveDiscoveryClient discoveryClient) {
 		this.discoveryClient = discoveryClient;
 		this.webClient = WebClient.builder().build();
 	}
 
+	/**
+	 * Discovers the OpenAPI document for the first available instance of the given route.
+	 * <p>
+	 * The route metadata is enriched in place with the resolved OpenAPI path and content
+	 * type. Completes empty when the route has no instance or no OpenAPI document is
+	 * found.
+	 * @param routeId the discovery service id whose instances are probed
+	 * @param routeDefinition the route definition to enrich with the discovered metadata
+	 * @return a {@link Mono} emitting the discovered OpenAPI document, or empty if none
+	 */
 	public Mono<OpenapiDiscover> discoverOpenapiUrl(String routeId, RouteDefinition routeDefinition) {
 		// next() (instead of last()) picks the first instance and completes empty when a
 		// route has no instance, rather than emitting NoSuchElementException.
@@ -105,6 +131,14 @@ public class OpenapiService {
 		}).onErrorComplete();
 	}
 
+	/**
+	 * Result of an OpenAPI discovery.
+	 *
+	 * @param path the path at which the OpenAPI document was found
+	 * @param contentType the content type of the OpenAPI document, if provided
+	 * @param resource the fetched OpenAPI document body
+	 * @param routeDefinition the route definition the document belongs to
+	 */
 	public record OpenapiDiscover(String path, Optional<MediaType> contentType, Resource resource,
 			RouteDefinition routeDefinition) {
 	}

@@ -19,9 +19,17 @@ package ch.nexsol.gateway.database.service;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+/**
+ * Raised when predicate arguments cannot be bound to the predicate configuration; mapped
+ * to an HTTP 400 response.
+ */
 @ResponseStatus(code = HttpStatus.BAD_REQUEST, reason = "Predicate argument is not correctly formatted.")
 public class PredicateArgsFormatException extends RuntimeException {
 
+	/**
+	 * Creates the exception with the given detail message.
+	 * @param msg the detail message
+	 */
 	public PredicateArgsFormatException(String msg) {
 		super(msg);
 	}

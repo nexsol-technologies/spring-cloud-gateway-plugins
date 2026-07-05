@@ -47,12 +47,19 @@ public class ConfigurableJwtGrantedAuthoritiesConverter implements Converter<Jwt
 
 	private final JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
 
+	/**
+	 * Create a converter resolving authorities from the given JSON path expressions.
+	 * @param jsonPaths the JSON path expressions locating the role claims
+	 */
 	public ConfigurableJwtGrantedAuthoritiesConverter(@NotEmpty List<@NotEmpty String> jsonPaths) {
 		this.jsonPath = (jsonPaths != null)
 				? jsonPaths.stream().map((jsonPath) -> JsonPath.compile(jsonPath).getPath()).toList()
 				: Collections.emptyList();
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public AbstractAuthenticationToken convert(Jwt jwt) {
 		Collection<GrantedAuthority> authorities = Stream

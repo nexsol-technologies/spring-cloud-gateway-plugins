@@ -33,12 +33,23 @@ import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.util.StringUtils;
 
+/**
+ * Route definition locator that, on top of the standard discovery routes, creates a
+ * dedicated OpenAPI documentation route for every discovered service that exposes an
+ * OpenAPI document.
+ */
 public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLocator {
 
+	/**
+	 * Prefix used to identify the generated OpenAPI documentation routes.
+	 */
 	public static final String ROUTE_ID_PREFIX = "openapi-docs-discovery-";
 
 	private static final Logger LOG = LoggerFactory.getLogger(HubDiscoveryRouteLocator.class);
 
+	/**
+	 * Base path under which the aggregated OpenAPI documents are served.
+	 */
 	public static final String API_DOCS_URL = "/v3/api-docs";
 
 	private final OpenapiService openapiService;
@@ -46,6 +57,12 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 	// because it's private in DiscoveryClientRouteDefinitionLocator
 	private final String routeIdPrefix;
 
+	/**
+	 * Creates a new locator.
+	 * @param discoveryClient the reactive discovery client
+	 * @param properties the discovery locator properties
+	 * @param openapiService the service used to discover the OpenAPI endpoints
+	 */
 	public HubDiscoveryRouteLocator(ReactiveDiscoveryClient discoveryClient, DiscoveryLocatorProperties properties,
 			OpenapiService openapiService) {
 		super(discoveryClient, properties);
@@ -59,6 +76,12 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 		}
 	}
 
+	/**
+	 * Returns an OpenAPI documentation route for each discovered service, derived from
+	 * the standard discovery routes. Failures affecting a single service are logged and
+	 * skipped so they do not prevent the discovery of the remaining routes.
+	 * @return the OpenAPI documentation route definitions
+	 */
 	@Override
 	public Flux<RouteDefinition> getRouteDefinitions() {
 		return super.getRouteDefinitions()

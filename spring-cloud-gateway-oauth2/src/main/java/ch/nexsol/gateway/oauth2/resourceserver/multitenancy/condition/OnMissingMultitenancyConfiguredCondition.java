@@ -31,6 +31,9 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 
 /**
+ * Condition that matches when no multi-tenant resource server client is configured,
+ * selecting the single default issuer configuration.
+ *
  * @author guerricmerle
  */
 public class OnMissingMultitenancyConfiguredCondition extends SpringBootCondition {
@@ -38,6 +41,9 @@ public class OnMissingMultitenancyConfiguredCondition extends SpringBootConditio
 	private static final Bindable<List<OAuth2ResourceServerProperties>> STRING_REGISTRATION_LIST = Bindable
 		.listOf(OAuth2ResourceServerProperties.class);
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
 		ConditionMessage.Builder message = ConditionMessage.forCondition("OAUTH2 Multitenancy");

@@ -28,6 +28,11 @@ import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 
+/**
+ * Auto-configuration registering the OAuth 2.0 gateway filter factories and web filters,
+ * including the authorization token filter factory and the Basic-auth to access-token
+ * exchange web filter.
+ */
 @AutoConfiguration
 public class FiltersAutoConfiguration {
 

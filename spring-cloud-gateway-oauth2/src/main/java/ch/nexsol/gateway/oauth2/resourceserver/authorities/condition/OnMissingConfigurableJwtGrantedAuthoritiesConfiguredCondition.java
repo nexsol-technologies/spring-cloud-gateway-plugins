@@ -31,6 +31,9 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 
 /**
+ * Condition that matches when no JSON path granted-authorities mapping is configured,
+ * selecting the default JWT granted authorities converter.
+ *
  * @author guerricmerle
  */
 public class OnMissingConfigurableJwtGrantedAuthoritiesConfiguredCondition extends SpringBootCondition {
@@ -38,6 +41,9 @@ public class OnMissingConfigurableJwtGrantedAuthoritiesConfiguredCondition exten
 	private static final Bindable<List<JsonPathGrantedAuthorityProperties>> STRING_REGISTRATION_LIST = Bindable
 		.listOf(JsonPathGrantedAuthorityProperties.class);
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
 		ConditionMessage.Builder message = ConditionMessage

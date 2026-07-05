@@ -31,17 +31,31 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 
 /**
+ * Web filter that copies the current trace identifier onto the response as an
+ * {@code x-correlation-id} header so downstream clients can correlate the request.
+ *
  * @author guerricmerle
  */
 public class CorrelationIdFilter implements WebFilter, Ordered {
 
 	private static final String X_CORRELATION_ID = "x-correlation-id";
 
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Runs near the start of the chain so the trace context is available when the
+	 * response is committed.
+	 */
 	@Override
 	public int getOrder() {
 		return Ordered.HIGHEST_PRECEDENCE + 3;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Adds the correlation header after the downstream chain has completed.
+	 */
 	@Override
 	public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
 		return chain.filter(exchange).then(addCustomTraceHeader(exchange));

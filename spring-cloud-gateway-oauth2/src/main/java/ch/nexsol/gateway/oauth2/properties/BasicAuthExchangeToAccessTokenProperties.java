@@ -23,18 +23,35 @@ import java.util.Map;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+/**
+ * Configuration properties mapping each configured client id to the token URI used to
+ * exchange its Basic credentials for an OAuth 2.0 access token.
+ */
 public class BasicAuthExchangeToAccessTokenProperties {
 
 	private Map<@NotEmpty String, @NotNull URI> tokenUris = new HashMap<>();
 
+	/**
+	 * Whether the given user (client id) has a configured token URI.
+	 * @param user the client id to look up
+	 * @return {@code true} if a token URI is configured for the user
+	 */
 	public boolean isUserConfigured(String user) {
 		return this.tokenUris.containsKey(user);
 	}
 
+	/**
+	 * Return the mapping of client id to token URI.
+	 * @return the token URIs
+	 */
 	public Map<String, URI> getTokenUris() {
 		return this.tokenUris;
 	}
 
+	/**
+	 * Set the mapping of client id to token URI.
+	 * @param tokenUris the token URIs to set
+	 */
 	public void setTokenUris(Map<String, URI> tokenUris) {
 		this.tokenUris = tokenUris;
 	}

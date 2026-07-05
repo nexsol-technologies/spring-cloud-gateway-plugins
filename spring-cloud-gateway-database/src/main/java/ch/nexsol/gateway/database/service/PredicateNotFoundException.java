@@ -16,8 +16,15 @@
 
 package ch.nexsol.gateway.database.service;
 
+/**
+ * Raised when a predicate is referenced by a name that has no registered factory.
+ */
 public class PredicateNotFoundException extends RuntimeException {
 
+	/**
+	 * Creates the exception for the given unknown predicate name.
+	 * @param name the unknown predicate name
+	 */
 	public PredicateNotFoundException(String name) {
 		super(name + " does't exist");
 	}

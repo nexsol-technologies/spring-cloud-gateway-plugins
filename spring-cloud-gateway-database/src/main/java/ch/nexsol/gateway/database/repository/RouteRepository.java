@@ -21,10 +21,23 @@ import reactor.core.publisher.Mono;
 
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 
+/**
+ * Reactive repository for {@link RouteEntity} routes.
+ */
 public interface RouteRepository extends ReactiveCrudRepository<RouteEntity, Long> {
 
+	/**
+	 * Finds a route by its business route id.
+	 * @param routeId the business route id
+	 * @return the matching route, or an empty result when none exists
+	 */
 	Mono<RouteEntity> findByRouteId(String routeId);
 
+	/**
+	 * Checks whether a route with the given business route id exists.
+	 * @param routeId the business route id
+	 * @return {@code true} when a matching route exists
+	 */
 	Mono<Boolean> existsByRouteId(String routeId);
 
 }

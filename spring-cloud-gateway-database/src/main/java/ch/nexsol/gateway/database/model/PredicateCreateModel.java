@@ -22,7 +22,14 @@ import jakarta.validation.constraints.NotEmpty;
 
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Creation payload for a route predicate, carrying the predicate name and its arguments.
+ *
+ * @param name the predicate name, must not be empty
+ * @param args the predicate arguments keyed by argument name, must not be empty
+ */
 @Validated
-public record PredicateCreateModel(@NotEmpty String name, @NotEmpty Map<@NotEmpty String, @NotEmpty String> args) {
+public record PredicateCreateModel(@NotEmpty String name,
+		@NotEmpty Map<@NotEmpty String, @NotEmpty String> args) implements RouteElementCreateModel {
 
 }

@@ -36,6 +36,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST controller exposing CRUD operations on gateway routes under
+ * {@code /api/gateway/routes}.
+ */
 @RestController
 @RequestMapping("/api/gateway/routes")
 @Validated
@@ -45,20 +49,39 @@ public class RouteController {
 
 	private final ApiService apiService;
 
+	/**
+	 * Creates the controller with the API service it delegates to.
+	 * @param apiService the API service
+	 */
 	public RouteController(ApiService apiService) {
 		this.apiService = apiService;
 	}
 
+	/**
+	 * Returns all configured routes.
+	 * @return the route response models
+	 */
 	@GetMapping
 	public Flux<RouteResponseModel> getAllRoutes() {
 		return this.apiService.getAllRoutes();
 	}
 
+	/**
+	 * Returns a single route by id.
+	 * @param id the route id
+	 * @return the route wrapped in a 200 response, or a 404 response when it does not
+	 * exist
+	 */
 	@GetMapping("/{id}")
 	public Mono<ResponseEntity<RouteResponseModel>> getRoute(@PathVariable Long id) {
 		return this.apiService.findById(id).map(ResponseEntity::ok).defaultIfEmpty(ResponseEntity.notFound().build());
 	}
 
+	/**
+	 * Creates a new route.
+	 * @param routeModel the route creation payload
+	 * @return the created route wrapped in a 200 response
+	 */
 	@PostMapping
 	public Mono<ResponseEntity<RouteResponseModel>> createRoute(@RequestBody @Valid RouteCreateModel routeModel) {
 		return this.apiService.createRoute(routeModel)
@@ -66,6 +89,12 @@ public class RouteController {
 			.doOnError((error) -> LOG.error(error.getMessage(), error));
 	}
 
+	/**
+	 * Updates an existing route.
+	 * @param id the id of the route to update
+	 * @param routeModel the new route payload
+	 * @return the updated route wrapped in a 200 response
+	 */
 	@PutMapping("/{id}")
 	public Mono<ResponseEntity<RouteResponseModel>> updateRoute(@PathVariable Long id,
 			@RequestBody @Valid RouteCreateModel routeModel) {
@@ -74,6 +103,11 @@ public class RouteController {
 			.doOnError((error) -> LOG.error(error.getMessage(), error));
 	}
 
+	/**
+	 * Deletes the route with the given id.
+	 * @param id the id of the route to delete
+	 * @return a 200 response once the route is deleted
+	 */
 	@DeleteMapping("/{id}")
 	public Mono<ResponseEntity<RouteResponseModel>> deleteRoute(@PathVariable Long id) {
 		return this.apiService.deleteRoute(id).then(Mono.just(ResponseEntity.ok().build()));

@@ -32,6 +32,10 @@ import org.springframework.security.oauth2.jwt.ReactiveJwtDecoders;
 import org.springframework.security.oauth2.server.resource.authentication.JwtReactiveAuthenticationManager;
 
 /**
+ * Reactive {@link ReactiveAuthenticationManagerResolver} that resolves a
+ * {@link ReactiveAuthenticationManager} per JWT issuer, but only for issuers accepted by
+ * a trusted-issuer predicate. Resolved managers are lazily built and cached per issuer.
+ *
  * @author guerricmerle
  */
 public class TrustedIssuerJwtReactiveAuthenticationManagerResolver
@@ -43,12 +47,21 @@ public class TrustedIssuerJwtReactiveAuthenticationManagerResolver
 
 	private final Converter<Jwt, Mono<AbstractAuthenticationToken>> converter;
 
+	/**
+	 * Create a new resolver.
+	 * @param trustedIssuer predicate deciding whether an issuer is trusted
+	 * @param converter the JWT authentication converter applied to resolved managers, may
+	 * be {@code null}
+	 */
 	public TrustedIssuerJwtReactiveAuthenticationManagerResolver(Predicate<String> trustedIssuer,
 			Converter<Jwt, Mono<AbstractAuthenticationToken>> converter) {
 		this.trustedIssuer = trustedIssuer;
 		this.converter = converter;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public Mono<ReactiveAuthenticationManager> resolve(String issuer) {
 		if (!this.trustedIssuer.test(issuer)) {

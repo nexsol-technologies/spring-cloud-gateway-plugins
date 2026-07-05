@@ -19,9 +19,16 @@ package ch.nexsol.gateway.database.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+/**
+ * Raised when creating a route whose business route id already exists; mapped to an HTTP
+ * 409 response.
+ */
 @ResponseStatus(code = HttpStatus.CONFLICT)
 public class RouteAlreadyExistException extends RuntimeException {
 
+	/**
+	 * Creates the exception.
+	 */
 	public RouteAlreadyExistException() {
 		super();
 	}

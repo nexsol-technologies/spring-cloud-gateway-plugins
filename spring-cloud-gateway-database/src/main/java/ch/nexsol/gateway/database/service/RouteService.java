@@ -38,6 +38,10 @@ import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+/**
+ * Core service managing route entities and assembling the Spring Cloud Gateway route
+ * definitions from the persisted routes, predicates and filters.
+ */
 @Service
 public class RouteService {
 
@@ -49,6 +53,13 @@ public class RouteService {
 
 	private final ApplicationEventPublisher publisher;
 
+	/**
+	 * Creates the route service with its collaborating beans.
+	 * @param routeRepository the repository persisting and querying routes
+	 * @param predicateService the service handling route predicates
+	 * @param filterService the service handling route filters
+	 * @param publisher the publisher used to trigger route refresh events
+	 */
 	public RouteService(RouteRepository routeRepository, PredicateService predicateService, FilterService filterService,
 			ApplicationEventPublisher publisher) {
 		this.routeRepository = routeRepository;
@@ -57,10 +68,19 @@ public class RouteService {
 		this.publisher = publisher;
 	}
 
+	/**
+	 * Returns all persisted routes.
+	 * @return all route entities
+	 */
 	public Flux<RouteEntity> getAllRoutes() {
 		return this.routeRepository.findAll();
 	}
 
+	/**
+	 * Loads every persisted route as a Spring Cloud Gateway route definition,
+	 * batch-loading predicates and filters to avoid N+1 queries.
+	 * @return the gateway route definitions
+	 */
 	public Flux<RouteDefinition> loadSpringCloudGatewayRouteDefinition() {
 		return this.routeRepository.findAll().collectList().flatMapMany((routes) -> {
 			List<Long> routeIds = routes.stream().map(RouteEntity::getId).toList();
@@ -93,14 +113,30 @@ public class RouteService {
 		});
 	}
 
+	/**
+	 * Finds a route by its primary key.
+	 * @param id the route id
+	 * @return the matching route, or an empty result when none exists
+	 */
 	public Mono<RouteEntity> findById(Long id) {
 		return this.routeRepository.findById(id);
 	}
 
+	/**
+	 * Persists the given route entity.
+	 * @param routeEntity the route to save
+	 * @return the saved route
+	 */
 	public Mono<RouteEntity> save(RouteEntity routeEntity) {
 		return this.routeRepository.save(routeEntity);
 	}
 
+	/**
+	 * Creates a new route after validating its predicate and filter arguments, then
+	 * publishes a route refresh event.
+	 * @param routeModel the route creation payload
+	 * @return the created route
+	 */
 	public Mono<RouteEntity> createRoute(@Valid RouteCreateModel routeModel) {
 		return this.routeRepository.existsByRouteId(routeModel.routeId()).flatMap((exists) -> {
 			if (exists) {
@@ -127,6 +163,13 @@ public class RouteService {
 			.subscribeOn(Schedulers.boundedElastic());
 	}
 
+	/**
+	 * Updates an existing route: validates the new predicate and filter arguments,
+	 * replaces its predicates and filters, then publishes a route refresh event.
+	 * @param routeId the id of the route to update
+	 * @param routeModel the new route payload
+	 * @return the updated route
+	 */
 	public Mono<RouteEntity> updateRoute(Long routeId, @Valid RouteCreateModel routeModel) {
 		return Mono
 			.zip(this.findById(routeId).switchIfEmpty(Mono.error(new RouteNotFoundException())),
@@ -147,6 +190,11 @@ public class RouteService {
 			.subscribeOn(Schedulers.boundedElastic());
 	}
 
+	/**
+	 * Deletes the route with the given id.
+	 * @param routeId the id of the route to delete
+	 * @return a completion signal, or an error when the route does not exist
+	 */
 	public Mono<Void> deleteRoute(Long routeId) {
 		return this.findById(routeId)
 			.switchIfEmpty(Mono.error(new RouteNotFoundException()))

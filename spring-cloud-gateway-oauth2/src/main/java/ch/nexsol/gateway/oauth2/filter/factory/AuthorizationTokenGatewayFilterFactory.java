@@ -51,6 +51,13 @@ import org.springframework.web.server.ServerWebExchange;
 
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
 
+/**
+ * {@link org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory} that
+ * authorizes a request against the bearer JWT it carries. Depending on the configuration
+ * it can check the token issuer, the client id and the granted accesses (roles resolved
+ * through JSON path expressions), rejecting the request with {@code 403 FORBIDDEN} when a
+ * check fails.
+ */
 @Valid
 public class AuthorizationTokenGatewayFilterFactory
 		extends AbstractGatewayFilterFactory<AuthorizationTokenGatewayFilterFactory.Config> {
@@ -76,16 +83,25 @@ public class AuthorizationTokenGatewayFilterFactory
 
 	private final Converter<Map<String, Object>, Map<String, Object>> claimSetConverter;
 
+	/**
+	 * Create a new factory bound to its {@link Config} type.
+	 */
 	public AuthorizationTokenGatewayFilterFactory() {
 		super(AuthorizationTokenGatewayFilterFactory.Config.class);
 		this.claimSetConverter = MappedJwtClaimSetConverter.withDefaults(Collections.emptyMap());
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public List<String> shortcutFieldOrder() {
 		return Arrays.asList(ISSUERS_KEY, CLIENT_IDS_KEY, GRANT_ACCESSES_KEY);
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public GatewayFilter apply(Config config) {
 		return (exchange, chain) -> {
@@ -159,6 +175,12 @@ public class AuthorizationTokenGatewayFilterFactory
 			.flatMap(this::createJwt);
 	}
 
+	/**
+	 * Check whether the given JWT claims satisfy all of the configured granted accesses.
+	 * @param claims the JWT claims to inspect
+	 * @param grantAccesses the required granted accesses
+	 * @return {@code true} if every granted access is satisfied
+	 */
 	public boolean hasAuthority(Map<String, Object> claims, List<GrantAccess> grantAccesses) {
 		return grantAccesses.stream().allMatch((grantAccess) -> hasAuthority(claims, grantAccess));
 	}
@@ -222,6 +244,10 @@ public class AuthorizationTokenGatewayFilterFactory
 		}
 	}
 
+	/**
+	 * Configuration for the {@link AuthorizationTokenGatewayFilterFactory} holding the
+	 * allowed issuers, client ids and granted accesses to check.
+	 */
 	@Validated
 	public static class Config {
 
@@ -234,44 +260,84 @@ public class AuthorizationTokenGatewayFilterFactory
 		@Valid
 		private List<@Valid GrantAccess> grantAccesses = new ArrayList<>(0);
 
+		/**
+		 * Return the allowed issuers.
+		 * @return the issuers
+		 */
 		public List<String> getIssuers() {
 			return this.issuers;
 		}
 
+		/**
+		 * Set the allowed issuers.
+		 * @param issuers the issuers to set
+		 */
 		public void setIssuers(List<String> issuers) {
 			this.issuers = issuers;
 		}
 
+		/**
+		 * Return the allowed client ids.
+		 * @return the client ids
+		 */
 		public List<String> getClientIds() {
 			return this.clientIds;
 		}
 
+		/**
+		 * Set the allowed client ids.
+		 * @param clientIds the client ids to set
+		 */
 		public void setClientIds(List<String> clientIds) {
 			this.clientIds = clientIds;
 		}
 
+		/**
+		 * Return the required granted accesses.
+		 * @return the granted accesses
+		 */
 		public List<GrantAccess> getGrantAccesses() {
 			return this.grantAccesses;
 		}
 
+		/**
+		 * Set the required granted accesses.
+		 * @param grantAccesses the granted accesses to set
+		 */
 		public void setGrantAccesses(List<GrantAccess> grantAccesses) {
 			this.grantAccesses = grantAccesses;
 		}
 
+		/**
+		 * Whether the issuer check is enabled (at least one issuer configured).
+		 * @return {@code true} if the issuer must be checked
+		 */
 		public boolean checkIssuer() {
 			return this.issuers != null && !this.issuers.isEmpty();
 		}
 
+		/**
+		 * Whether the client id check is enabled (at least one client id configured).
+		 * @return {@code true} if the client id must be checked
+		 */
 		public boolean checkClientId() {
 			return this.clientIds != null && !this.clientIds.isEmpty();
 		}
 
+		/**
+		 * Whether the granted access check is enabled (at least one configured).
+		 * @return {@code true} if the granted accesses must be checked
+		 */
 		public boolean checkGrantAccess() {
 			return this.grantAccesses != null && !this.grantAccesses.isEmpty();
 		}
 
 	}
 
+	/**
+	 * A single granted access requirement, made of a JSON path pointing to a claim and
+	 * the roles that claim must contain.
+	 */
 	@Validated
 	public static class GrantAccess {
 
@@ -282,18 +348,34 @@ public class AuthorizationTokenGatewayFilterFactory
 		@Valid
 		private List<@NotEmpty String> roles;
 
+		/**
+		 * Return the JSON path locating the claim holding the roles.
+		 * @return the json path
+		 */
 		public String getJsonPath() {
 			return this.jsonPath;
 		}
 
+		/**
+		 * Set the JSON path locating the claim holding the roles.
+		 * @param jsonPath the json path to set
+		 */
 		public void setJsonPath(@NotEmpty String jsonPath) {
 			this.jsonPath = jsonPath;
 		}
 
+		/**
+		 * Return the required roles.
+		 * @return the roles
+		 */
 		public List<String> getRoles() {
 			return this.roles;
 		}
 
+		/**
+		 * Set the required roles.
+		 * @param roles the roles to set
+		 */
 		public void setRoles(List<String> roles) {
 			this.roles = roles;
 		}

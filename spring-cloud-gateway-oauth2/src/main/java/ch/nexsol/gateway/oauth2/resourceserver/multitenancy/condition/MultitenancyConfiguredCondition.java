@@ -31,11 +31,18 @@ import org.springframework.context.annotation.ConditionContext;
 import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 
+/**
+ * Condition that matches when at least one multi-tenant resource server client is
+ * configured, enabling the multi-tenant authentication manager resolver.
+ */
 public class MultitenancyConfiguredCondition extends SpringBootCondition {
 
 	private static final Bindable<List<OAuth2ResourceServerProperties>> STRING_REGISTRATION_LIST = Bindable
 		.listOf(OAuth2ResourceServerProperties.class);
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
 		ConditionMessage.Builder message = ConditionMessage.forCondition("OAUTH2 Multitenancy registered");

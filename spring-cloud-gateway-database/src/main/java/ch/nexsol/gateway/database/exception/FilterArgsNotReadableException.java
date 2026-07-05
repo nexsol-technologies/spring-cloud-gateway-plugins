@@ -19,9 +19,17 @@ package ch.nexsol.gateway.database.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+/**
+ * Raised when stored filter arguments cannot be deserialized; mapped to an HTTP 400
+ * response.
+ */
 @ResponseStatus(code = HttpStatus.BAD_REQUEST)
 public class FilterArgsNotReadableException extends RuntimeException {
 
+	/**
+	 * Creates the exception wrapping the underlying cause.
+	 * @param ex the underlying cause
+	 */
 	public FilterArgsNotReadableException(Throwable ex) {
 		super(ex);
 	}

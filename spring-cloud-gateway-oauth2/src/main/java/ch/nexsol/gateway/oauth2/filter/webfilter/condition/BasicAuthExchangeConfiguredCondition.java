@@ -27,11 +27,18 @@ import org.springframework.context.annotation.ConditionContext;
 import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 
+/**
+ * Condition that matches when at least one Basic-auth to access-token exchange token URI
+ * is configured, enabling the related beans.
+ */
 public class BasicAuthExchangeConfiguredCondition extends SpringBootCondition {
 
 	private static final Bindable<BasicAuthExchangeToAccessTokenProperties> PROPERTIES = Bindable
 		.of(BasicAuthExchangeToAccessTokenProperties.class);
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
 		ConditionMessage.Builder message = ConditionMessage.forCondition("Basic Auth to OAUTH2 Configured Condition");
