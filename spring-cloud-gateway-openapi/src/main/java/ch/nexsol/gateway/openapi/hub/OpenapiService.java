@@ -17,9 +17,7 @@
 package ch.nexsol.gateway.openapi.hub;
 
 import java.net.URI;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -47,14 +45,11 @@ public class OpenapiService {
 	private static final Logger LOG = LoggerFactory.getLogger(OpenapiService.class);
 
 	/**
-	 * Route metadata key holding the resolved OpenAPI document path.
+	 * Service instance metadata key that a discovered service may declare to advertise
+	 * the path of its OpenAPI document, bypassing the probing of the well-known SpringDoc
+	 * paths.
 	 */
 	public static final String METADATA_SERVICE_INSTANCE_OPENAPI_PATH_KEY = "openapi_path";
-
-	/**
-	 * Route metadata key holding the content type of the resolved OpenAPI document.
-	 */
-	public static final String METADATA_SERVICE_INSTANCE_OPENAPI_CONTENT_TYPE_KEY = "openapi_content-type";
 
 	private final ReactiveDiscoveryClient discoveryClient;
 
@@ -75,11 +70,9 @@ public class OpenapiService {
 	/**
 	 * Discovers the OpenAPI document for the first available instance of the given route.
 	 * <p>
-	 * The route metadata is enriched in place with the resolved OpenAPI path and content
-	 * type. Completes empty when the route has no instance or no OpenAPI document is
-	 * found.
+	 * Completes empty when the route has no instance or no OpenAPI document is found.
 	 * @param routeId the discovery service id whose instances are probed
-	 * @param routeDefinition the route definition to enrich with the discovered metadata
+	 * @param routeDefinition the route definition the discovered document is attached to
 	 * @return a {@link Mono} emitting the discovered OpenAPI document, or empty if none
 	 */
 	public Mono<OpenapiDiscover> discoverOpenapiUrl(String routeId, RouteDefinition routeDefinition) {
@@ -100,19 +93,7 @@ public class OpenapiService {
 
 		// concatMap preserves the .json -> .yaml -> plain preference order and
 		// short-circuits on the first match (next()) instead of firing all in parallel.
-		return paths.concatMap((path) -> callOpenapi(serviceInstance.getUri(), path, routeDefinition))
-			.next()
-			.map((openapiResponse) -> {
-				// Build a fresh metadata map for the route definition instead of mutating
-				// the discovery ServiceInstance metadata, which may be immutable.
-				Map<String, Object> metadata = new LinkedHashMap<>(serviceInstance.getMetadata());
-				metadata.putIfAbsent(METADATA_SERVICE_INSTANCE_OPENAPI_PATH_KEY, openapiResponse.path());
-				metadata.putIfAbsent(METADATA_SERVICE_INSTANCE_OPENAPI_CONTENT_TYPE_KEY,
-						openapiResponse.contentType().map((m) -> m.toString()).orElse(""));
-
-				routeDefinition.setMetadata(metadata);
-				return openapiResponse;
-			});
+		return paths.concatMap((path) -> callOpenapi(serviceInstance.getUri(), path, routeDefinition)).next();
 	}
 
 	private Mono<OpenapiDiscover> callOpenapi(URI uri, String path, RouteDefinition routeDefinition) {
