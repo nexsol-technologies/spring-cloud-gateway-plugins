@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!-- Route list; carries hx-swap-oob when refreshed out-of-band after a save. -->
+<div th:fragment="list" id="route-list" th:attr="hx-swap-oob=${oob != null and oob} ? 'true' : null">
+	<div class="card shadow-sm">
+		<div class="card-body">
+			<h2 class="h5 card-title mb-3">Existing routes</h2>
+
+			<p th:if="${#lists.isEmpty(routes)}" class="text-secondary mb-0">No route configured.</p>
+
+			<div class="vstack gap-3">
+				<div class="border rounded p-3 bg-body" th:each="route : ${routes}">
+					<div class="d-flex justify-content-between align-items-start mb-2">
+						<div>
+							<h3 class="h6 mb-0" th:text="${route.routeId()}">route-id</h3>
+							<small class="text-secondary">
+								<span th:text="${route.uri()}">uri</span>
+								<span th:if="${route.order() != null}">
+									&middot; order <span th:text="${route.order()}">0</span>
+								</span>
+							</small>
+						</div>
+						<div class="btn-group btn-group-sm">
+							<button type="button" class="btn btn-outline-primary"
+								th:attr="hx-get=@{/ui/routes/{id}/edit(id=${route.id()})}"
+								hx-target="#route-form-container" hx-swap="outerHTML">Edit</button>
+							<button type="button" class="btn btn-outline-danger"
+								th:attr="hx-delete=@{/ui/routes/{id}(id=${route.id()})},hx-confirm=|Delete route '${route.routeId()}'?|"
+								hx-target="#route-list" hx-swap="outerHTML">Delete</button>
+						</div>
+					</div>
+
+					<div class="mb-1" th:if="${!#lists.isEmpty(route.predicates())}">
+						<span class="fw-semibold small">Predicates</span>
+						<ul class="small mb-0">
+							<li th:each="predicate : ${route.predicates()}">
+								<span class="badge text-bg-secondary" th:text="${predicate.name()}">name</span>
+								<span class="text-secondary" th:text="${predicate.args()}">args</span>
+							</li>
+						</ul>
+					</div>
+
+					<div th:if="${!#lists.isEmpty(route.filters())}">
+						<span class="fw-semibold small">Filters</span>
+						<ul class="small mb-0">
+							<li th:each="filter : ${route.filters()}">
+								<span class="badge text-bg-info" th:text="${filter.name()}">name</span>
+								<span class="text-secondary" th:text="${filter.args()}">args</span>
+							</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+</body>
+</html>

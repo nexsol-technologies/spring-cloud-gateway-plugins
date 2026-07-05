@@ -27,6 +27,8 @@ import ch.nexsol.gateway.database.exception.RouteNotFoundException;
 import ch.nexsol.gateway.database.model.RouteCreateModel;
 import ch.nexsol.gateway.database.repository.RouteRepository;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -44,6 +46,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class RouteService {
+
+	private static final Logger LOG = LoggerFactory.getLogger(RouteService.class);
 
 	private final RouteRepository routeRepository;
 
@@ -97,7 +101,20 @@ public class RouteService {
 				Map<Long, List<PredicateDefinition>> predicateMap = tuple.getT1();
 				Map<Long, List<FilterDefinition>> filterMap = tuple.getT2();
 
-				return Flux.fromIterable(routes).map((route) -> {
+				return Flux.fromIterable(routes).filter((route) -> {
+					// A gateway route with no predicate behaves as a catch-all that
+					// intercepts every request (static assets included) and proxies it to
+					// its
+					// target. Skip such invalid rows so a single bad route cannot break
+					// the
+					// whole gateway.
+					boolean hasPredicate = !predicateMap.getOrDefault(route.getId(), List.of()).isEmpty();
+					if (!hasPredicate) {
+						LOG.warn("Skipping route '{}' (id={}): a route must declare at least one predicate",
+								route.getRouteId(), route.getId());
+					}
+					return hasPredicate;
+				}).map((route) -> {
 					RouteDefinition routeDefinition = new RouteDefinition();
 					routeDefinition.setId(route.getRouteId());
 					routeDefinition.setUri(URI.create(route.getUri()));

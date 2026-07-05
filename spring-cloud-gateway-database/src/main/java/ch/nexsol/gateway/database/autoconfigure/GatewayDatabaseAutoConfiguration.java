@@ -19,6 +19,7 @@ package ch.nexsol.gateway.database.autoconfigure;
 import ch.nexsol.gateway.database.controller.FilterController;
 import ch.nexsol.gateway.database.controller.PredicateController;
 import ch.nexsol.gateway.database.controller.RouteController;
+import ch.nexsol.gateway.database.controller.RouteViewController;
 import ch.nexsol.gateway.database.controller.error.ControllerExceptionHandler;
 import ch.nexsol.gateway.database.locator.DatabaseRouteDefinitionLocator;
 import ch.nexsol.gateway.database.service.ApiService;
@@ -40,8 +41,8 @@ import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
  */
 @AutoConfiguration
 @Import({ DatabaseRouteDefinitionLocator.class, ControllerExceptionHandler.class, RouteController.class,
-		FilterController.class, PredicateController.class, GatewayConfigService.class, ApiService.class,
-		RouteService.class, PredicateService.class, FilterService.class, ArgumentService.class })
+		FilterController.class, PredicateController.class, RouteViewController.class, GatewayConfigService.class,
+		ApiService.class, RouteService.class, PredicateService.class, FilterService.class, ArgumentService.class })
 @EnableR2dbcRepositories(basePackages = "ch.nexsol.gateway.database.repository")
 @EntityScan(basePackages = "ch.nexsol.gateway.database.entity")
 public class GatewayDatabaseAutoConfiguration {
