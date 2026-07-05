@@ -19,85 +19,55 @@ package ch.nexsol.gateway.database.service;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import ch.nexsol.gateway.database.entity.PredicateEntity;
 import ch.nexsol.gateway.database.entity.RouteEntity;
 import ch.nexsol.gateway.database.exception.PredicatesNotValidException;
 import ch.nexsol.gateway.database.model.PredicateCreateModel;
 import ch.nexsol.gateway.database.repository.PredicateRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
 import org.springframework.stereotype.Service;
 
+/**
+ * Route element service handling the persistence, validation and gateway-definition
+ * mapping of route predicates.
+ */
 @Service
-public class PredicateService {
+public class PredicateService extends
+		AbstractRouteElementService<PredicateEntity, PredicateDefinition, PredicateCreateModel, PredicateRepository> {
 
-	private static final Logger LOG = LoggerFactory.getLogger(PredicateService.class);
-
-	private final GatewayConfigService gatewayConfigService;
-
-	private final PredicateRepository predicateRepository;
-
-	private final ArgumentService argumentService;
-
+	/**
+	 * Creates the predicate service with its collaborating beans.
+	 * @param gatewayConfigService the service validating predicate names and arguments
+	 * @param predicateRepository the repository persisting and querying predicates
+	 * @param argumentService the service converting arguments to and from their JSON form
+	 */
 	public PredicateService(GatewayConfigService gatewayConfigService, PredicateRepository predicateRepository,
 			ArgumentService argumentService) {
-		this.gatewayConfigService = gatewayConfigService;
-		this.predicateRepository = predicateRepository;
-		this.argumentService = argumentService;
+		super(gatewayConfigService, predicateRepository, argumentService);
 	}
 
-	public Flux<PredicateEntity> findByRouteId(Long id) {
-		return this.predicateRepository.findByRouteRefId(id);
-	}
-
+	/**
+	 * Validates the arguments of every predicate, emitting an error if any is invalid.
+	 * @param predicates the predicates to validate, may be {@code null} or empty
+	 * @return {@code true} when all predicates are valid (or none are provided),
+	 * otherwise an error signal
+	 */
 	public Mono<Boolean> validatePredicatesArgs(List<PredicateCreateModel> predicates) {
-		if (predicates != null && !predicates.isEmpty()) {
-			return Flux.fromIterable(predicates)
-				.flatMap((predicate) -> this.gatewayConfigService.validatePredicate(predicate.name(), predicate.args()))
-				.all((valid) -> valid)
-				.flatMap((validPredicates) -> {
-					if (!validPredicates) {
-						LOG.error("Some predicates have bad arguments");
-						return Mono.error(new PredicatesNotValidException());
-					}
-					else {
-						return Mono.just(true);
-					}
-				});
-		}
-		else {
-			return Mono.just(true);
-		}
+		return validateArgs(predicates);
 	}
 
+	/**
+	 * Persists the given predicates against the supplied route.
+	 * @param routeEntity the owning route
+	 * @param predicates the predicates to create, may be {@code null} or empty
+	 * @return the persisted predicates, or an empty stream when none are provided
+	 */
 	public Flux<PredicateEntity> createPredicates(RouteEntity routeEntity, List<PredicateCreateModel> predicates) {
-		if (predicates != null && !predicates.isEmpty()) {
-			return Flux.fromIterable(predicates).flatMap((p) -> {
-				PredicateEntity predicateEntity = new PredicateEntity();
-				predicateEntity.setName(p.name());
-				predicateEntity.setArgs(this.argumentService.mapArgumentsToJsonString(p.args()));
-				predicateEntity.setRouteRefId(routeEntity.getId());
-				return this.predicateRepository.save(predicateEntity);
-			});
-		}
-		else {
-			return Flux.empty();
-		}
-	}
-
-	public Mono<Void> deleteByRouteId(Long id) {
-		return this.predicateRepository.deleteByRouteRefId(id);
-	}
-
-	public Mono<List<PredicateDefinition>> loadSpringCloudGatewayPredicateDefinition(Long routeId) {
-		return this.findByRouteId(routeId).map(toPredicateDefinition()).collectList();
+		return create(routeEntity, predicates);
 	}
 
 	/**
@@ -108,28 +78,35 @@ public class PredicateService {
 	 * @return the predicate definitions grouped by route reference id
 	 */
 	public Mono<Map<Long, List<PredicateDefinition>>> loadPredicateDefinitionsByRouteIds(Collection<Long> routeIds) {
-		if (routeIds == null || routeIds.isEmpty()) {
-			return Mono.just(Map.of());
-		}
-		return this.predicateRepository.findByRouteRefIdIn(routeIds)
-			.collectList()
-			.map((entities) -> entities.stream()
-				.collect(Collectors.groupingBy(PredicateEntity::getRouteRefId,
-						Collectors.mapping(toPredicateDefinition(), Collectors.toList()))));
+		return loadDefinitionsByRouteIds(routeIds);
 	}
 
-	private Function<PredicateEntity, PredicateDefinition> toPredicateDefinition() {
-		return (predicate) -> {
-			try {
-				PredicateDefinition predicateDefinition = new PredicateDefinition();
-				predicateDefinition.setName(predicate.getName());
-				predicateDefinition.setArgs(this.argumentService.jsonStringArgumentsToMap(predicate.getArgs()));
-				return predicateDefinition;
-			}
-			catch (Exception ex) {
-				throw new RuntimeException("Error deserializing predicate args", ex);
-			}
-		};
+	@Override
+	protected PredicateEntity newEntity() {
+		return new PredicateEntity();
+	}
+
+	@Override
+	protected PredicateDefinition toDefinition(String name, Map<String, String> args) {
+		PredicateDefinition predicateDefinition = new PredicateDefinition();
+		predicateDefinition.setName(name);
+		predicateDefinition.setArgs(args);
+		return predicateDefinition;
+	}
+
+	@Override
+	protected Mono<Boolean> validateElement(GatewayConfigService configService, String name, Map<String, String> args) {
+		return configService.validatePredicate(name, args);
+	}
+
+	@Override
+	protected RuntimeException notValidException() {
+		return new PredicatesNotValidException();
+	}
+
+	@Override
+	protected String elementLabel() {
+		return "predicate";
 	}
 
 }

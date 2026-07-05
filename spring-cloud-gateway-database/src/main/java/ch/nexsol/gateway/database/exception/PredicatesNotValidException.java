@@ -19,6 +19,10 @@ package ch.nexsol.gateway.database.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+/**
+ * Raised when one or more route predicates carry invalid arguments; mapped to an HTTP 400
+ * response.
+ */
 @ResponseStatus(code = HttpStatus.BAD_REQUEST)
 public class PredicatesNotValidException extends RuntimeException {
 

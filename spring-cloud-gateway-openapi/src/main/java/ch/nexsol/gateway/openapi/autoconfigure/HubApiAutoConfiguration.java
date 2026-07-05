@@ -38,22 +38,48 @@ import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.codec.ServerCodecConfigurer;
 
+/**
+ * Auto-configuration that wires up the OpenAPI hub, aggregating the OpenAPI documentation
+ * of the services discovered by the gateway. It is only active when the
+ * {@code spring.cloud.gateway.openapi.hub.enabled} property is set to {@code true}.
+ */
 @AutoConfiguration
 @ConditionalOnProperty(name = "spring.cloud.gateway.openapi.hub.enabled", havingValue = "true", matchIfMissing = false)
 public class HubApiAutoConfiguration {
 
+	/**
+	 * Registers the component that publishes the discovered OpenAPI routes as Swagger UI
+	 * URLs.
+	 * @param routeLocator the gateway route locator
+	 * @param swaggerUiConfigProperties the SpringDoc Swagger UI configuration to populate
+	 * @return the {@link SpringDocOpenapiRoutes} bean
+	 */
 	@Bean
 	SpringDocOpenapiRoutes springDocOpenapiRoutes(RouteLocator routeLocator,
 			SwaggerUiConfigProperties swaggerUiConfigProperties) {
 		return new SpringDocOpenapiRoutes(routeLocator, swaggerUiConfigProperties);
 	}
 
+	/**
+	 * Registers the service that resolves the OpenAPI documentation endpoint of each
+	 * discovered service instance.
+	 * @param discoveryClient the reactive discovery client
+	 * @return the {@link OpenapiService} bean
+	 */
 	@Bean
 	@ConditionalOnClass(ReactiveDiscoveryClient.class)
 	OpenapiService openapiService(ReactiveDiscoveryClient discoveryClient) {
 		return new OpenapiService(discoveryClient);
 	}
 
+	/**
+	 * Registers the route locator that creates OpenAPI documentation routes for the
+	 * discovered services.
+	 * @param discoveryClient the reactive discovery client
+	 * @param properties the discovery locator properties
+	 * @param openapiService the service used to discover OpenAPI endpoints
+	 * @return the {@link HubDiscoveryRouteLocator} bean
+	 */
 	@Bean
 	@ConditionalOnClass(ReactiveDiscoveryClient.class)
 	HubDiscoveryRouteLocator hubDiscoveryRouteLocator(ReactiveDiscoveryClient discoveryClient,
@@ -61,6 +87,15 @@ public class HubApiAutoConfiguration {
 		return new HubDiscoveryRouteLocator(discoveryClient, properties, openapiService);
 	}
 
+	/**
+	 * Registers the filter factory that rewrites the {@code servers} section of the
+	 * proxied OpenAPI documents so they point at the gateway.
+	 * @param codecConfigurer the server codec configurer providing the message readers
+	 * @param bodyDecoders the available message body decoders
+	 * @param bodyEncoders the available message body encoders
+	 * @param apiGatewayUri the public gateway URI to advertise in the OpenAPI servers
+	 * @return the {@link OpenapiModifyResponseBodyGatewayFilterFactory} bean
+	 */
 	@Bean
 	@ConditionalOnEnabledFilter
 	OpenapiModifyResponseBodyGatewayFilterFactory customModifyResponseBodyGatewayFilterFactory(

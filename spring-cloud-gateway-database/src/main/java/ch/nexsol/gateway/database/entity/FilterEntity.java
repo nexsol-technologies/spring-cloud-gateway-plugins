@@ -19,8 +19,11 @@ package ch.nexsol.gateway.database.entity;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Table;
 
+/**
+ * R2DBC entity mapping a route filter row to its name, arguments and owning route.
+ */
 @Table("filter")
-public class FilterEntity {
+public class FilterEntity implements RouteElementEntity {
 
 	@Id
 	private Long id;
@@ -31,38 +34,73 @@ public class FilterEntity {
 
 	private String args;
 
+	/**
+	 * Returns the primary key of this filter.
+	 * @return the filter id
+	 */
 	public Long getId() {
 		return this.id;
 	}
 
+	/**
+	 * Sets the primary key of this filter.
+	 * @param id the filter id
+	 */
 	public void setId(Long id) {
 		this.id = id;
 	}
 
+	/**
+	 * {@return the id of the route this filter belongs to}
+	 */
+	@Override
 	public Long getRouteRefId() {
 		return this.routeRefId;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
 	public void setRouteRefId(Long routeRefId) {
 		this.routeRefId = routeRefId;
 	}
 
+	/**
+	 * {@return the filter name}
+	 */
+	@Override
 	public String getName() {
 		return this.name;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
 	public void setName(String name) {
 		this.name = name;
 	}
 
+	/**
+	 * {@return the serialized filter arguments}
+	 */
+	@Override
 	public String getArgs() {
 		return this.args;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
 	public void setArgs(String args) {
 		this.args = args;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public String toString() {
 		return "FilterEntity [id=" + this.id + ", routeRefId=" + this.routeRefId + ", name=" + this.name + ", args="

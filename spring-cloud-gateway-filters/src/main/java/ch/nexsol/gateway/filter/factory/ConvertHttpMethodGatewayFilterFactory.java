@@ -29,6 +29,10 @@ import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFac
 import org.springframework.http.HttpMethod;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Gateway filter factory that rewrites the HTTP method of the incoming request to a
+ * configured replacement method before the request is forwarded downstream.
+ */
 public class ConvertHttpMethodGatewayFilterFactory
 		extends AbstractGatewayFilterFactory<ConvertHttpMethodGatewayFilterFactory.Config> {
 
@@ -36,15 +40,29 @@ public class ConvertHttpMethodGatewayFilterFactory
 
 	private static final String REPLACEMENT_KEY = "replacement";
 
+	/**
+	 * Creates the factory bound to its {@link Config} type.
+	 */
 	public ConvertHttpMethodGatewayFilterFactory() {
 		super(Config.class);
 	}
 
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Maps the single shortcut argument to the {@code replacement} configuration field.
+	 */
 	@Override
 	public List<String> shortcutFieldOrder() {
 		return Arrays.asList(REPLACEMENT_KEY);
 	}
 
+	/**
+	 * Builds a filter that mutates the exchange to use the configured replacement HTTP
+	 * method.
+	 * @param config the filter configuration holding the replacement method
+	 * @return a gateway filter that swaps the request method
+	 */
 	@Override
 	public GatewayFilter apply(Config config) {
 		return (exchange, chain) -> Mono.just(exchange.getRequest())
@@ -54,19 +72,29 @@ public class ConvertHttpMethodGatewayFilterFactory
 			.flatMap(chain::filter);
 	}
 
+	/**
+	 * Configuration for {@link ConvertHttpMethodGatewayFilterFactory}.
+	 */
 	@Validated
 	public static class Config {
 
 		@NotNull
 		private HttpMethod replacement;
 
+		/**
+		 * Returns the HTTP method the request will be rewritten to.
+		 * @return the replacement HTTP method
+		 */
 		public HttpMethod getReplacement() {
 			return this.replacement;
 		}
 
+		/**
+		 * Sets the replacement HTTP method from its textual name.
+		 * @param method the HTTP method name to resolve
+		 */
 		public void setReplacement(String method) {
 			this.replacement = HttpMethod.valueOf(method);
-			assert this.replacement != null;
 		}
 
 	}

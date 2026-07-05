@@ -46,6 +46,10 @@ import org.springframework.security.oauth2.server.resource.authentication.Reacti
 import org.springframework.web.reactive.config.WebFluxConfigurer;
 import org.springframework.web.server.ServerWebExchange;
 
+/**
+ * Auto-configuration for the OAuth 2.0 resource server support, wiring the JWT granted
+ * authorities converters and the reactive multi-tenant authentication manager resolvers.
+ */
 @AutoConfiguration
 public class ResourceServerAutoConfiguration {
 
@@ -70,6 +74,12 @@ public class ResourceServerAutoConfiguration {
 		return new ResourceServerPluginsProperties();
 	}
 
+	/**
+	 * Reactive configuration that registers the
+	 * {@link ReactiveAuthenticationManagerResolver} used to resolve the authentication
+	 * manager per JWT issuer, both for the multi-tenant and the single default issuer
+	 * cases.
+	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnWebApplication(type = Type.REACTIVE)
 	@ConditionalOnClass({ WebFluxConfigurer.class })

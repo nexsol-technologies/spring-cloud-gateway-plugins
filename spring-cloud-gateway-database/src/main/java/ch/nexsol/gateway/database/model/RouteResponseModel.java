@@ -21,6 +21,16 @@ import java.util.List;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+/**
+ * API response model describing a persisted route with its predicates and filters.
+ *
+ * @param id the route primary key
+ * @param routeId the business route id
+ * @param uri the target URI
+ * @param order the resolution order, or {@code null} when unset
+ * @param predicates the route predicates
+ * @param filters the route filters
+ */
 public record RouteResponseModel(Long id, @NotEmpty String routeId, @NotEmpty String uri, Integer order,
 		@NotEmpty List<@NotNull PredicateResponseModel> predicates, List<FilterResponseModel> filters) {
 

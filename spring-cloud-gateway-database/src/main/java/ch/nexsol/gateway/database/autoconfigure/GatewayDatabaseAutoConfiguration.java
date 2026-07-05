@@ -33,6 +33,11 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
 
+/**
+ * Auto-configuration wiring the database-backed gateway route management: the
+ * controllers, services, route definition locator, R2DBC repositories and entity
+ * scanning.
+ */
 @AutoConfiguration
 @Import({ DatabaseRouteDefinitionLocator.class, ControllerExceptionHandler.class, RouteController.class,
 		FilterController.class, PredicateController.class, GatewayConfigService.class, ApiService.class,

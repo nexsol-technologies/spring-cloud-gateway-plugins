@@ -19,9 +19,15 @@ package ch.nexsol.gateway.database.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+/**
+ * Raised when a referenced route cannot be found; mapped to an HTTP 404 response.
+ */
 @ResponseStatus(code = HttpStatus.NOT_FOUND)
 public class RouteNotFoundException extends RuntimeException {
 
+	/**
+	 * Creates the exception.
+	 */
 	public RouteNotFoundException() {
 		super();
 	}

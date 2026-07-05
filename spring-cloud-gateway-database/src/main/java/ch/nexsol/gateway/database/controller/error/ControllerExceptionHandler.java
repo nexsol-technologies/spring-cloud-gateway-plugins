@@ -28,16 +28,29 @@ import org.springframework.web.bind.support.WebExchangeBindException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.ServerWebInputException;
 
+/**
+ * Default controller advice translating request validation and binding failures into HTTP
+ * 400 responses.
+ */
 @ControllerAdvice
 // @ConditionalOnMissingBean(annotation = ControllerAdvice.class)
 public class ControllerExceptionHandler {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ControllerExceptionHandler.class);
 
+	/**
+	 * Creates the default controller advice.
+	 */
 	public ControllerExceptionHandler() {
 		LOG.info("Initialize default @ControllerAdvice");
 	}
 
+	/**
+	 * Handles constraint violations by returning an HTTP 400 response.
+	 * @param exchange the current server exchange
+	 * @param e the constraint violation
+	 * @return a 400 response
+	 */
 	@ExceptionHandler(ConstraintViolationException.class)
 	public ResponseEntity<String> constraintViolationException(ServerWebExchange exchange,
 			ConstraintViolationException e) {
@@ -45,12 +58,24 @@ public class ControllerExceptionHandler {
 		return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
 	}
 
+	/**
+	 * Handles request body binding failures by returning an HTTP 400 response.
+	 * @param exchange the current server exchange
+	 * @param e the binding failure
+	 * @return a 400 response
+	 */
 	@ExceptionHandler(WebExchangeBindException.class)
 	public ResponseEntity<String> exception(ServerWebExchange exchange, WebExchangeBindException e) {
 		LOG.error("WebExchangeBindException", e);
 		return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
 	}
 
+	/**
+	 * Handles malformed request input by returning an HTTP 400 response.
+	 * @param exchange the current server exchange
+	 * @param e the input failure
+	 * @return a 400 response
+	 */
 	@ExceptionHandler(ServerWebInputException.class)
 	public ResponseEntity<String> exception(ServerWebExchange exchange, ServerWebInputException e) {
 		LOG.error("ServerWebInputException", e);

@@ -26,10 +26,28 @@ import jakarta.validation.constraints.NotNull;
 
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Creation payload for a route, carrying its business id, target URI, order and the
+ * predicates and filters to attach.
+ *
+ * @param routeId the business route id, must not be empty
+ * @param uri the target URI, must not be {@code null}
+ * @param order the resolution order, or {@code null} when unset
+ * @param predicates the predicates to attach, must not be empty
+ * @param filters the filters to attach
+ */
 @Validated
 public record RouteCreateModel(@NotEmpty String routeId, @NotNull URI uri, Integer order,
 		@NotEmpty List<@NotNull PredicateCreateModel> predicates, List<FilterCreateModel> filters) {
 
+	/**
+	 * Canonical constructor validating and normalizing the supplied URI.
+	 * @param routeId the business route id
+	 * @param uri the target URI
+	 * @param order the resolution order
+	 * @param predicates the predicates to attach
+	 * @param filters the filters to attach
+	 */
 	public RouteCreateModel(@NotEmpty String routeId, @NotNull URI uri, Integer order,
 			@NotEmpty List<@NotNull PredicateCreateModel> predicates, List<FilterCreateModel> filters) {
 		this.routeId = routeId;

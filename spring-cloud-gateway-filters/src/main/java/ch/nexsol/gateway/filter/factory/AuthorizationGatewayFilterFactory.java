@@ -32,6 +32,11 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * Gateway filter factory that authorizes the request by requiring the authenticated
+ * principal to hold at least one of the configured authorities, rejecting it with
+ * {@code 403 Forbidden} otherwise.
+ */
 public class AuthorizationGatewayFilterFactory
 		extends AbstractGatewayFilterFactory<AuthorizationGatewayFilterFactory.Config> {
 
@@ -40,15 +45,29 @@ public class AuthorizationGatewayFilterFactory
 	 */
 	public static final String AUTHORITIES_KEY = "authorities";
 
+	/**
+	 * Creates the factory bound to its {@link Config} type.
+	 */
 	public AuthorizationGatewayFilterFactory() {
 		super(AuthorizationGatewayFilterFactory.Config.class);
 	}
 
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Maps the single shortcut argument to the {@code authorities} configuration field.
+	 */
 	@Override
 	public List<String> shortcutFieldOrder() {
 		return Arrays.asList(AUTHORITIES_KEY);
 	}
 
+	/**
+	 * Builds a filter that forwards the request only when the authenticated principal
+	 * holds one of the configured authorities.
+	 * @param config the filter configuration holding the required authorities
+	 * @return a gateway filter enforcing the authority check
+	 */
 	@Override
 	public GatewayFilter apply(Config config) {
 		return (exchange, chain) -> {
@@ -74,16 +93,27 @@ public class AuthorizationGatewayFilterFactory
 		return userAuthorities.stream().anyMatch((userAuth) -> authoritiesConfigured.contains(userAuth.getAuthority()));
 	}
 
+	/**
+	 * Configuration for {@link AuthorizationGatewayFilterFactory}.
+	 */
 	@Validated
 	public static class Config {
 
 		@NotEmpty
 		private List<@NotEmpty String> authorities = new ArrayList<>(0);
 
+		/**
+		 * Returns the authorities that grant access to the route.
+		 * @return the required authorities
+		 */
 		public List<String> getAuthorities() {
 			return this.authorities;
 		}
 
+		/**
+		 * Sets the authorities that grant access to the route.
+		 * @param authorities the required authorities
+		 */
 		public void setAuthorities(List<String> authorities) {
 			this.authorities = authorities;
 		}

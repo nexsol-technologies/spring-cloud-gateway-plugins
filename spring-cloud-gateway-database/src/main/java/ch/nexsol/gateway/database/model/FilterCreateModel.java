@@ -22,7 +22,13 @@ import jakarta.validation.constraints.NotEmpty;
 
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Creation payload for a route filter, carrying the filter name and its arguments.
+ *
+ * @param name the filter name, must not be empty
+ * @param args the filter arguments keyed by argument name
+ */
 @Validated
-public record FilterCreateModel(@NotEmpty String name, Map<String, String> args) {
+public record FilterCreateModel(@NotEmpty String name, Map<String, String> args) implements RouteElementCreateModel {
 
 }

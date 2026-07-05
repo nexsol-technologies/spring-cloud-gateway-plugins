@@ -26,21 +26,38 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST controller exposing the gateway predicate factories available for building routes.
+ */
 @RestController
 @RequestMapping("/api/gateway/routes")
 public class PredicateController {
 
 	private final GatewayConfigService gatewayConfigService;
 
+	/**
+	 * Creates the controller with the gateway configuration service it delegates to.
+	 * @param gatewayConfigService the gateway configuration service
+	 */
 	public PredicateController(GatewayConfigService gatewayConfigService) {
 		this.gatewayConfigService = gatewayConfigService;
 	}
 
+	/**
+	 * Lists the available predicates together with their accepted arguments.
+	 * @return the available predicates, each as a map holding its {@code name} and
+	 * {@code args}
+	 */
 	@GetMapping(path = "/available-predicates")
 	public Flux<Map<String, Object>> getAvailablePredicatesWithArgs() {
 		return this.gatewayConfigService.getAvailablePredicatesWithArgs();
 	}
 
+	/**
+	 * Lists the accepted argument names for the named predicate.
+	 * @param predicate the predicate name
+	 * @return the accepted argument names
+	 */
 	@GetMapping(path = "/available-predicates/{predicate}/args")
 	public Flux<CharSequence> getArgs(@PathVariable String predicate) {
 		return this.gatewayConfigService.getArgsForPredicate(predicate);

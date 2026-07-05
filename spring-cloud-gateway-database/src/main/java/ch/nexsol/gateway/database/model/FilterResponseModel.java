@@ -21,6 +21,14 @@ import java.util.Map;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+/**
+ * API response model describing a persisted route filter.
+ *
+ * @param id the filter primary key
+ * @param name the filter name
+ * @param args the filter arguments keyed by argument name
+ * @param routeRefId the id of the owning route
+ */
 public record FilterResponseModel(@NotNull Long id, @NotEmpty String name, Map<String, String> args,
 		@NotNull Long routeRefId) {
 

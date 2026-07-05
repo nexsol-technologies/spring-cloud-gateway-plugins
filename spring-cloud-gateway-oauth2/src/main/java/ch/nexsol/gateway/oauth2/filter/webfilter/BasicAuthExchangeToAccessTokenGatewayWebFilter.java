@@ -16,6 +16,9 @@
 
 package ch.nexsol.gateway.oauth2.filter.webfilter;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
@@ -57,6 +60,12 @@ import org.springframework.web.server.WebFilterChain;
 
 import static ch.nexsol.gateway.oauth2.utils.SecurityUtils.HEADER_AUTHORIZATION_BASIC;
 
+/**
+ * {@link WebFilter} that intercepts requests carrying a Basic {@code Authorization}
+ * header for a configured client and exchanges the client credentials for an OAuth 2.0
+ * access token using the client credentials grant. The resulting bearer token is cached
+ * (keyed on the client id and a hash of the secret) and set on the forwarded request.
+ */
 public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter, Ordered {
 
 	private static final Logger LOG = LoggerFactory.getLogger(BasicAuthExchangeToAccessTokenGatewayWebFilter.class);
@@ -77,6 +86,12 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 	// single call to the OAuth server instead of one per in-flight request.
 	private final ConcurrentHashMap<String, Mono<String>> inFlightExchanges = new ConcurrentHashMap<>();
 
+	/**
+	 * Create a new filter.
+	 * @param properties the Basic-auth to access-token exchange configuration
+	 * @param cacheManager the cache manager providing the token exchange cache
+	 * @param registry the observation registry used to instrument the exchange
+	 */
 	public BasicAuthExchangeToAccessTokenGatewayWebFilter(BasicAuthExchangeToAccessTokenProperties properties,
 			CacheManager cacheManager, ObservationRegistry registry) {
 		this.properties = properties;
@@ -90,11 +105,17 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 		this.tokenCache = cacheManager.getCache("basicauth-token-exchange.cache");
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public int getOrder() {
 		return Ordered.HIGHEST_PRECEDENCE + 5;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
 
@@ -226,8 +247,9 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 
 	private Mono<String> getFromCache(String cacheKey) {
 		try {
-			if (this.tokenCache.get(cacheKey) != null && this.tokenCache.get(cacheKey).get() != null) {
-				String tokenExchangeCache = (String) this.tokenCache.get(cacheKey).get();
+			Cache.ValueWrapper wrapper = this.tokenCache.get(cacheKey);
+			if (wrapper != null && wrapper.get() != null) {
+				String tokenExchangeCache = (String) wrapper.get();
 				LOG.debug("token found in cache for key [{}]", cacheKey);
 				if (isTokenAvailable(tokenExchangeCache)) {
 					return Mono.just(tokenExchangeCache);
@@ -274,29 +296,40 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 		}
 	}
 
+	/**
+	 * Holder for the client id / client secret pair decoded from a Basic {@code
+	 * Authorization} header.
+	 */
 	public static class BasicValue {
 
-		private String clientId;
+		private final String clientId;
 
-		private String clientSecret;
+		private final String clientSecret;
 
+		/**
+		 * Create a new {@code BasicValue}.
+		 * @param clientId the OAuth 2.0 client id
+		 * @param clientSecret the OAuth 2.0 client secret
+		 */
 		public BasicValue(String clientId, String clientSecret) {
 			super();
 			this.clientId = clientId;
 			this.clientSecret = clientSecret;
 		}
 
+		/**
+		 * Build a stable, collision-safe key that also doubles as a safe log token. The
+		 * key combines the client id with the SHA-256 hex digest of the full client
+		 * secret, so it is unique per secret (no truncation collisions or stale tokens
+		 * after a rotation sharing a prefix) yet non-reversible for logging.
+		 * @return the cache key / safe log token for this pair
+		 */
 		public String getKey() {
-			if (this.clientSecret.length() > 5) {
-				return this.clientId + ":" + this.clientSecret.substring(0, 5) + "***";
-			}
-			else {
-				return this.clientId + ":***";
-			}
-
+			return this.clientId + ":" + sha256Hex(this.clientSecret);
 		}
 
 		/**
+		 * Return the OAuth 2.0 client id.
 		 * @return the clientId
 		 */
 		public String getClientId() {
@@ -304,24 +337,27 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 		}
 
 		/**
-		 * @param clientId the clientId to set
-		 */
-		public void setClientId(String clientId) {
-			this.clientId = clientId;
-		}
-
-		/**
+		 * Return the OAuth 2.0 client secret.
 		 * @return the clientSecret
 		 */
 		public String getClientSecret() {
 			return this.clientSecret;
 		}
 
-		/**
-		 * @param clientSecret the clientSecret to set
-		 */
-		public void setClientSecret(String clientSecret) {
-			this.clientSecret = clientSecret;
+		private static String sha256Hex(String value) {
+			try {
+				MessageDigest digest = MessageDigest.getInstance("SHA-256");
+				byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+				StringBuilder hex = new StringBuilder(hash.length * 2);
+				for (byte b : hash) {
+					hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+					hex.append(Character.forDigit(b & 0xF, 16));
+				}
+				return hex.toString();
+			}
+			catch (NoSuchAlgorithmException ex) {
+				throw new IllegalStateException("SHA-256 algorithm not available", ex);
+			}
 		}
 
 	}

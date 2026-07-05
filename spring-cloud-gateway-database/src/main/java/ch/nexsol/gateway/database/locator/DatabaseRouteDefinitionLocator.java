@@ -23,15 +23,26 @@ import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.stereotype.Component;
 
+/**
+ * {@link RouteDefinitionLocator} that sources Spring Cloud Gateway route definitions from
+ * the routes persisted in the database.
+ */
 @Component
 public class DatabaseRouteDefinitionLocator implements RouteDefinitionLocator {
 
 	private final RouteService routeService;
 
+	/**
+	 * Creates the locator with the route service supplying the definitions.
+	 * @param routeService the route service
+	 */
 	public DatabaseRouteDefinitionLocator(RouteService routeService) {
 		this.routeService = routeService;
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public Flux<RouteDefinition> getRouteDefinitions() {
 		return this.routeService.loadSpringCloudGatewayRouteDefinition();

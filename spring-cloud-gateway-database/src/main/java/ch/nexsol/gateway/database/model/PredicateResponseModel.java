@@ -21,6 +21,14 @@ import java.util.Map;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+/**
+ * API response model describing a persisted route predicate.
+ *
+ * @param id the predicate primary key
+ * @param name the predicate name
+ * @param args the predicate arguments keyed by argument name
+ * @param routeRefId the id of the owning route
+ */
 public record PredicateResponseModel(@NotNull Long id, @NotEmpty String name,
 		@NotEmpty Map<@NotEmpty String, @NotEmpty String> args, @NotNull Long routeRefId) {
 

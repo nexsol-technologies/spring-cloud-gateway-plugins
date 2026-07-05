@@ -19,83 +19,53 @@ package ch.nexsol.gateway.database.service;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import ch.nexsol.gateway.database.entity.FilterEntity;
 import ch.nexsol.gateway.database.entity.RouteEntity;
 import ch.nexsol.gateway.database.exception.FiltersNotValidException;
 import ch.nexsol.gateway.database.model.FilterCreateModel;
 import ch.nexsol.gateway.database.repository.FilterRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.springframework.cloud.gateway.filter.FilterDefinition;
 
-public class FilterService {
+/**
+ * Route element service handling the persistence, validation and gateway-definition
+ * mapping of route filters.
+ */
+public class FilterService
+		extends AbstractRouteElementService<FilterEntity, FilterDefinition, FilterCreateModel, FilterRepository> {
 
-	private static final Logger LOG = LoggerFactory.getLogger(FilterService.class);
-
-	private final GatewayConfigService gatewayConfigService;
-
-	private final FilterRepository filterRepository;
-
-	private final ArgumentService argumentService;
-
+	/**
+	 * Creates the filter service with its collaborating beans.
+	 * @param gatewayConfigService the service validating filter names and arguments
+	 * @param filterRepository the repository persisting and querying filters
+	 * @param argumentService the service converting arguments to and from their JSON form
+	 */
 	public FilterService(GatewayConfigService gatewayConfigService, FilterRepository filterRepository,
 			ArgumentService argumentService) {
-		this.gatewayConfigService = gatewayConfigService;
-		this.filterRepository = filterRepository;
-		this.argumentService = argumentService;
+		super(gatewayConfigService, filterRepository, argumentService);
 	}
 
-	public Flux<FilterEntity> findByRouteId(Long id) {
-		return this.filterRepository.findByRouteRefId(id);
-	}
-
+	/**
+	 * Validates the arguments of every filter, emitting an error if any is invalid.
+	 * @param filters the filters to validate, may be {@code null} or empty
+	 * @return {@code true} when all filters are valid (or none are provided), otherwise
+	 * an error signal
+	 */
 	public Mono<Boolean> validateFiltersArgs(List<FilterCreateModel> filters) {
-		if (filters != null && !filters.isEmpty()) {
-			return Flux.fromIterable(filters)
-				.flatMap((filter) -> this.gatewayConfigService.validateFilter(filter.name(), filter.args()))
-				.all((valid) -> valid)
-				.flatMap((validFilters) -> {
-					if (!validFilters) {
-						LOG.error("Some filters have bad arguments");
-						return Mono.error(new FiltersNotValidException());
-					}
-					else {
-						return Mono.just(true);
-					}
-				});
-		}
-		else {
-			return Mono.just(true);
-		}
+		return validateArgs(filters);
 	}
 
+	/**
+	 * Persists the given filters against the supplied route.
+	 * @param routeEntity the owning route
+	 * @param filters the filters to create, may be {@code null} or empty
+	 * @return the persisted filters, or an empty stream when none are provided
+	 */
 	public Flux<FilterEntity> createFilters(RouteEntity routeEntity, List<FilterCreateModel> filters) {
-		if (filters != null && !filters.isEmpty()) {
-			return Flux.fromIterable(filters).flatMap((f) -> {
-				FilterEntity filterEntity = new FilterEntity();
-				filterEntity.setName(f.name());
-				filterEntity.setArgs(this.argumentService.mapArgumentsToJsonString(f.args()));
-				filterEntity.setRouteRefId(routeEntity.getId());
-				return this.filterRepository.save(filterEntity);
-			});
-		}
-		else {
-			return Flux.empty();
-		}
-	}
-
-	public Mono<Void> deleteByRouteId(Long id) {
-		return this.filterRepository.deleteByRouteRefId(id);
-	}
-
-	public Mono<List<FilterDefinition>> loadSpringCloudGatewayFilterDefinition(Long routeId) {
-		return this.findByRouteId(routeId).map(toFilterDefinition()).collectList();
+		return create(routeEntity, filters);
 	}
 
 	/**
@@ -105,28 +75,35 @@ public class FilterService {
 	 * @return the filter definitions grouped by route reference id
 	 */
 	public Mono<Map<Long, List<FilterDefinition>>> loadFilterDefinitionsByRouteIds(Collection<Long> routeIds) {
-		if (routeIds == null || routeIds.isEmpty()) {
-			return Mono.just(Map.of());
-		}
-		return this.filterRepository.findByRouteRefIdIn(routeIds)
-			.collectList()
-			.map((entities) -> entities.stream()
-				.collect(Collectors.groupingBy(FilterEntity::getRouteRefId,
-						Collectors.mapping(toFilterDefinition(), Collectors.toList()))));
+		return loadDefinitionsByRouteIds(routeIds);
 	}
 
-	private Function<FilterEntity, FilterDefinition> toFilterDefinition() {
-		return (filter) -> {
-			try {
-				FilterDefinition filterDefinition = new FilterDefinition();
-				filterDefinition.setName(filter.getName());
-				filterDefinition.setArgs(this.argumentService.jsonStringArgumentsToMap(filter.getArgs()));
-				return filterDefinition;
-			}
-			catch (Exception ex) {
-				throw new RuntimeException("Error deserializing filter args", ex);
-			}
-		};
+	@Override
+	protected FilterEntity newEntity() {
+		return new FilterEntity();
+	}
+
+	@Override
+	protected FilterDefinition toDefinition(String name, Map<String, String> args) {
+		FilterDefinition filterDefinition = new FilterDefinition();
+		filterDefinition.setName(name);
+		filterDefinition.setArgs(args);
+		return filterDefinition;
+	}
+
+	@Override
+	protected Mono<Boolean> validateElement(GatewayConfigService configService, String name, Map<String, String> args) {
+		return configService.validateFilter(name, args);
+	}
+
+	@Override
+	protected RuntimeException notValidException() {
+		return new FiltersNotValidException();
+	}
+
+	@Override
+	protected String elementLabel() {
+		return "filter";
 	}
 
 }

@@ -31,7 +31,8 @@ import reactor.core.publisher.Mono;
 import org.springframework.stereotype.Service;
 
 /**
- * This service translate Database Entities to API Models
+ * Facade service that orchestrates the route, predicate and filter services and
+ * translates the database entities into the API response models.
  */
 @Service
 public class ApiService {
@@ -44,6 +45,13 @@ public class ApiService {
 
 	private final ArgumentService argumentService;
 
+	/**
+	 * Creates the API service with its collaborating beans.
+	 * @param routeService the route service
+	 * @param predicateService the predicate service
+	 * @param filterService the filter service
+	 * @param argumentService the service converting arguments to and from their JSON form
+	 */
 	public ApiService(RouteService routeService, PredicateService predicateService, FilterService filterService,
 			ArgumentService argumentService) {
 		this.routeService = routeService;
@@ -52,22 +60,47 @@ public class ApiService {
 		this.argumentService = argumentService;
 	}
 
+	/**
+	 * Finds a route by id and maps it to its API response model.
+	 * @param id the route id
+	 * @return the route response model, or an empty result when none exists
+	 */
 	public Mono<RouteResponseModel> findById(Long id) {
 		return this.routeService.findById(id).flatMap(this::toRouteResponseModel);
 	}
 
+	/**
+	 * Returns all routes mapped to their API response models.
+	 * @return the route response models
+	 */
 	public Flux<RouteResponseModel> getAllRoutes() {
 		return this.routeService.getAllRoutes().flatMap(this::toRouteResponseModel);
 	}
 
+	/**
+	 * Creates a route from the given payload and maps it to its API response model.
+	 * @param routeModel the route creation payload
+	 * @return the created route response model
+	 */
 	public Mono<RouteResponseModel> createRoute(RouteCreateModel routeModel) {
 		return this.routeService.createRoute(routeModel).flatMap(this::toRouteResponseModel);
 	}
 
+	/**
+	 * Updates the route with the given id and maps it to its API response model.
+	 * @param id the id of the route to update
+	 * @param routeModel the new route payload
+	 * @return the updated route response model
+	 */
 	public Mono<RouteResponseModel> updateRoute(Long id, RouteCreateModel routeModel) {
 		return this.routeService.updateRoute(id, routeModel).flatMap(this::toRouteResponseModel);
 	}
 
+	/**
+	 * Deletes the route with the given id.
+	 * @param id the id of the route to delete
+	 * @return a completion signal
+	 */
 	public Mono<Void> deleteRoute(Long id) {
 		return this.routeService.deleteRoute(id);
 	}

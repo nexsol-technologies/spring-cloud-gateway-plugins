@@ -28,6 +28,10 @@ import jakarta.validation.constraints.NotNull;
 
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Configuration properties for the OAuth 2.0 resource server plugins, covering the JSON
+ * path granted-authorities mapping and the list of multi-tenant issuers.
+ */
 @Validated
 public class ResourceServerPluginsProperties {
 
@@ -77,14 +81,25 @@ public class ResourceServerPluginsProperties {
 		return !this.multitenant.isEmpty();
 	}
 
+	/**
+	 * Return the JSON path granted-authorities mapping.
+	 * @return the granted authorities mapping
+	 */
 	public JsonPathGrantedAuthorityProperties getGrantedAuthoritiesMapping() {
 		return this.grantedAuthoritiesMapping;
 	}
 
+	/**
+	 * Set the JSON path granted-authorities mapping.
+	 * @param grantedAuthoritiesMapping the granted authorities mapping to set
+	 */
 	public void setGrantedAuthoritiesMapping(JsonPathGrantedAuthorityProperties grantedAuthoritiesMapping) {
 		this.grantedAuthoritiesMapping = grantedAuthoritiesMapping;
 	}
 
+	/**
+	 * Properties describing a single resource server tenant (its id and issuer URI).
+	 */
 	public static class OAuth2ResourceServerProperties {
 
 		/**
@@ -129,18 +144,34 @@ public class ResourceServerPluginsProperties {
 
 	}
 
+	/**
+	 * Properties holding the list of JSON path expressions used to map JWT claims to
+	 * Spring Security granted authorities.
+	 */
 	public static class JsonPathGrantedAuthorityProperties {
 
 		private List<String> jsonPath = new ArrayList<>();
 
+		/**
+		 * Return the configured JSON path expressions.
+		 * @return the json paths
+		 */
 		public List<String> getJsonPath() {
 			return this.jsonPath;
 		}
 
+		/**
+		 * Set the JSON path expressions.
+		 * @param jsonPath the json paths to set
+		 */
 		public void setJsonPath(List<String> jsonPath) {
 			this.jsonPath = jsonPath;
 		}
 
+		/**
+		 * Whether the default mapping should be used because no JSON path is configured.
+		 * @return {@code true} when no JSON path is configured
+		 */
 		public boolean isEnabledDefault() {
 			return this.jsonPath == null || this.jsonPath.isEmpty();
 		}

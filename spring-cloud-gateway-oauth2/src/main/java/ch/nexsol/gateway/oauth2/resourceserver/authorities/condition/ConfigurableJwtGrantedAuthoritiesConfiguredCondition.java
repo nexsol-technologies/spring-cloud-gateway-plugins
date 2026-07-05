@@ -31,11 +31,18 @@ import org.springframework.context.annotation.ConditionContext;
 import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 
+/**
+ * Condition that matches when at least one JSON path granted-authorities mapping is
+ * configured, selecting the configurable JWT granted authorities converter.
+ */
 public class ConfigurableJwtGrantedAuthoritiesConfiguredCondition extends SpringBootCondition {
 
 	private static final Bindable<List<JsonPathGrantedAuthorityProperties>> STRING_REGISTRATION_LIST = Bindable
 		.listOf(JsonPathGrantedAuthorityProperties.class);
 
+	/**
+	 * {@inheritDoc}
+	 */
 	@Override
 	public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
 		ConditionMessage.Builder message = ConditionMessage

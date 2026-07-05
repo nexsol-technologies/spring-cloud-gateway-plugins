@@ -28,17 +28,31 @@ import org.springframework.context.event.EventListener;
 
 import static ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator.ROUTE_ID_PREFIX;
 
+/**
+ * Keeps the SpringDoc Swagger UI configuration in sync with the discovered OpenAPI
+ * routes, exposing one Swagger UI entry per aggregated service.
+ */
 public class SpringDocOpenapiRoutes {
 
 	private final RouteLocator routeLocator;
 
 	private SwaggerUiConfigProperties swaggerUiConfigProperties;
 
+	/**
+	 * Creates a new instance.
+	 * @param routeLocator the route locator providing the discovered OpenAPI routes
+	 * @param swaggerUiConfigProperties the Swagger UI configuration to populate
+	 */
 	public SpringDocOpenapiRoutes(RouteLocator routeLocator, SwaggerUiConfigProperties swaggerUiConfigProperties) {
 		this.routeLocator = routeLocator;
 		this.swaggerUiConfigProperties = swaggerUiConfigProperties;
 	}
 
+	/**
+	 * Rebuilds the Swagger UI URLs from the current OpenAPI discovery routes whenever the
+	 * gateway routes are refreshed.
+	 * @param event the route refresh event
+	 */
 	@EventListener
 	public void handleContextStart(RefreshRoutesEvent event) {
 		this.routeLocator.getRoutes().filter((route) -> route.getId().startsWith(ROUTE_ID_PREFIX)).map((route) -> {
