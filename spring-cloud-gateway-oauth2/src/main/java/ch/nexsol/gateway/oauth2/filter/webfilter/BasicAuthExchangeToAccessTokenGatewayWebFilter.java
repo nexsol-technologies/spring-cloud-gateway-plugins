@@ -111,7 +111,6 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 
 			return Mono.just(request)
 				.map((r) -> r.getHeaders())
-				.doOnNext((h) -> LOG.debug(h.toString()))
 				.filter((headers) -> this.containsAuthorizationBasic(headers))
 				.flatMap((headers) -> Mono.justOrEmpty(this.extractAuthorizationBasic(headers))
 					.filter((basicValue) -> this.properties.isUserConfigured(basicValue.getClientId()))
@@ -222,7 +221,7 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 		try {
 			if (this.tokenCache.get(cacheKey) != null && this.tokenCache.get(cacheKey).get() != null) {
 				String tokenExchangeCache = (String) this.tokenCache.get(cacheKey).get();
-				LOG.debug("token from cache [{}] for key [{}]", tokenExchangeCache, cacheKey);
+				LOG.debug("token found in cache for key [{}]", cacheKey);
 				if (isTokenAvailable(tokenExchangeCache)) {
 					return Mono.just(tokenExchangeCache);
 				}
@@ -262,7 +261,7 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 			return JWTParser.parse(token);
 		}
 		catch (ParseException ex) {
-			LOG.error(String.format("error when parsing token [%s]", token), ex);
+			LOG.error("error when parsing token", ex);
 			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
 					"Not Authorized to access to this internal resource due to an internal error");
 		}

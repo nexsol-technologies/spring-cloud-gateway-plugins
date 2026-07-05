@@ -16,8 +16,7 @@
 
 package ch.nexsol.gateway.openapi.hub;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.stream.Collectors;
 
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
 import org.springdoc.core.properties.AbstractSwaggerUiConfigProperties.SwaggerUrl;
@@ -42,13 +41,10 @@ public class SpringDocOpenapiRoutes {
 
 	@EventListener
 	public void handleContextStart(RefreshRoutesEvent event) {
-		Set<SwaggerUrl> urls = new HashSet<>();
-		this.routeLocator.getRoutes().filter((route) -> route.getId().startsWith(ROUTE_ID_PREFIX)).doOnNext((route) -> {
+		this.routeLocator.getRoutes().filter((route) -> route.getId().startsWith(ROUTE_ID_PREFIX)).map((route) -> {
 			String name = (String) route.getMetadata().get("name");
-			SwaggerUrl swaggerUrl = new SwaggerUrl(name, HubDiscoveryRouteLocator.API_DOCS_URL + "/" + name, null);
-			urls.add(swaggerUrl);
-		}).subscribe();
-		this.swaggerUiConfigProperties.setUrls(urls);
+			return new SwaggerUrl(name, HubDiscoveryRouteLocator.API_DOCS_URL + "/" + name, null);
+		}).collect(Collectors.toSet()).doOnNext(this.swaggerUiConfigProperties::setUrls).subscribe();
 	}
 
 }
