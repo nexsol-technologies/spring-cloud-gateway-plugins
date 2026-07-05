@@ -188,18 +188,20 @@ public class AuthorizationTokenGatewayFilterFactory
 			if (!iterator.hasNext()) {
 				claimValues = Collections.emptyList();
 			}
-			final var firstItem = iterator.next();
-			if (firstItem instanceof String) {
-				claimValues = (Collection<String>) claim;
-			}
-			if (Collection.class.isAssignableFrom(firstItem.getClass())) {
-				claimValues = ((Collection) claim).stream()
-					.flatMap((colItem) -> ((Collection) colItem).stream())
-					.map(String.class::cast)
-					.toList();
+			else {
+				final var firstItem = iterator.next();
+				if (firstItem instanceof String) {
+					claimValues = (Collection<String>) claim;
+				}
+				if (Collection.class.isAssignableFrom(firstItem.getClass())) {
+					claimValues = ((Collection) claim).stream()
+						.flatMap((colItem) -> ((Collection) colItem).stream())
+						.map(String.class::cast)
+						.toList();
+				}
 			}
 		}
-		final Collection<String> claimValuesFinal = claimValues;
+		final Collection<String> claimValuesFinal = (claimValues != null) ? claimValues : Collections.emptyList();
 		return grantAccess.getRoles().stream().allMatch((value) -> claimValuesFinal.contains(value));
 	}
 
