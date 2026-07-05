@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!-- A single predicate/filter row: element selector plus its argument inputs.
+     Expects the context variables kind, names and row. -->
+<div th:fragment="row" class="element-row border rounded p-2">
+	<div class="d-flex gap-2 align-items-center">
+		<select class="form-select form-select-sm" th:name="|${kind}s[${row.index()}].name|"
+			hx-trigger="change" hx-swap="innerHTML"
+			th:attr="hx-get=|/ui/element-args/${kind}/${row.index()}|,hx-target=|#args-${row.index()}|">
+			<option value="" th:selected="${row.name() == null}"
+				th:text="'Choose a ' + ${kind} + '...'">Choose...</option>
+			<option th:each="name : ${names}" th:value="${name}" th:text="${name}"
+				th:selected="${name == row.name()}"></option>
+		</select>
+		<button type="button" class="btn btn-sm btn-outline-danger remove-element" title="Remove"
+			onclick="gwRemoveRow(this)">&times;</button>
+	</div>
+	<div class="element-args mt-2" th:id="|args-${row.index()}|"
+		th:with="index=${row.index()},args=${row.args()}">
+		<th:block th:replace="~{fragments/element :: args}"></th:block>
+	</div>
+</div>
+
+<!-- Argument inputs for one element. Expects the context variables kind, index and args. -->
+<th:block th:fragment="args">
+	<div class="mb-2" th:each="arg : ${args}">
+		<label class="form-label small mb-1" th:text="${arg.key}">arg</label>
+		<input class="form-control form-control-sm" required th:name="|${kind}s[${index}].args[${arg.key}]|"
+			th:value="${arg.value}">
+	</div>
+</th:block>
+
+</body>
+</html>

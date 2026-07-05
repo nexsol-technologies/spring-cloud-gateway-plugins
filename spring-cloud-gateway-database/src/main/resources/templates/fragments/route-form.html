@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!-- Combined success response: fresh form plus an out-of-band refresh of the route list. -->
+<th:block th:fragment="saved">
+	<th:block th:replace="~{fragments/route-form :: form}"></th:block>
+	<th:block th:replace="~{fragments/route-list :: list}"></th:block>
+</th:block>
+
+<!-- Route creation / edition form. -->
+<div th:fragment="form" id="route-form-container">
+	<div class="card shadow-sm">
+		<div class="card-body">
+			<h2 class="h5 card-title mb-3" th:text="${editing} ? 'Edit route' : 'Create a new route'">Create a new route</h2>
+
+			<div th:if="${formError}" class="alert alert-danger py-2" th:text="${formError}">error</div>
+
+			<form hx-post="/ui/routes" th:attr="hx-post=@{/ui/routes}"
+				hx-target="#route-form-container" hx-swap="outerHTML">
+				<input type="hidden" name="id" th:value="${formRouteId}">
+
+				<div class="mb-3">
+					<label class="form-label" for="routeId">Name</label>
+					<input class="form-control" id="routeId" name="routeId" required th:value="${routeId}">
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="uri">URI</label>
+					<input class="form-control" id="uri" name="uri" required
+						placeholder="http://localhost:8080" th:value="${uri}">
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="order">Order</label>
+					<input class="form-control" id="order" name="order" type="number" th:value="${order}">
+				</div>
+
+				<div class="mb-3">
+					<div class="d-flex justify-content-between align-items-center mb-2">
+						<h3 class="h6 mb-0">Predicates</h3>
+						<button type="button" class="btn btn-sm btn-outline-secondary"
+							hx-get="/ui/predicate-row" th:attr="hx-get=@{/ui/predicate-row}"
+							hx-target="#predicate-rows" hx-swap="beforeend">+ Add predicate</button>
+					</div>
+					<div id="predicate-rows" class="vstack gap-3"
+						th:with="kind='predicate',names=${predicateNames}">
+						<th:block th:each="row : ${predicateRows}">
+							<th:block th:replace="~{fragments/element :: row}"></th:block>
+						</th:block>
+					</div>
+				</div>
+
+				<div class="mb-3">
+					<div class="d-flex justify-content-between align-items-center mb-2">
+						<h3 class="h6 mb-0">Filters</h3>
+						<button type="button" class="btn btn-sm btn-outline-secondary"
+							hx-get="/ui/filter-row" th:attr="hx-get=@{/ui/filter-row}"
+							hx-target="#filter-rows" hx-swap="beforeend">+ Add filter</button>
+					</div>
+					<div id="filter-rows" class="vstack gap-3"
+						th:with="kind='filter',names=${filterNames}">
+						<th:block th:each="row : ${filterRows}">
+							<th:block th:replace="~{fragments/element :: row}"></th:block>
+						</th:block>
+					</div>
+				</div>
+
+				<div class="d-flex gap-2">
+					<button type="submit" class="btn btn-primary"
+						th:text="${editing} ? 'Update route' : 'Create route'">Create route</button>
+					<button th:if="${editing}" type="button" class="btn btn-outline-secondary"
+						hx-get="/ui/routes/new" th:attr="hx-get=@{/ui/routes/new}"
+						hx-target="#route-form-container" hx-swap="outerHTML">Cancel</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+
+</body>
+</html>
