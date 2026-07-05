@@ -101,20 +101,22 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 
 				String name = routeDefinition.getId().replace(this.routeIdPrefix, "");
 
-				// Derive the exposed path from the service id, not getUri().getHost():
-				// getHost() is null for ids with characters invalid in a URI host (e.g.
-				// '_'),
-				// and SpringDocOpenapiRoutes builds the Swagger UI URL from this same id,
-				// so
-				// both must stay in sync to avoid a 404.
+				// Exposed path derived from the service id, not getUri().getHost().
+				// getHost() is null for ids with URI-invalid chars such as '_', and
+				// SpringDocOpenapiRoutes builds the Swagger UI URL from the same id,
+				// so both must match to avoid a 404.
 				String path = "/" + name;
+
+				// Rewrite towards the path where the document was actually found (.json,
+				// .yaml or a service-declared override), not a hard-coded /v3/api-docs.
+				String discoveredPath = openapiDiscover.path();
 
 				// create OPENAPI route
 				RouteDefinition r = new RouteDefinition();
 				r.setId(ROUTE_ID_PREFIX + name);
 				r.setUri(routeDefinition.getUri());
 				r.setMetadata(Map.of("name", name));
-				r.setFilters(List.of(new FilterDefinition("RewritePath=" + API_DOCS_URL + path + ", " + API_DOCS_URL),
+				r.setFilters(List.of(new FilterDefinition("RewritePath=" + API_DOCS_URL + path + ", " + discoveredPath),
 						new FilterDefinition("OpenapiModifyResponseBody=" + path)));
 				r.setPredicates(List.of(new PredicateDefinition("Path=" + API_DOCS_URL + path)));
 
