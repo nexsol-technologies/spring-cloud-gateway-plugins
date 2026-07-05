@@ -16,19 +16,27 @@
 
 package ch.nexsol.gateway.database.service;
 
+import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import org.springframework.beans.BeanWrapper;
+import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.boot.context.properties.bind.BindException;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
-import org.springframework.cloud.gateway.support.ConfigurationService;
 import org.springframework.stereotype.Service;
 
 /**
@@ -39,8 +47,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class GatewayConfigService {
 
-	private final ConfigurationService configurationService;
-
 	private final Map<String, RoutePredicateFactory> predicates = new LinkedHashMap<>();
 
 	private final Map<String, GatewayFilterFactory> gatewayFilterFactories = new HashMap<>();
@@ -48,14 +54,10 @@ public class GatewayConfigService {
 	/**
 	 * Creates the service by indexing the available filter and predicate factories by
 	 * name.
-	 * @param configurationService the gateway configuration binder used to validate
-	 * predicate arguments
 	 * @param gatewayFilters the available gateway filter factories
 	 * @param predicates the available route predicate factories
 	 */
-	public GatewayConfigService(ConfigurationService configurationService, List<GatewayFilterFactory> gatewayFilters,
-			List<RoutePredicateFactory> predicates) {
-		this.configurationService = configurationService;
+	public GatewayConfigService(List<GatewayFilterFactory> gatewayFilters, List<RoutePredicateFactory> predicates) {
 		gatewayFilters.forEach((factory) -> this.gatewayFilterFactories.put(factory.name(), factory));
 		predicates.forEach((factory) -> this.predicates.put(factory.name(), factory));
 	}
@@ -121,6 +123,72 @@ public class GatewayConfigService {
 	}
 
 	/**
+	 * Returns the accepted arguments of the named predicate mapped to their default
+	 * values, as read from a freshly instantiated predicate configuration.
+	 * @param predicate the predicate name
+	 * @return the argument names mapped to their default value (empty string when none),
+	 * or an empty map when the predicate is unknown
+	 */
+	public Map<String, String> getDefaultArgsForPredicate(String predicate) {
+		RoutePredicateFactory factory = this.predicates.get(predicate);
+		if (factory == null) {
+			return Map.of();
+		}
+		return defaultArgs(factory.newConfig(), factory.shortcutFieldOrder());
+	}
+
+	/**
+	 * Returns the accepted arguments of the named filter mapped to their default values,
+	 * as read from a freshly instantiated filter configuration.
+	 * @param filter the filter name
+	 * @return the argument names mapped to their default value (empty string when none),
+	 * or an empty map when the filter is unknown
+	 */
+	public Map<String, String> getDefaultArgsForFilter(String filter) {
+		GatewayFilterFactory factory = this.gatewayFilterFactories.get(filter);
+		if (factory == null) {
+			return Map.of();
+		}
+		return defaultArgs(factory.newConfig(), factory.shortcutFieldOrder());
+	}
+
+	private static Map<String, String> defaultArgs(Object config, List<String> fieldOrder) {
+		BeanWrapper wrapper = new BeanWrapperImpl(config);
+		LinkedHashMap<String, String> result = new LinkedHashMap<>();
+		for (String field : fieldOrder) {
+			String value;
+			try {
+				value = stringify(wrapper.getPropertyValue(field));
+			}
+			catch (RuntimeException ex) {
+				// Nested or unreadable fields (e.g. a null nested config) have no default
+				// to
+				// propose; fall back to an empty value.
+				value = "";
+			}
+			result.put(field, value);
+		}
+		return result;
+	}
+
+	private static String stringify(Object value) {
+		if (value == null) {
+			return "";
+		}
+		if (value instanceof Collection<?> collection) {
+			return collection.stream().map(String::valueOf).collect(Collectors.joining(","));
+		}
+		if (value.getClass().isArray()) {
+			List<String> parts = new ArrayList<>();
+			for (int i = 0; i < Array.getLength(value); i++) {
+				parts.add(String.valueOf(Array.get(value, i)));
+			}
+			return String.join(",", parts);
+		}
+		return String.valueOf(value);
+	}
+
+	/**
 	 * Validates that a filter with the given name exists and that the supplied arguments
 	 * cover its required argument names.
 	 * @param name the filter name
@@ -139,7 +207,12 @@ public class GatewayConfigService {
 		if (!validArgs.isEmpty() && args.keySet().isEmpty()) {
 			return Mono.just(false);
 		}
-		return Mono.just(validArgs.stream().allMatch((a) -> args.keySet().contains(a)));
+		if (!validArgs.stream().allMatch((a) -> args.keySet().contains(a))) {
+			return Mono.just(false);
+		}
+		// Reject arguments that cannot be bound to the filter configuration (e.g. a
+		// non-boolean value for a boolean field).
+		return Mono.just(bindsCleanly(factory.getConfigClass(), args));
 	}
 
 	/**
@@ -165,12 +238,33 @@ public class GatewayConfigService {
 			return Mono.just(false);
 		}
 		try {
-			this.configurationService.with(factory).name(name).properties(args).bind();
+			// Strictly bind the arguments to the predicate configuration so that
+			// type-incompatible values (e.g. a non-boolean value for a boolean field) are
+			// rejected instead of being silently coerced.
+			new Binder(new MapConfigurationPropertySource(args)).bind("", Bindable.of(factory.getConfigClass()));
 		}
 		catch (BindException ex) {
-			throw new PredicateArgsFormatException(ex.getMessage());
+			return Mono.error(new PredicateArgsFormatException(ex.getMessage()));
 		}
 		return Mono.just(true);
+	}
+
+	/**
+	 * Strictly binds the supplied arguments to the given element configuration class,
+	 * reporting whether every value can be converted to its target type.
+	 * @param configClass the predicate or filter configuration class to bind against
+	 * @param args the supplied arguments keyed by field name
+	 * @return {@code true} when the arguments bind cleanly, {@code false} when at least
+	 * one value cannot be converted to its target type
+	 */
+	private boolean bindsCleanly(Class<?> configClass, Map<String, String> args) {
+		try {
+			new Binder(new MapConfigurationPropertySource(args)).bind("", Bindable.of(configClass));
+			return true;
+		}
+		catch (BindException ex) {
+			return false;
+		}
 	}
 
 }

@@ -33,9 +33,9 @@ import ch.nexsol.gateway.database.model.PredicateCreateModel;
 import ch.nexsol.gateway.database.model.RouteCreateModel;
 import ch.nexsol.gateway.database.service.ApiService;
 import ch.nexsol.gateway.database.service.GatewayConfigService;
+import ch.nexsol.gateway.database.service.PredicateArgsFormatException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.springframework.stereotype.Controller;
@@ -194,15 +194,12 @@ public class RouteViewController {
 			Model model) {
 		String selected = exchange.getRequest().getQueryParams().getFirst(kind + "s[" + index + "].name");
 		String name = (selected != null) ? selected : "";
-		Flux<CharSequence> argNames = "filter".equals(kind) ? this.gatewayConfigService.getArgsForFilter(name)
-				: this.gatewayConfigService.getArgsForPredicate(name);
-		return argNames.map(CharSequence::toString).collectList().doOnNext((names) -> {
-			LinkedHashMap<String, String> args = new LinkedHashMap<>();
-			names.forEach((arg) -> args.put(arg, ""));
-			model.addAttribute("kind", kind);
-			model.addAttribute("index", index);
-			model.addAttribute("args", args);
-		}).thenReturn("fragments/element :: args");
+		Map<String, String> args = "filter".equals(kind) ? this.gatewayConfigService.getDefaultArgsForFilter(name)
+				: this.gatewayConfigService.getDefaultArgsForPredicate(name);
+		model.addAttribute("kind", kind);
+		model.addAttribute("index", index);
+		model.addAttribute("args", args);
+		return Mono.just("fragments/element :: args");
 	}
 
 	/**
@@ -370,7 +367,7 @@ public class RouteViewController {
 		if (ex instanceof RouteAlreadyExistException) {
 			return "A route with this id already exists.";
 		}
-		if (ex instanceof PredicatesNotValidException) {
+		if (ex instanceof PredicatesNotValidException || ex instanceof PredicateArgsFormatException) {
 			return "One or more predicates have missing or invalid arguments.";
 		}
 		if (ex instanceof FiltersNotValidException) {
