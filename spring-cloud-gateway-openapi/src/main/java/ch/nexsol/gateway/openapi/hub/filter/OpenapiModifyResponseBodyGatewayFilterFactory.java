@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.openapi.hub.filter;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collections;
@@ -24,9 +25,10 @@ import java.util.List;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.models.servers.Server;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import org.springframework.cloud.gateway.filter.GatewayFilter;
@@ -45,6 +47,8 @@ import org.springframework.util.Assert;
  */
 public class OpenapiModifyResponseBodyGatewayFilterFactory
 		extends AbstractGatewayFilterFactory<OpenapiModifyResponseBodyGatewayFilterFactory.Config> {
+
+	private static final Logger LOG = LoggerFactory.getLogger(OpenapiModifyResponseBodyGatewayFilterFactory.class);
 
 	private final ObjectMapper objectMapper;
 
@@ -103,7 +107,7 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 	@Override
 	public GatewayFilter apply(Config config) {
 		org.springframework.cloud.gateway.filter.factory.rewrite.ModifyResponseBodyGatewayFilterFactory.Config c = new org.springframework.cloud.gateway.filter.factory.rewrite.ModifyResponseBodyGatewayFilterFactory.Config();
-		c.setRewriteFunction(LinkedHashMap.class, String.class, rewriteServersWithGatewayUrl(config.getPath()));
+		c.setRewriteFunction(byte[].class, byte[].class, rewriteServersWithGatewayUrl(config.getPath()));
 		ModifyResponseBodyGatewayFilterFactory factory = new ModifyResponseBodyGatewayFilterFactory(this.messageReaders,
 				this.messageBodyDecoders, this.messageBodyEncoders);
 
@@ -112,24 +116,36 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 		return gatewayFilter;
 	}
 
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	private RewriteFunction<LinkedHashMap, String> rewriteServersWithGatewayUrl(String path) {
-		return (serverWebExchange, openAPI) -> {
+	private RewriteFunction<byte[], byte[]> rewriteServersWithGatewayUrl(String path) {
+		return (serverWebExchange, body) -> Mono.justOrEmpty(rewriteServers(body, path));
+	}
 
-			if (openAPI == null) {
-				return Mono.empty();
-			}
+	/**
+	 * Rewrites the {@code servers} section of the given OpenAPI document so it advertises
+	 * the gateway URI. A document that cannot be parsed as JSON (for example a YAML
+	 * document) is returned unchanged rather than dropped, so the client always receives
+	 * a usable body.
+	 * @param body the raw OpenAPI document, may be {@code null} or empty
+	 * @param path the path appended to the gateway URI in the rewritten servers
+	 * @return the rewritten document, or the original body when it could not be rewritten
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	byte[] rewriteServers(byte[] body, String path) {
+		if (body == null || body.length == 0) {
+			return body;
+		}
+		try {
+			LinkedHashMap openAPI = this.objectMapper.readValue(body, LinkedHashMap.class);
 			Server server = new Server();
 			server.setUrl(this.apiGatewayUri.toString() + path);
 			openAPI.put("servers", Collections.singletonList(server));
-			try {
-				String result = this.objectMapper.writeValueAsString(openAPI);
-				return Mono.just(result);
-			}
-			catch (JsonProcessingException ex) {
-				return Mono.empty();
-			}
-		};
+			return this.objectMapper.writeValueAsBytes(openAPI);
+		}
+		catch (IOException ex) {
+			LOG.warn("Could not rewrite the OpenAPI servers for path {}; forwarding the document unchanged: {}", path,
+					ex.getMessage());
+			return body;
+		}
 	}
 
 	/**

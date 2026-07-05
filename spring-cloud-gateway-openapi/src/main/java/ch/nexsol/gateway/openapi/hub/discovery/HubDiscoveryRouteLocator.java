@@ -99,11 +99,15 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 			.map((openapiDiscover) -> {
 				RouteDefinition routeDefinition = openapiDiscover.routeDefinition();
 
-				// the path to the route to the microservice (ex. lb://MICROSERVICE-A)
-				String path = "/" + routeDefinition.getUri().getHost();
+				String name = routeDefinition.getId().replace(this.routeIdPrefix, "");
 
-				String name = routeDefinition.getId();
-				name = name.replace(this.routeIdPrefix, "");
+				// Derive the exposed path from the service id, not getUri().getHost():
+				// getHost() is null for ids with characters invalid in a URI host (e.g.
+				// '_'),
+				// and SpringDocOpenapiRoutes builds the Swagger UI URL from this same id,
+				// so
+				// both must stay in sync to avoid a 404.
+				String path = "/" + name;
 
 				// create OPENAPI route
 				RouteDefinition r = new RouteDefinition();
