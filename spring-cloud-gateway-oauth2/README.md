@@ -5,7 +5,7 @@ This plugin provides OAuth2 support for Spring Cloud Gateway.
 ```xml
     <dependencies>
         <dependency>
-           <groupId>ch.nexsol.gateway</groupId>
+           <groupId>ch.nexsol-tech.gateway</groupId>
            <artifactId>spring-cloud-gateway-oauth2</artifactId>
            <version>${spring-cloud-gateway-plugins.version}</version>
         </dependency>
@@ -55,7 +55,7 @@ usage:
 spring.cloud.gateway.server.webflux:
   webfilter:
     basicauth-exchange-oauth2:
-      token-uri:
+      token-uris:
         user1: https://my-authorization-server/protocol/openid-connect/token
         user2: https://keycloak/realms/test/protocol/openid-connect/token
         user3: https://keycloak/realms/test/protocol/openid-connect/token

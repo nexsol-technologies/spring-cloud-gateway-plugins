@@ -5,7 +5,7 @@ This project provides filters for Spring Cloud Gateway
 ```xml
     <dependencies>
         <dependency>
-           <groupId>ch.nexsol.gateway</groupId>
+           <groupId>ch.nexsol-tech.gateway</groupId>
            <artifactId>spring-cloud-gateway-filters</artifactId>
            <version>${spring-cloud-gateway-plugins.version}</version>
         </dependency>
@@ -81,7 +81,7 @@ spring.cloud.gateway.server.webflux:
       args:
         verify-url: the url of the site to validate the captcha.
         version: # (optional) the version of reCAPTCHA : V2 or V3. Default is V3.
-        secretKey: # the secret key to use to validate captcha. It is generated at Google reCAPTCHA.
+        secret-key: # the secret key to use to validate captcha. It is generated at Google reCAPTCHA.
         recaptcha-http-header: #(optional) where to retreive the captcha in the http header. Default is 'recaptcha'
         score: # (optional) the minimal score to have for the request. (0 - 100). Default is '90'
 ```

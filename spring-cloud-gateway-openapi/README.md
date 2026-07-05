@@ -5,7 +5,7 @@ This plugin provides openapi support for Spring Cloud Gateway
 ```xml
     <dependencies>
         <dependency>
-           <groupId>ch.nexsol.gateway</groupId>
+           <groupId>ch.nexsol-tech.gateway</groupId>
            <artifactId>spring-cloud-gateway-openapi</artifactId>
            <version>${spring-cloud-gateway-plugins.version}</version>
         </dependency>

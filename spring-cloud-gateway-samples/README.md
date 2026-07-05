@@ -3,7 +3,7 @@
 ## Getting start
 
 ### auth-server
-Launch auth-server: this will start an esay config of oauth2 authorization server. 
+Launch auth-server: this will start an easy config of oauth2 authorization server. 
 To log-in, use these two user:password : `user:user` with role 'USER'  or `admin:admin` with role 'ADMIN'
 
 ### eureka

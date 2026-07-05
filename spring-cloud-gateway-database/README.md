@@ -5,7 +5,7 @@ This project provides a database management for routes for Spring Cloud Gateway
 ```xml
     <dependencies>
         <dependency>
-           <groupId>ch.nexsol.gateway</groupId>
+           <groupId>ch.nexsol-tech.gateway</groupId>
            <artifactId>spring-cloud-gateway-database</artifactId>
            <version>${spring-cloud-gateway-plugins.version}</version>
         </dependency>

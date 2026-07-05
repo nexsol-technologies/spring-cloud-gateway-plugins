@@ -30,7 +30,7 @@ This project provides some examples.
 
 ## Spring Cloud Gateway documentation
 
-[reference documentation](https://docs.spring.io/spring-cloud-gateway/docs/current/reference/html/)
+[reference documentation](https://docs.spring.io/spring-cloud-gateway/reference/)
 
 
 
@@ -43,4 +43,4 @@ Having trouble with Spring cloud Gateway plugins by Nexsol? We’d like to help!
 ## Trademarks and licenses
 The source code of nexsol's Spring cloud Gateway is licensed under [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 
-Spring, Spring Boot and Spring Cloud are trademarks of [Pivotal Software, Inc.](https://pivotal.io/) in the U.S. and other countries.
+Spring, Spring Boot and Spring Cloud are trademarks of [Broadcom Inc.](https://www.broadcom.com/) and/or its subsidiaries in the U.S. and other countries.
