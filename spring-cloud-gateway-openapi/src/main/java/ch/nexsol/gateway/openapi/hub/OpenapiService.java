@@ -19,6 +19,7 @@ package ch.nexsol.gateway.openapi.hub;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -56,8 +57,10 @@ public class OpenapiService {
 	}
 
 	public Mono<OpenapiDiscover> discoverOpenapiUrl(String routeId, RouteDefinition routeDefinition) {
+		// next() (instead of last()) picks the first instance and completes empty when a
+		// route has no instance, rather than emitting NoSuchElementException.
 		return this.discoveryClient.getInstances(routeId)
-			.last()
+			.next()
 			.flatMap((si) -> discoverOpenapiUrl(si, routeDefinition));
 	}
 
@@ -69,20 +72,19 @@ public class OpenapiService {
 			paths = Flux.just(openapiPath);
 		}
 
-		return paths.flatMap((path) -> callOpenapi(serviceInstance.getUri(), path, routeDefinition))
+		// concatMap preserves the .json -> .yaml -> plain preference order and
+		// short-circuits on the first match (next()) instead of firing all in parallel.
+		return paths.concatMap((path) -> callOpenapi(serviceInstance.getUri(), path, routeDefinition))
 			.next()
 			.map((openapiResponse) -> {
-				if (!serviceInstance.getMetadata().containsKey(METADATA_SERVICE_INSTANCE_OPENAPI_PATH_KEY)) {
-					serviceInstance.getMetadata()
-						.put(METADATA_SERVICE_INSTANCE_OPENAPI_PATH_KEY, openapiResponse.path());
-				}
-				if (!serviceInstance.getMetadata().containsKey(METADATA_SERVICE_INSTANCE_OPENAPI_CONTENT_TYPE_KEY)) {
-					serviceInstance.getMetadata()
-						.put(METADATA_SERVICE_INSTANCE_OPENAPI_CONTENT_TYPE_KEY,
-								openapiResponse.contentType().map((m) -> m.toString()).orElse(""));
-				}
+				// Build a fresh metadata map for the route definition instead of mutating
+				// the discovery ServiceInstance metadata, which may be immutable.
+				Map<String, Object> metadata = new LinkedHashMap<>(serviceInstance.getMetadata());
+				metadata.putIfAbsent(METADATA_SERVICE_INSTANCE_OPENAPI_PATH_KEY, openapiResponse.path());
+				metadata.putIfAbsent(METADATA_SERVICE_INSTANCE_OPENAPI_CONTENT_TYPE_KEY,
+						openapiResponse.contentType().map((m) -> m.toString()).orElse(""));
 
-				routeDefinition.setMetadata(new LinkedHashMap<>(serviceInstance.getMetadata()));
+				routeDefinition.setMetadata(metadata);
 				return openapiResponse;
 			});
 	}
