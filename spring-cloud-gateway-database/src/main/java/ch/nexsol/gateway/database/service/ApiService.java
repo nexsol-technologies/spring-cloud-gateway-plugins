@@ -16,6 +16,8 @@
 
 package ch.nexsol.gateway.database.service;
 
+import java.util.List;
+
 import ch.nexsol.gateway.database.entity.FilterEntity;
 import ch.nexsol.gateway.database.entity.PredicateEntity;
 import ch.nexsol.gateway.database.entity.RouteEntity;
@@ -55,17 +57,7 @@ public class ApiService {
 	}
 
 	public Flux<RouteResponseModel> getAllRoutes() {
-		return this.routeService.getAllRoutes()
-			.flatMap((route) -> this.predicateService.findByRouteId(route.getId())
-				.flatMap(this::toPredicateResponseModel)
-				.collectList()
-				.flatMap((predicates) -> this.filterService.findByRouteId(route.getId())
-					.flatMap(this::toFilterResponseModel)
-					.collectList()
-					.map((filters) -> new RouteResponseModel(route.getId(), route.getRouteId(), route.getUri(),
-							route.getOrder(), predicates, filters))
-
-				));
+		return this.routeService.getAllRoutes().flatMap(this::toRouteResponseModel);
 	}
 
 	public Mono<RouteResponseModel> createRoute(RouteCreateModel routeModel) {
@@ -81,16 +73,15 @@ public class ApiService {
 	}
 
 	private Mono<RouteResponseModel> toRouteResponseModel(RouteEntity route) {
-		return this.predicateService.findByRouteId(route.getId())
+		Mono<List<PredicateResponseModel>> predicates = this.predicateService.findByRouteId(route.getId())
 			.flatMap(this::toPredicateResponseModel)
-			.collectList()
-			.flatMap((predicates) -> this.filterService.findByRouteId(route.getId())
-				.flatMap(this::toFilterResponseModel)
-				.collectList()
-				.map((filters) -> new RouteResponseModel(route.getId(), route.getRouteId(), route.getUri(),
-						route.getOrder(), predicates, filters))
-
-			);
+			.collectList();
+		Mono<List<FilterResponseModel>> filters = this.filterService.findByRouteId(route.getId())
+			.flatMap(this::toFilterResponseModel)
+			.collectList();
+		return Mono.zip(predicates, filters)
+			.map((tuple) -> new RouteResponseModel(route.getId(), route.getRouteId(), route.getUri(), route.getOrder(),
+					tuple.getT1(), tuple.getT2()));
 	}
 
 	private Mono<PredicateResponseModel> toPredicateResponseModel(PredicateEntity predicate) {

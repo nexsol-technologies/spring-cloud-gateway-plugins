@@ -18,6 +18,7 @@ package ch.nexsol.gateway.database.service;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 import ch.nexsol.gateway.database.entity.RouteEntity;
@@ -61,29 +62,33 @@ public class RouteService {
 	}
 
 	public Flux<RouteDefinition> loadSpringCloudGatewayRouteDefinition() {
-		return this.routeRepository.findAll().flatMap((routeEntity) -> {
+		return this.routeRepository.findAll().collectList().flatMapMany((routes) -> {
+			List<Long> routeIds = routes.stream().map(RouteEntity::getId).toList();
 
-			Mono<List<PredicateDefinition>> predicates = this.predicateService
-				.loadSpringCloudGatewayPredicateDefinition(routeEntity.getId());
+			// Batch-load predicates and filters for every route in a single query each
+			// (3 queries total) instead of 1 + 2N on the route-resolution hot path.
+			Mono<Map<Long, List<PredicateDefinition>>> predicatesByRoute = this.predicateService
+				.loadPredicateDefinitionsByRouteIds(routeIds);
 
-			Mono<List<FilterDefinition>> filters = this.filterService
-				.loadSpringCloudGatewayFilterDefinition(routeEntity.getId());
+			Mono<Map<Long, List<FilterDefinition>>> filtersByRoute = this.filterService
+				.loadFilterDefinitionsByRouteIds(routeIds);
 
-			return Mono.zip(Mono.just(routeEntity), predicates, filters).map((tuple) -> {
-				RouteEntity route = tuple.getT1();
-				List<PredicateDefinition> predicateDefinitions = tuple.getT2();
-				List<FilterDefinition> filterDefinitions = tuple.getT3();
+			return Mono.zip(predicatesByRoute, filtersByRoute).flatMapMany((tuple) -> {
+				Map<Long, List<PredicateDefinition>> predicateMap = tuple.getT1();
+				Map<Long, List<FilterDefinition>> filterMap = tuple.getT2();
 
-				RouteDefinition routeDefinition = new RouteDefinition();
-				routeDefinition.setId(route.getRouteId());
-				routeDefinition.setUri(URI.create(route.getUri()));
-				if (route.getOrder() != null) {
-					routeDefinition.setOrder(route.getOrder());
-				}
-				routeDefinition.setPredicates(predicateDefinitions);
-				routeDefinition.setFilters(filterDefinitions);
+				return Flux.fromIterable(routes).map((route) -> {
+					RouteDefinition routeDefinition = new RouteDefinition();
+					routeDefinition.setId(route.getRouteId());
+					routeDefinition.setUri(URI.create(route.getUri()));
+					if (route.getOrder() != null) {
+						routeDefinition.setOrder(route.getOrder());
+					}
+					routeDefinition.setPredicates(predicateMap.getOrDefault(route.getId(), List.of()));
+					routeDefinition.setFilters(filterMap.getOrDefault(route.getId(), List.of()));
 
-				return routeDefinition;
+					return routeDefinition;
+				});
 			});
 		});
 	}

@@ -16,8 +16,11 @@
 
 package ch.nexsol.gateway.database.service;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import ch.nexsol.gateway.database.entity.FilterEntity;
 import ch.nexsol.gateway.database.entity.RouteEntity;
@@ -95,6 +98,23 @@ public class FilterService {
 		return this.findByRouteId(routeId).map(toFilterDefinition()).collectList();
 	}
 
+	/**
+	 * Batch-loads the filter definitions for several routes in a single query and groups
+	 * them by route id, avoiding the N+1 query pattern on the route-resolution hot path.
+	 * @param routeIds the route reference ids to load filters for
+	 * @return the filter definitions grouped by route reference id
+	 */
+	public Mono<Map<Long, List<FilterDefinition>>> loadFilterDefinitionsByRouteIds(Collection<Long> routeIds) {
+		if (routeIds == null || routeIds.isEmpty()) {
+			return Mono.just(Map.of());
+		}
+		return this.filterRepository.findByRouteRefIdIn(routeIds)
+			.collectList()
+			.map((entities) -> entities.stream()
+				.collect(Collectors.groupingBy(FilterEntity::getRouteRefId,
+						Collectors.mapping(toFilterDefinition(), Collectors.toList()))));
+	}
+
 	private Function<FilterEntity, FilterDefinition> toFilterDefinition() {
 		return (filter) -> {
 			try {
@@ -104,7 +124,7 @@ public class FilterService {
 				return filterDefinition;
 			}
 			catch (Exception ex) {
-				throw new RuntimeException("Error deserializing predicate args", ex);
+				throw new RuntimeException("Error deserializing filter args", ex);
 			}
 		};
 	}

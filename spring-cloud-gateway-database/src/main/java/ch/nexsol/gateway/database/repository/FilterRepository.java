@@ -16,6 +16,8 @@
 
 package ch.nexsol.gateway.database.repository;
 
+import java.util.Collection;
+
 import ch.nexsol.gateway.database.entity.FilterEntity;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -25,6 +27,8 @@ import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 public interface FilterRepository extends ReactiveCrudRepository<FilterEntity, Long> {
 
 	Flux<FilterEntity> findByRouteRefId(Long routeId);
+
+	Flux<FilterEntity> findByRouteRefIdIn(Collection<Long> routeIds);
 
 	Mono<Void> deleteByRouteRefId(Long routeId);
 

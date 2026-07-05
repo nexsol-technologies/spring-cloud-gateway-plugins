@@ -23,6 +23,7 @@ import ch.nexsol.gateway.openapi.hub.OpenapiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
 import org.springframework.cloud.gateway.discovery.DiscoveryClientRouteDefinitionLocator;
@@ -65,7 +66,12 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 			.filter((route) -> !route.getId().startsWith(ROUTE_ID_PREFIX))
 			.flatMap((routeDefinition) -> {
 				String routeId = routeDefinition.getId().replace(this.routeIdPrefix, "");
-				return this.openapiService.discoverOpenapiUrl(routeId, routeDefinition);
+				// Isolate failures per route: a single unreachable/erroring service must
+				// not abort the discovery of all the other OpenAPI routes.
+				return this.openapiService.discoverOpenapiUrl(routeId, routeDefinition).onErrorResume((ex) -> {
+					LOG.warn("Skipping OpenAPI discovery for route {} : {}", routeId, ex.getMessage());
+					return Mono.empty();
+				});
 			})
 			.map((openapiDiscover) -> {
 				RouteDefinition routeDefinition = openapiDiscover.routeDefinition();

@@ -28,7 +28,6 @@ import reactor.core.publisher.Mono;
 import org.springframework.boot.context.properties.bind.BindException;
 import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
-import org.springframework.cloud.gateway.route.RouteDefinitionRouteLocator;
 import org.springframework.cloud.gateway.support.ConfigurationService;
 import org.springframework.stereotype.Service;
 
@@ -36,8 +35,6 @@ import org.springframework.stereotype.Service;
 public class GatewayConfigService {
 
 	private final ConfigurationService configurationService;
-
-	private RouteDefinitionRouteLocator routeDefinitionRouteLocator;
 
 	private final Map<String, RoutePredicateFactory> predicates = new LinkedHashMap<>();
 
@@ -83,45 +80,37 @@ public class GatewayConfigService {
 	}
 
 	public Mono<Boolean> validateFilter(String name, Map<String, String> args) {
-		return this.getAvailableFiltersWithArgs()
-			.filter((filter) -> filter.get("name").equals(name))
-			.next() // Récupère le premier (et unique) élément correspondant
-			.flatMap((filter) -> {
-				@SuppressWarnings("unchecked")
-				List<String> validArgs = (List<String>) filter.get("args");
-				if (!validArgs.isEmpty() && args.keySet().isEmpty()) {
-					return Mono.just(false);
-				}
-				return Mono.just(validArgs.stream().allMatch((a) -> args.keySet().contains(a)));
-			})
-			.defaultIfEmpty(false); // Si aucun filtre trouvé avec ce nom, renvoie false
+		// Look the factory up directly from the name-keyed map instead of rebuilding and
+		// sorting the whole list of available filters on every call.
+		GatewayFilterFactory factory = this.gatewayFilterFactories.get(name);
+		if (factory == null) {
+			return Mono.just(false);
+		}
+		List<String> validArgs = factory.shortcutFieldOrder();
+		if (!validArgs.isEmpty() && args.keySet().isEmpty()) {
+			return Mono.just(false);
+		}
+		return Mono.just(validArgs.stream().allMatch((a) -> args.keySet().contains(a)));
 	}
 
 	public Mono<Boolean> validatePredicate(String name, Map<String, String> args) {
-		if (!this.predicates.containsKey(name)) {
+		// Look the factory up directly from the name-keyed map instead of rebuilding and
+		// sorting the whole list of available predicates on every call.
+		RoutePredicateFactory factory = this.predicates.get(name);
+		if (factory == null) {
 			return Mono.error(new PredicateNotFoundException(name));
 		}
-		return this.getAvailablePredicatesWithArgs()
-			.filter((predicate) -> predicate.get("name").equals(name))
-			.next() // Récupère le premier (et unique) élément correspondant
-			.flatMap((predicate) -> {
-				@SuppressWarnings("unchecked")
-				var validArgs = (List<String>) predicate.get("args");
-				return Mono.just(validArgs.stream().allMatch((a) -> args.keySet().contains(a)));
-			})
-			.map((isValid) -> {
-				if (isValid) {
-					try {
-						RoutePredicateFactory factory = this.predicates.get(name);
-						this.configurationService.with(factory).name(name).properties(args).bind();
-					}
-					catch (BindException ex) {
-						throw new PredicateArgsFormatException(ex.getMessage());
-					}
-					return true;
-				}
-				return false;
-			});
+		List<String> validArgs = factory.shortcutFieldOrder();
+		if (!validArgs.stream().allMatch((a) -> args.keySet().contains(a))) {
+			return Mono.just(false);
+		}
+		try {
+			this.configurationService.with(factory).name(name).properties(args).bind();
+		}
+		catch (BindException ex) {
+			throw new PredicateArgsFormatException(ex.getMessage());
+		}
+		return Mono.just(true);
 	}
 
 }

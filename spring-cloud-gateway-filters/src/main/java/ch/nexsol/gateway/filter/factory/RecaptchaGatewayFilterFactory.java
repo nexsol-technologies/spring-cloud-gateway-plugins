@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.filter.factory;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 
@@ -49,6 +50,12 @@ import static ch.nexsol.gateway.filter.common.Constants.HTTP_SCHEME;
 public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<RecaptchaGatewayFilterFactory.Config> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RecaptchaGatewayFilterFactory.class);
+
+	/**
+	 * Maximum time to wait for the reCAPTCHA verification endpoint before failing the
+	 * request, to avoid a slow/hung provider blocking the gateway indefinitely.
+	 */
+	private static final Duration VERIFY_TIMEOUT = Duration.ofSeconds(10);
 
 	/**
 	 * VerifyUrl key.
@@ -113,7 +120,10 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 							.map((__) -> result)
 							.cast(RecaptchaResponseIdentifier.class))))
 				.map((recaptchaResponse) -> exchange)
-				.defaultIfEmpty(exchange)
+				// Fail closed: if validation produced no result, deny rather than let the
+				// request through unverified.
+				.switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN,
+						"reCAPTCHA validation could not be completed")))
 				.flatMap(chain::filter);
 
 		};
@@ -149,7 +159,8 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 				LOG.error("Error when call {} : {} - {}", verifyUrl, response.statusCode(), m);
 				throw new ResponseStatusException(response.statusCode());
 			}))
-			.bodyToMono(responseVersionType);
+			.bodyToMono(responseVersionType)
+			.timeout(VERIFY_TIMEOUT);
 	}
 
 	private Mono<RecaptchaResponseV2> validateV2(RecaptchaResponseV2 recaptchaResponse) {

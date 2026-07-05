@@ -16,8 +16,11 @@
 
 package ch.nexsol.gateway.database.service;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import ch.nexsol.gateway.database.entity.PredicateEntity;
 import ch.nexsol.gateway.database.entity.RouteEntity;
@@ -95,6 +98,24 @@ public class PredicateService {
 
 	public Mono<List<PredicateDefinition>> loadSpringCloudGatewayPredicateDefinition(Long routeId) {
 		return this.findByRouteId(routeId).map(toPredicateDefinition()).collectList();
+	}
+
+	/**
+	 * Batch-loads the predicate definitions for several routes in a single query and
+	 * groups them by route id, avoiding the N+1 query pattern on the route-resolution hot
+	 * path.
+	 * @param routeIds the route reference ids to load predicates for
+	 * @return the predicate definitions grouped by route reference id
+	 */
+	public Mono<Map<Long, List<PredicateDefinition>>> loadPredicateDefinitionsByRouteIds(Collection<Long> routeIds) {
+		if (routeIds == null || routeIds.isEmpty()) {
+			return Mono.just(Map.of());
+		}
+		return this.predicateRepository.findByRouteRefIdIn(routeIds)
+			.collectList()
+			.map((entities) -> entities.stream()
+				.collect(Collectors.groupingBy(PredicateEntity::getRouteRefId,
+						Collectors.mapping(toPredicateDefinition(), Collectors.toList()))));
 	}
 
 	private Function<PredicateEntity, PredicateDefinition> toPredicateDefinition() {

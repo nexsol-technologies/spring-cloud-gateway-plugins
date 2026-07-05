@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 import ch.nexsol.gateway.oauth2.properties.BasicAuthExchangeToAccessTokenProperties;
 import com.nimbusds.jwt.JWT;
@@ -71,6 +72,10 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 	private final ObservationRegistry registry;
 
 	private final WebClient webClient;
+
+	// Coalesces concurrent token exchanges for the same client so a cache miss triggers a
+	// single call to the OAuth server instead of one per in-flight request.
+	private final ConcurrentHashMap<String, Mono<String>> inFlightExchanges = new ConcurrentHashMap<>();
 
 	public BasicAuthExchangeToAccessTokenGatewayWebFilter(BasicAuthExchangeToAccessTokenProperties properties,
 			CacheManager cacheManager, ObservationRegistry registry) {
@@ -173,17 +178,19 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 	}
 
 	private Mono<String> exchangeBasicToJwt(ServerHttpRequest request, HttpHeaders headers, BasicValue basicValue) {
-		return this.getFromCache(basicValue.getKey())
-			.switchIfEmpty(Mono.defer(() -> this.getToken(request, basicValue).doOnNext((newAuthToken) -> {
-				if (this.tokenCache != null && newAuthToken != null) {
-					try {
-						this.tokenCache.put(basicValue.getKey(), newAuthToken);
-					}
-					catch (Exception ex) {
-						LOG.warn("Error on accessing to token cache", ex);
-					}
-				}
-			})));
+		String key = basicValue.getKey();
+		return this.getFromCache(key)
+			.switchIfEmpty(Mono.defer(() -> this.inFlightExchanges.computeIfAbsent(key,
+					(k) -> this.getToken(request, basicValue).doOnNext((newAuthToken) -> {
+						if (this.tokenCache != null && newAuthToken != null) {
+							try {
+								this.tokenCache.put(k, newAuthToken);
+							}
+							catch (Exception ex) {
+								LOG.warn("Error on accessing to token cache", ex);
+							}
+						}
+					}).doFinally((signal) -> this.inFlightExchanges.remove(k)).cache())));
 	}
 
 	private BodyExtractor<Mono<OAuth2AccessTokenResponse>, ReactiveHttpInputMessage> bodyExtractor = OAuth2BodyExtractors
