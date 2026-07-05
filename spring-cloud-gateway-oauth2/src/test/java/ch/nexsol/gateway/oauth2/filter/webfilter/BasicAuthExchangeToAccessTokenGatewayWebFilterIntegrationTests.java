@@ -73,16 +73,6 @@ class BasicAuthExchangeToAccessTokenGatewayWebFilterIntegrationTests extends Bas
 
 	private int initialRequestCount;
 
-	// @BeforeAll
-	// static void setUpAll() throws IOException {
-	// mockOAuthServer.start();
-	// }
-	//
-	// @AfterAll
-	// static void tearDownAll() throws IOException {
-	// mockOAuthServer.shutdown();
-	// }
-
 	@BeforeEach
 	void setUp() {
 

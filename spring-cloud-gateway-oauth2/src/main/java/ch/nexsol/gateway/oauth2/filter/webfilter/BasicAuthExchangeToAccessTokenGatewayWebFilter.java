@@ -143,7 +143,7 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 	}
 
 	private boolean containsAuthorizationBasic(HttpHeaders headers) {
-		if (headers.containsKey(HttpHeaders.AUTHORIZATION) && headers.get(HttpHeaders.AUTHORIZATION) != null
+		if (headers.containsHeader(HttpHeaders.AUTHORIZATION) && headers.get(HttpHeaders.AUTHORIZATION) != null
 				&& !headers.get(HttpHeaders.AUTHORIZATION).isEmpty()) {
 			LOG.trace("contains AUTHORIZATION header");
 			return headers.get(HttpHeaders.AUTHORIZATION)
@@ -155,7 +155,7 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 	}
 
 	private Optional<BasicValue> extractAuthorizationBasic(HttpHeaders headers) {
-		if (headers.containsKey(HttpHeaders.AUTHORIZATION) && headers.get(HttpHeaders.AUTHORIZATION) != null
+		if (headers.containsHeader(HttpHeaders.AUTHORIZATION) && headers.get(HttpHeaders.AUTHORIZATION) != null
 				&& !headers.get(HttpHeaders.AUTHORIZATION).isEmpty()) {
 
 			return headers.get(HttpHeaders.AUTHORIZATION)

@@ -13,7 +13,7 @@
 	<name>sample-gateway</name>
 	<description>Api Gateway with SPring Cloud Gateway</description>
 	<properties>
-		<java.version>21</java.version>
+		<java.version>25</java.version>
 	</properties>
 	<dependencies>
 		<dependency>

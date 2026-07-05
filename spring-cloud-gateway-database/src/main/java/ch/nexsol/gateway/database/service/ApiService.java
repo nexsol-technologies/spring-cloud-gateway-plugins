@@ -19,12 +19,10 @@ package ch.nexsol.gateway.database.service;
 import ch.nexsol.gateway.database.entity.FilterEntity;
 import ch.nexsol.gateway.database.entity.PredicateEntity;
 import ch.nexsol.gateway.database.entity.RouteEntity;
-import ch.nexsol.gateway.database.exception.PredicateArgsNotReadableException;
 import ch.nexsol.gateway.database.model.FilterResponseModel;
 import ch.nexsol.gateway.database.model.PredicateResponseModel;
 import ch.nexsol.gateway.database.model.RouteCreateModel;
 import ch.nexsol.gateway.database.model.RouteResponseModel;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -96,25 +94,15 @@ public class ApiService {
 	}
 
 	private Mono<PredicateResponseModel> toPredicateResponseModel(PredicateEntity predicate) {
-		try {
-			PredicateResponseModel model = new PredicateResponseModel(predicate.getId(), predicate.getName(),
-					this.argumentService.jsonStringArgumentsToMap(predicate.getArgs()), predicate.getRouteRefId());
-			return Mono.just(model);
-		}
-		catch (JsonProcessingException ex) {
-			return Mono.error(new PredicateArgsNotReadableException());
-		}
+		PredicateResponseModel model = new PredicateResponseModel(predicate.getId(), predicate.getName(),
+				this.argumentService.jsonStringArgumentsToMap(predicate.getArgs()), predicate.getRouteRefId());
+		return Mono.just(model);
 	}
 
 	private Mono<FilterResponseModel> toFilterResponseModel(FilterEntity filter) {
-		try {
-			FilterResponseModel model = new FilterResponseModel(filter.getId(), filter.getName(),
-					this.argumentService.jsonStringArgumentsToMap(filter.getArgs()), filter.getRouteRefId());
-			return Mono.just(model);
-		}
-		catch (JsonProcessingException ex) {
-			return Mono.error(new PredicateArgsNotReadableException());
-		}
+		FilterResponseModel model = new FilterResponseModel(filter.getId(), filter.getName(),
+				this.argumentService.jsonStringArgumentsToMap(filter.getArgs()), filter.getRouteRefId());
+		return Mono.just(model);
 	}
 
 }

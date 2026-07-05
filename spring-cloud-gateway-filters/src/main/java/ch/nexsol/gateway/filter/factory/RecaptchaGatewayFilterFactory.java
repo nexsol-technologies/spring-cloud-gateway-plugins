@@ -121,7 +121,7 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 
 	private Mono<String> extractRecaptchaToken(ServerHttpRequest request, Config config) {
 		HttpHeaders httpHeaders = request.getHeaders();
-		if (httpHeaders.containsKey(config.getRecaptchaHttpHeader())) {
+		if (httpHeaders.containsHeader(config.getRecaptchaHttpHeader())) {
 			String token = httpHeaders.getFirst(config.getRecaptchaHttpHeader());
 			if (StringUtils.hasText(token)) {
 				return Mono.just(token);

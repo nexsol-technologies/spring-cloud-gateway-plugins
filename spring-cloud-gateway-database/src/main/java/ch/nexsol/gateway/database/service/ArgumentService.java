@@ -18,10 +18,8 @@ package ch.nexsol.gateway.database.service;
 
 import java.util.Map;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.text.StringEscapeUtils;
+import tools.jackson.databind.ObjectMapper;
 
 public class ArgumentService {
 
@@ -33,12 +31,11 @@ public class ArgumentService {
 	}
 
 	@SuppressWarnings("unchecked")
-	public Map<String, String> jsonStringArgumentsToMap(String args)
-			throws JsonProcessingException, JsonMappingException {
+	public Map<String, String> jsonStringArgumentsToMap(String args) {
 		return this.objectMapper.readValue(StringEscapeUtils.unescapeJson(args), Map.class);
 	}
 
-	public String mapArgumentsToJsonString(Map<String, String> args) throws JsonProcessingException {
+	public String mapArgumentsToJsonString(Map<String, String> args) {
 		return StringEscapeUtils.escapeJson(this.objectMapper.writeValueAsString(args));
 	}
 
