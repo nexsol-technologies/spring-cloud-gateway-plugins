@@ -149,7 +149,7 @@ public class AuthorizationTokenGatewayFilterFactory
 	private Optional<Jwt> extractBearer(ServerWebExchange exchange) {
 		return exchange.getRequest()
 			.getHeaders()
-			.entrySet()
+			.headerSet()
 			.stream()
 			.filter((entry) -> HttpHeaders.AUTHORIZATION.equals(entry.getKey()) && !entry.getValue().isEmpty())
 			.findFirst()

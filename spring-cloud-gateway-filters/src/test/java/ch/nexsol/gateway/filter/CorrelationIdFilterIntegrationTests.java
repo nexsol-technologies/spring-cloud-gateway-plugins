@@ -42,7 +42,7 @@ public class CorrelationIdFilterIntegrationTests extends BaseWebClientTests {
 			.headers((headers) -> headers.set("Host", "www.validatecorrelationidheader.ch"))
 			.exchange()
 			.expectBody(Map.class)
-			.consumeWith((result) -> assertThat(result.getResponseHeaders().containsKey("x-correlation-id"))
+			.consumeWith((result) -> assertThat(result.getResponseHeaders().containsHeader("x-correlation-id"))
 				.isEqualTo(true));
 	}
 

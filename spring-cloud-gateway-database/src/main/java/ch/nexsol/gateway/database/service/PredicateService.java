@@ -21,11 +21,9 @@ import java.util.function.Function;
 
 import ch.nexsol.gateway.database.entity.PredicateEntity;
 import ch.nexsol.gateway.database.entity.RouteEntity;
-import ch.nexsol.gateway.database.exception.PredicateArgsNotReadableException;
 import ch.nexsol.gateway.database.exception.PredicatesNotValidException;
 import ch.nexsol.gateway.database.model.PredicateCreateModel;
 import ch.nexsol.gateway.database.repository.PredicateRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -79,17 +77,11 @@ public class PredicateService {
 	public Flux<PredicateEntity> createPredicates(RouteEntity routeEntity, List<PredicateCreateModel> predicates) {
 		if (predicates != null && !predicates.isEmpty()) {
 			return Flux.fromIterable(predicates).flatMap((p) -> {
-				try {
-					PredicateEntity predicateEntity = new PredicateEntity();
-					predicateEntity.setName(p.name());
-					predicateEntity.setArgs(this.argumentService.mapArgumentsToJsonString(p.args()));
-					predicateEntity.setRouteRefId(routeEntity.getId());
-					return this.predicateRepository.save(predicateEntity);
-				}
-				catch (JsonProcessingException ex) {
-					LOG.error("Filter {} has arguments '{}' which are not readable", p.name(), p.args());
-					return Mono.error(new PredicateArgsNotReadableException(ex));
-				}
+				PredicateEntity predicateEntity = new PredicateEntity();
+				predicateEntity.setName(p.name());
+				predicateEntity.setArgs(this.argumentService.mapArgumentsToJsonString(p.args()));
+				predicateEntity.setRouteRefId(routeEntity.getId());
+				return this.predicateRepository.save(predicateEntity);
 			});
 		}
 		else {

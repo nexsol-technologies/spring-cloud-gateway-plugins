@@ -25,7 +25,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
  * @see <a href=
- * "https://github.com/spring-cloud/spring-cloud-gateway/blob/main/spring-cloud-gateway-server/src/test/java/org/springframework/cloud/gateway/test/BaseWebClientTests.java">spring-cloud-gateway
+ * "https://github.com/spring-cloud/spring-cloud-gateway/blob/main/spring-cloud-gateway-server-webflux/src/test/java/org/springframework/cloud/gateway/test/BaseWebClientTests.java">spring-cloud-gateway
  * BaseWebClientTests</a>
  */
 public class BaseWebClientTests {

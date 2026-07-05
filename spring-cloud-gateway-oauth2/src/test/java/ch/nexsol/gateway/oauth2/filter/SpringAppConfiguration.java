@@ -18,6 +18,8 @@ package ch.nexsol.gateway.oauth2.filter;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import okhttp3.mockwebserver.MockWebServer;
@@ -30,6 +32,8 @@ import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.http.MediaType;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -49,6 +53,18 @@ public class SpringAppConfiguration {
 	@Bean
 	WebClient webClient() {
 		return WebClient.builder().build();
+	}
+
+	// The gateway filters (AuthorizationToken, BasicAuth exchange) perform their own
+	// authorization logic, so the endpoints under test must not be blocked by the default
+	// Spring Security chain (which secures everything by default on Spring Boot 4).
+	@Bean
+	SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+		http.csrf(ServerHttpSecurity.CsrfSpec::disable);
+		http.httpBasic(ServerHttpSecurity.HttpBasicSpec::disable);
+		http.formLogin(ServerHttpSecurity.FormLoginSpec::disable);
+		http.authorizeExchange((spec) -> spec.anyExchange().permitAll());
+		return http.build();
 	}
 
 	@Bean
@@ -76,7 +92,7 @@ public class SpringAppConfiguration {
 				method = { RequestMethod.GET, RequestMethod.POST }, produces = MediaType.APPLICATION_JSON_VALUE)
 		public Map<String, Object> authorizationHeader(ServerWebExchange exchange) {
 			Map<String, Object> result = new HashMap<>();
-			result.put("headers", exchange.getRequest().getHeaders());
+			result.put("headers", toMap(exchange));
 			return result;
 		}
 
@@ -84,8 +100,20 @@ public class SpringAppConfiguration {
 				method = { RequestMethod.GET, RequestMethod.POST }, produces = MediaType.APPLICATION_JSON_VALUE)
 		public Map<String, Object> basicAuthToAccessToken(ServerWebExchange exchange) {
 			Map<String, Object> result = new HashMap<>();
-			result.put("headers", exchange.getRequest().getHeaders());
+			result.put("headers", toMap(exchange));
 			return result;
+		}
+
+		// As of Spring Framework 7, HttpHeaders no longer implements Map, so it can no
+		// longer be serialized directly as a name/value map. Echo every request header
+		// explicitly so the tests can assert on the forwarded Authorization header.
+		private Map<String, List<String>> toMap(ServerWebExchange exchange) {
+			Map<String, List<String>> headers = new LinkedHashMap<>();
+			exchange.getRequest()
+				.getHeaders()
+				.headerSet()
+				.forEach((entry) -> headers.put(entry.getKey(), entry.getValue()));
+			return headers;
 		}
 
 	}

@@ -31,9 +31,9 @@ import org.springframework.boot.autoconfigure.condition.AllNestedConditions;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.IssuerUriCondition;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.OAuth2ResourceServerProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.security.oauth2.server.resource.autoconfigure.ConditionalOnIssuerLocationJwtDecoder;
+import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OAuth2ResourceServerProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
@@ -107,7 +107,7 @@ public class ResourceServerAutoConfiguration {
 			super(ConfigurationPhase.REGISTER_BEAN);
 		}
 
-		@Conditional(IssuerUriCondition.class)
+		@ConditionalOnIssuerLocationJwtDecoder
 		static class DefaultConfig {
 
 		}

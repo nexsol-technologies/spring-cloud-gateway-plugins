@@ -21,11 +21,9 @@ import java.util.function.Function;
 
 import ch.nexsol.gateway.database.entity.FilterEntity;
 import ch.nexsol.gateway.database.entity.RouteEntity;
-import ch.nexsol.gateway.database.exception.FilterArgsNotReadableException;
 import ch.nexsol.gateway.database.exception.FiltersNotValidException;
 import ch.nexsol.gateway.database.model.FilterCreateModel;
 import ch.nexsol.gateway.database.repository.FilterRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -77,17 +75,11 @@ public class FilterService {
 	public Flux<FilterEntity> createFilters(RouteEntity routeEntity, List<FilterCreateModel> filters) {
 		if (filters != null && !filters.isEmpty()) {
 			return Flux.fromIterable(filters).flatMap((f) -> {
-				try {
-					FilterEntity filterEntity = new FilterEntity();
-					filterEntity.setName(f.name());
-					filterEntity.setArgs(this.argumentService.mapArgumentsToJsonString(f.args()));
-					filterEntity.setRouteRefId(routeEntity.getId());
-					return this.filterRepository.save(filterEntity);
-				}
-				catch (JsonProcessingException ex) {
-					LOG.error("Predicate {} has arguments '{}' which are not readable", f.name(), f.args());
-					return Mono.error(new FilterArgsNotReadableException(ex));
-				}
+				FilterEntity filterEntity = new FilterEntity();
+				filterEntity.setName(f.name());
+				filterEntity.setArgs(this.argumentService.mapArgumentsToJsonString(f.args()));
+				filterEntity.setRouteRefId(routeEntity.getId());
+				return this.filterRepository.save(filterEntity);
 			});
 		}
 		else {

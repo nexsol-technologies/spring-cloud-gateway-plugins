@@ -29,7 +29,7 @@ import ch.nexsol.gateway.database.service.PredicateService;
 import ch.nexsol.gateway.database.service.RouteService;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
 
