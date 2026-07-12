@@ -74,6 +74,7 @@
 	</properties>
 
 	<modules>
+		<module>spring-cloud-gateway-audit</module>
 		<module>spring-cloud-gateway-database</module>
 		<module>spring-cloud-gateway-filters</module>
 		<module>spring-cloud-gateway-oauth2</module>
