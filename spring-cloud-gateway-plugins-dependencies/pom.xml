@@ -19,6 +19,26 @@
         <dependencies>
             <dependency>
                 <groupId>ch.nexsol-tech.gateway</groupId>
+                <artifactId>spring-cloud-gateway-audit-core</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol-tech.gateway</groupId>
+                <artifactId>spring-cloud-gateway-audit-kafka</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol-tech.gateway</groupId>
+                <artifactId>spring-cloud-gateway-audit-redis</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol-tech.gateway</groupId>
+                <artifactId>spring-cloud-gateway-audit-r2dbc</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol-tech.gateway</groupId>
                 <artifactId>spring-cloud-gateway-filters</artifactId>
                 <version>${revision}</version>
             </dependency>
