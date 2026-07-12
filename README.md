@@ -10,6 +10,9 @@
 
 ## Getting Started
 
+[spring-cloud-gateway-audit](spring-cloud-gateway-audit/README.md)<br>
+This plugin audits gateway requests and responses (JWT, request, response and trace attributes, toggled by logical group) and pushes them to a pluggable provider (Redis, Kafka, RabbitMQ, database, ...). It works per-route (the Audit gateway filter) or globally (a web filter).
+
 [spring-cloud-gateway-database](spring-cloud-gateway-database/README.md) <br>
 This plugin enables database-driven route management in Spring Cloud Gateway and includes a simple GUI for adding, updating, and deleting routes.
 
