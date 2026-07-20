@@ -27,8 +27,9 @@
 <th:block th:fragment="args">
 	<div class="mb-2" th:each="arg : ${args}">
 		<label class="form-label small mb-1" th:text="${arg.key}">arg</label>
-		<input class="form-control form-control-sm" required th:name="|${kind}s[${index}].args[${arg.key}]|"
-			th:value="${arg.value}">
+		<input class="form-control form-control-sm" th:name="|${kind}s[${index}].args[${arg.key}]|"
+			th:value="${arg.value}"
+			th:attr="required=${requiredArgs != null and requiredArgs.contains(arg.key)} ? 'required' : null">
 	</div>
 </th:block>
 

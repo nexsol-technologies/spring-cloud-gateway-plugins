@@ -104,6 +104,31 @@ class RouteViewControllerTests {
 	}
 
 	@Test
+	void shouldMarkOnlyStrictlyRequiredArgsAsRequired() {
+		// Retry has only optional fields (no bean validation constraint): its inputs must
+		// not be marked required, so the user can leave statuses, methods, etc. empty.
+		this.webTestClient.get()
+			.uri((builder) -> builder.path("/ui/element-args/filter/0").queryParam("filters[0].name", "Retry").build())
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("filters[0].args[retries]").doesNotContain("required"));
+
+		// AddRequestHeader constrains name and value: its inputs keep the required
+		// attribute.
+		this.webTestClient.get()
+			.uri((builder) -> builder.path("/ui/element-args/filter/1")
+				.queryParam("filters[1].name", "AddRequestHeader")
+				.build())
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("required"));
+	}
+
+	@Test
 	void shouldCreateRouteFromForm() {
 		MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
 		form.add("id", "");

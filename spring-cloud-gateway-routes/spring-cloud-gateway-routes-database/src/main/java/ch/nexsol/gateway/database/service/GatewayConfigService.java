@@ -17,15 +17,21 @@
 package ch.nexsol.gateway.database.service;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -152,6 +158,29 @@ public class GatewayConfigService {
 		return defaultArgs(factory.newConfig(), factory.shortcutFieldOrder());
 	}
 
+	/**
+	 * Returns the names of the strictly required arguments of the named predicate, that
+	 * is the ones carrying a bean validation constraint. The other arguments are
+	 * optional.
+	 * @param predicate the predicate name
+	 * @return the required argument names, or an empty set when the predicate is unknown
+	 */
+	public Set<String> getRequiredArgsForPredicate(String predicate) {
+		RoutePredicateFactory factory = this.predicates.get(predicate);
+		return (factory != null) ? requiredArgs(factory.getConfigClass(), factory.shortcutFieldOrder()) : Set.of();
+	}
+
+	/**
+	 * Returns the names of the strictly required arguments of the named filter, that is
+	 * the ones carrying a bean validation constraint. The other arguments are optional.
+	 * @param filter the filter name
+	 * @return the required argument names, or an empty set when the filter is unknown
+	 */
+	public Set<String> getRequiredArgsForFilter(String filter) {
+		GatewayFilterFactory factory = this.gatewayFilterFactories.get(filter);
+		return (factory != null) ? requiredArgs(factory.getConfigClass(), factory.shortcutFieldOrder()) : Set.of();
+	}
+
 	private static Map<String, String> defaultArgs(Object config, List<String> fieldOrder) {
 		BeanWrapper wrapper = new BeanWrapperImpl(config);
 		LinkedHashMap<String, String> result = new LinkedHashMap<>();
@@ -203,11 +232,7 @@ public class GatewayConfigService {
 		if (factory == null) {
 			return Mono.just(false);
 		}
-		List<String> validArgs = factory.shortcutFieldOrder();
-		if (!validArgs.isEmpty() && args.keySet().isEmpty()) {
-			return Mono.just(false);
-		}
-		if (!validArgs.stream().allMatch((a) -> args.keySet().contains(a))) {
+		if (!coversRequiredArgs(factory.getConfigClass(), factory.shortcutFieldOrder(), args)) {
 			return Mono.just(false);
 		}
 		// Reject arguments that cannot be bound to the filter configuration (e.g. a
@@ -233,8 +258,7 @@ public class GatewayConfigService {
 		if (factory == null) {
 			return Mono.error(new PredicateNotFoundException(name));
 		}
-		List<String> validArgs = factory.shortcutFieldOrder();
-		if (!validArgs.stream().allMatch((a) -> args.keySet().contains(a))) {
+		if (!coversRequiredArgs(factory.getConfigClass(), factory.shortcutFieldOrder(), args)) {
 			return Mono.just(false);
 		}
 		try {
@@ -257,6 +281,58 @@ public class GatewayConfigService {
 	 * @return {@code true} when the arguments bind cleanly, {@code false} when at least
 	 * one value cannot be converted to its target type
 	 */
+	/**
+	 * Checks that the supplied arguments only use known argument names and cover the
+	 * strictly required ones. A field is considered required only when it carries a bean
+	 * validation constraint ({@link NotNull}, {@link NotEmpty} or {@link NotBlank}); the
+	 * other fields are optional and fall back to their configuration default. When no
+	 * field is strictly required, at least one argument is still expected for an element
+	 * that accepts some, to avoid creating an empty predicate or filter.
+	 * @param configClass the predicate or filter configuration class
+	 * @param fieldOrder the accepted argument names
+	 * @param args the supplied arguments
+	 * @return {@code true} when the arguments are acceptable
+	 */
+	private boolean coversRequiredArgs(Class<?> configClass, List<String> fieldOrder, Map<String, String> args) {
+		if (!fieldOrder.containsAll(args.keySet())) {
+			return false;
+		}
+		Set<String> required = requiredArgs(configClass, fieldOrder);
+		if (required.isEmpty()) {
+			return fieldOrder.isEmpty() || !args.isEmpty();
+		}
+		return args.keySet().containsAll(required);
+	}
+
+	private static Set<String> requiredArgs(Class<?> configClass, List<String> fieldOrder) {
+		Set<String> required = new LinkedHashSet<>();
+		for (String name : fieldOrder) {
+			Field field = findField(configClass, name);
+			if (field != null && isRequired(field)) {
+				required.add(name);
+			}
+		}
+		return required;
+	}
+
+	private static Field findField(Class<?> type, String name) {
+		Class<?> current = type;
+		while (current != null && current != Object.class) {
+			try {
+				return current.getDeclaredField(name);
+			}
+			catch (NoSuchFieldException ex) {
+				current = current.getSuperclass();
+			}
+		}
+		return null;
+	}
+
+	private static boolean isRequired(Field field) {
+		return field.isAnnotationPresent(NotNull.class) || field.isAnnotationPresent(NotEmpty.class)
+				|| field.isAnnotationPresent(NotBlank.class);
+	}
+
 	private boolean bindsCleanly(Class<?> configClass, Map<String, String> args) {
 		try {
 			new Binder(new MapConfigurationPropertySource(args)).bind("", Bindable.of(configClass));

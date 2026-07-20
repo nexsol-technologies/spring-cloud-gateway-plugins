@@ -87,7 +87,7 @@ public class ApiGatewayApplication {
 
 	@Bean
 	@Order(2)
-	SecurityWebFilterChain basicWebFilterChain(ServerHttpSecurity http) {
+	SecurityWebFilterChain testAuthorizationWebFilterChain(ServerHttpSecurity http) {
 		http.cors(withDefaults());
 		http.csrf(ServerHttpSecurity.CsrfSpec::disable);
 		http.securityMatcher(ServerWebExchangeMatchers.pathMatchers("/test-authorization/*"));

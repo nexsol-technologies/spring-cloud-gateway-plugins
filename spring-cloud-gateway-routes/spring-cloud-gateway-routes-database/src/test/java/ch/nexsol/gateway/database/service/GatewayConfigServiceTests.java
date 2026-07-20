@@ -112,6 +112,27 @@ class GatewayConfigServiceTests {
 	}
 
 	@Test
+	void shouldAcceptFilterWithoutFillingEveryOptionalArg() {
+		// Retry exposes several fields but none is strictly required (no bean validation
+		// constraint): providing a single one must be enough, the rest keep their
+		// defaults.
+		Map<String, String> accepted = this.gatewayConfigService.getDefaultArgsForFilter("Retry");
+		assertThat(accepted).hasSizeGreaterThan(1);
+		assertThat(accepted).containsKey("retries");
+
+		StepVerifier.create(this.gatewayConfigService.validateFilter("Retry", Map.of("retries", "2")))
+			.assertNext((b) -> assertThat(b).isTrue())
+			.verifyComplete();
+	}
+
+	@Test
+	void shouldRejectFilterWithUnknownArg() {
+		StepVerifier.create(this.gatewayConfigService.validateFilter("Retry", Map.of("_unknown_", "2")))
+			.assertNext((b) -> assertThat(b).isFalse())
+			.verifyComplete();
+	}
+
+	@Test
 	void shouldPredicateArgsValidationSuccess() {
 		MethodRoutePredicateFactory factory = new MethodRoutePredicateFactory();
 		StepVerifier

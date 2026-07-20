@@ -20,6 +20,7 @@ import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -196,9 +197,12 @@ public class RouteViewController {
 		String name = (selected != null) ? selected : "";
 		Map<String, String> args = "filter".equals(kind) ? this.gatewayConfigService.getDefaultArgsForFilter(name)
 				: this.gatewayConfigService.getDefaultArgsForPredicate(name);
+		Set<String> required = "filter".equals(kind) ? this.gatewayConfigService.getRequiredArgsForFilter(name)
+				: this.gatewayConfigService.getRequiredArgsForPredicate(name);
 		model.addAttribute("kind", kind);
 		model.addAttribute("index", index);
 		model.addAttribute("args", args);
+		model.addAttribute("requiredArgs", required);
 		return Mono.just("fragments/element :: args");
 	}
 
