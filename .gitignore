@@ -16,6 +16,10 @@ node/
 .settings
 .springBeans
 .sts4-cache
+bin/
+
+### CodeGraph (local index) ###
+.codegraph/
 
 ### IntelliJ IDEA ###
 .idea
