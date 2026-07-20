@@ -30,8 +30,10 @@ import jakarta.validation.constraints.NotNull;
  * @param order the resolution order, or {@code null} when unset
  * @param predicates the route predicates
  * @param filters the route filters
+ * @param publicRoute whether the route is public, hence exempt from authentication
  */
 public record RouteResponseModel(Long id, @NotEmpty String routeId, @NotEmpty String uri, Integer order,
-		@NotEmpty List<@NotNull PredicateResponseModel> predicates, List<FilterResponseModel> filters) {
+		@NotEmpty List<@NotNull PredicateResponseModel> predicates, List<FilterResponseModel> filters,
+		boolean publicRoute) {
 
 }

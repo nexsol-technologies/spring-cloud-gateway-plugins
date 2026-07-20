@@ -114,7 +114,7 @@ public class ApiService {
 			.collectList();
 		return Mono.zip(predicates, filters)
 			.map((tuple) -> new RouteResponseModel(route.getId(), route.getRouteId(), route.getUri(), route.getOrder(),
-					tuple.getT1(), tuple.getT2()));
+					tuple.getT1(), tuple.getT2(), route.isPublicRoute()));
 	}
 
 	private Mono<PredicateResponseModel> toPredicateResponseModel(PredicateEntity predicate) {

@@ -2,7 +2,8 @@ CREATE TABLE IF NOT EXISTS route (
     id SERIAL PRIMARY KEY,
     route_id VARCHAR(255) NOT NULL UNIQUE,
     uri VARCHAR(255) NOT NULL,
-    route_order INT
+    route_order INT,
+    public_route BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS predicate (

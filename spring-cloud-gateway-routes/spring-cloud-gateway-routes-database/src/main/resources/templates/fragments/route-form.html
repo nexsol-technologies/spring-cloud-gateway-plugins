@@ -36,6 +36,12 @@
 					<input class="form-control" id="order" name="order" type="number" th:value="${order}">
 				</div>
 
+				<div class="mb-3 form-check">
+					<input class="form-check-input" id="public" name="public" type="checkbox" value="true"
+						th:checked="${publicRoute}">
+					<label class="form-check-label" for="public">Public route (bypass authentication)</label>
+				</div>
+
 				<div class="mb-3">
 					<div class="d-flex justify-content-between align-items-center mb-2">
 						<h3 class="h6 mb-0">Predicates</h3>

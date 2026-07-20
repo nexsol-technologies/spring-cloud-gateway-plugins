@@ -18,6 +18,7 @@
 		<module>spring-cloud-gateway-routes-database</module>
 		<module>spring-cloud-gateway-routes-files</module>
 		<module>spring-cloud-gateway-routes-openapi</module>
+		<module>spring-cloud-gateway-routes-security</module>
 	</modules>
 
 </project>

@@ -37,6 +37,9 @@ public class RouteEntity {
 	@Column("route_order")
 	private Integer order;
 
+	@Column("public_route")
+	private boolean publicRoute;
+
 	/**
 	 * Creates an empty route entity.
 	 */
@@ -109,12 +112,28 @@ public class RouteEntity {
 	}
 
 	/**
+	 * Returns whether this route is public, hence exempt from authentication.
+	 * @return {@code true} when the route is public
+	 */
+	public boolean isPublicRoute() {
+		return this.publicRoute;
+	}
+
+	/**
+	 * Sets whether this route is public, hence exempt from authentication.
+	 * @param publicRoute {@code true} to make the route public
+	 */
+	public void setPublicRoute(boolean publicRoute) {
+		this.publicRoute = publicRoute;
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	@Override
 	public String toString() {
 		return "RouteEntity [id=" + this.id + ", routeId=" + this.routeId + ", uri=" + this.uri + ", order="
-				+ this.order + "]";
+				+ this.order + ", publicRoute=" + this.publicRoute + "]";
 	}
 
 }

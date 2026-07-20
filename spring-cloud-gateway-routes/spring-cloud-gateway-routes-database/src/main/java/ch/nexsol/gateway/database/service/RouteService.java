@@ -49,6 +49,13 @@ public class RouteService {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RouteService.class);
 
+	/**
+	 * Route metadata key flagging a route as public, hence exempt from authentication. It
+	 * mirrors {@code PublicRouteMatcher.PUBLIC_METADATA_KEY} from the routes-security
+	 * module, kept as a literal here to avoid a compile dependency on that module.
+	 */
+	private static final String PUBLIC_METADATA_KEY = "public";
+
 	private final RouteRepository routeRepository;
 
 	private final PredicateService predicateService;
@@ -123,6 +130,9 @@ public class RouteService {
 					}
 					routeDefinition.setPredicates(predicateMap.getOrDefault(route.getId(), List.of()));
 					routeDefinition.setFilters(filterMap.getOrDefault(route.getId(), List.of()));
+					if (route.isPublicRoute()) {
+						routeDefinition.setMetadata(Map.of(PUBLIC_METADATA_KEY, Boolean.TRUE));
+					}
 
 					return routeDefinition;
 				});
@@ -169,6 +179,7 @@ public class RouteService {
 						routeEntity.setRouteId(routeModel.routeId());
 						routeEntity.setUri(routeModel.uri().toASCIIString());
 						routeEntity.setOrder(routeModel.order());
+						routeEntity.setPublicRoute(routeModel.publicRoute());
 
 						return this.save(routeEntity)
 							.flatMap(createPredicates(routeModel))
@@ -197,6 +208,7 @@ public class RouteService {
 				routeEntity.setRouteId(routeModel.routeId());
 				routeEntity.setUri(routeModel.uri().toASCIIString());
 				routeEntity.setOrder(routeModel.order());
+				routeEntity.setPublicRoute(routeModel.publicRoute());
 				return this.save(routeEntity)
 					.flatMap(deletePredicates())
 					.flatMap(deleteFilters())

@@ -135,6 +135,7 @@ public class RouteViewController {
 			model.addAttribute("routeId", route.routeId());
 			model.addAttribute("uri", route.uri());
 			model.addAttribute("order", (route.order() != null) ? route.order() : "");
+			model.addAttribute("publicRoute", route.publicRoute());
 			model.addAttribute("predicateRows",
 					route.predicates()
 						.stream()
@@ -278,6 +279,7 @@ public class RouteViewController {
 			model.addAttribute("routeId", form.getFirst("routeId"));
 			model.addAttribute("uri", form.getFirst("uri"));
 			model.addAttribute("order", form.getFirst("order"));
+			model.addAttribute("publicRoute", Boolean.parseBoolean(form.getFirst("public")));
 			model.addAttribute("predicateRows", buildRows(form, "predicate"));
 			model.addAttribute("filterRows", buildRows(form, "filter"));
 			model.addAttribute("formError", message);
@@ -309,6 +311,7 @@ public class RouteViewController {
 		model.addAttribute("routeId", "");
 		model.addAttribute("uri", "");
 		model.addAttribute("order", "");
+		model.addAttribute("publicRoute", false);
 		model.addAttribute("predicateRows",
 				List.of(new ElementRowView(this.rowIndex.incrementAndGet(), null, new LinkedHashMap<>())));
 		model.addAttribute("filterRows", List.of());
@@ -325,8 +328,9 @@ public class RouteViewController {
 			.filter((row) -> row.name() != null && !row.name().isBlank())
 			.map((row) -> new FilterCreateModel(row.name(), nonBlankArgs(row.args())))
 			.toList();
+		boolean publicRoute = Boolean.parseBoolean(form.getFirst("public"));
 		return new RouteCreateModel(form.getFirst("routeId"), URI.create(form.getFirst("uri")), order, predicates,
-				filters);
+				filters, publicRoute);
 	}
 
 	private List<ElementRowView> buildRows(MultiValueMap<String, String> form, String kind) {

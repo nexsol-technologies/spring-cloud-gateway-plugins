@@ -35,10 +35,12 @@ import org.springframework.validation.annotation.Validated;
  * @param order the resolution order, or {@code null} when unset
  * @param predicates the predicates to attach, must not be empty
  * @param filters the filters to attach
+ * @param publicRoute whether the route is public, hence exempt from authentication
  */
 @Validated
 public record RouteCreateModel(@NotEmpty String routeId, @NotNull URI uri, Integer order,
-		@NotEmpty List<@NotNull PredicateCreateModel> predicates, List<FilterCreateModel> filters) {
+		@NotEmpty List<@NotNull PredicateCreateModel> predicates, List<FilterCreateModel> filters,
+		boolean publicRoute) {
 
 	/**
 	 * Canonical constructor validating and normalizing the supplied URI.
@@ -47,9 +49,11 @@ public record RouteCreateModel(@NotEmpty String routeId, @NotNull URI uri, Integ
 	 * @param order the resolution order
 	 * @param predicates the predicates to attach
 	 * @param filters the filters to attach
+	 * @param publicRoute whether the route is public
 	 */
 	public RouteCreateModel(@NotEmpty String routeId, @NotNull URI uri, Integer order,
-			@NotEmpty List<@NotNull PredicateCreateModel> predicates, List<FilterCreateModel> filters) {
+			@NotEmpty List<@NotNull PredicateCreateModel> predicates, List<FilterCreateModel> filters,
+			boolean publicRoute) {
 		this.routeId = routeId;
 		try {
 			// this.uri = new URL(uri.toASCIIString()).toURI();
@@ -61,6 +65,20 @@ public record RouteCreateModel(@NotEmpty String routeId, @NotNull URI uri, Integ
 		this.order = order;
 		this.predicates = predicates;
 		this.filters = filters;
+		this.publicRoute = publicRoute;
+	}
+
+	/**
+	 * Convenience constructor defaulting {@code publicRoute} to {@code false}.
+	 * @param routeId the business route id
+	 * @param uri the target URI
+	 * @param order the resolution order
+	 * @param predicates the predicates to attach
+	 * @param filters the filters to attach
+	 */
+	public RouteCreateModel(String routeId, URI uri, Integer order, List<PredicateCreateModel> predicates,
+			List<FilterCreateModel> filters) {
+		this(routeId, uri, order, predicates, filters, false);
 	}
 
 }
