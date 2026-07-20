@@ -1,0 +1,10 @@
+[
+  {
+    "id": "json_route",
+    "uri": "https://example.org",
+    "predicates": [
+      "Method=GET,POST"
+    ],
+    "filters": []
+  }
+]

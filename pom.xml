@@ -75,10 +75,10 @@
 
 	<modules>
 		<module>spring-cloud-gateway-audit</module>
-		<module>spring-cloud-gateway-database</module>
+		<module>spring-cloud-gateway-routes</module>
 		<module>spring-cloud-gateway-filters</module>
 		<module>spring-cloud-gateway-oauth2</module>
-		<module>spring-cloud-gateway-openapi</module>
+		<module>spring-cloud-gateway-hub-openapi</module>
 		<module>spring-cloud-gateway-samples</module>
 		<module>spring-cloud-gateway-plugins-dependencies</module>
 	</modules>

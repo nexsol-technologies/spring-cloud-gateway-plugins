@@ -1,0 +1,4 @@
+routes:
+  - id: broken
+    predicates:
+      - Path=/x

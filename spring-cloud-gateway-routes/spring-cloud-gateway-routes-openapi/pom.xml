@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>ch.nexsol-tech.gateway</groupId>
+		<artifactId>spring-cloud-gateway-routes</artifactId>
+		<version>${revision}</version>
+		<relativePath>../pom.xml </relativePath>
+	</parent>
+	<artifactId>spring-cloud-gateway-routes-openapi</artifactId>
+	<name>spring-cloud-gateway-routes-openapi</name>
+	<description>Route definition locator generating routes from an OpenAPI contract for Spring Cloud Gateway</description>
+	<properties>
+		<swagger-parser.version>2.1.31</swagger-parser.version>
+		<swagger-core.version>2.2.34</swagger-core.version>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-core</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
+		</dependency>
+		<!--
+			swagger-parser-v3 transitively pulls the non-jakarta swagger-core/models/annotations,
+			which clash on the classpath with the jakarta variants used by Spring Boot 4 / springdoc
+			(same io.swagger.v3.oas.models.* package in two artifacts). Exclude the plain flavour and
+			bring the jakarta one; the parser is compiled against the same API and works with either.
+		-->
+		<dependency>
+			<groupId>io.swagger.parser.v3</groupId>
+			<artifactId>swagger-parser-v3</artifactId>
+			<version>${swagger-parser.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>io.swagger.core.v3</groupId>
+					<artifactId>swagger-core</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>io.swagger.core.v3</groupId>
+					<artifactId>swagger-models</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>io.swagger.core.v3</groupId>
+					<artifactId>swagger-annotations</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>io.swagger.core.v3</groupId>
+			<artifactId>swagger-core-jakarta</artifactId>
+			<version>${swagger-core.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.projectreactor</groupId>
+			<artifactId>reactor-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>io.spring.javaformat</groupId>
+				<artifactId>spring-javaformat-maven-plugin</artifactId>
+				<version>${spring-javaformat-maven-plugin.version}</version>
+				<executions>
+					<execution>
+						<phase>validate</phase>
+						<inherited>true</inherited>
+						<goals>
+							<goal>validate</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+</project>

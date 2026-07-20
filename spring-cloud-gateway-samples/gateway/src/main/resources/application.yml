@@ -53,8 +53,32 @@ spring.cloud.gateway.server.webflux:
         - jsonPath: '$.roles'
           roles: '_UNKNOWN_ROLE_'
     - RewritePath=/test-authorization-token/?(?<segment>.*), /$\{segment}
-    
-    
+
+
+# Route definition management plugins (spring-cloud-gateway-routes).
+# 'files' aggregates JSON/YAML route files into the route locator (GitOps friendly).
+# 'openapi' turns an OpenAPI contract into routes (needs a reachable spec).
+spring.cloud.gateway.routes:
+  files:
+    enabled: true
+    watch: true
+    locations:
+      - classpath:gateway-routes/*.yaml
+  openapi:
+    enabled: false
+    # update-interval: 5m
+    # sources:
+    #   - id: petstore
+    #     uri: https://petstore3.swagger.io
+    #     spec-url: https://petstore3.swagger.io/api/v3/openapi.json
+    #     mode: PER_OPERATION
+    #     # base-path: /api/v3   # optional; derived from the contract servers when omitted
+    #     metadata:
+    #       team: pets
+    #     filters:
+    #       - Retry=3
+
+
 spring.r2dbc:
   url: r2dbc:h2:mem:///test_db;MODE=PostgreSQL
 

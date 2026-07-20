@@ -1,0 +1,13 @@
+openapi: 3.0.1
+info:
+  title: Root Server API
+  version: 1.0.0
+servers:
+  - url: /
+paths:
+  /ping:
+    get:
+      operationId: ping
+      responses:
+        '200':
+          description: ok

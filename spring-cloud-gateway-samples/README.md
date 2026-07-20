@@ -25,7 +25,7 @@ In the application.yml some routes are configured to test the filters provided b
 | http://localhost:8181/test-authorization-token-ko/sample | the validation of jwt with 'user:user' is failed |
 
 
-#### spring-cloud-gateway-openapi
+#### spring-cloud-gateway-hub-openapi
 <i>For the demo, you need to run the gateway and service-a with the profile "eureka".</i>
 <br>
 To test, go to http://localhost:8181/swagger-ui.html and you should have access to swagger interface with SERVICE-A api's:
@@ -33,9 +33,9 @@ To test, go to http://localhost:8181/swagger-ui.html and you should have access 
   <img src="doc/spring-cloud-gateway-openapi.png" alt="spring-cloud-gateway-openapi" width="50%"/>
 </p>
 
-#### spring-cloud-gateway-database
+#### spring-cloud-gateway-routes-database
 
 To test, go to http://localhost:8181/routes.html and you should have access to the basic gui to manage routes:
 <p align="center">
-  <img src="../spring-cloud-gateway-database/doc/spring-cloud-gateway-database-ui.png" alt="spring-cloud-gateway-openapi" width="50%"/>
+  <img src="../spring-cloud-gateway-routes/spring-cloud-gateway-routes-database/doc/spring-cloud-gateway-database-ui.png" alt="spring-cloud-gateway-openapi" width="50%"/>
 </p>

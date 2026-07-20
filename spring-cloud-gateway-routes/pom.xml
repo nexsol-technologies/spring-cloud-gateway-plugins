@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>ch.nexsol-tech.gateway</groupId>
+		<artifactId>spring-cloud-gateway-plugins</artifactId>
+		<version>${revision}</version>
+		<relativePath>../pom.xml </relativePath>
+	</parent>
+	<artifactId>spring-cloud-gateway-routes</artifactId>
+	<name>spring-cloud-gateway-routes</name>
+	<description>Route definition management for Spring Cloud Gateway with pluggable sources (database, files, openapi)</description>
+	<packaging>pom</packaging>
+	<modules>
+		<module>spring-cloud-gateway-routes-core</module>
+		<module>spring-cloud-gateway-routes-database</module>
+		<module>spring-cloud-gateway-routes-files</module>
+		<module>spring-cloud-gateway-routes-openapi</module>
+	</modules>
+
+</project>

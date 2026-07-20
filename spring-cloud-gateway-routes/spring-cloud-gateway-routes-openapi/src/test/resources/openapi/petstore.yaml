@@ -1,0 +1,24 @@
+openapi: 3.0.1
+info:
+  title: Pet Store
+  version: 1.0.0
+servers:
+  - url: /api/v3
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      responses:
+        '200':
+          description: ok
+    post:
+      operationId: createPet
+      responses:
+        '201':
+          description: created
+  /pets/{petId}:
+    get:
+      operationId: getPet
+      responses:
+        '200':
+          description: ok

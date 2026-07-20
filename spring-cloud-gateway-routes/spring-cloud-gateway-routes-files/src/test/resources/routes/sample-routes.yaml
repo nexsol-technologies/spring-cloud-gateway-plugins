@@ -1,0 +1,16 @@
+routes:
+  - id: after_route
+    uri: https://example.org
+    order: 1
+    predicates:
+      - Cookie=mycookie,mycookievalue
+      - name: Path
+        args:
+          pattern: /api/**
+    filters:
+      - AddRequestHeader=X-Request-Foo,Bar
+      - name: Retry
+        args:
+          retries: "3"
+    metadata:
+      tier: gold

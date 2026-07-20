@@ -48,7 +48,17 @@
 		</dependency>
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
-			<artifactId>spring-cloud-gateway-database</artifactId>
+			<artifactId>spring-cloud-gateway-routes-database</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-files</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-openapi</artifactId>
 			<version>${revision}</version>
 		</dependency>
 		<dependency>
@@ -58,7 +68,7 @@
 		</dependency>
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
-			<artifactId>spring-cloud-gateway-openapi</artifactId>
+			<artifactId>spring-cloud-gateway-hub-openapi</artifactId>
 			<version>${revision}</version>
 		</dependency>
 		<dependency>
