@@ -33,10 +33,11 @@ import org.springframework.context.annotation.Bean;
 
 /**
  * Auto-configuration wiring the OpenAPI-based route definition locator when
- * {@code spring.cloud.gateway.routes.openapi.enabled} is {@code true}.
+ * {@code spring.cloud.gateway.server.webflux.routes-openapi.enabled} is {@code true}.
  */
 @AutoConfiguration
-@ConditionalOnProperty(prefix = "spring.cloud.gateway.routes.openapi", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "spring.cloud.gateway.server.webflux.routes-openapi", name = "enabled",
+		havingValue = "true")
 @EnableConfigurationProperties(RoutesOpenapiProperties.class)
 public class RoutesOpenapiAutoConfiguration {
 

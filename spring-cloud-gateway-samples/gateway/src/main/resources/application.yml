@@ -56,27 +56,26 @@ spring.cloud.gateway.server.webflux:
 
 
 # Route definition management plugins (spring-cloud-gateway-routes).
-# 'files' aggregates JSON/YAML route files into the route locator (GitOps friendly).
-# 'openapi' turns an OpenAPI contract into routes (needs a reachable spec).
-spring.cloud.gateway.routes:
-  files:
-    enabled: true
-    watch: true
-    locations:
-      - classpath:gateway-routes/*.yaml
-  openapi:
-    enabled: false
-    # update-interval: 5m
-    # sources:
-    #   - id: petstore
-    #     uri: https://petstore3.swagger.io
-    #     spec-url: https://petstore3.swagger.io/api/v3/openapi.json
-    #     mode: PER_OPERATION
-    #     # base-path: /api/v3   # optional; derived from the contract servers when omitted
-    #     metadata:
-    #       team: pets
-    #     filters:
-    #       - Retry=3
+# 'routes-files' aggregates JSON/YAML route files into the route locator (GitOps friendly).
+# 'routes-openapi' turns an OpenAPI contract into routes (needs a reachable spec).
+spring.cloud.gateway.server.webflux.routes-files:
+  enabled: true
+  watch: true
+  locations:
+    - classpath:gateway-routes/*.yaml
+spring.cloud.gateway.server.webflux.routes-openapi:
+  enabled: false
+  # update-interval: 5m
+  # sources:
+  #   - id: petstore
+  #     uri: https://petstore3.swagger.io
+  #     spec-url: https://petstore3.swagger.io/api/v3/openapi.json
+  #     mode: PER_OPERATION
+  #     # base-path: /api/v3   # optional; derived from the contract servers when omitted
+  #     metadata:
+  #       team: pets
+  #     filters:
+  #       - Retry=3
 
 
 spring.r2dbc:
@@ -140,5 +139,6 @@ spring.cloud.gateway.server.webflux:
   discovery:
     locator:
       enabled: true
-spring.cloud.gateway.openapi.hub.enabled: true
-openapi.gateway.uri: http://localhost:${server.port}
+spring.cloud.gateway.server.webflux.hub-openapi:
+  enabled: true
+  gateway-uri: http://localhost:${server.port}

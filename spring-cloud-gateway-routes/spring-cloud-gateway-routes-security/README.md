@@ -47,7 +47,7 @@ routes:
 OpenAPI source:
 
 ```yaml
-spring.cloud.gateway.routes.openapi.sources[0].metadata.public: true
+spring.cloud.gateway.server.webflux.routes-openapi.sources[0].metadata.public: true
 ```
 
 Database: tick **Public route** in the routes UI, or set the `public_route` column
@@ -58,5 +58,5 @@ Database: tick **Public route** in the routes UI, or set the `public_route` colu
 The feature is active as soon as the module is on the classpath. Disable it with:
 
 ```yaml
-spring.cloud.gateway.routes.security.public-routes.enabled: false
+spring.cloud.gateway.server.webflux.routes-security.public-routes.enabled: false
 ```

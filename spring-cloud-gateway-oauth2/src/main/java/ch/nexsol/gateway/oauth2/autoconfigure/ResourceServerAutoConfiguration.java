@@ -64,7 +64,7 @@ public class ResourceServerAutoConfiguration {
 	@Bean
 	@Conditional(OnMissingConfigurableJwtGrantedAuthoritiesConfiguredCondition.class)
 	Converter<Jwt, AbstractAuthenticationToken> defaultJwtGrantedAuthoritiesConverter(
-			@Value("${spring.cloud.gateway.resourcename:${spring.application.name}}") String resourceName) {
+			@Value("${spring.cloud.gateway.server.webflux.oauth2.resource-name:${spring.application.name}}") String resourceName) {
 		return new DefaultJwtGrantedAuthoritiesConverter(resourceName);
 	}
 

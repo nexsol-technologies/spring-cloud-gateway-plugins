@@ -36,11 +36,11 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
  * The chain is ordered ahead of the application security chains and only matches public
  * routes (see {@link PublicRouteMatcher}); every other request falls through to the
  * application's own chains unchanged. It can be disabled with
- * {@code spring.cloud.gateway.routes.security.public-routes.enabled=false}.
+ * {@code spring.cloud.gateway.server.webflux.routes-security.public-routes.enabled=false}.
  */
 @AutoConfiguration
 @ConditionalOnClass({ SecurityWebFilterChain.class, RouteLocator.class })
-@ConditionalOnProperty(prefix = "spring.cloud.gateway.routes.security.public-routes", name = "enabled",
+@ConditionalOnProperty(prefix = "spring.cloud.gateway.server.webflux.routes-security.public-routes", name = "enabled",
 		matchIfMissing = true)
 public class RoutesSecurityAutoConfiguration {
 

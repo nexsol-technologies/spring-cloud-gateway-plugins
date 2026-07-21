@@ -28,7 +28,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Configuration properties for the OpenAPI-based route definition locator.
  */
-@ConfigurationProperties(prefix = "spring.cloud.gateway.routes.openapi")
+@ConfigurationProperties(prefix = "spring.cloud.gateway.server.webflux.routes-openapi")
 public class RoutesOpenapiProperties {
 
 	/**
