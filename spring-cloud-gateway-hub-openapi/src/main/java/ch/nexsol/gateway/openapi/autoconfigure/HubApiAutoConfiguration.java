@@ -45,10 +45,12 @@ import org.springframework.http.codec.ServerCodecConfigurer;
 /**
  * Auto-configuration that wires up the OpenAPI hub, aggregating the OpenAPI documentation
  * of the services discovered by the gateway. It is only active when the
- * {@code spring.cloud.gateway.openapi.hub.enabled} property is set to {@code true}.
+ * {@code spring.cloud.gateway.server.webflux.hub-openapi.enabled} property is set to
+ * {@code true}.
  */
 @AutoConfiguration
-@ConditionalOnProperty(name = "spring.cloud.gateway.openapi.hub.enabled", havingValue = "true", matchIfMissing = false)
+@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.hub-openapi.enabled", havingValue = "true",
+		matchIfMissing = false)
 public class HubApiAutoConfiguration {
 
 	/**
@@ -104,7 +106,8 @@ public class HubApiAutoConfiguration {
 	@ConditionalOnEnabledFilter
 	OpenapiModifyResponseBodyGatewayFilterFactory customModifyResponseBodyGatewayFilterFactory(
 			ServerCodecConfigurer codecConfigurer, Set<MessageBodyDecoder> bodyDecoders,
-			Set<MessageBodyEncoder> bodyEncoders, @Value("${openapi.gateway.uri}") URI apiGatewayUri) {
+			Set<MessageBodyEncoder> bodyEncoders,
+			@Value("${spring.cloud.gateway.server.webflux.hub-openapi.gateway-uri}") URI apiGatewayUri) {
 		return new OpenapiModifyResponseBodyGatewayFilterFactory(codecConfigurer.getReaders(), bodyDecoders,
 				bodyEncoders, apiGatewayUri);
 	}

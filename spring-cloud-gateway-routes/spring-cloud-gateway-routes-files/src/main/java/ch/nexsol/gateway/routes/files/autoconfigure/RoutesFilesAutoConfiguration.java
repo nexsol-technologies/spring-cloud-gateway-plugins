@@ -32,10 +32,11 @@ import org.springframework.core.io.support.ResourcePatternResolver;
 
 /**
  * Auto-configuration wiring the file-based route definition locator when
- * {@code spring.cloud.gateway.routes.files.enabled} is {@code true}.
+ * {@code spring.cloud.gateway.server.webflux.routes-files.enabled} is {@code true}.
  */
 @AutoConfiguration
-@ConditionalOnProperty(prefix = "spring.cloud.gateway.routes.files", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "spring.cloud.gateway.server.webflux.routes-files", name = "enabled",
+		havingValue = "true")
 @EnableConfigurationProperties(RoutesFilesProperties.class)
 public class RoutesFilesAutoConfiguration {
 

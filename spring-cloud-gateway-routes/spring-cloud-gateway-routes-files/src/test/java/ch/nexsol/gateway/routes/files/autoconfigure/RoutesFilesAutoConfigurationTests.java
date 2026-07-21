@@ -42,8 +42,8 @@ class RoutesFilesAutoConfigurationTests {
 	@Test
 	void locatorLoadsRoutesWhenEnabled() {
 		this.runner
-			.withPropertyValues("spring.cloud.gateway.routes.files.enabled=true",
-					"spring.cloud.gateway.routes.files.locations=classpath:routes/sample-routes.yaml")
+			.withPropertyValues("spring.cloud.gateway.server.webflux.routes-files.enabled=true",
+					"spring.cloud.gateway.server.webflux.routes-files.locations=classpath:routes/sample-routes.yaml")
 			.run((context) -> {
 				assertThat(context).hasSingleBean(FileRouteDefinitionLocator.class);
 				FileRouteDefinitionLocator locator = context.getBean(FileRouteDefinitionLocator.class);

@@ -15,20 +15,19 @@ route locator. Inspired by
 ## Configuration
 
 ```yaml
-spring.cloud.gateway.routes:
-  openapi:
-    enabled: true
-    update-interval: 5m               # optional periodic reload; omit to load once at startup
-    sources:
-      - id: petstore
-        uri: https://petstore.example.org   # backend target: only scheme/host/port is used
-        spec-url: https://petstore.example.org/v3/api-docs
-        mode: PER_OPERATION           # or AGGREGATED
-        # base-path: /api/v3          # optional; omit to derive it from the contract servers
-        metadata:
-          team: pets
-        filters:
-          - Retry=3
+spring.cloud.gateway.server.webflux.routes-openapi:
+  enabled: true
+  update-interval: 5m                 # optional periodic reload; omit to load once at startup
+  sources:
+    - id: petstore
+      uri: https://petstore.example.org   # backend target: only scheme/host/port is used
+      spec-url: https://petstore.example.org/v3/api-docs
+      mode: PER_OPERATION             # or AGGREGATED
+      # base-path: /api/v3            # optional; omit to derive it from the contract servers
+      metadata:
+        team: pets
+      filters:
+        - Retry=3
 ```
 
 ### Backend base path

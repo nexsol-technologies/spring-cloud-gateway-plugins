@@ -37,16 +37,16 @@ gateway), so there is no CORS issue and "Try it out" targets the gateway.
 No extra configuration is needed beyond enabling both plugins:
 
 ```yaml
-openapi.gateway.uri: http://localhost:8181   # required by the hub to rewrite the servers
-spring.cloud.gateway:
-  openapi.hub.enabled: true                   # enable the hub / Swagger UI aggregation
-  routes.openapi:
-    enabled: true
-    sources:
-      - id: petstore
-        uri: https://petstore3.swagger.io
-        spec-url: https://petstore3.swagger.io/api/v3/openapi.json
-        mode: PER_OPERATION
+spring.cloud.gateway.server.webflux.hub-openapi:
+  enabled: true                               # enable the hub / Swagger UI aggregation
+  gateway-uri: http://localhost:8181          # required by the hub to rewrite the servers
+spring.cloud.gateway.server.webflux.routes-openapi:
+  enabled: true
+  sources:
+    - id: petstore
+      uri: https://petstore3.swagger.io
+      spec-url: https://petstore3.swagger.io/api/v3/openapi.json
+      mode: PER_OPERATION
 ```
 
 The source then appears in the Swagger UI dropdown as `petstore`, served through the

@@ -92,7 +92,7 @@ The following claims are searched in the access token to create `GrantedAuthorit
 | Claim Path                  | Description                                                                 |
 |-----------------------------|-----------------------------------------------------------------------------|
 | `$.realm_access.roles`      | In Keycloak, contains the global roles of the realm.                        |
-| `$.resource_access.xxx.roles` | In Keycloak, contains client-specific roles for `xxx`. `xxx` defaults to the value of `spring.cloud.gateway.resourcename`, or `spring.application.name` if undefined. |
+| `$.resource_access.xxx.roles` | In Keycloak, contains client-specific roles for `xxx`. `xxx` defaults to the value of `spring.cloud.gateway.server.webflux.oauth2.resource-name`, or `spring.application.name` if undefined. |
 | `$.permissions`             | Additional permissions.                                                     |
 | `$.roles`                   | General roles.                                                              |
 

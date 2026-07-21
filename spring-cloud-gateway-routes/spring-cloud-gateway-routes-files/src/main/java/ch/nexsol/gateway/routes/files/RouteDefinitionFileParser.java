@@ -36,12 +36,13 @@ import org.springframework.cloud.gateway.route.RouteDefinition;
 /**
  * Parses a JSON or YAML file into a list of Spring Cloud Gateway {@link RouteDefinition}.
  * <p>
- * The accepted structure mirrors the standard {@code spring.cloud.gateway.routes}
- * configuration. A file may either be a top-level array of routes or an object with a
- * {@code routes} array. Each predicate and filter can be expressed either as the
- * shorthand string form ({@code Cookie=mycookie,mycookievalue}), which is parsed by the
- * native {@link PredicateDefinition}/{@link FilterDefinition} string constructors, or as
- * an object with {@code name} and {@code args}.
+ * The accepted structure mirrors the standard
+ * {@code spring.cloud.gateway.server.webflux.routes} configuration. A file may either be
+ * a top-level array of routes or an object with a {@code routes} array. Each predicate
+ * and filter can be expressed either as the shorthand string form
+ * ({@code Cookie=mycookie,mycookievalue}), which is parsed by the native
+ * {@link PredicateDefinition}/{@link FilterDefinition} string constructors, or as an
+ * object with {@code name} and {@code args}.
  */
 public class RouteDefinitionFileParser {
 

@@ -15,20 +15,19 @@ pipeline can validate, review and deploy.
 ## Configuration
 
 ```yaml
-spring.cloud.gateway.routes:
-  files:
-    enabled: true
-    watch: true                       # reload when a watched file changes (file: locations only)
-    locations:
-      - classpath:gateway-routes/*.yaml
-      - file:./config/routes/*.json
+spring.cloud.gateway.server.webflux.routes-files:
+  enabled: true
+  watch: true                         # reload when a watched file changes (file: locations only)
+  locations:
+    - classpath:gateway-routes/*.yaml
+    - file:./config/routes/*.json
 ```
 
 ## File format
 
-The file mirrors the standard `spring.cloud.gateway` route configuration. It is either a
-top-level array of routes or an object with a `routes` array. Predicates and filters accept
-both the shorthand string form and the object form.
+The file mirrors the standard `spring.cloud.gateway.server.webflux` route configuration.
+It is either a top-level array of routes or an object with a `routes` array. Predicates
+and filters accept both the shorthand string form and the object form.
 
 ```yaml
 routes:

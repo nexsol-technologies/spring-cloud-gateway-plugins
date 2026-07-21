@@ -45,11 +45,11 @@ class RoutesOpenapiAutoConfigurationTests {
 		String specPath = new ClassPathResource("openapi/petstore.yaml").getFile().getAbsolutePath();
 
 		this.runner
-			.withPropertyValues("spring.cloud.gateway.routes.openapi.enabled=true",
-					"spring.cloud.gateway.routes.openapi.sources[0].id=petstore",
-					"spring.cloud.gateway.routes.openapi.sources[0].uri=https://backend.example.org",
-					"spring.cloud.gateway.routes.openapi.sources[0].spec-url=" + specPath,
-					"spring.cloud.gateway.routes.openapi.sources[0].mode=AGGREGATED")
+			.withPropertyValues("spring.cloud.gateway.server.webflux.routes-openapi.enabled=true",
+					"spring.cloud.gateway.server.webflux.routes-openapi.sources[0].id=petstore",
+					"spring.cloud.gateway.server.webflux.routes-openapi.sources[0].uri=https://backend.example.org",
+					"spring.cloud.gateway.server.webflux.routes-openapi.sources[0].spec-url=" + specPath,
+					"spring.cloud.gateway.server.webflux.routes-openapi.sources[0].mode=AGGREGATED")
 			.run((context) -> {
 				assertThat(context).hasSingleBean(OpenApiRouteDefinitionLocator.class);
 				OpenApiRouteDefinitionLocator locator = context.getBean(OpenApiRouteDefinitionLocator.class);

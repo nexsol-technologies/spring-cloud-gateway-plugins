@@ -24,7 +24,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Configuration properties for the file-based route definition locator.
  */
-@ConfigurationProperties(prefix = "spring.cloud.gateway.routes.files")
+@ConfigurationProperties(prefix = "spring.cloud.gateway.server.webflux.routes-files")
 public class RoutesFilesProperties {
 
 	/**
