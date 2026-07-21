@@ -29,15 +29,17 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnSingleCandidate;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.r2dbc.autoconfigure.R2dbcAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.r2dbc.core.DatabaseClient;
 
 /**
  * Registers the R2DBC {@link AuditEventPublisher} when {@code audit.provider=r2dbc} and a
- * {@link DatabaseClient} is available. Ordered before the core auto-configuration so its
- * publisher wins over the default one.
+ * {@link DatabaseClient} is available. Ordered after {@link R2dbcAutoConfiguration} so
+ * the auto-configured client is already defined, and before the core auto-configuration
+ * so its publisher wins over the default one.
  */
-@AutoConfiguration(before = AuditAutoConfiguration.class)
+@AutoConfiguration(after = R2dbcAutoConfiguration.class, before = AuditAutoConfiguration.class)
 @ConditionalOnClass(DatabaseClient.class)
 @ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.audit.provider", havingValue = "r2dbc")
 public class R2dbcAuditAutoConfiguration {

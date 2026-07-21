@@ -29,15 +29,17 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnSingleCandidate;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.kafka.core.KafkaTemplate;
 
 /**
  * Registers the Kafka {@link AuditEventPublisher} when {@code audit.provider=kafka} and a
- * {@link KafkaTemplate} is available. Ordered before the core auto-configuration so its
- * publisher wins over the default one.
+ * {@link KafkaTemplate} is available. Ordered after {@link KafkaAutoConfiguration} so the
+ * auto-configured template is already defined, and before the core auto-configuration so
+ * its publisher wins over the default one.
  */
-@AutoConfiguration(before = AuditAutoConfiguration.class)
+@AutoConfiguration(after = KafkaAutoConfiguration.class, before = AuditAutoConfiguration.class)
 @ConditionalOnClass(KafkaTemplate.class)
 @ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.audit.provider", havingValue = "kafka")
 public class KafkaAuditAutoConfiguration {

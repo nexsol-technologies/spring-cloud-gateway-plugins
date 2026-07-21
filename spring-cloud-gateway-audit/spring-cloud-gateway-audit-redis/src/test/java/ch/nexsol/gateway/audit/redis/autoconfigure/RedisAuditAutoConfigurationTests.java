@@ -24,8 +24,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -33,9 +34,10 @@ import static org.mockito.Mockito.mock;
 class RedisAuditAutoConfigurationTests {
 
 	private final ApplicationContextRunner runner = new ApplicationContextRunner()
-		.withConfiguration(AutoConfigurations.of(AuditAutoConfiguration.class, RedisAuditAutoConfiguration.class))
+		.withConfiguration(AutoConfigurations.of(DataRedisReactiveAutoConfiguration.class, AuditAutoConfiguration.class,
+				RedisAuditAutoConfiguration.class))
 		.withBean(ObjectMapper.class)
-		.withBean(ReactiveStringRedisTemplate.class, () -> mock(ReactiveStringRedisTemplate.class));
+		.withBean(ReactiveRedisConnectionFactory.class, () -> mock(ReactiveRedisConnectionFactory.class));
 
 	@Test
 	void registersRedisPublisherWhenSelected() {
