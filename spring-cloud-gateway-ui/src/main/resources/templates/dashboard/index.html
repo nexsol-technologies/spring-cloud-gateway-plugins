@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Home', ~{:: #gw-page}, ~{})}">
+<body>
+	<div id="gw-page">
+		<header class="mb-4">
+			<h1 class="h3 fw-bold mb-1">Spring Cloud Gateway</h1>
+			<p class="text-secondary mb-0">Welcome to the gateway control panel.</p>
+		</header>
+
+		<div class="card border-0 shadow-sm">
+			<div class="card-body">
+				<h2 class="h5 fw-semibold">Home</h2>
+				<p class="text-secondary mb-0">
+					Use the side menu to navigate. Menu entries light up automatically for each
+					gateway plugin present on the classpath. Collapse the menu with the button in
+					the top-left corner to keep only the icons visible.
+				</p>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

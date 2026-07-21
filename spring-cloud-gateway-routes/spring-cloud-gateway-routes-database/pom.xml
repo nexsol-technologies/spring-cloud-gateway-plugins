@@ -89,6 +89,14 @@
             <artifactId>reactor-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- The management UI renders inside the gateway UI shell; pulled in for tests
+             so the view controller and its shell rendering can be exercised here. -->
+        <dependency>
+            <groupId>ch.nexsol-tech.gateway</groupId>
+            <artifactId>spring-cloud-gateway-ui</artifactId>
+            <version>${revision}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <build>
         <plugins>

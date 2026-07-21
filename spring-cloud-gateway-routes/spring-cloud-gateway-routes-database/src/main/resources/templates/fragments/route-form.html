@@ -16,7 +16,7 @@
 
 			<div th:if="${formError}" class="alert alert-danger py-2" th:text="${formError}">error</div>
 
-			<form hx-post="/ui/routes" th:attr="hx-post=@{/ui/routes}"
+			<form hx-post="/ui/routes/db" th:attr="hx-post=@{/ui/routes/db}"
 				hx-target="#route-form-container" hx-swap="outerHTML">
 				<input type="hidden" name="id" th:value="${formRouteId}">
 
@@ -46,7 +46,7 @@
 					<div class="d-flex justify-content-between align-items-center mb-2">
 						<h3 class="h6 mb-0">Predicates</h3>
 						<button type="button" class="btn btn-sm btn-outline-secondary"
-							hx-get="/ui/predicate-row" th:attr="hx-get=@{/ui/predicate-row}"
+							hx-get="/ui/routes/db/predicate-row" th:attr="hx-get=@{/ui/routes/db/predicate-row}"
 							hx-target="#predicate-rows" hx-swap="beforeend">+ Add predicate</button>
 					</div>
 					<div id="predicate-rows" class="vstack gap-3"
@@ -61,7 +61,7 @@
 					<div class="d-flex justify-content-between align-items-center mb-2">
 						<h3 class="h6 mb-0">Filters</h3>
 						<button type="button" class="btn btn-sm btn-outline-secondary"
-							hx-get="/ui/filter-row" th:attr="hx-get=@{/ui/filter-row}"
+							hx-get="/ui/routes/db/filter-row" th:attr="hx-get=@{/ui/routes/db/filter-row}"
 							hx-target="#filter-rows" hx-swap="beforeend">+ Add filter</button>
 					</div>
 					<div id="filter-rows" class="vstack gap-3"
@@ -76,7 +76,7 @@
 					<button type="submit" class="btn btn-primary"
 						th:text="${editing} ? 'Update route' : 'Create route'">Create route</button>
 					<button th:if="${editing}" type="button" class="btn btn-outline-secondary"
-						hx-get="/ui/routes/new" th:attr="hx-get=@{/ui/routes/new}"
+						hx-get="/ui/routes/db/new" th:attr="hx-get=@{/ui/routes/db/new}"
 						hx-target="#route-form-container" hx-swap="outerHTML">Cancel</button>
 				</div>
 			</form>

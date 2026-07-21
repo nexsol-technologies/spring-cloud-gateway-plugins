@@ -30,7 +30,9 @@ import ch.nexsol.gateway.database.service.PredicateService;
 import ch.nexsol.gateway.database.service.RouteService;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
 
@@ -41,10 +43,21 @@ import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories;
  */
 @AutoConfiguration
 @Import({ DatabaseRouteDefinitionLocator.class, ControllerExceptionHandler.class, RouteController.class,
-		FilterController.class, PredicateController.class, RouteViewController.class, GatewayConfigService.class,
-		ApiService.class, RouteService.class, PredicateService.class, FilterService.class, ArgumentService.class })
+		FilterController.class, PredicateController.class, GatewayConfigService.class, ApiService.class,
+		RouteService.class, PredicateService.class, FilterService.class, ArgumentService.class })
 @EnableR2dbcRepositories(basePackages = "ch.nexsol.gateway.database.repository")
 @EntityScan(basePackages = "ch.nexsol.gateway.database.entity")
 public class GatewayDatabaseAutoConfiguration {
+
+	/**
+	 * Registers the management UI only when the gateway UI shell is on the classpath: the
+	 * view renders inside that shell, so without it only the REST API is exposed.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(name = "ch.nexsol.gateway.ui.nav.GatewayUiMenu")
+	@Import(RouteViewController.class)
+	static class RouteViewConfiguration {
+
+	}
 
 }

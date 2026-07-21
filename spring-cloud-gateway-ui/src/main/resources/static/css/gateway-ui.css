@@ -1,0 +1,180 @@
+/*
+ * Gateway UI shell: collapsible side menu.
+ * The layout is a flex row of a fixed-width sidebar and a growing content area.
+ * Collapsing is driven by the .gw-collapsed class toggled on .gw-shell.
+ */
+
+:root {
+	--gw-sidebar-width: 248px;
+	--gw-sidebar-width-collapsed: 64px;
+	--gw-sidebar-bg: #1f2937;
+	--gw-sidebar-fg: #cbd5e1;
+	--gw-sidebar-fg-muted: #94a3b8;
+	--gw-sidebar-active-bg: #2563eb;
+	--gw-sidebar-hover-bg: #334155;
+}
+
+.gw-shell {
+	display: flex;
+	min-height: 100vh;
+}
+
+/* Sidebar ----------------------------------------------------------------- */
+
+.gw-sidebar {
+	display: flex;
+	flex-direction: column;
+	flex: 0 0 var(--gw-sidebar-width);
+	width: var(--gw-sidebar-width);
+	height: 100vh;
+	position: sticky;
+	top: 0;
+	background: var(--gw-sidebar-bg);
+	color: var(--gw-sidebar-fg);
+	overflow: hidden;
+	transition: flex-basis .2s ease, width .2s ease;
+}
+
+.gw-collapsed .gw-sidebar {
+	flex-basis: var(--gw-sidebar-width-collapsed);
+	width: var(--gw-sidebar-width-collapsed);
+}
+
+.gw-sidebar-header {
+	display: flex;
+	align-items: center;
+	gap: .75rem;
+	padding: 1rem;
+	min-height: 60px;
+	border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.gw-brand {
+	display: flex;
+	align-items: center;
+	gap: .6rem;
+	font-weight: 600;
+	color: #fff;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.gw-brand .gw-icon {
+	color: #60a5fa;
+}
+
+.gw-toggle {
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border: 0;
+	border-radius: .375rem;
+	background: transparent;
+	color: var(--gw-sidebar-fg-muted);
+	cursor: pointer;
+	transition: background .15s ease, color .15s ease;
+}
+
+.gw-toggle:hover {
+	background: var(--gw-sidebar-hover-bg);
+	color: #fff;
+}
+
+.gw-collapsed .gw-brand-label {
+	display: none;
+}
+
+.gw-collapsed .gw-sidebar-header {
+	justify-content: center;
+	padding: 1rem .5rem;
+}
+
+.gw-collapsed .gw-toggle {
+	margin-left: 0;
+}
+
+/* Navigation -------------------------------------------------------------- */
+
+.gw-nav {
+	flex: 1 1 auto;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding: .5rem;
+	/* Thin scrollbar (Firefox). */
+	scrollbar-width: thin;
+	scrollbar-color: rgba(148, 163, 184, .4) transparent;
+}
+
+/* Thin scrollbar (WebKit/Blink). */
+.gw-nav::-webkit-scrollbar {
+	width: 6px;
+}
+
+.gw-nav::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.gw-nav::-webkit-scrollbar-thumb {
+	background: rgba(148, 163, 184, .35);
+	border-radius: 3px;
+}
+
+.gw-nav::-webkit-scrollbar-thumb:hover {
+	background: rgba(148, 163, 184, .6);
+}
+
+.gw-nav-link {
+	display: flex;
+	align-items: center;
+	gap: .85rem;
+	padding: .6rem .7rem;
+	margin-bottom: .15rem;
+	border-radius: .5rem;
+	color: var(--gw-sidebar-fg);
+	text-decoration: none;
+	white-space: nowrap;
+	overflow: hidden;
+	transition: background .15s ease, color .15s ease;
+}
+
+.gw-nav-link:hover {
+	background: var(--gw-sidebar-hover-bg);
+	color: #fff;
+}
+
+.gw-nav-link.active {
+	background: var(--gw-sidebar-active-bg);
+	color: #fff;
+}
+
+.gw-icon {
+	flex: 0 0 24px;
+	width: 24px;
+	height: 24px;
+}
+
+.gw-nav-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.gw-collapsed .gw-nav-label {
+	display: none;
+}
+
+.gw-collapsed .gw-nav-link {
+	justify-content: center;
+	padding: .6rem 0;
+}
+
+/* Content ----------------------------------------------------------------- */
+
+.gw-content {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 1.75rem 2rem;
+}

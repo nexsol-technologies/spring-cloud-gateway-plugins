@@ -8,7 +8,7 @@
 	<div class="d-flex gap-2 align-items-center">
 		<select class="form-select form-select-sm" th:name="|${kind}s[${row.index()}].name|"
 			hx-trigger="change" hx-swap="innerHTML"
-			th:attr="hx-get=|/ui/element-args/${kind}/${row.index()}|,hx-target=|#args-${row.index()}|">
+			th:attr="hx-get=|/ui/routes/db/element-args/${kind}/${row.index()}|,hx-target=|#args-${row.index()}|">
 			<option value="" th:selected="${row.name() == null}"
 				th:text="'Choose a ' + ${kind} + '...'">Choose...</option>
 			<option th:each="name : ${names}" th:value="${name}" th:text="${name}"

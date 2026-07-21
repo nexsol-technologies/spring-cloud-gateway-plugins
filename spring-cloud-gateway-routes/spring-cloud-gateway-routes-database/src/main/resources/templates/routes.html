@@ -1,16 +1,11 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Spring Cloud Gateway &mdash; Routes</title>
-	<link rel="stylesheet" th:href="@{/css/bootstrap.min.css}" href="/css/bootstrap.min.css">
-</head>
-<body class="bg-body-tertiary">
-	<div class="container py-4">
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Routes', ~{:: #routes-content}, ~{:: #routes-scripts})}">
+<body>
+	<div id="routes-content">
 		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1">Routes management</h1>
-			<p class="text-secondary mb-0">Manage your Spring Cloud Gateway routes dynamically.</p>
+			<h1 class="h3 fw-bold mb-1">Database routes</h1>
+			<p class="text-secondary mb-0">Manage the Spring Cloud Gateway routes stored in the database.</p>
 		</header>
 
 		<div class="row g-4">
@@ -21,30 +16,28 @@
 				<div th:replace="~{fragments/route-form :: form}"></div>
 			</div>
 		</div>
-	</div>
 
-	<div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+		<div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
 
-	<!-- Confirmation dialog used in place of the native window.confirm() for hx-confirm. -->
-	<div class="modal fade" id="confirm-modal" tabindex="-1" aria-labelledby="confirm-modal-title" aria-hidden="true">
-		<div class="modal-dialog modal-dialog-centered">
-			<div class="modal-content">
-				<div class="modal-header">
-					<h5 class="modal-title" id="confirm-modal-title">Please confirm</h5>
-					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-				</div>
-				<div class="modal-body" id="confirm-modal-body">Are you sure?</div>
-				<div class="modal-footer">
-					<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-					<button type="button" class="btn btn-danger" id="confirm-modal-ok">Delete</button>
+		<!-- Confirmation dialog used in place of the native window.confirm() for hx-confirm. -->
+		<div class="modal fade" id="confirm-modal" tabindex="-1" aria-labelledby="confirm-modal-title" aria-hidden="true">
+			<div class="modal-dialog modal-dialog-centered">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title" id="confirm-modal-title">Please confirm</h5>
+						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					</div>
+					<div class="modal-body" id="confirm-modal-body">Are you sure?</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+						<button type="button" class="btn btn-danger" id="confirm-modal-ok">Delete</button>
+					</div>
 				</div>
 			</div>
 		</div>
 	</div>
 
-	<script th:src="@{/js/htmx.min.js}" src="/js/htmx.min.js"></script>
-	<script th:src="@{/js/bootstrap.bundle.min.js}" src="/js/bootstrap.bundle.min.js"></script>
-	<script>
+	<script id="routes-scripts" th:inline="none">
 		// Bridge HTMX's HX-Trigger "showToast" events onto a Bootstrap toast.
 		document.body.addEventListener('showToast', function (evt) {
 			var detail = evt.detail || {};

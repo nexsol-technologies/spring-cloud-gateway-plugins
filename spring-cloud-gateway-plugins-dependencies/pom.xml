@@ -77,6 +77,11 @@
                 <artifactId>spring-cloud-gateway-hub-openapi</artifactId>
                 <version>${revision}</version>
             </dependency>
+            <dependency>
+                <groupId>ch.nexsol-tech.gateway</groupId>
+                <artifactId>spring-cloud-gateway-ui</artifactId>
+                <version>${revision}</version>
+            </dependency>
         </dependencies>
 
     </dependencyManagement>

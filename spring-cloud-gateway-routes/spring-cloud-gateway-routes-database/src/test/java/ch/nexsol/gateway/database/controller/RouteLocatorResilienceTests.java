@@ -57,7 +57,7 @@ class RouteLocatorResilienceTests {
 
 		this.webTestClient.get().uri("/css/bootstrap.min.css").exchange().expectStatus().isOk();
 		this.webTestClient.get().uri("/js/htmx.min.js").exchange().expectStatus().isOk();
-		this.webTestClient.get().uri("/ui").exchange().expectStatus().isOk();
+		this.webTestClient.get().uri("/ui/routes/db").exchange().expectStatus().isOk();
 	}
 
 }
