@@ -24,18 +24,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.kafka.core.KafkaTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 
 class KafkaAuditAutoConfigurationTests {
 
 	private final ApplicationContextRunner runner = new ApplicationContextRunner()
-		.withConfiguration(AutoConfigurations.of(AuditAutoConfiguration.class, KafkaAuditAutoConfiguration.class))
-		.withBean(ObjectMapper.class)
-		.withBean(KafkaTemplate.class, () -> mock(KafkaTemplate.class));
+		.withConfiguration(AutoConfigurations.of(KafkaAutoConfiguration.class, AuditAutoConfiguration.class,
+				KafkaAuditAutoConfiguration.class))
+		.withBean(ObjectMapper.class);
 
 	@Test
 	void registersKafkaPublisherWhenSelected() {

@@ -24,18 +24,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.r2dbc.autoconfigure.R2dbcAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.r2dbc.core.DatabaseClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 
 class R2dbcAuditAutoConfigurationTests {
 
 	private final ApplicationContextRunner runner = new ApplicationContextRunner()
-		.withConfiguration(AutoConfigurations.of(AuditAutoConfiguration.class, R2dbcAuditAutoConfiguration.class))
-		.withBean(ObjectMapper.class)
-		.withBean(DatabaseClient.class, () -> mock(DatabaseClient.class));
+		.withConfiguration(AutoConfigurations.of(R2dbcAutoConfiguration.class, AuditAutoConfiguration.class,
+				R2dbcAuditAutoConfiguration.class))
+		.withPropertyValues("spring.r2dbc.url=r2dbc:h2:mem:///audit")
+		.withBean(ObjectMapper.class);
 
 	@Test
 	void registersR2dbcPublisherWhenSelected() {

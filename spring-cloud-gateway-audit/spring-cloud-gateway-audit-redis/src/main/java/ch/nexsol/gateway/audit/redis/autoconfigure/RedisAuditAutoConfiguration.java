@@ -29,15 +29,18 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnSingleCandidate;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 
 /**
  * Registers the Redis {@link AuditEventPublisher} when {@code audit.provider=redis} and a
- * {@link ReactiveStringRedisTemplate} is available. Ordered before the core
- * auto-configuration so its publisher wins over the default one.
+ * {@link ReactiveStringRedisTemplate} is available. Ordered after
+ * {@link DataRedisReactiveAutoConfiguration} so the auto-configured template is already
+ * defined, and before the core auto-configuration so its publisher wins over the default
+ * one.
  */
-@AutoConfiguration(before = AuditAutoConfiguration.class)
+@AutoConfiguration(after = DataRedisReactiveAutoConfiguration.class, before = AuditAutoConfiguration.class)
 @ConditionalOnClass(ReactiveStringRedisTemplate.class)
 @ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.audit.provider", havingValue = "redis")
 public class RedisAuditAutoConfiguration {
