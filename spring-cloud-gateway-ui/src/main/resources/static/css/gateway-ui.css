@@ -178,3 +178,15 @@
 	min-width: 0;
 	padding: 1.75rem 2rem;
 }
+
+/* Traffic table ----------------------------------------------------------- */
+
+.gw-sortable {
+	cursor: pointer;
+	user-select: none;
+	white-space: nowrap;
+}
+
+.gw-sortable:hover {
+	color: var(--gw-sidebar-active-bg);
+}

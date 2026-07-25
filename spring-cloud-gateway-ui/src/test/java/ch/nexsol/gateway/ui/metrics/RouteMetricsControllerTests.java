@@ -52,6 +52,8 @@ class RouteMetricsControllerTests {
 			.expectBody(String.class)
 			.value((body) -> assertThat(body).contains("gw-sidebar")
 				.contains("id=\"gm-chart\"")
+				.contains("id=\"gm-tbody\"")
+				.contains("Where should I optimise?")
 				.contains(">Traffic</span>"));
 	}
 

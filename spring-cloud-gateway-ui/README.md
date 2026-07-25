@@ -30,19 +30,34 @@ CDN, offline friendly).
 
 ## Traffic view
 
-When Micrometer is on the classpath, a **Traffic** entry appears (`/ui/metrics`) plotting
-every gateway route as a bubble in an interactive chart (ECharts, vendored locally):
+When Micrometer is on the classpath, a **Traffic** entry appears (`/ui/metrics`), built
+from the gateway request metrics (`spring.cloud.gateway.requests`): calls, average and max
+latency, errors and error rate per route. The page reads top to bottom &mdash; summary,
+then map, then the exact numbers.
 
-* Each bubble is a route, positioned from its request metrics
-  (`spring.cloud.gateway.requests`): calls, average and max latency, errors, error rate.
-* The X, Y, Z and bubble-size axes are each mapped to a metric from the toolbar; bubble
-  colour follows the error rate (green &rarr; red).
-* A **3D** switch turns the scatter into a rotatable 3D plot (echarts-gl); **Auto** polls
-  the data every 5 seconds.
+**Summary** &mdash; routes called, total calls, weighted average latency, total 5xx.
 
-The chart is fed by `GET /ui/metrics/data` (JSON). The feature stays hidden when no meter
-registry is available, and shows an empty state until traffic has flowed through the
-gateway (gateway request metrics are enabled by default).
+**Map** &mdash; one bubble per route (ECharts, vendored locally). Rather than exposing raw
+axes, the chart answers a named question that also picks the metrics:
+
+| Question | Reads as |
+| --- | --- |
+| Where should I optimise? | calls &times; avg latency &mdash; top-right is busier *and* slower than the median route |
+| Where does it break? | calls &times; error rate &mdash; top-right fails on traffic that matters |
+| Which routes spike? | avg &times; max latency &mdash; outliers have a worst case far above their average |
+| Custom&hellip; | re-opens the raw X / Y / bubble-size pickers |
+
+Dashed lines mark the median of both axes and the four quadrants are labelled in place, so
+a bubble's position is readable without a legend. Bubble colour is the error rate
+(green &rarr; red), and each bubble is labelled with its route id. The **3D** switch adds a
+third metric on a rotatable Z axis (echarts-gl); **Auto** polls every 5 seconds.
+
+**All routes** &mdash; the same data as a sortable table (click any column) for the exact
+figures, with the error rate as a colour-coded badge.
+
+The view is fed by `GET /ui/metrics/data` (JSON). It stays hidden when no meter registry is
+available, and shows an empty state until traffic has flowed through the gateway (gateway
+request metrics are enabled by default).
 
 ## Menu entries (Spring Boot Admin style)
 
