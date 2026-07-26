@@ -22,7 +22,7 @@ import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
 import org.springdoc.core.properties.AbstractSwaggerUiConfigProperties.SwaggerUrl;
 import org.springdoc.core.properties.SwaggerUiConfigProperties;
 
-import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
+import org.springframework.cloud.gateway.event.RefreshRoutesResultEvent;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.event.EventListener;
 
@@ -49,12 +49,17 @@ public class SpringDocOpenapiRoutes {
 	}
 
 	/**
-	 * Rebuilds the Swagger UI URLs from the current OpenAPI discovery routes whenever the
-	 * gateway routes are refreshed.
-	 * @param event the route refresh event
+	 * Rebuilds the Swagger UI URLs from the OpenAPI discovery routes once the gateway has
+	 * refreshed its route table.
+	 * <p>
+	 * The result event is the one to listen to, not {@code RefreshRoutesEvent}: the
+	 * caching route locator refreshes its cache asynchronously, so reading the routes
+	 * when the refresh is only requested returns the previous table, and a service that
+	 * has just been discovered would be missing from the list until the next refresh.
+	 * @param event the result of the route refresh
 	 */
-	@EventListener
-	public void handleContextStart(RefreshRoutesEvent event) {
+	@EventListener(condition = "#event.success")
+	public void handleRoutesRefreshed(RefreshRoutesResultEvent event) {
 		this.routeLocator.getRoutes().filter((route) -> route.getId().startsWith(ROUTE_ID_PREFIX)).map((route) -> {
 			String name = (String) route.getMetadata().get("name");
 			return new SwaggerUrl(name, HubDiscoveryRouteLocator.API_DOCS_URL + "/" + name, null);
