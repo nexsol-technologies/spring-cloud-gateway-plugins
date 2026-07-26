@@ -43,8 +43,11 @@ what the application actually runs:
 ## Home page
 
 An overview of the gateway rather than a welcome text: the uptime, one tile per figure
-contributed by the active views (routes and their sources, calls, average latency, server
-errors, audited exchanges) and a link to every view that lit up.
+contributed by the active views (routes and their sources, calls, average latency, client
+errors, server errors, audited exchanges) and a link to every view that lit up.
+
+Client and server errors get a tile each, for the same reason the traffic view separates
+them: a wave of 404 and a backend outage are not the same news.
 
 The figures come from the views themselves: each one contributes an `OverviewContribution`
 bean declared next to it and guarded by the same condition, so the home page never
@@ -187,6 +190,10 @@ Dashed lines mark the median of both axes and the four quadrants are labelled in
 a bubble's position is readable without a legend. Bubble colour is the error rate
 (green &rarr; red), and each bubble is labelled with its route id. The **3D** switch adds a
 third metric on a rotatable Z axis (echarts-gl); **Auto** polls every 5 seconds.
+
+Each question also carries its Z axis, applied when the question is picked: *Who gets
+rejected?* plots the client errors, the others the server errors. It is only a starting
+point &mdash; changing Z afterwards sticks until another question is selected.
 
 **All routes** &mdash; the same data as a sortable table (click any column) for the exact
 figures, with the error rate as a colour-coded badge.

@@ -50,14 +50,18 @@ public class MetricsOverviewContribution implements OverviewContribution {
 	 */
 	static List<OverviewStat> toStats(List<RouteMetric> metrics) {
 		long calls = metrics.stream().mapToLong(RouteMetric::count).sum();
+		long clientErrors = metrics.stream().mapToLong(RouteMetric::clientErrorCount).sum();
 		long errors = metrics.stream().mapToLong(RouteMetric::errorCount).sum();
 		double totalMs = metrics.stream().mapToDouble((metric) -> metric.avgMs() * metric.count()).sum();
 		String latency = (calls > 0) ? Math.round(totalMs / calls) + " ms" : "—";
-		String errorDetail = (calls > 0) ? Math.round(1000.0 * errors / calls) / 10.0 + "% of calls"
-				: "no call recorded yet";
 		return List.of(new OverviewStat("Calls", String.valueOf(calls), metrics.size() + " route(s) called", 20),
 				new OverviewStat("Avg latency", latency, "weighted across every call", 30),
-				new OverviewStat("Server errors", String.valueOf(errors), errorDetail, 40));
+				new OverviewStat("Client errors", String.valueOf(clientErrors), shareOfCalls(clientErrors, calls), 35),
+				new OverviewStat("Server errors", String.valueOf(errors), shareOfCalls(errors, calls), 40));
+	}
+
+	private static String shareOfCalls(long responses, long calls) {
+		return (calls > 0) ? Math.round(1000.0 * responses / calls) / 10.0 + "% of calls" : "no call recorded yet";
 	}
 
 }

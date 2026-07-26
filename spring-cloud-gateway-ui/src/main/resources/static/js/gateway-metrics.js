@@ -28,7 +28,7 @@
 	// Each preset frames a question, then says how to read the resulting picture.
 	var PRESETS = {
 		optimise: {
-			x: 'count', y: 'avgMs', size: 'errorCount',
+			x: 'count', y: 'avgMs', size: 'errorCount', z: 'errorCount',
 			help: 'Right = called often, up = slow. The dashed lines are the median route, '
 				+ 'so anything in the top-right is both busier and slower than half your routes: '
 				+ 'that is where an optimisation pays off the most.',
@@ -40,7 +40,7 @@
 			}
 		},
 		failing: {
-			x: 'count', y: 'errorRate', size: 'errorCount',
+			x: 'count', y: 'errorRate', size: 'errorCount', z: 'errorCount',
 			help: 'Right = called often, up = fails often. Top-right routes fail on traffic that '
 				+ 'actually matters — fix those first. Bubble size is the absolute number of 5xx.',
 			quadrants: {
@@ -51,7 +51,7 @@
 			}
 		},
 		rejected: {
-			x: 'count', y: 'clientErrorRate', size: 'clientErrorCount',
+			x: 'count', y: 'clientErrorRate', size: 'clientErrorCount', z: 'clientErrorCount',
 			help: 'Right = called often, up = rejected often. These are 4xx: the caller was turned '
 				+ 'away, not the backend failing. A route high on this chart usually means a wrong '
 				+ 'path, a missing permission or a client calling it wrong — bubble size is the '
@@ -64,7 +64,7 @@
 			}
 		},
 		spikes: {
-			x: 'avgMs', y: 'maxMs', size: 'count',
+			x: 'avgMs', y: 'maxMs', size: 'count', z: 'errorCount',
 			help: 'Compares the typical response time (right) with the worst one seen (up). '
 				+ 'A bubble far above the others is a route whose worst case is much worse than '
 				+ 'its average: look for timeouts, cold starts or a slow dependency.',
@@ -417,7 +417,14 @@
 			});
 	}
 
-	['gm-preset', 'gm-x', 'gm-y', 'gm-size', 'gm-z', 'gm-3d'].forEach(function (id) {
+	sel('gm-preset').addEventListener('change', function () {
+		var config = preset();
+		if (config.z) {
+			sel('gm-z').value = config.z;
+		}
+		render();
+	});
+	['gm-x', 'gm-y', 'gm-size', 'gm-z', 'gm-3d'].forEach(function (id) {
 		sel(id).addEventListener('change', render);
 	});
 	sel('gm-refresh').addEventListener('click', load);
