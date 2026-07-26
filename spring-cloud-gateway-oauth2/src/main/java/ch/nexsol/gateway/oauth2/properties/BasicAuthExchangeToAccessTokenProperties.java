@@ -31,6 +31,8 @@ public class BasicAuthExchangeToAccessTokenProperties {
 
 	private Map<@NotEmpty String, @NotNull URI> tokenUris = new HashMap<>();
 
+	private boolean securityChainEnabled = true;
+
 	/**
 	 * Whether the given user (client id) has a configured token URI.
 	 * @param user the client id to look up
@@ -54,6 +56,24 @@ public class BasicAuthExchangeToAccessTokenProperties {
 	 */
 	public void setTokenUris(Map<String, URI> tokenUris) {
 		this.tokenUris = tokenUris;
+	}
+
+	/**
+	 * Whether the plugin contributes the security filter chain that lets the configured
+	 * Basic credentials through Spring Security so they can be exchanged.
+	 * @return {@code true} when the chain is contributed
+	 */
+	public boolean isSecurityChainEnabled() {
+		return this.securityChainEnabled;
+	}
+
+	/**
+	 * Set whether the plugin contributes its security filter chain.
+	 * @param securityChainEnabled {@code false} to declare the chain in the application
+	 * instead
+	 */
+	public void setSecurityChainEnabled(boolean securityChainEnabled) {
+		this.securityChainEnabled = securityChainEnabled;
 	}
 
 }
