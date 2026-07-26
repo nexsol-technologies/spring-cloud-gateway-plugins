@@ -30,6 +30,58 @@ spring.cloud.gateway.server.webflux.routes-openapi:
         - Retry=3
 ```
 
+### Sources declared in documents
+
+Sources do not have to live in the application configuration. `sources-locations` points at
+documents declaring further sources, which are added to the inline ones:
+
+```yaml
+spring.cloud.gateway.server.webflux.routes-openapi:
+  enabled: true
+  sources-locations:
+    - classpath:openapi/internal-apis.yaml
+    - file:/etc/gateway/partner-apis.yaml
+    - http://localhost:8888/gateway/default/main/team-apis.yaml
+  sources:                            # still available, and read first
+    - id: petstore
+      uri: https://petstore.example.org
+      spec-url: https://petstore.example.org/v3/api-docs
+```
+
+A location is anything the Spring resource resolver understands — `classpath:`, `file:` or
+an `http(s)` URL, patterns included (`classpath:openapi/*-apis.yaml`). An `http(s)` location
+is how a document **served by a Config Server** is reached, over its plain-text resource
+endpoint `/{name}/{profile}/{label}/{path}`:
+
+```yaml
+    - http://localhost:8888/gateway/default/main/team-apis.yaml
+```
+
+Note this is the *only* way Config Server can carry OpenAPI sources through this plugin: the
+[routes-configserver](../spring-cloud-gateway-routes-configserver/README.md) plugin parses
+route definitions, not sources, and would silently ignore a `sources:` document.
+
+A document is written exactly like the inline configuration — an array of sources, or an
+object with a `sources` array:
+
+```yaml
+sources:
+  - id: partner
+    uri: https://partner.example.org
+    spec-url: https://partner.example.org/v3/api-docs
+    mode: PER_OPERATION
+    base-path: /api/v3
+    metadata:
+      team: partners
+    filters:
+      - Retry=3
+```
+
+Documents are re-read on every reload, so a change is picked up by the `update-interval` or
+by `/actuator/refresh`. A document that cannot be read or parsed is **skipped with a warning**
+rather than dropping the sources the others declared — the same isolation the generator
+applies per source.
+
 ### Backend base path
 
 The OpenAPI operation paths are relative to the document `servers` base path, so the

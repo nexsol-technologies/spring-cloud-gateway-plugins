@@ -32,6 +32,7 @@ import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -69,10 +70,16 @@ class OpenApiRouteDefinitionLoaderTests {
 		return source;
 	}
 
+	private static OpenapiSourcesLoader sourcesOf(Source... sources) {
+		RoutesOpenapiProperties properties = new RoutesOpenapiProperties();
+		properties.setSources(List.of(sources));
+		return new OpenapiSourcesLoader(properties, new PathMatchingResourcePatternResolver());
+	}
+
 	@Test
 	void loaderAggregatesRoutesFromEverySource() {
 		OpenApiRouteDefinitionLoader loader = new OpenApiRouteDefinitionLoader(this.stubLoader,
-				new OpenApiRouteDefinitionMapper(), List.of(aggregatedSource()));
+				new OpenApiRouteDefinitionMapper(), sourcesOf(aggregatedSource()));
 
 		List<RouteDefinition> routes = loader.load();
 
@@ -92,7 +99,7 @@ class OpenApiRouteDefinitionLoaderTests {
 			return parse();
 		};
 		OpenApiRouteDefinitionLoader loader = new OpenApiRouteDefinitionLoader(partialLoader,
-				new OpenApiRouteDefinitionMapper(), List.of(failing, aggregatedSource()));
+				new OpenApiRouteDefinitionMapper(), sourcesOf(failing, aggregatedSource()));
 
 		List<RouteDefinition> routes = loader.load();
 
@@ -103,7 +110,7 @@ class OpenApiRouteDefinitionLoaderTests {
 	@Test
 	void locatorCachesRoutesAndPublishesRefreshEvent() {
 		OpenApiRouteDefinitionLoader loader = new OpenApiRouteDefinitionLoader(this.stubLoader,
-				new OpenApiRouteDefinitionMapper(), List.of(aggregatedSource()));
+				new OpenApiRouteDefinitionMapper(), sourcesOf(aggregatedSource()));
 		OpenApiRouteDefinitionLocator locator = new OpenApiRouteDefinitionLocator(loader, this.publisher);
 
 		StepVerifier.create(locator.getRouteDefinitions()).verifyComplete();

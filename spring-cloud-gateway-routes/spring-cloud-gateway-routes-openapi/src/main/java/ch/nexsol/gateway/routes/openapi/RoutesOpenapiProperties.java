@@ -47,6 +47,14 @@ public class RoutesOpenapiProperties {
 	 */
 	private List<Source> sources = new ArrayList<>();
 
+	/**
+	 * Locations of the documents declaring further sources, read on every reload and
+	 * added to the ones configured inline. Anything the resource resolver understands is
+	 * accepted: {@code classpath:}, {@code file:} or an {@code http(s)} URL, so a
+	 * document served by a Config Server is addressed like any other.
+	 */
+	private List<String> sourcesLocations = new ArrayList<>();
+
 	public boolean isEnabled() {
 		return this.enabled;
 	}
@@ -69,6 +77,14 @@ public class RoutesOpenapiProperties {
 
 	public void setSources(List<Source> sources) {
 		this.sources = sources;
+	}
+
+	public List<String> getSourcesLocations() {
+		return this.sourcesLocations;
+	}
+
+	public void setSourcesLocations(List<String> sourcesLocations) {
+		this.sourcesLocations = sourcesLocations;
 	}
 
 	/**
