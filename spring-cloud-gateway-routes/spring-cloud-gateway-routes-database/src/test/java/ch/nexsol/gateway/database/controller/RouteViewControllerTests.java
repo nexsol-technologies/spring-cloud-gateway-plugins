@@ -56,14 +56,16 @@ class RouteViewControllerTests {
 	@Test
 	void shouldRenderFullPage() {
 		this.webTestClient.get()
-			.uri("/ui")
+			.uri("/ui/routes/db")
 			.exchange()
 			.expectStatus()
 			.isOk()
 			.expectHeader()
 			.contentTypeCompatibleWith(MediaType.TEXT_HTML)
 			.expectBody(String.class)
-			.value((body) -> assertThat(body).contains("Routes management")
+			.value((body) -> assertThat(body).contains("gw-sidebar")
+				.contains("Database routes")
+				.contains("stored in the database")
 				.contains("Create a new route")
 				.contains("fake"));
 	}
@@ -71,7 +73,7 @@ class RouteViewControllerTests {
 	@Test
 	void shouldRenderRouteListFragment() {
 		this.webTestClient.get()
-			.uri("/ui/routes")
+			.uri("/ui/routes/db/list")
 			.exchange()
 			.expectStatus()
 			.isOk()
@@ -82,7 +84,7 @@ class RouteViewControllerTests {
 	@Test
 	void shouldRenderPredicateRowWithAvailablePredicates() {
 		this.webTestClient.get()
-			.uri("/ui/predicate-row")
+			.uri("/ui/routes/db/predicate-row")
 			.exchange()
 			.expectStatus()
 			.isOk()
@@ -93,7 +95,7 @@ class RouteViewControllerTests {
 	@Test
 	void shouldRenderElementArgsForSelectedPredicate() {
 		this.webTestClient.get()
-			.uri((builder) -> builder.path("/ui/element-args/predicate/0")
+			.uri((builder) -> builder.path("/ui/routes/db/element-args/predicate/0")
 				.queryParam("predicates[0].name", "Method")
 				.build())
 			.exchange()
@@ -108,7 +110,9 @@ class RouteViewControllerTests {
 		// Retry has only optional fields (no bean validation constraint): its inputs must
 		// not be marked required, so the user can leave statuses, methods, etc. empty.
 		this.webTestClient.get()
-			.uri((builder) -> builder.path("/ui/element-args/filter/0").queryParam("filters[0].name", "Retry").build())
+			.uri((builder) -> builder.path("/ui/routes/db/element-args/filter/0")
+				.queryParam("filters[0].name", "Retry")
+				.build())
 			.exchange()
 			.expectStatus()
 			.isOk()
@@ -118,7 +122,7 @@ class RouteViewControllerTests {
 		// AddRequestHeader constrains name and value: its inputs keep the required
 		// attribute.
 		this.webTestClient.get()
-			.uri((builder) -> builder.path("/ui/element-args/filter/1")
+			.uri((builder) -> builder.path("/ui/routes/db/element-args/filter/1")
 				.queryParam("filters[1].name", "AddRequestHeader")
 				.build())
 			.exchange()
@@ -139,7 +143,7 @@ class RouteViewControllerTests {
 		form.add("predicates[0].args[methods]", "GET");
 
 		this.webTestClient.post()
-			.uri("/ui/routes")
+			.uri("/ui/routes/db")
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData(form))
 			.exchange()
@@ -169,7 +173,7 @@ class RouteViewControllerTests {
 		form.add("predicates[0].args[methods]", "GET");
 
 		this.webTestClient.post()
-			.uri("/ui/routes")
+			.uri("/ui/routes/db")
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData(form))
 			.exchange()
@@ -196,7 +200,7 @@ class RouteViewControllerTests {
 		form.add("order", "0");
 
 		this.webTestClient.post()
-			.uri("/ui/routes")
+			.uri("/ui/routes/db")
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData(form))
 			.exchange()
@@ -225,7 +229,7 @@ class RouteViewControllerTests {
 		form.add("predicates[0].args[methods]", "");
 
 		this.webTestClient.post()
-			.uri("/ui/routes")
+			.uri("/ui/routes/db")
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData(form))
 			.exchange()
@@ -255,7 +259,7 @@ class RouteViewControllerTests {
 		form.add("predicates[0].args[matchTrailingSlash]", "sadfsdf");
 
 		this.webTestClient.post()
-			.uri("/ui/routes")
+			.uri("/ui/routes/db")
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData(form))
 			.exchange()
@@ -278,7 +282,7 @@ class RouteViewControllerTests {
 		Long id = this.routeRepository.findAll().blockFirst().getId();
 
 		this.webTestClient.delete()
-			.uri("/ui/routes/" + id)
+			.uri("/ui/routes/db/" + id)
 			.exchange()
 			.expectStatus()
 			.isOk()

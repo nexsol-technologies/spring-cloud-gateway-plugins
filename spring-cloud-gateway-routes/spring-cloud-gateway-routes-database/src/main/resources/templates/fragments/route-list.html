@@ -24,10 +24,10 @@
 						</div>
 						<div class="btn-group btn-group-sm">
 							<button type="button" class="btn btn-outline-primary"
-								th:attr="hx-get=@{/ui/routes/{id}/edit(id=${route.id()})}"
+								th:attr="hx-get=@{/ui/routes/db/{id}/edit(id=${route.id()})}"
 								hx-target="#route-form-container" hx-swap="outerHTML">Edit</button>
 							<button type="button" class="btn btn-outline-danger"
-								th:attr="hx-delete=@{/ui/routes/{id}(id=${route.id()})},hx-confirm=|Delete route '${route.routeId()}'?|"
+								th:attr="hx-delete=@{/ui/routes/db/{id}(id=${route.id()})},hx-confirm=|Delete route '${route.routeId()}'?|"
 								hx-target="#route-list" hx-swap="outerHTML">Delete</button>
 						</div>
 					</div>

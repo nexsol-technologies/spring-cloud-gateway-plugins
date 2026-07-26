@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:fragment="layout(title, content, scripts)">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title th:text="${title}">Spring Cloud Gateway</title>
+	<link rel="stylesheet" th:href="@{/css/bootstrap.min.css}" href="/css/bootstrap.min.css">
+	<link rel="stylesheet" th:href="@{/css/gateway-ui.css}" href="/css/gateway-ui.css">
+</head>
+<body class="bg-body-tertiary">
+	<!-- Inline SVG sprite: each NavItem references a symbol by id through its icon field. -->
+	<svg xmlns="http://www.w3.org/2000/svg" style="display: none" aria-hidden="true">
+		<symbol id="icon-gateway" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+			<!-- Routing connectors: one client on the left, three services on the right. -->
+			<path d="M4.9 12H9.25"/>
+			<path d="M14.75 12H19.1"/>
+			<path d="M14.75 10.6 19.3 5.9"/>
+			<path d="M14.75 13.4 19.3 18.1"/>
+			<!-- Gateway node. -->
+			<rect x="9.25" y="9.25" width="5.5" height="5.5" rx="1.4"/>
+			<!-- Client and service nodes. -->
+			<circle cx="3.4" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+			<circle cx="20.6" cy="5" r="1.5" fill="currentColor" stroke="none"/>
+			<circle cx="20.6" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+			<circle cx="20.6" cy="19" r="1.5" fill="currentColor" stroke="none"/>
+		</symbol>
+		<symbol id="icon-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>
+		</symbol>
+		<symbol id="icon-home" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/>
+		</symbol>
+		<symbol id="icon-plugin" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/>
+			<rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>
+		</symbol>
+		<symbol id="icon-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<path d="M4 4v16h16"/>
+			<circle cx="9" cy="14.5" r="1.7" fill="currentColor" stroke="none"/>
+			<circle cx="13.5" cy="9" r="1.7" fill="currentColor" stroke="none"/>
+			<circle cx="18" cy="12.5" r="1.7" fill="currentColor" stroke="none"/>
+		</symbol>
+	</svg>
+
+	<div class="gw-shell" id="gw-shell">
+		<aside class="gw-sidebar">
+			<div class="gw-sidebar-header">
+				<span class="gw-brand">
+					<svg class="gw-icon"><use href="#icon-gateway"></use></svg>
+					<span class="gw-brand-label">Gateway</span>
+				</span>
+				<button type="button" class="gw-toggle" id="gw-toggle" aria-label="Toggle menu"
+						aria-expanded="true">
+					<svg class="gw-icon"><use href="#icon-menu"></use></svg>
+				</button>
+			</div>
+			<nav class="gw-nav">
+				<a th:each="item : ${navItems}" class="gw-nav-link"
+						th:classappend="${item.id() == activeNav} ? 'active'"
+						th:href="@{${item.href()}}" th:title="${item.label()}" href="#">
+					<svg class="gw-icon"><use th:attr="href='#' + ${item.icon()}" href="#icon-plugin"></use></svg>
+					<span class="gw-nav-label" th:text="${item.label()}">Label</span>
+				</a>
+			</nav>
+		</aside>
+		<main class="gw-content">
+			<div th:replace="${content}">Page content</div>
+		</main>
+	</div>
+
+	<script th:src="@{/js/htmx.min.js}" src="/js/htmx.min.js"></script>
+	<script th:src="@{/js/bootstrap.bundle.min.js}" src="/js/bootstrap.bundle.min.js"></script>
+	<script th:src="@{/js/gateway-ui.js}" src="/js/gateway-ui.js"></script>
+	<!-- Page-specific scripts, injected after the vendor bundles so they can use them. -->
+	<th:block th:replace="${scripts}"></th:block>
+</body>
+</html>

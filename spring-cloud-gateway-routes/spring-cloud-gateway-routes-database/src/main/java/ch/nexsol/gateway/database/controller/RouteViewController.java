@@ -52,11 +52,12 @@ import org.springframework.web.server.ServerWebExchange;
 /**
  * Server-rendered Thymeleaf/HTMX user interface for managing gateway routes, backed by
  * the same {@link ApiService} and {@link GatewayConfigService} that power the REST API.
- * It serves the full page under {@code /ui} and the HTMX fragments used to refresh the
- * route list, build the form and load predicate/filter arguments dynamically.
+ * It serves the full page under {@code /ui/routes/db}, rendered inside the gateway UI
+ * shell, and the HTMX fragments used to refresh the route list, build the form and load
+ * predicate/filter arguments dynamically.
  */
 @Controller
-@RequestMapping("/ui")
+@RequestMapping("/ui/routes/db")
 public class RouteViewController {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RouteViewController.class);
@@ -93,6 +94,7 @@ public class RouteViewController {
 	public Mono<String> index(Model model) {
 		return addNames(model).then(reloadRoutes(model)).then(Mono.fromCallable(() -> {
 			populateEmptyForm(model);
+			model.addAttribute("activeNav", "routes");
 			return "routes";
 		}));
 	}
@@ -102,7 +104,7 @@ public class RouteViewController {
 	 * @param model the view model
 	 * @return the list fragment view name
 	 */
-	@GetMapping("/routes")
+	@GetMapping("/list")
 	public Mono<String> list(Model model) {
 		return reloadRoutes(model).thenReturn("fragments/route-list :: list");
 	}
@@ -113,7 +115,7 @@ public class RouteViewController {
 	 * @param model the view model
 	 * @return the form fragment view name
 	 */
-	@GetMapping("/routes/new")
+	@GetMapping("/new")
 	public Mono<String> newForm(Model model) {
 		return addNames(model).then(Mono.fromCallable(() -> {
 			populateEmptyForm(model);
@@ -127,7 +129,7 @@ public class RouteViewController {
 	 * @param model the view model
 	 * @return the form fragment view name
 	 */
-	@GetMapping("/routes/{id}/edit")
+	@GetMapping("/{id}/edit")
 	public Mono<String> editForm(@PathVariable Long id, Model model) {
 		return addNames(model).then(this.apiService.findById(id)).doOnNext((route) -> {
 			model.addAttribute("editing", true);
@@ -217,7 +219,7 @@ public class RouteViewController {
 	 * @return the combined form and list fragment on success, or the form fragment on
 	 * failure
 	 */
-	@PostMapping("/routes")
+	@PostMapping
 	public Mono<String> save(ServerWebExchange exchange, Model model) {
 		return exchange.getFormData().flatMap((form) -> {
 			String idParam = form.getFirst("id");
@@ -253,7 +255,7 @@ public class RouteViewController {
 	 * @param model the view model
 	 * @return the list fragment view name
 	 */
-	@DeleteMapping("/routes/{id}")
+	@DeleteMapping("/{id}")
 	public Mono<String> delete(@PathVariable Long id, ServerWebExchange exchange, Model model) {
 		return this.apiService.deleteRoute(id).then(reloadRoutes(model)).then(Mono.fromCallable(() -> {
 			triggerToast(exchange, "success", "Route deleted");

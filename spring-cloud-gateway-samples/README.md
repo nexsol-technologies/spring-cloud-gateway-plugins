@@ -33,9 +33,16 @@ To test, go to http://localhost:8181/swagger-ui.html and you should have access 
   <img src="doc/spring-cloud-gateway-openapi.png" alt="spring-cloud-gateway-openapi" width="50%"/>
 </p>
 
+#### spring-cloud-gateway-ui
+
+The sample bundles the `spring-cloud-gateway-ui` shell. Go to http://localhost:8181/ui for
+the home page and its collapsible side menu. Because the routes-database plugin is on the
+classpath, a **Database routes** entry lights up automatically and leads to the management UI.
+
 #### spring-cloud-gateway-routes-database
 
-To test, go to http://localhost:8181/ui and you should have access to the gui to manage routes:
+To test, go to http://localhost:8181/ui/routes/db (or open it from the **Database routes** menu entry)
+and you should have access to the gui to manage routes:
 <p align="center">
   <img src="../spring-cloud-gateway-routes/spring-cloud-gateway-routes-database/doc/spring-cloud-gateway-database-ui.png" alt="spring-cloud-gateway-openapi" width="50%"/>
 </p>

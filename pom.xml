@@ -79,6 +79,7 @@
 		<module>spring-cloud-gateway-filters</module>
 		<module>spring-cloud-gateway-oauth2</module>
 		<module>spring-cloud-gateway-hub-openapi</module>
+		<module>spring-cloud-gateway-ui</module>
 		<module>spring-cloud-gateway-samples</module>
 		<module>spring-cloud-gateway-plugins-dependencies</module>
 	</modules>
