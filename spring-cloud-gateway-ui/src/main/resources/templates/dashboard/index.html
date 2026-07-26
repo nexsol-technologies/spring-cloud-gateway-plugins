@@ -3,18 +3,51 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Home', ~{:: #gw-page}, ~{})}">
 <body>
 	<div id="gw-page">
-		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1">Spring Cloud Gateway</h1>
-			<p class="text-secondary mb-0">Welcome to the gateway control panel.</p>
+		<header class="mb-4 d-flex flex-wrap gap-3 align-items-baseline">
+			<div>
+				<h1 class="h3 fw-bold mb-1">Spring Cloud Gateway</h1>
+				<p class="text-secondary mb-0">Where the gateway stands right now.</p>
+			</div>
+			<div class="ms-auto text-secondary small">
+				up for <span class="fw-semibold" th:text="${uptime}">—</span>
+			</div>
 		</header>
 
+		<!-- One tile per contributed figure: routes, traffic and audit light up on their own. -->
+		<div class="row g-3 mb-3" th:if="${not #lists.isEmpty(stats)}">
+			<div class="col-6 col-lg-3" th:each="stat : ${stats}">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small" th:text="${stat.label()}">Label</div>
+						<div class="h4 fw-semibold mb-0" th:text="${stat.value()}">&mdash;</div>
+						<div class="text-secondary small mt-1" th:if="${stat.detail() != null}"
+								th:text="${stat.detail()}">detail</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Every menu entry but the home one: what this gateway actually has wired. -->
 		<div class="card border-0 shadow-sm">
 			<div class="card-body">
-				<h2 class="h5 fw-semibold">Home</h2>
-				<p class="text-secondary mb-0">
-					Use the side menu to navigate. Menu entries light up automatically for each
-					gateway plugin present on the classpath. Collapse the menu with the button in
-					the top-left corner to keep only the icons visible.
+				<h2 class="h6 fw-semibold mb-1">Views</h2>
+				<p class="text-secondary small mb-3">
+					Each gateway plugin on the classpath lights up its own entry, here and in the side
+					menu.
+				</p>
+				<div class="row g-2">
+					<div class="col-12 col-md-6 col-xl-4" th:each="item : ${navItems}"
+							th:if="${item.id() != 'home'}">
+						<a class="d-flex align-items-center gap-2 border rounded p-2 text-decoration-none text-body"
+								th:href="@{${item.href()}}" href="#">
+							<svg class="gw-icon text-primary"><use th:attr="href='#' + ${item.icon()}" href="#icon-plugin"></use></svg>
+							<span th:text="${item.label()}">Label</span>
+						</a>
+					</div>
+				</div>
+				<p class="text-secondary small mb-0 mt-3" th:if="${#lists.size(navItems) <= 1}">
+					No plugin view is active yet &mdash; add a gateway plugin to the classpath and its
+					entry appears here.
 				</p>
 			</div>
 		</div>

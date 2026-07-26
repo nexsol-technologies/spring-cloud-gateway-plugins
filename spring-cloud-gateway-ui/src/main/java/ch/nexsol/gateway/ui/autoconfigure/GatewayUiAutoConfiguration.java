@@ -16,28 +16,52 @@
 
 package ch.nexsol.gateway.ui.autoconfigure;
 
+import ch.nexsol.gateway.audit.AuditEventPublisher;
+import ch.nexsol.gateway.ui.audit.AuditOverviewContribution;
+import ch.nexsol.gateway.ui.audit.AuditTailBeanPostProcessor;
+import ch.nexsol.gateway.ui.audit.AuditTailBuffer;
+import ch.nexsol.gateway.ui.audit.AuditTailController;
 import ch.nexsol.gateway.ui.controller.DashboardController;
 import ch.nexsol.gateway.ui.controller.GatewayUiModelAttributes;
+import ch.nexsol.gateway.ui.metrics.MetricsOverviewContribution;
 import ch.nexsol.gateway.ui.metrics.RouteMetricsController;
 import ch.nexsol.gateway.ui.metrics.RouteMetricsService;
 import ch.nexsol.gateway.ui.nav.GatewayUiMenu;
 import ch.nexsol.gateway.ui.nav.NavItem;
+import ch.nexsol.gateway.ui.overview.OverviewContribution;
+import ch.nexsol.gateway.ui.overview.OverviewService;
+import ch.nexsol.gateway.ui.routes.RouteInventoryController;
+import ch.nexsol.gateway.ui.routes.RouteInventoryService;
+import ch.nexsol.gateway.ui.routes.RouteOverviewContribution;
+import ch.nexsol.gateway.ui.routes.RouteTesterController;
+import ch.nexsol.gateway.ui.routes.RouteTesterService;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
+import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
 /**
  * Auto-configuration wiring the gateway UI shell: the dashboard controller, the side-menu
- * registry and the built-in home entry.
+ * registry, the home page overview and the views whose prerequisites are on the
+ * classpath.
  * <p>
  * Plugins extend the menu, Spring Boot Admin style, by declaring their own
  * {@link NavItem} beans (typically guarded by {@code @ConditionalOnClass} or
- * {@code @ConditionalOnBean}); {@link GatewayUiMenu} gathers them automatically.
+ * {@code @ConditionalOnBean}); {@link GatewayUiMenu} gathers them automatically. The same
+ * goes for the home page figures, gathered from every {@link OverviewContribution} bean.
+ * <p>
+ * Each view is guarded by the presence of the types it is built on, and resolves the
+ * beans it reads through an {@link ObjectProvider}: a view whose source of data is absent
+ * reports that it has nothing to show rather than breaking the context.
  */
 @AutoConfiguration
 @Import({ DashboardController.class, GatewayUiModelAttributes.class })
@@ -51,6 +75,18 @@ public class GatewayUiAutoConfiguration {
 	@Bean
 	public GatewayUiMenu gatewayUiMenu(ObjectProvider<NavItem> navItems) {
 		return new GatewayUiMenu(navItems);
+	}
+
+	/**
+	 * Registers the home page aggregation over every contributed figure.
+	 * @param contributions the provider over every {@link OverviewContribution} bean
+	 * @param applicationContext the context the gateway uptime is read from
+	 * @return the overview service
+	 */
+	@Bean
+	public OverviewService overviewService(ObjectProvider<OverviewContribution> contributions,
+			ApplicationContext applicationContext) {
+		return new OverviewService(contributions, applicationContext);
 	}
 
 	/**
@@ -74,6 +110,85 @@ public class GatewayUiAutoConfiguration {
 	}
 
 	/**
+	 * Activates the routes view whenever the gateway route definition types are on the
+	 * classpath: it lists what every source contributed, so the effective route table can
+	 * be traced back to the configuration it came from.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(RouteDefinitionLocator.class)
+	@Import(RouteInventoryController.class)
+	static class RouteInventoryConfiguration {
+
+		/**
+		 * Registers the service listing the resolved route definitions per source.
+		 * @param locators the provider over every route definition source in the context
+		 * @param publisher the publisher used to ask the gateway to rebuild its route
+		 * table
+		 * @return the route inventory service
+		 */
+		@Bean
+		RouteInventoryService routeInventoryService(ObjectProvider<RouteDefinitionLocator> locators,
+				ApplicationEventPublisher publisher) {
+			return new RouteInventoryService(locators, publisher);
+		}
+
+		/**
+		 * Contributes the route figures to the home page.
+		 * @param inventoryService the route inventory service
+		 * @return the route overview contribution
+		 */
+		@Bean
+		RouteOverviewContribution routeOverviewContribution(RouteInventoryService inventoryService) {
+			return new RouteOverviewContribution(inventoryService);
+		}
+
+		/**
+		 * Contributes the routes entry to the side menu.
+		 * @return the routes menu entry
+		 */
+		@Bean
+		NavItem routesInventoryNavItem() {
+			return new NavItem("routes-all", "Routes", "icon-route", "/ui/routes", 5);
+		}
+
+	}
+
+	/**
+	 * Activates the route tester whenever the gateway route table type is on the
+	 * classpath: the view evaluates a described request against the very predicates the
+	 * gateway would apply.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(RouteLocator.class)
+	@Import(RouteTesterController.class)
+	static class RouteTesterConfiguration {
+
+		/**
+		 * Registers the service evaluating a request against the route table.
+		 * @param routeLocator the provider over the locator exposing the effective route
+		 * table
+		 * @param inventoryService the service resolving the definition behind a route
+		 * @param applicationContext the context exposed to the predicates under test
+		 * @return the route tester service
+		 */
+		@Bean
+		RouteTesterService routeTesterService(ObjectProvider<RouteLocator> routeLocator,
+				RouteInventoryService inventoryService, ApplicationContext applicationContext) {
+			return new RouteTesterService(routeLocator, inventoryService, applicationContext);
+		}
+
+		/**
+		 * Contributes the route tester entry to the side menu.
+		 * @return the route tester menu entry
+		 */
+		@Bean
+		NavItem routeTesterNavItem() {
+			return new NavItem("route-tester", "Route tester", "icon-target", "/ui/routes/test", 15);
+		}
+
+	}
+
+	/**
 	 * Activates the traffic bubble chart only when Micrometer is on the classpath: the
 	 * view plots the gateway routes from their request metrics read off the meter
 	 * registry.
@@ -94,12 +209,73 @@ public class GatewayUiAutoConfiguration {
 		}
 
 		/**
+		 * Contributes the traffic figures to the home page.
+		 * @param metricsService the metrics aggregation service
+		 * @return the traffic overview contribution
+		 */
+		@Bean
+		MetricsOverviewContribution metricsOverviewContribution(RouteMetricsService metricsService) {
+			return new MetricsOverviewContribution(metricsService);
+		}
+
+		/**
 		 * Contributes the traffic entry to the side menu.
 		 * @return the traffic menu entry
 		 */
 		@Bean
 		NavItem trafficNavItem() {
 			return new NavItem("traffic", "Traffic", "icon-chart", "/ui/metrics", 20);
+		}
+
+	}
+
+	/**
+	 * Activates the audit view only when the audit plugin is on the classpath: the view
+	 * tails the events on their way to whichever backend the plugin publishes to.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(AuditEventPublisher.class)
+	@Import(AuditTailController.class)
+	static class AuditTailConfiguration {
+
+		/**
+		 * Registers the bounded, in-memory tail of the recent audit events.
+		 * @return the audit tail buffer
+		 */
+		@Bean
+		AuditTailBuffer auditTailBuffer() {
+			return new AuditTailBuffer();
+		}
+
+		/**
+		 * Wraps the configured audit publisher so the published events also reach the
+		 * tail. Declared {@code static} because a bean post-processor must not force the
+		 * enclosing configuration to be created early.
+		 * @param buffer the provider over the audit tail buffer
+		 * @return the post-processor decorating the audit publisher
+		 */
+		@Bean
+		static BeanPostProcessor auditTailBeanPostProcessor(ObjectProvider<AuditTailBuffer> buffer) {
+			return new AuditTailBeanPostProcessor(buffer);
+		}
+
+		/**
+		 * Contributes the audit figures to the home page.
+		 * @param buffer the audit tail buffer
+		 * @return the audit overview contribution
+		 */
+		@Bean
+		AuditOverviewContribution auditOverviewContribution(AuditTailBuffer buffer) {
+			return new AuditOverviewContribution(buffer);
+		}
+
+		/**
+		 * Contributes the audit entry to the side menu.
+		 * @return the audit menu entry
+		 */
+		@Bean
+		NavItem auditNavItem() {
+			return new NavItem("audit", "Audit", "icon-list", "/ui/audit", 30);
 		}
 
 	}

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Routes', ~{:: #routes-content}, ~{:: #routes-scripts})}">
+<body>
+	<div id="routes-content">
+		<header class="mb-4">
+			<h1 class="h3 fw-bold mb-1">Routes</h1>
+			<p class="text-secondary mb-0">
+				Every route the gateway resolves, and the source it comes from &mdash; so you can tell
+				which configuration actually won.
+			</p>
+		</header>
+
+		<div class="card border-0 shadow-sm">
+			<div class="card-body">
+				<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+					<input type="search" id="gr-filter" class="form-control form-control-sm"
+							style="max-width: 18rem" placeholder="Filter by route id, target or source">
+					<div class="ms-auto d-flex gap-2">
+						<!--
+							The two actions have different targets, which is what their labels have to
+							carry: one refreshes what you see, the other what the gateway does.
+						-->
+						<button type="button" class="btn btn-sm btn-outline-secondary"
+								th:attr="hx-get=@{/ui/routes/list}" hx-get="/ui/routes/list"
+								hx-target="#gr-inventory" hx-swap="outerHTML"
+								title="Re-reads the route sources and updates this table only. Nothing changes for the traffic. Sources that cache a snapshot (files, Config Server) report what they last loaded.">
+							Refresh view
+						</button>
+						<button type="button" class="btn btn-sm btn-outline-primary"
+								th:attr="hx-post=@{/ui/routes/reload}" hx-post="/ui/routes/reload"
+								hx-target="#gr-inventory" hx-swap="outerHTML"
+								title="Asks the gateway to rebuild its route table from the current definitions, as the gateway actuator refresh endpoint does. This does not re-read a file or Config Server source.">
+							Rebuild gateway routes
+						</button>
+					</div>
+				</div>
+
+				<div th:replace="~{dashboard/fragments/route-inventory :: inventory}">Route table</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="routes-scripts">
+		<script th:src="@{/js/gateway-routes.js}" src="/js/gateway-routes.js"></script>
+	</div>
+</body>
+</html>

@@ -16,18 +16,32 @@
 
 package ch.nexsol.gateway.ui.controller;
 
+import ch.nexsol.gateway.ui.overview.OverviewService;
+import reactor.core.publisher.Mono;
+
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * Serves the gateway UI shell home page. The side menu is populated globally by
+ * Serves the gateway UI shell home page: an overview of the gateway built from the
+ * figures contributed by every enabled view. The side menu is populated globally by
  * {@link GatewayUiModelAttributes}, so plugin-contributed entries appear automatically.
  */
 @Controller
 @RequestMapping("/ui")
 public class DashboardController {
+
+	private final OverviewService overviewService;
+
+	/**
+	 * Creates the controller with the overview aggregation service.
+	 * @param overviewService the service gathering the figures shown on the home page
+	 */
+	public DashboardController(OverviewService overviewService) {
+		this.overviewService = overviewService;
+	}
 
 	/**
 	 * Renders the home page inside the shell.
@@ -35,9 +49,12 @@ public class DashboardController {
 	 * @return the home page view name
 	 */
 	@GetMapping
-	public String home(Model model) {
-		model.addAttribute("activeNav", "home");
-		return "dashboard/index";
+	public Mono<String> home(Model model) {
+		return this.overviewService.stats().doOnNext((stats) -> {
+			model.addAttribute("stats", stats);
+			model.addAttribute("uptime", this.overviewService.uptimeText());
+			model.addAttribute("activeNav", "home");
+		}).thenReturn("dashboard/index");
 	}
 
 }

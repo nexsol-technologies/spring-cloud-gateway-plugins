@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+	<!-- Verdict of one route test: the winner first, then every candidate in gateway order. -->
+	<div th:fragment="result" id="gt-result">
+		<div th:if="${report.error() != null}" class="alert alert-danger">
+			The request could not be built: <span th:text="${report.error()}">error</span>
+		</div>
+
+		<div th:if="${report.error() == null}">
+			<div class="alert d-flex flex-wrap gap-2 align-items-baseline"
+					th:classappend="${report.matchedRouteId() != null} ? 'alert-success' : 'alert-warning'">
+				<span class="badge text-bg-dark" th:text="${report.method()}">GET</span>
+				<code th:text="${report.uri()}">uri</code>
+				<span th:if="${report.matchedRouteId() != null}">
+					&rarr; handled by route <strong th:text="${report.matchedRouteId()}">id</strong>
+				</span>
+				<span th:if="${report.matchedRouteId() == null}">
+					&rarr; no route matches, the gateway would answer 404
+				</span>
+			</div>
+
+			<div class="card border-0 shadow-sm">
+				<div class="card-body">
+					<h2 class="h6 fw-semibold mb-3">
+						Candidates
+						<span class="text-secondary fw-normal small">
+							(evaluated in this order; the first match wins)
+						</span>
+					</h2>
+
+					<div th:each="route : ${report.routes()}" class="border rounded p-3 mb-2"
+							th:classappend="${route.routeId() == report.matchedRouteId()} ? 'border-success bg-success-subtle' : ''">
+						<div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+							<span class="badge"
+									th:classappend="${route.matched()} ? 'text-bg-success' : 'text-bg-secondary'"
+									th:text="${route.matched()} ? 'match' : 'no match'">no match</span>
+							<code th:text="${route.routeId()}">id</code>
+							<span class="text-secondary small">&rarr;</span>
+							<span class="text-secondary small text-break" th:text="${route.uri()}">uri</span>
+							<span class="badge text-bg-light border fw-normal ms-auto" th:if="${route.source() != null}"
+									th:text="${route.source()}">source</span>
+							<span class="text-secondary small">order <span th:text="${route.order()}">0</span></span>
+						</div>
+
+						<div th:if="${route.error() != null}" class="text-danger small mb-2">
+							Route predicate failed: <span th:text="${route.error()}">error</span>
+						</div>
+
+						<ul class="list-unstyled mb-0 small">
+							<li th:each="predicate : ${route.predicates()}" class="d-flex gap-2 align-items-baseline">
+								<span th:if="${predicate.error() == null}"
+										th:classappend="${predicate.matched()} ? 'text-success' : 'text-danger'"
+										th:text="${predicate.matched()} ? '✓' : '✗'">✗</span>
+								<span th:if="${predicate.error() != null}" class="text-warning">!</span>
+								<span class="text-break" th:text="${predicate.description()}">predicate</span>
+								<span th:if="${predicate.error() != null}" class="text-secondary"
+										th:text="'(' + ${predicate.error()} + ')'">(error)</span>
+							</li>
+							<li th:if="${#lists.isEmpty(route.predicates())}" class="text-secondary">
+								This route has no predicate the gateway can report individually.
+							</li>
+						</ul>
+
+						<div th:if="${route.routeId() == report.matchedRouteId() and not #lists.isEmpty(route.filters())}"
+								class="mt-2 pt-2 border-top">
+							<div class="text-secondary small mb-1">Filters applied</div>
+							<span th:each="filter : ${route.filters()}" class="gw-chip" th:text="${filter}">filter</span>
+						</div>
+					</div>
+
+					<div th:if="${#lists.isEmpty(report.routes())}" class="text-secondary text-center py-4">
+						The gateway route table is empty &mdash; there is nothing to match against.
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Route tester', ~{:: #tester-content}, ~{})}">
+<body>
+	<div id="tester-content">
+		<header class="mb-4">
+			<h1 class="h3 fw-bold mb-1">Route tester</h1>
+			<p class="text-secondary mb-0">
+				Describe a request and see which route would handle it, predicate by predicate.
+				Nothing is sent downstream.
+			</p>
+		</header>
+
+		<div class="card border-0 shadow-sm mb-3">
+			<div class="card-body">
+				<form th:attr="hx-post=@{/ui/routes/test}" hx-post="/ui/routes/test" hx-target="#gt-result"
+						hx-swap="outerHTML" hx-indicator="#gt-spinner">
+					<div class="row g-3">
+						<div class="col-6 col-md-2">
+							<label class="form-label small text-secondary mb-1" for="gt-method">Method</label>
+							<select id="gt-method" name="method" class="form-select form-select-sm">
+								<option value="GET" selected>GET</option>
+								<option value="POST">POST</option>
+								<option value="PUT">PUT</option>
+								<option value="PATCH">PATCH</option>
+								<option value="DELETE">DELETE</option>
+								<option value="HEAD">HEAD</option>
+								<option value="OPTIONS">OPTIONS</option>
+							</select>
+						</div>
+						<div class="col-12 col-md-10">
+							<label class="form-label small text-secondary mb-1" for="gt-path">Path</label>
+							<input type="text" id="gt-path" name="path" class="form-control form-control-sm"
+									value="/" placeholder="/api/v1/users?active=true" required>
+						</div>
+						<div class="col-12">
+							<label class="form-label small text-secondary mb-1" for="gt-headers">
+								Headers <span class="text-secondary">(one <code>Name: value</code> pair per line)</span>
+							</label>
+							<textarea id="gt-headers" name="headers" class="form-control form-control-sm"
+									rows="3" placeholder="Host: api.example.com&#10;Authorization: Bearer ..."></textarea>
+						</div>
+					</div>
+					<div class="d-flex align-items-center gap-3 mt-3">
+						<button type="submit" class="btn btn-sm btn-primary">Test</button>
+						<span id="gt-spinner" class="htmx-indicator spinner-border spinner-border-sm text-primary"
+								role="status" aria-hidden="true"></span>
+						<span class="text-secondary small">
+							The <code>Host</code> header, when set, is used as the request host.
+						</span>
+					</div>
+				</form>
+			</div>
+		</div>
+
+		<!-- Replaced in place by the result fragment on every test. -->
+		<div id="gt-result" class="text-secondary">
+			No test run yet.
+		</div>
+	</div>
+</body>
+</html>

@@ -190,3 +190,67 @@
 .gw-sortable:hover {
 	color: var(--gw-sidebar-active-bg);
 }
+
+/* Predicate / filter chips ------------------------------------------------ */
+
+/*
+ * Used wherever a route predicate or filter is listed (routes table, route tester):
+ * a compact monospace token so a long list still scans vertically.
+ *
+ * A rewrite filter carries a whole regexp and easily runs longer than any column, so a
+ * chip wraps rather than pushing the other columns out of shape. It only ever breaks
+ * mid-token when there is no other way to fit.
+ */
+.gw-chip {
+	display: inline-block;
+	max-width: 100%;
+	margin: 0 .25rem .25rem 0;
+	padding: .1rem .4rem;
+	border: 1px solid rgba(0, 0, 0, .1);
+	border-radius: .3rem;
+	background: rgba(0, 0, 0, .03);
+	font-family: var(--bs-font-monospace);
+	font-size: .78rem;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+/* Routes table ------------------------------------------------------------ */
+
+/*
+ * The table would rather scroll than squeeze: below this width the browser starts
+ * breaking URIs and predicates one character per line, so let .table-responsive
+ * scroll instead.
+ */
+.gw-routes {
+	min-width: 58rem;
+}
+
+.gw-routes .gw-col-route {
+	min-width: 14rem;
+}
+
+.gw-routes .gw-col-source,
+.gw-routes .gw-col-order {
+	white-space: nowrap;
+	width: 1%;
+}
+
+.gw-route-id {
+	overflow-wrap: anywhere;
+}
+
+/*
+ * Target of the route, under its id. Kept on a single line and cut with an ellipsis
+ * (the full value is in the title attribute): a target is there to be recognised at a
+ * glance, not read in full, and wrapping it was what made the column unreadable.
+ */
+.gw-target {
+	display: block;
+	max-width: 22rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--bs-secondary-color);
+	font-size: .8rem;
+}
