@@ -159,7 +159,18 @@ from the gateway request metrics (`spring.cloud.gateway.requests`): calls, avera
 latency, errors and error rate per route. The page reads top to bottom &mdash; summary,
 then map, then the exact numbers.
 
-**Summary** &mdash; routes called, total calls, weighted average latency, total 5xx.
+**Summary** &mdash; routes called, total calls, weighted average latency, total 4xx, total 5xx.
+
+**4xx and 5xx are counted apart.** A 4xx is the caller being turned away (unknown path,
+missing rights, malformed request); a 5xx is the gateway or the backend failing. Summing
+them would make a scanner hitting unknown paths look like an outage, so each has its own
+tile, its own column and its own axis. The bubble colour and the *Error rate* badge stay on
+the 5xx: they answer "is it broken", not "is it being refused".
+
+The **4xx** switch removes the client errors from the view entirely &mdash; tile, column,
+axis options and the question built on them &mdash; for reading the traffic as pure
+server-side health. A metric selection pointing at a hidden column falls back rather than
+plotting what was just removed.
 
 **Map** &mdash; one bubble per route (ECharts, vendored locally). Rather than exposing raw
 axes, the chart answers a named question that also picks the metrics:
@@ -167,7 +178,8 @@ axes, the chart answers a named question that also picks the metrics:
 | Question | Reads as |
 | --- | --- |
 | Where should I optimise? | calls &times; avg latency &mdash; top-right is busier *and* slower than the median route |
-| Where does it break? | calls &times; error rate &mdash; top-right fails on traffic that matters |
+| Where does it break? | calls &times; 5xx rate &mdash; top-right fails on traffic that matters |
+| Who gets rejected? | calls &times; 4xx rate &mdash; top-right is refused on traffic that matters (wrong path, missing permission) |
 | Which routes spike? | avg &times; max latency &mdash; outliers have a worst case far above their average |
 | Custom&hellip; | re-opens the raw X / Y / bubble-size pickers |
 

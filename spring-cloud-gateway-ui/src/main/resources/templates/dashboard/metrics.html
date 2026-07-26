@@ -10,7 +10,7 @@
 
 		<!-- Summary of the whole gateway, read before the detail below. -->
 		<div class="row g-3 mb-3">
-			<div class="col-6 col-lg-3">
+			<div class="col-6 col-lg">
 				<div class="card border-0 shadow-sm h-100">
 					<div class="card-body py-3">
 						<div class="text-secondary small">Routes called</div>
@@ -18,7 +18,7 @@
 					</div>
 				</div>
 			</div>
-			<div class="col-6 col-lg-3">
+			<div class="col-6 col-lg">
 				<div class="card border-0 shadow-sm h-100">
 					<div class="card-body py-3">
 						<div class="text-secondary small">Total calls</div>
@@ -26,7 +26,7 @@
 					</div>
 				</div>
 			</div>
-			<div class="col-6 col-lg-3">
+			<div class="col-6 col-lg">
 				<div class="card border-0 shadow-sm h-100">
 					<div class="card-body py-3">
 						<div class="text-secondary small">Avg latency</div>
@@ -34,10 +34,18 @@
 					</div>
 				</div>
 			</div>
-			<div class="col-6 col-lg-3">
+			<div class="col-6 col-lg gm-4xx">
 				<div class="card border-0 shadow-sm h-100">
 					<div class="card-body py-3">
-						<div class="text-secondary small">Errors (5xx)</div>
+						<div class="text-secondary small">Client errors (4xx)</div>
+						<div class="h4 fw-semibold mb-0" id="gm-kpi-client-errors">&mdash;</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-lg">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small">Server errors (5xx)</div>
 						<div class="h4 fw-semibold mb-0" id="gm-kpi-errors">&mdash;</div>
 					</div>
 				</div>
@@ -53,6 +61,7 @@
 						<select id="gm-preset" class="form-select form-select-sm" style="min-width: 14rem">
 							<option value="optimise" selected>Where should I optimise?</option>
 							<option value="failing">Where does it break?</option>
+							<option value="rejected" class="gm-4xx">Who gets rejected?</option>
 							<option value="spikes">Which routes spike?</option>
 							<option value="custom">Custom&hellip;</option>
 						</select>
@@ -64,8 +73,10 @@
 								<option value="count">Calls</option>
 								<option value="avgMs">Avg latency (ms)</option>
 								<option value="maxMs">Max latency (ms)</option>
-								<option value="errorCount">Errors</option>
-								<option value="errorRate">Error rate (%)</option>
+								<option value="clientErrorCount" class="gm-4xx">Client errors (4xx)</option>
+								<option value="clientErrorRate" class="gm-4xx">Client error rate (%)</option>
+								<option value="errorCount">Server errors (5xx)</option>
+								<option value="errorRate">Server error rate (%)</option>
 							</select>
 						</div>
 						<div>
@@ -74,8 +85,10 @@
 								<option value="count">Calls</option>
 								<option value="avgMs">Avg latency (ms)</option>
 								<option value="maxMs">Max latency (ms)</option>
-								<option value="errorCount">Errors</option>
-								<option value="errorRate">Error rate (%)</option>
+								<option value="clientErrorCount" class="gm-4xx">Client errors (4xx)</option>
+								<option value="clientErrorRate" class="gm-4xx">Client error rate (%)</option>
+								<option value="errorCount">Server errors (5xx)</option>
+								<option value="errorRate">Server error rate (%)</option>
 							</select>
 						</div>
 						<div>
@@ -84,8 +97,10 @@
 								<option value="count">Calls</option>
 								<option value="avgMs">Avg latency (ms)</option>
 								<option value="maxMs">Max latency (ms)</option>
-								<option value="errorCount">Errors</option>
-								<option value="errorRate">Error rate (%)</option>
+								<option value="clientErrorCount" class="gm-4xx">Client errors (4xx)</option>
+								<option value="clientErrorRate" class="gm-4xx">Client error rate (%)</option>
+								<option value="errorCount">Server errors (5xx)</option>
+								<option value="errorRate">Server error rate (%)</option>
 							</select>
 						</div>
 					</div>
@@ -95,11 +110,17 @@
 							<option value="count">Calls</option>
 							<option value="avgMs">Avg latency (ms)</option>
 							<option value="maxMs">Max latency (ms)</option>
-							<option value="errorCount" selected>Errors</option>
-							<option value="errorRate">Error rate (%)</option>
+							<option value="clientErrorCount" class="gm-4xx">Client errors (4xx)</option>
+							<option value="clientErrorRate" class="gm-4xx">Client error rate (%)</option>
+							<option value="errorCount" selected>Server errors (5xx)</option>
+							<option value="errorRate">Server error rate (%)</option>
 						</select>
 					</div>
 					<div class="ms-auto d-flex align-items-center gap-3">
+						<div class="form-check form-switch mb-0">
+							<input class="form-check-input" type="checkbox" role="switch" id="gm-show-4xx" checked>
+							<label class="form-check-label small" for="gm-show-4xx">4xx</label>
+						</div>
 						<div class="form-check form-switch mb-0">
 							<input class="form-check-input" type="checkbox" role="switch" id="gm-3d">
 							<label class="form-check-label small" for="gm-3d">3D</label>
@@ -139,7 +160,8 @@
 								<th class="gw-sortable text-end" data-sort="count">Calls</th>
 								<th class="gw-sortable text-end" data-sort="avgMs">Avg (ms)</th>
 								<th class="gw-sortable text-end" data-sort="maxMs">Max (ms)</th>
-								<th class="gw-sortable text-end" data-sort="errorCount">Errors</th>
+								<th class="gw-sortable text-end gm-4xx" data-sort="clientErrorCount">4xx</th>
+								<th class="gw-sortable text-end" data-sort="errorCount">5xx</th>
 								<th class="gw-sortable text-end" data-sort="errorRate">Error rate</th>
 							</tr>
 						</thead>

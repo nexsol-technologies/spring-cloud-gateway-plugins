@@ -105,6 +105,26 @@ class RouteMetricsServiceTests {
 	}
 
 	@Test
+	void countsClientErrorsApartFromServerErrors() {
+		SimpleMeterRegistry registry = new SimpleMeterRegistry();
+		for (String status : List.of("200", "403", "404", "500")) {
+			Timer.builder(RouteMetricsService.REQUESTS_METER)
+				.tags("routeId", "orders", "httpStatusCode", status)
+				.register(registry)
+				.record(10, TimeUnit.MILLISECONDS);
+		}
+
+		RouteMetric orders = serviceFor(registry).collect().get(0);
+
+		assertThat(orders.count()).isEqualTo(4);
+		// 403 and 404 are the caller being turned away, not the backend failing.
+		assertThat(orders.clientErrorCount()).isEqualTo(2);
+		assertThat(orders.clientErrorRate()).isCloseTo(0.5, offset(0.001));
+		assertThat(orders.errorCount()).isEqualTo(1);
+		assertThat(orders.errorRate()).isCloseTo(0.25, offset(0.001));
+	}
+
+	@Test
 	void excludesTheOpenapiDocumentationRoutesByDefault() {
 		SimpleMeterRegistry registry = registryWith("orders", "openapi-docs-discovery-petstore",
 				"openapi-docs-discovery-SERVICE-A");

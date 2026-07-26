@@ -54,10 +54,6 @@ public class RouteMetricsService {
 	/**
 	 * Creates the service reading from the (optional) meter registry.
 	 * @param meterRegistry the provider over the application meter registry
-	 */
-	/**
-	 * Creates the service.
-	 * @param meterRegistry the provider over the application meter registry
 	 * @param properties the traffic view configuration, holding the route exclusions
 	 */
 	public RouteMetricsService(ObjectProvider<MeterRegistry> meterRegistry, RouteMetricsProperties properties) {
@@ -108,7 +104,11 @@ public class RouteMetricsService {
 			accumulator.count += count;
 			accumulator.totalMs += timer.totalTime(TimeUnit.MILLISECONDS);
 			accumulator.maxMs = Math.max(accumulator.maxMs, timer.max(TimeUnit.MILLISECONDS));
-			if (isServerError(timer.getId().getTag("httpStatusCode"))) {
+			String status = timer.getId().getTag("httpStatusCode");
+			if (isStatusClass(status, '4')) {
+				accumulator.clientErrorCount += count;
+			}
+			else if (isStatusClass(status, '5')) {
 				accumulator.errorCount += count;
 			}
 		}
@@ -119,8 +119,8 @@ public class RouteMetricsService {
 			.toList();
 	}
 
-	private static boolean isServerError(String httpStatusCode) {
-		return httpStatusCode != null && httpStatusCode.length() == 3 && httpStatusCode.charAt(0) == '5';
+	private static boolean isStatusClass(String httpStatusCode, char leadingDigit) {
+		return httpStatusCode != null && httpStatusCode.length() == 3 && httpStatusCode.charAt(0) == leadingDigit;
 	}
 
 	/**
@@ -137,12 +137,16 @@ public class RouteMetricsService {
 
 		private double maxMs;
 
+		private long clientErrorCount;
+
 		private long errorCount;
 
 		private RouteMetric toMetric(String routeId) {
 			double avgMs = (this.count > 0) ? this.totalMs / this.count : 0.0;
+			double clientErrorRate = (this.count > 0) ? (double) this.clientErrorCount / this.count : 0.0;
 			double errorRate = (this.count > 0) ? (double) this.errorCount / this.count : 0.0;
-			return new RouteMetric(routeId, this.uri, this.count, avgMs, this.maxMs, this.errorCount, errorRate);
+			return new RouteMetric(routeId, this.uri, this.count, avgMs, this.maxMs, this.clientErrorCount,
+					clientErrorRate, this.errorCount, errorRate);
 		}
 
 	}

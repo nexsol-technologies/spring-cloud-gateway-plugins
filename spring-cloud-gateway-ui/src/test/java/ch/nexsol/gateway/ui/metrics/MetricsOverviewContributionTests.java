@@ -29,8 +29,8 @@ class MetricsOverviewContributionTests {
 	void weightsTheLatencyByTheCallsEachRouteTook() {
 		// 10 calls at 100 ms and 90 calls at 10 ms average out at 19 ms, not at 55 ms.
 		List<OverviewStat> stats = MetricsOverviewContribution
-			.toStats(List.of(new RouteMetric("slow", "http://slow", 10, 100.0, 150.0, 0, 0.0),
-					new RouteMetric("fast", "http://fast", 90, 10.0, 20.0, 9, 0.1)));
+			.toStats(List.of(new RouteMetric("slow", "http://slow", 10, 100.0, 150.0, 0, 0.0, 0, 0.0),
+					new RouteMetric("fast", "http://fast", 90, 10.0, 20.0, 5, 0.055, 9, 0.1)));
 
 		assertThat(stats).extracting(OverviewStat::label).containsExactly("Calls", "Avg latency", "Server errors");
 		assertThat(stats.get(0).value()).isEqualTo("100");
