@@ -23,6 +23,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import ch.nexsol.gateway.routes.openapi.RoutesOpenapiProperties.Source;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -59,13 +60,14 @@ public class OpenApiRouteDefinitionMapper {
 			return List.of();
 		}
 		String basePath = resolveBasePath(source, openApi);
+		String pathPrefix = normalizeBasePath(source.getPathPrefix());
 		return switch (source.getMode()) {
-			case PER_OPERATION -> perOperation(source, paths, basePath);
-			case AGGREGATED -> aggregated(source, paths, basePath);
+			case PER_OPERATION -> perOperation(source, paths, basePath, pathPrefix);
+			case AGGREGATED -> aggregated(source, paths, basePath, pathPrefix);
 		};
 	}
 
-	private List<RouteDefinition> perOperation(Source source, Paths paths, String basePath) {
+	private List<RouteDefinition> perOperation(Source source, Paths paths, String basePath, String pathPrefix) {
 		List<RouteDefinition> routes = new ArrayList<>();
 		for (Map.Entry<String, PathItem> pathEntry : paths.entrySet()) {
 			String path = pathEntry.getKey();
@@ -74,9 +76,9 @@ public class OpenApiRouteDefinitionMapper {
 				.entrySet()) {
 				HttpMethod method = operationEntry.getKey();
 				RouteDefinition route = newRoute(source,
-						operationRouteId(source, method, path, operationEntry.getValue()), basePath);
+						operationRouteId(source, method, path, operationEntry.getValue()), basePath, pathPrefix);
 				List<PredicateDefinition> predicates = new ArrayList<>();
-				predicates.add(new PredicateDefinition("Path=" + path));
+				predicates.add(new PredicateDefinition("Path=" + pathPrefix + path));
 				predicates.add(new PredicateDefinition("Method=" + method.name()));
 				route.setPredicates(predicates);
 				routes.add(route);
@@ -85,14 +87,15 @@ public class OpenApiRouteDefinitionMapper {
 		return routes;
 	}
 
-	private List<RouteDefinition> aggregated(Source source, Paths paths, String basePath) {
+	private List<RouteDefinition> aggregated(Source source, Paths paths, String basePath, String pathPrefix) {
 		Set<String> methods = new LinkedHashSet<>();
 		for (PathItem item : paths.values()) {
 			item.readOperationsMap().keySet().forEach((method) -> methods.add(method.name()));
 		}
-		RouteDefinition route = newRoute(source, source.getId(), basePath);
+		RouteDefinition route = newRoute(source, source.getId(), basePath, pathPrefix);
 		List<PredicateDefinition> predicates = new ArrayList<>();
-		predicates.add(new PredicateDefinition("Path=" + String.join(",", paths.keySet())));
+		String prefixed = paths.keySet().stream().map((path) -> pathPrefix + path).collect(Collectors.joining(","));
+		predicates.add(new PredicateDefinition("Path=" + prefixed));
 		if (!methods.isEmpty()) {
 			predicates.add(new PredicateDefinition("Method=" + String.join(",", methods)));
 		}
@@ -100,11 +103,17 @@ public class OpenApiRouteDefinitionMapper {
 		return List.of(route);
 	}
 
-	private RouteDefinition newRoute(Source source, String id, String basePath) {
+	private RouteDefinition newRoute(Source source, String id, String basePath, String pathPrefix) {
 		RouteDefinition route = new RouteDefinition();
 		route.setId(id);
 		route.setUri(source.getUri());
 		List<FilterDefinition> filters = new ArrayList<>();
+		// Filters apply in declaration order: drop the gateway-side prefix, then prepend
+		// the base path the backend expects. RewritePath rather than StripPrefix, so the
+		// route names the prefix it removes instead of removing whatever sits first.
+		if (!pathPrefix.isEmpty()) {
+			filters.add(new FilterDefinition("RewritePath=" + pathPrefix + "(?<remaining>/?.*), ${remaining}"));
+		}
 		// Operation paths are relative to the server base path; prepend it to reach the
 		// real backend endpoint.
 		if (!basePath.isEmpty()) {

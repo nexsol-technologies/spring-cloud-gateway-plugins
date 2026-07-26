@@ -15,14 +15,20 @@
 		count: 'Calls',
 		avgMs: 'Avg latency (ms)',
 		maxMs: 'Max latency (ms)',
-		errorCount: 'Errors',
-		errorRate: 'Error rate (%)'
+		clientErrorCount: 'Client errors (4xx)',
+		clientErrorRate: 'Client error rate (%)',
+		errorCount: 'Server errors (5xx)',
+		errorRate: 'Server error rate (%)'
 	};
+
+	// 4xx and 5xx answer different questions, so the view can be read without the client
+	// errors: the switch hides their tile, their column and their axes.
+	var CLIENT_ERROR_KEYS = ['clientErrorCount', 'clientErrorRate'];
 
 	// Each preset frames a question, then says how to read the resulting picture.
 	var PRESETS = {
 		optimise: {
-			x: 'count', y: 'avgMs', size: 'errorCount',
+			x: 'count', y: 'avgMs', size: 'errorCount', z: 'errorCount',
 			help: 'Right = called often, up = slow. The dashed lines are the median route, '
 				+ 'so anything in the top-right is both busier and slower than half your routes: '
 				+ 'that is where an optimisation pays off the most.',
@@ -34,7 +40,7 @@
 			}
 		},
 		failing: {
-			x: 'count', y: 'errorRate', size: 'errorCount',
+			x: 'count', y: 'errorRate', size: 'errorCount', z: 'errorCount',
 			help: 'Right = called often, up = fails often. Top-right routes fail on traffic that '
 				+ 'actually matters — fix those first. Bubble size is the absolute number of 5xx.',
 			quadrants: {
@@ -44,8 +50,21 @@
 				bl: 'Quiet & healthy'
 			}
 		},
+		rejected: {
+			x: 'count', y: 'clientErrorRate', size: 'clientErrorCount', z: 'clientErrorCount',
+			help: 'Right = called often, up = rejected often. These are 4xx: the caller was turned '
+				+ 'away, not the backend failing. A route high on this chart usually means a wrong '
+				+ 'path, a missing permission or a client calling it wrong — bubble size is the '
+				+ 'absolute number of 4xx.',
+			quadrants: {
+				tr: 'Busy & rejected — check auth or paths',
+				tl: 'Rejected but rarely called',
+				br: 'Busy & accepted',
+				bl: 'Quiet & accepted'
+			}
+		},
 		spikes: {
-			x: 'avgMs', y: 'maxMs', size: 'count',
+			x: 'avgMs', y: 'maxMs', size: 'count', z: 'errorCount',
 			help: 'Compares the typical response time (right) with the worst one seen (up). '
 				+ 'A bubble far above the others is a route whose worst case is much worse than '
 				+ 'its average: look for timeouts, cold starts or a slow dependency.',
@@ -65,14 +84,45 @@
 		return document.getElementById(id);
 	}
 
+	function showClientErrors() {
+		var toggle = sel('gm-show-4xx');
+		return !toggle || toggle.checked;
+	}
+
+	// Hides everything the client errors feed: their tile, their table column, their axis
+	// options and the question built on them. A selection left pointing at a hidden metric
+	// falls back rather than plotting a column the reader just asked to remove.
+	function applyClientErrorFilter() {
+		var shown = showClientErrors();
+		Array.prototype.forEach.call(document.querySelectorAll('.gm-4xx'), function (element) {
+			if (element.tagName === 'OPTION') {
+				element.hidden = !shown;
+				element.disabled = !shown;
+			}
+			else {
+				element.style.display = shown ? '' : 'none';
+			}
+		});
+		if (!shown) {
+			if (sel('gm-preset').value === 'rejected') {
+				sel('gm-preset').value = 'optimise';
+			}
+			['gm-x', 'gm-y', 'gm-size', 'gm-z'].forEach(function (id) {
+				if (CLIENT_ERROR_KEYS.indexOf(sel(id).value) >= 0) {
+					sel(id).value = (id === 'gm-x') ? 'count' : 'errorCount';
+				}
+			});
+		}
+	}
+
 	function preset() {
 		return PRESETS[sel('gm-preset').value] || PRESETS.optimise;
 	}
 
 	// Value actually plotted / displayed for a metric key.
 	function value(row, key) {
-		if (key === 'errorRate') {
-			return Math.round(row.errorRate * 1000) / 10;
+		if (key === 'errorRate' || key === 'clientErrorRate') {
+			return Math.round(row[key] * 1000) / 10;
 		}
 		if (key === 'avgMs' || key === 'maxMs') {
 			return Math.round(row[key] * 10) / 10;
@@ -144,7 +194,9 @@
 			+ '<br>Calls: ' + row.count
 			+ '<br>Avg: ' + row.avgMs.toFixed(1) + ' ms'
 			+ '<br>Max: ' + row.maxMs.toFixed(1) + ' ms'
-			+ '<br>Errors: ' + row.errorCount + ' (' + (row.errorRate * 100).toFixed(1) + '%)';
+			+ (showClientErrors()
+				? '<br>4xx: ' + row.clientErrorCount + ' (' + (row.clientErrorRate * 100).toFixed(1) + '%)' : '')
+			+ '<br>5xx: ' + row.errorCount + ' (' + (row.errorRate * 100).toFixed(1) + '%)';
 	}
 
 	function point(row, keys, sizeFn, sizeKey) {
@@ -260,16 +312,19 @@
 
 	function renderKpis() {
 		var calls = 0;
+		var clientErrors = 0;
 		var errors = 0;
 		var weighted = 0;
 		rows.forEach(function (row) {
 			calls += row.count;
+			clientErrors += row.clientErrorCount;
 			errors += row.errorCount;
 			weighted += row.avgMs * row.count;
 		});
 		sel('gm-kpi-routes').textContent = rows.length;
 		sel('gm-kpi-calls').textContent = calls;
 		sel('gm-kpi-avg').textContent = calls ? (weighted / calls).toFixed(1) + ' ms' : '—';
+		sel('gm-kpi-client-errors').textContent = clientErrors;
 		sel('gm-kpi-errors').textContent = errors;
 	}
 
@@ -300,6 +355,9 @@
 			tr.appendChild(cell(row.count, true));
 			tr.appendChild(cell(row.avgMs.toFixed(1), true));
 			tr.appendChild(cell(row.maxMs.toFixed(1), true));
+			if (showClientErrors()) {
+				tr.appendChild(cell(row.clientErrorCount, true));
+			}
 			tr.appendChild(cell(row.errorCount, true));
 			var rate = document.createElement('td');
 			rate.className = 'text-end';
@@ -315,6 +373,7 @@
 	}
 
 	function render() {
+		applyClientErrorFilter();
 		var config = preset();
 		var isCustom = sel('gm-preset').value === 'custom';
 		var is3d = sel('gm-3d').checked;
@@ -358,10 +417,18 @@
 			});
 	}
 
-	['gm-preset', 'gm-x', 'gm-y', 'gm-size', 'gm-z', 'gm-3d'].forEach(function (id) {
+	sel('gm-preset').addEventListener('change', function () {
+		var config = preset();
+		if (config.z) {
+			sel('gm-z').value = config.z;
+		}
+		render();
+	});
+	['gm-x', 'gm-y', 'gm-size', 'gm-z', 'gm-3d'].forEach(function (id) {
 		sel(id).addEventListener('change', render);
 	});
 	sel('gm-refresh').addEventListener('click', load);
+	sel('gm-show-4xx').addEventListener('change', render);
 	sel('gm-auto').addEventListener('change', function () {
 		if (sel('gm-auto').checked) {
 			pollTimer = setInterval(load, 5000);

@@ -1,0 +1,11 @@
+# A document declaring OpenAPI sources, in the same shape as the inline configuration.
+sources:
+  - id: partner
+    uri: https://partner.example.org
+    spec-url: https://partner.example.org/v3/api-docs
+    mode: PER_OPERATION
+    base-path: /api/v3
+    metadata:
+      team: partners
+    filters:
+      - Retry=3

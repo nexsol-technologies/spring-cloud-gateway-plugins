@@ -56,6 +56,11 @@
 			<artifactId>swagger-core-jakarta</artifactId>
 			<version>${swagger-core.version}</version>
 		</dependency>
+		<!-- Reads the documents the 'sources-locations' point at. -->
+		<dependency>
+			<groupId>tools.jackson.dataformat</groupId>
+			<artifactId>jackson-dataformat-yaml</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-configuration-processor</artifactId>

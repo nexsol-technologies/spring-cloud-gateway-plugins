@@ -21,6 +21,7 @@ import ch.nexsol.gateway.routes.openapi.OpenApiRouteDefinitionLoader;
 import ch.nexsol.gateway.routes.openapi.OpenApiRouteDefinitionLocator;
 import ch.nexsol.gateway.routes.openapi.OpenApiRouteDefinitionMapper;
 import ch.nexsol.gateway.routes.openapi.OpenApiSpecLoader;
+import ch.nexsol.gateway.routes.openapi.OpenapiSourcesLoader;
 import ch.nexsol.gateway.routes.openapi.RouteOpenapiLifecycle;
 import ch.nexsol.gateway.routes.openapi.RoutesOpenapiProperties;
 
@@ -30,6 +31,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.io.support.ResourcePatternResolver;
 
 /**
  * Auto-configuration wiring the OpenAPI-based route definition locator when
@@ -68,10 +70,23 @@ public class RoutesOpenapiAutoConfiguration {
 	 * @param properties the OpenAPI locator properties
 	 * @return the loader bean
 	 */
+	/**
+	 * Registers the resolver of the configured sources: the inline ones, plus those
+	 * declared in the documents the locations point at.
+	 * @param properties the OpenAPI locator properties
+	 * @param resolver the resolver used to reach the documents
+	 * @return the sources loader bean
+	 */
+	@Bean
+	@ConditionalOnMissingBean
+	OpenapiSourcesLoader openapiSourcesLoader(RoutesOpenapiProperties properties, ResourcePatternResolver resolver) {
+		return new OpenapiSourcesLoader(properties, resolver);
+	}
+
 	@Bean
 	OpenApiRouteDefinitionLoader openApiRouteDefinitionLoader(OpenApiSpecLoader specLoader,
-			OpenApiRouteDefinitionMapper mapper, RoutesOpenapiProperties properties) {
-		return new OpenApiRouteDefinitionLoader(specLoader, mapper, properties.getSources());
+			OpenApiRouteDefinitionMapper mapper, OpenapiSourcesLoader sourcesLoader) {
+		return new OpenApiRouteDefinitionLoader(specLoader, mapper, sourcesLoader);
 	}
 
 	/**

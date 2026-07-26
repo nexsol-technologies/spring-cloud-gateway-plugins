@@ -50,6 +50,18 @@
 			<version>${revision}</version>
 			<optional>true</optional>
 		</dependency>
+		<!-- Optional: the hub contributes its own security filter chain when the
+		     application secures the gateway with Spring Security. -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-config</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-web</artifactId>
+			<optional>true</optional>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>

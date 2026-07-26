@@ -21,6 +21,7 @@ import ch.nexsol.gateway.filter.factory.AuthorizationGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.ConvertHttpMethodGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.RecaptchaGatewayFilterFactory;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -76,14 +77,16 @@ public class FiltersAutoConfiguration {
 
 	/**
 	 * Provides a default {@link WebClient} for reCAPTCHA verification when none is
-	 * already defined.
-	 * @param builder the web client builder
+	 * already defined. The client is derived from the application
+	 * {@link WebClient.Builder} when one is available, so that this module stays usable
+	 * without the WebClient auto-configuration on the classpath.
+	 * @param webClientBuilder the optional application web client builder
 	 * @return the web client bean
 	 */
 	@Bean
 	@ConditionalOnMissingBean(WebClient.class)
-	WebClient webClientForRecaptcha(WebClient.Builder builder) {
-		return builder.build();
+	WebClient webClientForRecaptcha(ObjectProvider<WebClient.Builder> webClientBuilder) {
+		return webClientBuilder.getIfAvailable(WebClient::builder).build();
 	}
 
 }

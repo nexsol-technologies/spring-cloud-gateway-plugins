@@ -1,2 +1,3 @@
 ch.nexsol.gateway.oauth2.autoconfigure.FiltersAutoConfiguration
+ch.nexsol.gateway.oauth2.autoconfigure.BasicAuthExchangeSecurityAutoConfiguration
 ch.nexsol.gateway.oauth2.autoconfigure.ResourceServerAutoConfiguration

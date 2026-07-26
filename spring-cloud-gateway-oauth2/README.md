@@ -47,7 +47,7 @@ It implements a token expiration-based caching mechanism to optimize performance
 <ul>
 <li>Basic to Bearer Conversion: Replaces Basic authentication with Bearer authentication for downstream services.</li>
 <li>Client Credentials Flow: Uses the standard OAuth 2.0 Client Credentials Grant flow.</li>
-<li>Caching: Caches the access token in memory, relying on the JWT expiration date (exp) to ensure only valid tokens are used.</li>
+<li>Caching: Caches the access token in memory, relying on the JWT expiration date (exp) to ensure only valid tokens are used. The application <code>CacheManager</code> is used when there is one, otherwise the filter falls back to its own in-memory cache: no caching setup is required in the host application.</li>
 </ul>  
 
 usage:
@@ -61,24 +61,31 @@ spring.cloud.gateway.server.webflux:
         user3: https://keycloak/realms/test/protocol/openid-connect/token
 ```
 
-#### Spring Security Integration Example
+#### Spring Security Integration
 
-To integrate this filter into the Spring Security WebFlux chain, you typically define a security filter chain that is conditionally activated only when a Basic Authorization header is detected. The custom filter is then added before the standard authentication process.
+The plugin contributes the security filter chain itself, as soon as at least one `token-uris`
+entry is configured: it matches the requests carrying the Basic credentials of a configured
+client, disables the standard HTTP Basic authentication for them, and inserts the exchange
+filter before authentication. Nothing has to be declared in the application.
 
+The chain is ordered at `BasicAuthExchangeSecurityAutoConfiguration.BASIC_AUTH_EXCHANGE_CHAIN_ORDER`
+(`Ordered.HIGHEST_PRECEDENCE + 200`), ahead of the chains an application usually declares from `@Order(1)`.
+
+Two escape hatches:
+
+* declare your own bean named `basicAuthExchangeSecurityWebFilterChain` — the plugin backs off;
+* or turn the chain off entirely:
+
+```yaml
+spring.cloud.gateway.server.webflux:
+  webfilter:
+    basicauth-exchange-oauth2:
+      security-chain-enabled: false
 ```
-@Bean
-@Order(1)
-@Conditional(BasicAuthExchangeConfiguredCondition.class)
-SecurityWebFilterChain basicWebFilterChain(ServerHttpSecurity http,
-        BasicAuthExchangeToAccessTokenProperties properties,
-        BasicAuthExchangeToAccessTokenGatewayWebFilter basicAuthExchangeGatewayWebFilter) {
-...
-    http.securityMatcher(SecurityUtils.authorizationHeaderBasicMatcher(properties));
-    http.addFilterBefore(basicAuthExchangeGatewayWebFilter, SecurityWebFiltersOrder.AUTHENTICATION);
-    return http.build();
-}
 
-```
+> As with any `SecurityWebFilterChain` bean, its presence makes Spring Boot back off from its
+> default "everything authenticated" chain. An application that was relying on that default
+> must declare its own chains.
 
 
 ## Converter for GrantedAuthority

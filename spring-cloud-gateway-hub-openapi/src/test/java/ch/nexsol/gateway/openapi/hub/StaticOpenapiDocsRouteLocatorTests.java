@@ -19,6 +19,7 @@ package ch.nexsol.gateway.openapi.hub;
 import java.net.URI;
 import java.util.List;
 
+import ch.nexsol.gateway.routes.openapi.OpenapiSourcesLoader;
 import ch.nexsol.gateway.routes.openapi.RoutesOpenapiProperties;
 import ch.nexsol.gateway.routes.openapi.RoutesOpenapiProperties.Source;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import reactor.test.StepVerifier;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cloud.gateway.filter.FilterDefinition;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -39,13 +41,15 @@ class StaticOpenapiDocsRouteLocatorTests {
 
 	@SuppressWarnings("unchecked")
 	private StaticOpenapiDocsRouteLocator locatorFor(RoutesOpenapiProperties properties) {
-		ObjectProvider<RoutesOpenapiProperties> provider = mock(ObjectProvider.class);
-		when(provider.getIfAvailable()).thenReturn(properties);
+		ObjectProvider<OpenapiSourcesLoader> provider = mock(ObjectProvider.class);
+		OpenapiSourcesLoader loader = (properties != null)
+				? new OpenapiSourcesLoader(properties, new PathMatchingResourcePatternResolver()) : null;
+		when(provider.getIfAvailable()).thenReturn(loader);
 		return new StaticOpenapiDocsRouteLocator(provider);
 	}
 
 	@Test
-	void emitsNothingWhenPropertiesAbsent() {
+	void emitsNothingWhenTheRouteGeneratorIsAbsent() {
 		StepVerifier.create(locatorFor(null).getRouteDefinitions()).verifyComplete();
 	}
 
@@ -70,6 +74,53 @@ class StaticOpenapiDocsRouteLocatorTests {
 			assertThat(route.getFilters().get(0).getArgs().values()).contains("/v3/api-docs/petstore",
 					"/api/v3/openapi.json");
 		}).verifyComplete();
+	}
+
+	@Test
+	void emitsDocumentationRouteForSourcesDeclaredInADocument() {
+		// Sources configured through 'sources-locations' generate routes, so they must
+		// reach the aggregated Swagger UI exactly like the inline ones.
+		RoutesOpenapiProperties properties = new RoutesOpenapiProperties();
+		properties.setSourcesLocations(List.of("classpath:openapi/hub-sources.yaml"));
+
+		StepVerifier.create(locatorFor(properties).getRouteDefinitions()).assertNext((route) -> {
+			assertThat(route.getId()).isEqualTo("openapi-docs-discovery-from-document");
+			assertThat(route.getMetadata()).containsEntry("name", "from-document");
+		}).verifyComplete();
+	}
+
+	@Test
+	void advertisesThePathPrefixSoTheConsoleCallsTheGeneratedRoutes() {
+		// The generated routes live under the prefix, so the served contract must
+		// advertise it: otherwise "Try it out" calls the bare contract paths, which is
+		// exactly what the prefix moved away.
+		RoutesOpenapiProperties properties = new RoutesOpenapiProperties();
+		Source source = new Source();
+		source.setId("patients");
+		source.setUri(URI.create("https://patient-service.example.org"));
+		source.setSpecUrl("https://patient-service.example.org/v3/api-docs");
+		source.setPathPrefix("/patient-service");
+		properties.setSources(List.of(source));
+
+		StepVerifier.create(locatorFor(properties).getRouteDefinitions()).assertNext((route) -> {
+			FilterDefinition rewriteServers = route.getFilters().get(1);
+			assertThat(rewriteServers.getName()).isEqualTo("OpenapiModifyResponseBody");
+			assertThat(rewriteServers.getArgs().values()).contains("/patient-service");
+		}).verifyComplete();
+	}
+
+	@Test
+	void advertisesTheGatewayRootWhenNoPrefixIsConfigured() {
+		RoutesOpenapiProperties properties = new RoutesOpenapiProperties();
+		Source source = new Source();
+		source.setId("petstore");
+		source.setUri(URI.create("https://petstore3.swagger.io"));
+		source.setSpecUrl("https://petstore3.swagger.io/api/v3/openapi.json");
+		properties.setSources(List.of(source));
+
+		StepVerifier.create(locatorFor(properties).getRouteDefinitions())
+			.assertNext((route) -> assertThat(route.getFilters().get(1).getArgs().values()).contains("/"))
+			.verifyComplete();
 	}
 
 	@Test

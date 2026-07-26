@@ -33,11 +33,26 @@ import static org.mockito.Mockito.when;
 
 class RouteMetricsServiceTests {
 
-	@SuppressWarnings("unchecked")
 	private RouteMetricsService serviceFor(MeterRegistry registry) {
+		return serviceFor(registry, new RouteMetricsProperties());
+	}
+
+	@SuppressWarnings("unchecked")
+	private RouteMetricsService serviceFor(MeterRegistry registry, RouteMetricsProperties properties) {
 		ObjectProvider<MeterRegistry> provider = mock(ObjectProvider.class);
 		when(provider.getIfAvailable()).thenReturn(registry);
-		return new RouteMetricsService(provider);
+		return new RouteMetricsService(provider, properties);
+	}
+
+	private static SimpleMeterRegistry registryWith(String... routeIds) {
+		SimpleMeterRegistry registry = new SimpleMeterRegistry();
+		for (String routeId : routeIds) {
+			Timer.builder(RouteMetricsService.REQUESTS_METER)
+				.tags("routeId", routeId, "httpStatusCode", "200")
+				.register(registry)
+				.record(10, TimeUnit.MILLISECONDS);
+		}
+		return registry;
 	}
 
 	@Test
@@ -87,6 +102,81 @@ class RouteMetricsServiceTests {
 	@Test
 	void returnsEmptyWhenNoRegistryIsAvailable() {
 		assertThat(serviceFor(null).collect()).isEmpty();
+	}
+
+	@Test
+	void countsClientErrorsApartFromServerErrors() {
+		SimpleMeterRegistry registry = new SimpleMeterRegistry();
+		for (String status : List.of("200", "403", "404", "500")) {
+			Timer.builder(RouteMetricsService.REQUESTS_METER)
+				.tags("routeId", "orders", "httpStatusCode", status)
+				.register(registry)
+				.record(10, TimeUnit.MILLISECONDS);
+		}
+
+		RouteMetric orders = serviceFor(registry).collect().get(0);
+
+		assertThat(orders.count()).isEqualTo(4);
+		// 403 and 404 are the caller being turned away, not the backend failing.
+		assertThat(orders.clientErrorCount()).isEqualTo(2);
+		assertThat(orders.clientErrorRate()).isCloseTo(0.5, offset(0.001));
+		assertThat(orders.errorCount()).isEqualTo(1);
+		assertThat(orders.errorRate()).isCloseTo(0.25, offset(0.001));
+	}
+
+	@Test
+	void excludesTheOpenapiDocumentationRoutesByDefault() {
+		SimpleMeterRegistry registry = registryWith("orders", "openapi-docs-discovery-petstore",
+				"openapi-docs-discovery-SERVICE-A");
+
+		List<RouteMetric> metrics = serviceFor(registry).collect();
+
+		assertThat(metrics).extracting(RouteMetric::routeId).containsExactly("orders");
+	}
+
+	@Test
+	void excludesEveryRouteMatchingAConfiguredExpression() {
+		RouteMetricsProperties properties = new RouteMetricsProperties();
+		properties.setExcludedRoutes(List.of("internal_.*", ".*_healthcheck"));
+		SimpleMeterRegistry registry = registryWith("orders", "internal_metrics", "billing_healthcheck");
+
+		List<RouteMetric> metrics = serviceFor(registry, properties).collect();
+
+		assertThat(metrics).extracting(RouteMetric::routeId).containsExactly("orders");
+	}
+
+	@Test
+	void matchesTheWholeRouteIdRatherThanAFragment() {
+		RouteMetricsProperties properties = new RouteMetricsProperties();
+		properties.setExcludedRoutes(List.of("docs"));
+		SimpleMeterRegistry registry = registryWith("docs", "docs-public");
+
+		List<RouteMetric> metrics = serviceFor(registry, properties).collect();
+
+		assertThat(metrics).extracting(RouteMetric::routeId).containsExactly("docs-public");
+	}
+
+	@Test
+	void showsEveryRouteWhenTheExclusionsAreCleared() {
+		RouteMetricsProperties properties = new RouteMetricsProperties();
+		properties.setExcludedRoutes(List.of());
+		SimpleMeterRegistry registry = registryWith("orders", "openapi-docs-discovery-petstore");
+
+		List<RouteMetric> metrics = serviceFor(registry, properties).collect();
+
+		assertThat(metrics).extracting(RouteMetric::routeId)
+			.containsExactlyInAnyOrder("orders", "openapi-docs-discovery-petstore");
+	}
+
+	@Test
+	void keepsTheUsableExpressionsWhenOneIsMalformed() {
+		RouteMetricsProperties properties = new RouteMetricsProperties();
+		properties.setExcludedRoutes(List.of("[unclosed", "internal_.*"));
+		SimpleMeterRegistry registry = registryWith("orders", "internal_metrics");
+
+		List<RouteMetric> metrics = serviceFor(registry, properties).collect();
+
+		assertThat(metrics).extracting(RouteMetric::routeId).containsExactly("orders");
 	}
 
 }

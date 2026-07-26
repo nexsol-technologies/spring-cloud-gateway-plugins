@@ -42,10 +42,33 @@
 			<version>${revision}</version>
 			<optional>true</optional>
 		</dependency>
+		<!-- Optional: the shell contributes its own security filter chain when the
+		     application secures the gateway with Spring Security. -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-config</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-web</artifactId>
+			<optional>true</optional>
+		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!--
+			The OpenAPI view activates on a class name of the hub plugin. Depending on it in
+			test scope keeps that condition honest: a renamed class breaks the test, not the
+			application.
+		-->
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-hub-openapi</artifactId>
+			<version>${revision}</version>
 			<scope>test</scope>
 		</dependency>
 		<!--

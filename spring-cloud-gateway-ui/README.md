@@ -43,8 +43,11 @@ what the application actually runs:
 ## Home page
 
 An overview of the gateway rather than a welcome text: the uptime, one tile per figure
-contributed by the active views (routes and their sources, calls, average latency, server
-errors, audited exchanges) and a link to every view that lit up.
+contributed by the active views (routes and their sources, calls, average latency, client
+errors, server errors, audited exchanges) and a link to every view that lit up.
+
+Client and server errors get a tile each, for the same reason the traffic view separates
+them: a wave of 404 and a backend outage are not the same news.
 
 The figures come from the views themselves: each one contributes an `OverviewContribution`
 bean declared next to it and guarded by the same condition, so the home page never
@@ -159,7 +162,18 @@ from the gateway request metrics (`spring.cloud.gateway.requests`): calls, avera
 latency, errors and error rate per route. The page reads top to bottom &mdash; summary,
 then map, then the exact numbers.
 
-**Summary** &mdash; routes called, total calls, weighted average latency, total 5xx.
+**Summary** &mdash; routes called, total calls, weighted average latency, total 4xx, total 5xx.
+
+**4xx and 5xx are counted apart.** A 4xx is the caller being turned away (unknown path,
+missing rights, malformed request); a 5xx is the gateway or the backend failing. Summing
+them would make a scanner hitting unknown paths look like an outage, so each has its own
+tile, its own column and its own axis. The bubble colour and the *Error rate* badge stay on
+the 5xx: they answer "is it broken", not "is it being refused".
+
+The **4xx** switch removes the client errors from the view entirely &mdash; tile, column,
+axis options and the question built on them &mdash; for reading the traffic as pure
+server-side health. A metric selection pointing at a hidden column falls back rather than
+plotting what was just removed.
 
 **Map** &mdash; one bubble per route (ECharts, vendored locally). Rather than exposing raw
 axes, the chart answers a named question that also picks the metrics:
@@ -167,7 +181,8 @@ axes, the chart answers a named question that also picks the metrics:
 | Question | Reads as |
 | --- | --- |
 | Where should I optimise? | calls &times; avg latency &mdash; top-right is busier *and* slower than the median route |
-| Where does it break? | calls &times; error rate &mdash; top-right fails on traffic that matters |
+| Where does it break? | calls &times; 5xx rate &mdash; top-right fails on traffic that matters |
+| Who gets rejected? | calls &times; 4xx rate &mdash; top-right is refused on traffic that matters (wrong path, missing permission) |
 | Which routes spike? | avg &times; max latency &mdash; outliers have a worst case far above their average |
 | Custom&hellip; | re-opens the raw X / Y / bubble-size pickers |
 
@@ -176,12 +191,45 @@ a bubble's position is readable without a legend. Bubble colour is the error rat
 (green &rarr; red), and each bubble is labelled with its route id. The **3D** switch adds a
 third metric on a rotatable Z axis (echarts-gl); **Auto** polls every 5 seconds.
 
+Each question also carries its Z axis, applied when the question is picked: *Who gets
+rejected?* plots the client errors, the others the server errors. It is only a starting
+point &mdash; changing Z afterwards sticks until another question is selected.
+
 **All routes** &mdash; the same data as a sortable table (click any column) for the exact
 figures, with the error rate as a colour-coded badge.
 
 The view is fed by `GET /ui/metrics/data` (JSON). It stays hidden when no meter registry is
 available, and shows an empty state until traffic has flowed through the gateway (gateway
 request metrics are enabled by default).
+
+### Excluding routes
+
+Some routes carry no traffic worth reading &mdash; the documentation routes the OpenAPI hub
+publishes are contracts being fetched, not usage. They are left out by default:
+
+```yaml
+spring.cloud.gateway.server.webflux.ui.traffic:
+  excluded-routes:
+    - openapi-docs-.*            # the default
+```
+
+Each entry is a regular expression matched against the **route id**, and the whole id must
+match (`docs` excludes `docs`, not `docs-public`). Setting the property replaces the default
+list, so keep `openapi-docs-.*` if you want to keep hiding them:
+
+```yaml
+spring.cloud.gateway.server.webflux.ui.traffic:
+  excluded-routes:
+    - openapi-docs-.*
+    - internal_.*
+    - .*_healthcheck
+```
+
+An empty list shows every route. A malformed expression is dropped with a warning rather
+than failing the application &mdash; losing a filter beats a gateway that does not start.
+
+The exclusion applies to the whole view: the summary, the map, the table and the traffic
+figures on the home page all read the same filtered set.
 
 ## Menu entries (Spring Boot Admin style)
 
@@ -227,3 +275,65 @@ The sidebar is populated automatically for every rendered view by `GatewayUiMode
 (a `@ControllerAdvice` exposing `navItems`); the controller only sets `activeNav` to its
 own entry id. The database routes management page (`spring-cloud-gateway-routes-database`)
 is wired exactly this way and shows up under `/ui/routes/db`.
+
+## OpenAPI view
+
+When [spring-cloud-gateway-hub-openapi](../spring-cloud-gateway-hub-openapi/README.md) is on
+the classpath **and** enabled, the shell lights up an `OpenAPI` entry serving the contracts
+the hub aggregates, rendered with [Scalar](https://github.com/scalar/scalar) at `/ui/openapi`.
+
+The page reads the list of contracts from the SpringDoc `swagger-config` endpoint, which the
+hub keeps in sync with the discovered services, and feeds them to Scalar as its document
+sources: one entry per service in the selector. Since the hub rewrites each contract's
+`servers` section to the gateway, Scalar's request client calls the gateway, not the service
+directly. When nothing has been aggregated, the contract of the gateway itself is shown.
+
+A custom `springdoc.api-docs.path` is honoured &mdash; the view is handed the configured
+paths, it does not assume `/v3/api-docs`.
+
+The Scalar bundle ships with the plugin (`/js/scalar.standalone.js`, 2.7 MB) and its default
+web fonts are switched off, so the view works on an isolated network without reaching any CDN.
+
+## Spring Security
+
+When Spring Security is on the classpath, the plugin contributes its own
+`SecurityWebFilterChain` so the shell keeps working behind the authentication of the
+application. Nothing has to be declared.
+
+The chain permits **exactly** the paths the active views serve &mdash; never a `/ui/**`
+pattern. A gateway route declared under `/ui` (say `/ui/find_pwd`) must not inherit the UI
+permissions, and a view that is not active leaves its path closed. Each view declares its
+own endpoints and assets through a `UiSecuredPaths` bean:
+
+```java
+@Bean
+UiSecuredPaths auditTailSecuredPaths() {
+    return new UiSecuredPaths("/ui/audit", "/ui/audit/events", "/js/gateway-audit.js");
+}
+```
+
+A plugin hosting its own page inside the shell declares its paths the same way, and they
+join the chain.
+
+What is permitted out of the box: `/ui` and the shell assets, plus `/ui/routes`,
+`/ui/routes/list`, `/ui/routes/reload`, `/ui/routes/test`, `/ui/metrics`,
+`/ui/metrics/data`, `/ui/audit`, `/ui/audit/events`, `/ui/openapi` and their assets for the
+views that are active. The contracts the OpenAPI view reads are permitted by the hub's own
+chain, not by this one. The database routes management page (`/ui/routes/db`, which creates and deletes
+routes) is **not** permitted: it belongs to another plugin and stays under the rules of the
+application.
+
+The chain is ordered at `GatewayUiSecurityAutoConfiguration.GATEWAY_UI_CHAIN_ORDER`
+(`Ordered.HIGHEST_PRECEDENCE + 300`), ahead of the chains an application usually declares
+from `@Order(1)`. Two escape hatches: declare your own bean named
+`gatewayUiSecurityWebFilterChain` (the plugin backs off), or turn it off:
+
+```yaml
+spring.cloud.gateway.server.webflux:
+  ui:
+    security-chain-enabled: false
+```
+
+> As with any `SecurityWebFilterChain` bean, its presence makes Spring Boot back off from
+> its default "everything authenticated" chain. An application that was relying on that
+> default must declare its own chains.

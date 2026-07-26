@@ -24,15 +24,17 @@ import ch.nexsol.gateway.openapi.hub.SpringDocOpenapiRoutes;
 import ch.nexsol.gateway.openapi.hub.StaticOpenapiDocsRouteLocator;
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
 import ch.nexsol.gateway.openapi.hub.filter.OpenapiModifyResponseBodyGatewayFilterFactory;
-import ch.nexsol.gateway.routes.openapi.RoutesOpenapiProperties;
+import ch.nexsol.gateway.routes.openapi.OpenapiSourcesLoader;
 import org.springdoc.core.properties.SwaggerUiConfigProperties;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
+import org.springframework.cloud.client.discovery.composite.reactive.ReactiveCompositeDiscoveryClientAutoConfiguration;
 import org.springframework.cloud.gateway.config.conditional.ConditionalOnEnabledFilter;
 import org.springframework.cloud.gateway.discovery.DiscoveryLocatorProperties;
 import org.springframework.cloud.gateway.filter.factory.rewrite.MessageBodyDecoder;
@@ -48,7 +50,7 @@ import org.springframework.http.codec.ServerCodecConfigurer;
  * {@code spring.cloud.gateway.server.webflux.hub-openapi.enabled} property is set to
  * {@code true}.
  */
-@AutoConfiguration
+@AutoConfiguration(after = ReactiveCompositeDiscoveryClientAutoConfiguration.class)
 @ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.hub-openapi.enabled", havingValue = "true",
 		matchIfMissing = false)
 public class HubApiAutoConfiguration {
@@ -68,26 +70,27 @@ public class HubApiAutoConfiguration {
 
 	/**
 	 * Registers the service that resolves the OpenAPI documentation endpoint of each
-	 * discovered service instance.
+	 * discovered service instance, only when the application actually has a discovery
+	 * client: without one the hub keeps serving the statically configured contracts.
 	 * @param discoveryClient the reactive discovery client
 	 * @return the {@link OpenapiService} bean
 	 */
 	@Bean
-	@ConditionalOnClass(ReactiveDiscoveryClient.class)
+	@ConditionalOnBean(ReactiveDiscoveryClient.class)
 	OpenapiService openapiService(ReactiveDiscoveryClient discoveryClient) {
 		return new OpenapiService(discoveryClient);
 	}
 
 	/**
 	 * Registers the route locator that creates OpenAPI documentation routes for the
-	 * discovered services.
+	 * discovered services, only when the application actually has a discovery client.
 	 * @param discoveryClient the reactive discovery client
 	 * @param properties the discovery locator properties
 	 * @param openapiService the service used to discover OpenAPI endpoints
 	 * @return the {@link HubDiscoveryRouteLocator} bean
 	 */
 	@Bean
-	@ConditionalOnClass(ReactiveDiscoveryClient.class)
+	@ConditionalOnBean(ReactiveDiscoveryClient.class)
 	HubDiscoveryRouteLocator hubDiscoveryRouteLocator(ReactiveDiscoveryClient discoveryClient,
 			DiscoveryLocatorProperties properties, OpenapiService openapiService) {
 		return new HubDiscoveryRouteLocator(discoveryClient, properties, openapiService);
@@ -118,19 +121,20 @@ public class HubApiAutoConfiguration {
 	 * UI.
 	 */
 	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnClass(RoutesOpenapiProperties.class)
+	@ConditionalOnClass(OpenapiSourcesLoader.class)
 	static class RoutesOpenapiHubIntegrationConfiguration {
 
 		/**
 		 * Registers the locator emitting an OpenAPI documentation route for every
-		 * configured OpenAPI source, so they appear in the aggregated Swagger UI.
-		 * @param properties the OpenAPI route generator properties, when present
+		 * configured OpenAPI source, so they appear in the aggregated Swagger UI. The
+		 * sources are the resolved ones, so those declared in a document are included.
+		 * @param sourcesLoader the resolver of the OpenAPI sources, when present
 		 * @return the {@link StaticOpenapiDocsRouteLocator} bean
 		 */
 		@Bean
 		StaticOpenapiDocsRouteLocator staticOpenapiDocsRouteLocator(
-				ObjectProvider<RoutesOpenapiProperties> properties) {
-			return new StaticOpenapiDocsRouteLocator(properties);
+				ObjectProvider<OpenapiSourcesLoader> sourcesLoader) {
+			return new StaticOpenapiDocsRouteLocator(sourcesLoader);
 		}
 
 	}

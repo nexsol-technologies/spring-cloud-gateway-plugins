@@ -37,28 +37,30 @@ public class OpenApiRouteDefinitionLoader {
 
 	private final OpenApiRouteDefinitionMapper mapper;
 
-	private final List<Source> sources;
+	private final OpenapiSourcesLoader sourcesLoader;
 
 	/**
 	 * Creates the loader.
 	 * @param specLoader the OpenAPI document reader
 	 * @param mapper the document-to-routes mapper
-	 * @param sources the configured sources
+	 * @param sourcesLoader the resolver of the configured sources
 	 */
 	public OpenApiRouteDefinitionLoader(OpenApiSpecLoader specLoader, OpenApiRouteDefinitionMapper mapper,
-			List<Source> sources) {
+			OpenapiSourcesLoader sourcesLoader) {
 		this.specLoader = specLoader;
 		this.mapper = mapper;
-		this.sources = sources;
+		this.sourcesLoader = sourcesLoader;
 	}
 
 	/**
-	 * Reads every source and generates the corresponding route definitions.
+	 * Reads every source and generates the corresponding route definitions. The sources
+	 * are resolved on each call, so a document declaring them is re-read on every reload.
 	 * @return the aggregated route definitions
 	 */
 	public List<RouteDefinition> load() {
 		List<RouteDefinition> definitions = new ArrayList<>();
-		for (Source source : this.sources) {
+		List<Source> sources = this.sourcesLoader.load();
+		for (Source source : sources) {
 			// Isolate failures per source: a broken one must not drop the others' routes.
 			try {
 				OpenAPI openApi = this.specLoader.load(source.getSpecUrl());
@@ -68,7 +70,7 @@ public class OpenApiRouteDefinitionLoader {
 				LOG.warn("Skipping OpenAPI source '{}' ({}): {}", source.getId(), source.getSpecUrl(), ex.getMessage());
 			}
 		}
-		LOG.info("Generated {} route definition(s) from {} OpenAPI source(s)", definitions.size(), this.sources.size());
+		LOG.info("Generated {} route definition(s) from {} OpenAPI source(s)", definitions.size(), sources.size());
 		return definitions;
 	}
 

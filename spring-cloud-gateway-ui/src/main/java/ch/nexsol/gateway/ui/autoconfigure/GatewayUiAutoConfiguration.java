@@ -25,9 +25,11 @@ import ch.nexsol.gateway.ui.controller.DashboardController;
 import ch.nexsol.gateway.ui.controller.GatewayUiModelAttributes;
 import ch.nexsol.gateway.ui.metrics.MetricsOverviewContribution;
 import ch.nexsol.gateway.ui.metrics.RouteMetricsController;
+import ch.nexsol.gateway.ui.metrics.RouteMetricsProperties;
 import ch.nexsol.gateway.ui.metrics.RouteMetricsService;
 import ch.nexsol.gateway.ui.nav.GatewayUiMenu;
 import ch.nexsol.gateway.ui.nav.NavItem;
+import ch.nexsol.gateway.ui.openapi.OpenapiViewController;
 import ch.nexsol.gateway.ui.overview.OverviewContribution;
 import ch.nexsol.gateway.ui.overview.OverviewService;
 import ch.nexsol.gateway.ui.routes.RouteInventoryController;
@@ -35,12 +37,15 @@ import ch.nexsol.gateway.ui.routes.RouteInventoryService;
 import ch.nexsol.gateway.ui.routes.RouteOverviewContribution;
 import ch.nexsol.gateway.ui.routes.RouteTesterController;
 import ch.nexsol.gateway.ui.routes.RouteTesterService;
+import ch.nexsol.gateway.ui.security.UiSecuredPaths;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.ApplicationContext;
@@ -99,6 +104,17 @@ public class GatewayUiAutoConfiguration {
 	}
 
 	/**
+	 * Declares the paths of the shell itself: the home page and the assets every page
+	 * loads.
+	 * @return the shell paths
+	 */
+	@Bean
+	public UiSecuredPaths shellSecuredPaths() {
+		return new UiSecuredPaths("/ui", "/css/bootstrap.min.css", "/css/gateway-ui.css", "/js/htmx.min.js",
+				"/js/bootstrap.bundle.min.js", "/js/gateway-ui.js");
+	}
+
+	/**
 	 * Contributes the routes entry, Spring Boot Admin style, only when the
 	 * database-backed routes management UI is present on the classpath.
 	 * @return the routes menu entry
@@ -151,6 +167,15 @@ public class GatewayUiAutoConfiguration {
 			return new NavItem("routes-all", "Routes", "icon-route", "/ui/routes", 5);
 		}
 
+		/**
+		 * Declares the paths of the routes view.
+		 * @return the routes view paths
+		 */
+		@Bean
+		UiSecuredPaths routeInventorySecuredPaths() {
+			return new UiSecuredPaths("/ui/routes", "/ui/routes/list", "/ui/routes/reload", "/js/gateway-routes.js");
+		}
+
 	}
 
 	/**
@@ -186,6 +211,15 @@ public class GatewayUiAutoConfiguration {
 			return new NavItem("route-tester", "Route tester", "icon-target", "/ui/routes/test", 15);
 		}
 
+		/**
+		 * Declares the paths of the route tester view, served on GET and POST.
+		 * @return the route tester paths
+		 */
+		@Bean
+		UiSecuredPaths routeTesterSecuredPaths() {
+			return new UiSecuredPaths("/ui/routes/test");
+		}
+
 	}
 
 	/**
@@ -195,17 +229,20 @@ public class GatewayUiAutoConfiguration {
 	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(MeterRegistry.class)
+	@EnableConfigurationProperties(RouteMetricsProperties.class)
 	@Import(RouteMetricsController.class)
 	static class RouteMetricsConfiguration {
 
 		/**
 		 * Registers the metrics aggregation service.
 		 * @param meterRegistry the provider over the application meter registry
+		 * @param properties the traffic view configuration
 		 * @return the metrics service
 		 */
 		@Bean
-		RouteMetricsService routeMetricsService(ObjectProvider<MeterRegistry> meterRegistry) {
-			return new RouteMetricsService(meterRegistry);
+		RouteMetricsService routeMetricsService(ObjectProvider<MeterRegistry> meterRegistry,
+				RouteMetricsProperties properties) {
+			return new RouteMetricsService(meterRegistry, properties);
 		}
 
 		/**
@@ -225,6 +262,48 @@ public class GatewayUiAutoConfiguration {
 		@Bean
 		NavItem trafficNavItem() {
 			return new NavItem("traffic", "Traffic", "icon-chart", "/ui/metrics", 20);
+		}
+
+		/**
+		 * Declares the paths of the traffic view and of the charting library it loads.
+		 * @return the traffic view paths
+		 */
+		@Bean
+		UiSecuredPaths routeMetricsSecuredPaths() {
+			return new UiSecuredPaths("/ui/metrics", "/ui/metrics/data", "/js/echarts.min.js", "/js/echarts-gl.min.js",
+					"/js/gateway-metrics.js");
+		}
+
+	}
+
+	/**
+	 * Activates the OpenAPI view only when the OpenAPI hub plugin is on the classpath and
+	 * enabled: the view renders the contracts it aggregates, read from the SpringDoc
+	 * endpoints the hub keeps in sync.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(name = "ch.nexsol.gateway.openapi.hub.SpringDocOpenapiRoutes")
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.hub-openapi.enabled", havingValue = "true")
+	@Import(OpenapiViewController.class)
+	static class OpenapiViewConfiguration {
+
+		/**
+		 * Contributes the OpenAPI entry to the side menu.
+		 * @return the OpenAPI menu entry
+		 */
+		@Bean
+		NavItem openapiNavItem() {
+			return new NavItem("openapi", "OpenAPI", "icon-book", "/ui/openapi", 25);
+		}
+
+		/**
+		 * Declares the paths of the OpenAPI view. The contracts themselves are served by
+		 * the hub, which declares them in its own chain.
+		 * @return the OpenAPI view paths
+		 */
+		@Bean
+		UiSecuredPaths openapiSecuredPaths() {
+			return new UiSecuredPaths("/ui/openapi", "/js/scalar.standalone.js", "/js/gateway-openapi.js");
 		}
 
 	}
@@ -276,6 +355,15 @@ public class GatewayUiAutoConfiguration {
 		@Bean
 		NavItem auditNavItem() {
 			return new NavItem("audit", "Audit", "icon-list", "/ui/audit", 30);
+		}
+
+		/**
+		 * Declares the paths of the audit view.
+		 * @return the audit view paths
+		 */
+		@Bean
+		UiSecuredPaths auditTailSecuredPaths() {
+			return new UiSecuredPaths("/ui/audit", "/ui/audit/events", "/js/gateway-audit.js");
 		}
 
 	}

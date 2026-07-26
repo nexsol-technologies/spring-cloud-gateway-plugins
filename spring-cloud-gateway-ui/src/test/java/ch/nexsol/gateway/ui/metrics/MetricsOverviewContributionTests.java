@@ -29,15 +29,28 @@ class MetricsOverviewContributionTests {
 	void weightsTheLatencyByTheCallsEachRouteTook() {
 		// 10 calls at 100 ms and 90 calls at 10 ms average out at 19 ms, not at 55 ms.
 		List<OverviewStat> stats = MetricsOverviewContribution
-			.toStats(List.of(new RouteMetric("slow", "http://slow", 10, 100.0, 150.0, 0, 0.0),
-					new RouteMetric("fast", "http://fast", 90, 10.0, 20.0, 9, 0.1)));
+			.toStats(List.of(new RouteMetric("slow", "http://slow", 10, 100.0, 150.0, 0, 0.0, 0, 0.0),
+					new RouteMetric("fast", "http://fast", 90, 10.0, 20.0, 5, 0.055, 9, 0.1)));
 
-		assertThat(stats).extracting(OverviewStat::label).containsExactly("Calls", "Avg latency", "Server errors");
+		assertThat(stats).extracting(OverviewStat::label)
+			.containsExactly("Calls", "Avg latency", "Client errors", "Server errors");
 		assertThat(stats.get(0).value()).isEqualTo("100");
 		assertThat(stats.get(0).detail()).isEqualTo("2 route(s) called");
 		assertThat(stats.get(1).value()).isEqualTo("19 ms");
-		assertThat(stats.get(2).value()).isEqualTo("9");
-		assertThat(stats.get(2).detail()).isEqualTo("9.0% of calls");
+		assertThat(stats.get(3).value()).isEqualTo("9");
+		assertThat(stats.get(3).detail()).isEqualTo("9.0% of calls");
+	}
+
+	@Test
+	void reportsTheClientErrorsApartFromTheServerOnes() {
+		List<OverviewStat> stats = MetricsOverviewContribution
+			.toStats(List.of(new RouteMetric("orders", "http://orders", 100, 10.0, 20.0, 25, 0.25, 4, 0.04)));
+
+		OverviewStat clientErrors = stats.get(2);
+		assertThat(clientErrors.label()).isEqualTo("Client errors");
+		assertThat(clientErrors.value()).isEqualTo("25");
+		assertThat(clientErrors.detail()).isEqualTo("25.0% of calls");
+		assertThat(stats.get(3).value()).isEqualTo("4");
 	}
 
 	@Test
@@ -47,6 +60,7 @@ class MetricsOverviewContributionTests {
 		assertThat(stats.get(0).value()).isEqualTo("0");
 		assertThat(stats.get(1).value()).isEqualTo("—");
 		assertThat(stats.get(2).detail()).isEqualTo("no call recorded yet");
+		assertThat(stats.get(3).detail()).isEqualTo("no call recorded yet");
 	}
 
 }

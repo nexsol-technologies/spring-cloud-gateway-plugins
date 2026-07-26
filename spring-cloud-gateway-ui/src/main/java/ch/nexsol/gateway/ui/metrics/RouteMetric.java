@@ -20,14 +20,21 @@ package ch.nexsol.gateway.ui.metrics;
  * Aggregated request metrics for a single gateway route, used as a data point in the
  * traffic bubble chart.
  *
+ * Client errors are counted apart from server errors on purpose: a 4xx is the caller
+ * being turned away (unknown resource, missing rights, malformed request) while a 5xx is
+ * the gateway or the backend failing. Summing them would make a scanner hitting unknown
+ * paths look like an outage.
+ *
  * @param routeId the route identifier
  * @param uri the route target URI, or {@code null} when unknown
  * @param count the total number of requests routed
  * @param avgMs the mean response time in milliseconds
  * @param maxMs the maximum response time in milliseconds
+ * @param clientErrorCount the number of client-error (4xx) responses
+ * @param clientErrorRate the fraction of client-error responses, between 0 and 1
  * @param errorCount the number of server-error (5xx) responses
  * @param errorRate the fraction of server-error responses, between 0 and 1
  */
-public record RouteMetric(String routeId, String uri, long count, double avgMs, double maxMs, long errorCount,
-		double errorRate) {
+public record RouteMetric(String routeId, String uri, long count, double avgMs, double maxMs, long clientErrorCount,
+		double clientErrorRate, long errorCount, double errorRate) {
 }

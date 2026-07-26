@@ -47,6 +47,14 @@ public class RoutesOpenapiProperties {
 	 */
 	private List<Source> sources = new ArrayList<>();
 
+	/**
+	 * Locations of the documents declaring further sources, read on every reload and
+	 * added to the ones configured inline. Anything the resource resolver understands is
+	 * accepted: {@code classpath:}, {@code file:} or an {@code http(s)} URL, so a
+	 * document served by a Config Server is addressed like any other.
+	 */
+	private List<String> sourcesLocations = new ArrayList<>();
+
 	public boolean isEnabled() {
 		return this.enabled;
 	}
@@ -69,6 +77,14 @@ public class RoutesOpenapiProperties {
 
 	public void setSources(List<Source> sources) {
 		this.sources = sources;
+	}
+
+	public List<String> getSourcesLocations() {
+		return this.sourcesLocations;
+	}
+
+	public void setSourcesLocations(List<String> sourcesLocations) {
+		this.sourcesLocations = sourcesLocations;
 	}
 
 	/**
@@ -97,6 +113,16 @@ public class RoutesOpenapiProperties {
 		 * How to turn the document into routes.
 		 */
 		private RouteGenerationMode mode = RouteGenerationMode.AGGREGATED;
+
+		/**
+		 * Prefix added, on the gateway side, to every path the contract declares: with
+		 * {@code /patient-service}, the operation {@code /patients} is exposed as
+		 * {@code /patient-service/patients}. The prefix is stripped again before the
+		 * request is forwarded, so the backend still receives the path its contract
+		 * declares. This is what keeps two contracts declaring the same paths apart;
+		 * leave it unset to expose the contract paths as they are.
+		 */
+		private String pathPrefix;
 
 		/**
 		 * Base path prepended (as a {@code PrefixPath} filter) to the backend request,
@@ -147,6 +173,14 @@ public class RoutesOpenapiProperties {
 
 		public void setMode(RouteGenerationMode mode) {
 			this.mode = mode;
+		}
+
+		public String getPathPrefix() {
+			return this.pathPrefix;
+		}
+
+		public void setPathPrefix(String pathPrefix) {
+			this.pathPrefix = pathPrefix;
 		}
 
 		public String getBasePath() {
