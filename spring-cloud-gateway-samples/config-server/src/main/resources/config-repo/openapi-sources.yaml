@@ -18,11 +18,23 @@ sources:
       team: weather
     filters:
       - Retry=3
-  - id: api.guru
+  - id: api.guru.1
     uri: https://api.apis.guru
     spec-url: https://api.apis.guru/v2/openapi.yaml
     mode: AGGREGATED
     # base-path: /api/v3   # optional; derived from the contract servers when omitted
+    path-prefix: /guru-1
+    metadata:
+      source: configserver
+      team: guru
+    filters:
+      - Retry=3
+  - id: api.guru.2
+    uri: https://api.apis.guru
+    spec-url: https://api.apis.guru/v2/openapi.yaml
+    mode: AGGREGATED
+    # base-path: /api/v3   # optional; derived from the contract servers when omitted
+    path-prefix: /guru/2
     metadata:
       source: configserver
       team: guru
