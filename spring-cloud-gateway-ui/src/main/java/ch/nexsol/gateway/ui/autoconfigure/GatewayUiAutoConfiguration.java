@@ -25,6 +25,7 @@ import ch.nexsol.gateway.ui.controller.DashboardController;
 import ch.nexsol.gateway.ui.controller.GatewayUiModelAttributes;
 import ch.nexsol.gateway.ui.metrics.MetricsOverviewContribution;
 import ch.nexsol.gateway.ui.metrics.RouteMetricsController;
+import ch.nexsol.gateway.ui.metrics.RouteMetricsProperties;
 import ch.nexsol.gateway.ui.metrics.RouteMetricsService;
 import ch.nexsol.gateway.ui.nav.GatewayUiMenu;
 import ch.nexsol.gateway.ui.nav.NavItem;
@@ -44,6 +45,7 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.ApplicationContext;
@@ -227,17 +229,20 @@ public class GatewayUiAutoConfiguration {
 	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(MeterRegistry.class)
+	@EnableConfigurationProperties(RouteMetricsProperties.class)
 	@Import(RouteMetricsController.class)
 	static class RouteMetricsConfiguration {
 
 		/**
 		 * Registers the metrics aggregation service.
 		 * @param meterRegistry the provider over the application meter registry
+		 * @param properties the traffic view configuration
 		 * @return the metrics service
 		 */
 		@Bean
-		RouteMetricsService routeMetricsService(ObjectProvider<MeterRegistry> meterRegistry) {
-			return new RouteMetricsService(meterRegistry);
+		RouteMetricsService routeMetricsService(ObjectProvider<MeterRegistry> meterRegistry,
+				RouteMetricsProperties properties) {
+			return new RouteMetricsService(meterRegistry, properties);
 		}
 
 		/**

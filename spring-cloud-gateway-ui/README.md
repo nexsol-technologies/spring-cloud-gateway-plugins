@@ -183,6 +183,35 @@ The view is fed by `GET /ui/metrics/data` (JSON). It stays hidden when no meter 
 available, and shows an empty state until traffic has flowed through the gateway (gateway
 request metrics are enabled by default).
 
+### Excluding routes
+
+Some routes carry no traffic worth reading &mdash; the documentation routes the OpenAPI hub
+publishes are contracts being fetched, not usage. They are left out by default:
+
+```yaml
+spring.cloud.gateway.server.webflux.ui.traffic:
+  excluded-routes:
+    - openapi-docs-.*            # the default
+```
+
+Each entry is a regular expression matched against the **route id**, and the whole id must
+match (`docs` excludes `docs`, not `docs-public`). Setting the property replaces the default
+list, so keep `openapi-docs-.*` if you want to keep hiding them:
+
+```yaml
+spring.cloud.gateway.server.webflux.ui.traffic:
+  excluded-routes:
+    - openapi-docs-.*
+    - internal_.*
+    - .*_healthcheck
+```
+
+An empty list shows every route. A malformed expression is dropped with a warning rather
+than failing the application &mdash; losing a filter beats a gateway that does not start.
+
+The exclusion applies to the whole view: the summary, the map, the table and the traffic
+figures on the home page all read the same filtered set.
+
 ## Menu entries (Spring Boot Admin style)
 
 Menu entries come from a registry: any `NavItem` bean present in the application context

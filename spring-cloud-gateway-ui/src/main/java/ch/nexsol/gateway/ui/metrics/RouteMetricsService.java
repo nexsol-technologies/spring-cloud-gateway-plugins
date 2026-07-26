@@ -16,14 +16,19 @@
 
 package ch.nexsol.gateway.ui.metrics;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.springframework.beans.factory.ObjectProvider;
 
@@ -40,14 +45,44 @@ public class RouteMetricsService {
 	/** Name of the timer published by the gateway metrics filter for each request. */
 	static final String REQUESTS_METER = "spring.cloud.gateway.requests";
 
+	private static final Logger LOG = LoggerFactory.getLogger(RouteMetricsService.class);
+
 	private final ObjectProvider<MeterRegistry> meterRegistry;
+
+	private final List<Pattern> excludedRoutes;
 
 	/**
 	 * Creates the service reading from the (optional) meter registry.
 	 * @param meterRegistry the provider over the application meter registry
 	 */
-	public RouteMetricsService(ObjectProvider<MeterRegistry> meterRegistry) {
+	/**
+	 * Creates the service.
+	 * @param meterRegistry the provider over the application meter registry
+	 * @param properties the traffic view configuration, holding the route exclusions
+	 */
+	public RouteMetricsService(ObjectProvider<MeterRegistry> meterRegistry, RouteMetricsProperties properties) {
 		this.meterRegistry = meterRegistry;
+		this.excludedRoutes = compile(properties.getExcludedRoutes());
+	}
+
+	// An unusable expression is dropped rather than failing the application: the traffic
+	// view is a read-only page, and losing a filter is a lesser evil than a gateway that
+	// does not start.
+	private static List<Pattern> compile(List<String> expressions) {
+		List<Pattern> patterns = new ArrayList<>();
+		for (String expression : expressions) {
+			try {
+				patterns.add(Pattern.compile(expression));
+			}
+			catch (PatternSyntaxException ex) {
+				LOG.warn("Ignoring the traffic view route exclusion '{}': {}", expression, ex.getMessage());
+			}
+		}
+		return List.copyOf(patterns);
+	}
+
+	private boolean isExcluded(String routeId) {
+		return this.excludedRoutes.stream().anyMatch((pattern) -> pattern.matcher(routeId).matches());
 	}
 
 	/**
@@ -62,7 +97,7 @@ public class RouteMetricsService {
 		Map<String, Accumulator> byRoute = new LinkedHashMap<>();
 		for (Timer timer : registry.find(REQUESTS_METER).timers()) {
 			String routeId = timer.getId().getTag("routeId");
-			if (routeId == null || routeId.isBlank()) {
+			if (routeId == null || routeId.isBlank() || isExcluded(routeId)) {
 				continue;
 			}
 			Accumulator accumulator = byRoute.computeIfAbsent(routeId, (key) -> new Accumulator());
