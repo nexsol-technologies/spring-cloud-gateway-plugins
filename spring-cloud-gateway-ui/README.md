@@ -86,11 +86,25 @@ definitions do reach the route table; the lowest order is matched first.
 
 **Filter** &mdash; the search box narrows the table on route id, target or source.
 
-**Refresh** re-reads the sources; **Reload route table** additionally publishes a
-`RefreshRoutesEvent`, asking the gateway to rebuild its route table from the current
-definitions &mdash; exactly what the gateway actuator endpoint does. Neither button re-reads
-a remote source: a database, file or Config Server source reloads through its own plugin
-(a file watch, a poll, `/actuator/refresh`).
+**The two actions have different targets**, which is why they are named after what they
+refresh:
+
+| | Refresh view | Rebuild gateway routes |
+| --- | --- | --- |
+| Does | re-reads the sources, re-renders this table | publishes a `RefreshRoutesEvent`, then re-renders |
+| Affects | this page only | the gateway route table used to route traffic |
+
+*Refresh view* calls every locator again. What that picks up depends on the locator: a
+database or discovery source is queried live, while a file or Config Server source serves the
+snapshot it last loaded &mdash; those reload through their own plugin (a file watch, a poll,
+`/actuator/refresh`), never through this page.
+
+*Rebuild gateway routes* aims at the gateway: `CachingRouteLocator` drops its cached `Route`
+objects and rebuilds them from the current definitions, exactly as the gateway actuator
+refresh endpoint does. This is what makes a definition change take effect on traffic &mdash;
+though the routes-database plugin already publishes that event itself when a route is created
+or deleted, so it is mostly for definitions changed behind the API's back (a row inserted
+straight into the database, for instance).
 
 ## Route tester
 

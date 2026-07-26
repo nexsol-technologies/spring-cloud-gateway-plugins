@@ -71,6 +71,20 @@ class RouteInventoryControllerTests {
 	}
 
 	@Test
+	void shouldNameEachActionAfterWhatItActuallyRefreshes() {
+		this.webTestClient.get()
+			.uri("/ui/routes")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("Refresh view")
+				.contains("Rebuild gateway routes")
+				.contains("Nothing changes for the traffic")
+				.contains("rebuild its route table"));
+	}
+
+	@Test
 	void shouldListEachRouteWithItsSourcePredicatesAndFilters() {
 		this.webTestClient.get()
 			.uri("/ui/routes")
