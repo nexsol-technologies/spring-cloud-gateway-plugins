@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — OpenAPI', ~{:: #openapi-content}, ~{:: #openapi-scripts})}">
+<body>
+	<div id="openapi-content">
+		<header class="mb-4 d-flex flex-wrap gap-3 align-items-start">
+			<div>
+				<h1 class="h3 fw-bold mb-1">OpenAPI</h1>
+				<p class="text-secondary mb-0">The contracts aggregated by the hub, served through the gateway:
+					pick a service, read its operations, and call them from here.</p>
+			</div>
+			<div class="ms-auto d-flex align-items-center gap-3">
+				<span class="text-secondary small" id="gw-openapi-count"></span>
+				<div class="form-check form-switch mb-0">
+					<input class="form-check-input" type="checkbox" role="switch" id="gw-openapi-auto" checked>
+					<label class="form-check-label small" for="gw-openapi-auto">Auto</label>
+				</div>
+				<button type="button" id="gw-openapi-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
+			</div>
+		</header>
+
+		<div class="card border-0 shadow-sm">
+			<div class="card-body p-0">
+				<!-- Scalar renders the reference in place, from the contracts listed by SpringDoc. -->
+				<div id="gw-openapi" style="min-height: 70vh"
+						th:attr="data-config-url=${openapiConfigUrl}, data-document-url=${openapiDocumentUrl}"
+						data-config-url="/v3/api-docs/swagger-config" data-document-url="/v3/api-docs"></div>
+				<div id="gw-openapi-error" class="text-secondary text-center py-5" style="display: none">
+					No contract could be loaded &mdash; check that the OpenAPI hub is enabled and that the
+					documentation endpoints are reachable.
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="openapi-scripts">
+		<script th:src="@{/js/scalar.standalone.js}" src="/js/scalar.standalone.js"></script>
+		<script th:src="@{/js/gateway-openapi.js}" src="/js/gateway-openapi.js"></script>
+	</div>
+</body>
+</html>

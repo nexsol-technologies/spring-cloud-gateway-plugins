@@ -228,6 +228,24 @@ The sidebar is populated automatically for every rendered view by `GatewayUiMode
 own entry id. The database routes management page (`spring-cloud-gateway-routes-database`)
 is wired exactly this way and shows up under `/ui/routes/db`.
 
+## OpenAPI view
+
+When [spring-cloud-gateway-hub-openapi](../spring-cloud-gateway-hub-openapi/README.md) is on
+the classpath **and** enabled, the shell lights up an `OpenAPI` entry serving the contracts
+the hub aggregates, rendered with [Scalar](https://github.com/scalar/scalar) at `/ui/openapi`.
+
+The page reads the list of contracts from the SpringDoc `swagger-config` endpoint, which the
+hub keeps in sync with the discovered services, and feeds them to Scalar as its document
+sources: one entry per service in the selector. Since the hub rewrites each contract's
+`servers` section to the gateway, Scalar's request client calls the gateway, not the service
+directly. When nothing has been aggregated, the contract of the gateway itself is shown.
+
+A custom `springdoc.api-docs.path` is honoured &mdash; the view is handed the configured
+paths, it does not assume `/v3/api-docs`.
+
+The Scalar bundle ships with the plugin (`/js/scalar.standalone.js`, 2.7 MB) and its default
+web fonts are switched off, so the view works on an isolated network without reaching any CDN.
+
 ## Spring Security
 
 When Spring Security is on the classpath, the plugin contributes its own
@@ -251,8 +269,9 @@ join the chain.
 
 What is permitted out of the box: `/ui` and the shell assets, plus `/ui/routes`,
 `/ui/routes/list`, `/ui/routes/reload`, `/ui/routes/test`, `/ui/metrics`,
-`/ui/metrics/data`, `/ui/audit`, `/ui/audit/events` and their assets for the views that are
-active. The database routes management page (`/ui/routes/db`, which creates and deletes
+`/ui/metrics/data`, `/ui/audit`, `/ui/audit/events`, `/ui/openapi` and their assets for the
+views that are active. The contracts the OpenAPI view reads are permitted by the hub's own
+chain, not by this one. The database routes management page (`/ui/routes/db`, which creates and deletes
 routes) is **not** permitted: it belongs to another plugin and stays under the rules of the
 application.
 

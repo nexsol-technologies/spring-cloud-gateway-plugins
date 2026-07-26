@@ -28,6 +28,7 @@ import ch.nexsol.gateway.ui.metrics.RouteMetricsController;
 import ch.nexsol.gateway.ui.metrics.RouteMetricsService;
 import ch.nexsol.gateway.ui.nav.GatewayUiMenu;
 import ch.nexsol.gateway.ui.nav.NavItem;
+import ch.nexsol.gateway.ui.openapi.OpenapiViewController;
 import ch.nexsol.gateway.ui.overview.OverviewContribution;
 import ch.nexsol.gateway.ui.overview.OverviewService;
 import ch.nexsol.gateway.ui.routes.RouteInventoryController;
@@ -42,6 +43,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.ApplicationContext;
@@ -265,6 +267,38 @@ public class GatewayUiAutoConfiguration {
 		UiSecuredPaths routeMetricsSecuredPaths() {
 			return new UiSecuredPaths("/ui/metrics", "/ui/metrics/data", "/js/echarts.min.js", "/js/echarts-gl.min.js",
 					"/js/gateway-metrics.js");
+		}
+
+	}
+
+	/**
+	 * Activates the OpenAPI view only when the OpenAPI hub plugin is on the classpath and
+	 * enabled: the view renders the contracts it aggregates, read from the SpringDoc
+	 * endpoints the hub keeps in sync.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(name = "ch.nexsol.gateway.openapi.hub.SpringDocOpenapiRoutes")
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.hub-openapi.enabled", havingValue = "true")
+	@Import(OpenapiViewController.class)
+	static class OpenapiViewConfiguration {
+
+		/**
+		 * Contributes the OpenAPI entry to the side menu.
+		 * @return the OpenAPI menu entry
+		 */
+		@Bean
+		NavItem openapiNavItem() {
+			return new NavItem("openapi", "OpenAPI", "icon-book", "/ui/openapi", 25);
+		}
+
+		/**
+		 * Declares the paths of the OpenAPI view. The contracts themselves are served by
+		 * the hub, which declares them in its own chain.
+		 * @return the OpenAPI view paths
+		 */
+		@Bean
+		UiSecuredPaths openapiSecuredPaths() {
+			return new UiSecuredPaths("/ui/openapi", "/js/scalar.standalone.js", "/js/gateway-openapi.js");
 		}
 
 	}
