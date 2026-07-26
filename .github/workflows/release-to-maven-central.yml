@@ -14,7 +14,7 @@ jobs:
     steps:
       - run: echo "Will start a Maven Central upload with version ${{ github.event.inputs.releaseversion }}"
 
-      - name: free disk spac
+      - name: free disk space
         continue-on-error: true
         run: |
             df -h
@@ -87,15 +87,15 @@ jobs:
 
       - name: Create GitHub Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.event.inputs.releaseversion }}
-          release_name: ${{ github.event.inputs.releaseversion }}
+          name: ${{ github.event.inputs.releaseversion }}
           body: |
             Grab the new version from Maven central https://repo1.maven.org/maven2/ch/nexsol-tech/gateway/
-           
+
             ### Things that changed in this release
             ${{ steps.changelog.outputs.changelog }}
           draft: false
