@@ -58,6 +58,11 @@
 		</dependency>
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-configserver</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-routes-openapi</artifactId>
 			<version>${revision}</version>
 		</dependency>

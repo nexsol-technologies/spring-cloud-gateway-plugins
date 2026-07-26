@@ -18,5 +18,6 @@
         <module>gateway</module>
         <module>service-a</module>
         <module>eureka</module>
+        <module>config-server</module>
     </modules>
 </project>

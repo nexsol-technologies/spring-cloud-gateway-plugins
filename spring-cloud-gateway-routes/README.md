@@ -11,6 +11,7 @@ the sources can be combined freely.
 | [spring-cloud-gateway-routes-core](spring-cloud-gateway-routes-core) | Shared caching/refresh locator infrastructure | — |
 | [spring-cloud-gateway-routes-database](spring-cloud-gateway-routes-database/README.md) | Database (R2DBC) with a light GUI | read/write (CRUD + UI) |
 | [spring-cloud-gateway-routes-files](spring-cloud-gateway-routes-files/README.md) | JSON/YAML files (GitOps / CI pipelines) | read-only |
+| [spring-cloud-gateway-routes-configserver](spring-cloud-gateway-routes-configserver/README.md) | JSON/YAML files served by Spring Cloud Config Server | read-only |
 | [spring-cloud-gateway-routes-openapi](spring-cloud-gateway-routes-openapi/README.md) | OpenAPI contract | read-only |
 | [spring-cloud-gateway-routes-security](spring-cloud-gateway-routes-security/README.md) | Route metadata (`public`) → Spring Security | cross-cutting |
 
@@ -33,3 +34,25 @@ Add the sub-module matching your source. Each is independently activated by its 
     <version>${spring-cloud-gateway-plugins.version}</version>
 </dependency>
 ```
+
+## Refreshing routes
+
+Every source whose locator extends `AbstractRefreshableRouteDefinitionLocator` (the `files`,
+`configserver` and `openapi` sources) caches its route definitions and reloads them:
+
+- at startup;
+- on the source's own trigger (file watch, poll interval, …);
+- on **`/actuator/refresh`** and **`/actuator/busrefresh`** (Spring Cloud Bus).
+
+The `/refresh` support is provided once, in `spring-cloud-gateway-routes-core`: a shared listener
+reloads **all** refreshable locators on `RefreshScopeRefreshedEvent`, re-reading each source from
+scratch (not just rebuilding the gateway from the cached snapshot). It is wired only when the
+Spring Cloud Config client (`spring-cloud-context`) is on the classpath — i.e. whenever the gateway
+is itself a Config Server client — and degrades gracefully otherwise. Expose the endpoints as usual:
+
+```yaml
+management.endpoints.web.exposure.include: refresh, busrefresh
+```
+
+> The `database` source is not cached (it reads on demand), so it always reflects the latest
+> state without needing this mechanism.

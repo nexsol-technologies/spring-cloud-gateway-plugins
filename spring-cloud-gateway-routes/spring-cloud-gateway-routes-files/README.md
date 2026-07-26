@@ -47,3 +47,8 @@ routes:
     metadata:
       tier: gold
 ```
+
+## Reloading
+
+Besides the optional `watch`, the routes are reloaded on `/actuator/refresh` and
+`/actuator/busrefresh` — see [Refreshing routes](../README.md#refreshing-routes).

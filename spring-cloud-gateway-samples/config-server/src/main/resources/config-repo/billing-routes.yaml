@@ -1,0 +1,11 @@
+routes:
+  - id: configserver_billing_route
+    uri: https://httpbin.org
+    predicates:
+      - Path=/cs-billing/**
+      - Method=GET
+    filters:
+      - StripPrefix=1
+    metadata:
+      source: configserver
+      domain: billing

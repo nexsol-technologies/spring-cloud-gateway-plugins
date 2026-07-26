@@ -9,22 +9,28 @@
 		<version>${revision}</version>
 		<relativePath>../pom.xml </relativePath>
 	</parent>
-	<artifactId>spring-cloud-gateway-routes-core</artifactId>
-	<name>spring-cloud-gateway-routes-core</name>
-	<description>Shared route definition locator infrastructure for the routes plugins</description>
+	<artifactId>spring-cloud-gateway-routes-configserver</artifactId>
+	<name>spring-cloud-gateway-routes-configserver</name>
+	<description>Route definition locator sourcing JSON/YAML route files served by Spring Cloud Config Server for Spring Cloud Gateway</description>
 	<dependencies>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-core</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<!-- Reuses the JSON/YAML RouteDefinition parser shared with the file-based locator. -->
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-files</artifactId>
+			<version>${revision}</version>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
 		</dependency>
-		<!--
-			Optional: brings RefreshScopeRefreshedEvent so refreshable locators can re-load on
-			/actuator/refresh and /actuator/busrefresh. Present whenever the application uses the
-			Spring Cloud Config client; the refresh support degrades gracefully otherwise.
-		-->
 		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-context</artifactId>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
 			<optional>true</optional>
 		</dependency>
 		<dependency>

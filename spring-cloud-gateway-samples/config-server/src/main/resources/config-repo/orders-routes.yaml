@@ -1,0 +1,11 @@
+routes:
+  - id: configserver_orders_route
+    uri: https://httpbin.org
+    predicates:
+      - Path=/cs-orders/**
+      - Method=GET
+    filters:
+      - StripPrefix=1
+    metadata:
+      source: configserver
+      domain: orders

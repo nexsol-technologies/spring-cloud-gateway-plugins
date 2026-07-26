@@ -1,0 +1,5 @@
+routes:
+  - id: orders_route
+    uri: https://orders.example.org
+    predicates:
+      - Path=/orders/**
