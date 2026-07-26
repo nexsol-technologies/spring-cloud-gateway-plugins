@@ -1,1 +1,2 @@
 ch.nexsol.gateway.ui.autoconfigure.GatewayUiAutoConfiguration
+ch.nexsol.gateway.ui.autoconfigure.GatewayUiSecurityAutoConfiguration

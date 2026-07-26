@@ -227,3 +227,46 @@ The sidebar is populated automatically for every rendered view by `GatewayUiMode
 (a `@ControllerAdvice` exposing `navItems`); the controller only sets `activeNav` to its
 own entry id. The database routes management page (`spring-cloud-gateway-routes-database`)
 is wired exactly this way and shows up under `/ui/routes/db`.
+
+## Spring Security
+
+When Spring Security is on the classpath, the plugin contributes its own
+`SecurityWebFilterChain` so the shell keeps working behind the authentication of the
+application. Nothing has to be declared.
+
+The chain permits **exactly** the paths the active views serve &mdash; never a `/ui/**`
+pattern. A gateway route declared under `/ui` (say `/ui/find_pwd`) must not inherit the UI
+permissions, and a view that is not active leaves its path closed. Each view declares its
+own endpoints and assets through a `UiSecuredPaths` bean:
+
+```java
+@Bean
+UiSecuredPaths auditTailSecuredPaths() {
+    return new UiSecuredPaths("/ui/audit", "/ui/audit/events", "/js/gateway-audit.js");
+}
+```
+
+A plugin hosting its own page inside the shell declares its paths the same way, and they
+join the chain.
+
+What is permitted out of the box: `/ui` and the shell assets, plus `/ui/routes`,
+`/ui/routes/list`, `/ui/routes/reload`, `/ui/routes/test`, `/ui/metrics`,
+`/ui/metrics/data`, `/ui/audit`, `/ui/audit/events` and their assets for the views that are
+active. The database routes management page (`/ui/routes/db`, which creates and deletes
+routes) is **not** permitted: it belongs to another plugin and stays under the rules of the
+application.
+
+The chain is ordered at `GatewayUiSecurityAutoConfiguration.GATEWAY_UI_CHAIN_ORDER`
+(`Ordered.HIGHEST_PRECEDENCE + 300`), ahead of the chains an application usually declares
+from `@Order(1)`. Two escape hatches: declare your own bean named
+`gatewayUiSecurityWebFilterChain` (the plugin backs off), or turn it off:
+
+```yaml
+spring.cloud.gateway.server.webflux:
+  ui:
+    security-chain-enabled: false
+```
+
+> As with any `SecurityWebFilterChain` bean, its presence makes Spring Boot back off from
+> its default "everything authenticated" chain. An application that was relying on that
+> default must declare its own chains.

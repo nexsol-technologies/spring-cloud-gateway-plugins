@@ -35,6 +35,7 @@ import ch.nexsol.gateway.ui.routes.RouteInventoryService;
 import ch.nexsol.gateway.ui.routes.RouteOverviewContribution;
 import ch.nexsol.gateway.ui.routes.RouteTesterController;
 import ch.nexsol.gateway.ui.routes.RouteTesterService;
+import ch.nexsol.gateway.ui.security.UiSecuredPaths;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -99,6 +100,17 @@ public class GatewayUiAutoConfiguration {
 	}
 
 	/**
+	 * Declares the paths of the shell itself: the home page and the assets every page
+	 * loads.
+	 * @return the shell paths
+	 */
+	@Bean
+	public UiSecuredPaths shellSecuredPaths() {
+		return new UiSecuredPaths("/ui", "/css/bootstrap.min.css", "/css/gateway-ui.css", "/js/htmx.min.js",
+				"/js/bootstrap.bundle.min.js", "/js/gateway-ui.js");
+	}
+
+	/**
 	 * Contributes the routes entry, Spring Boot Admin style, only when the
 	 * database-backed routes management UI is present on the classpath.
 	 * @return the routes menu entry
@@ -151,6 +163,15 @@ public class GatewayUiAutoConfiguration {
 			return new NavItem("routes-all", "Routes", "icon-route", "/ui/routes", 5);
 		}
 
+		/**
+		 * Declares the paths of the routes view.
+		 * @return the routes view paths
+		 */
+		@Bean
+		UiSecuredPaths routeInventorySecuredPaths() {
+			return new UiSecuredPaths("/ui/routes", "/ui/routes/list", "/ui/routes/reload", "/js/gateway-routes.js");
+		}
+
 	}
 
 	/**
@@ -184,6 +205,15 @@ public class GatewayUiAutoConfiguration {
 		@Bean
 		NavItem routeTesterNavItem() {
 			return new NavItem("route-tester", "Route tester", "icon-target", "/ui/routes/test", 15);
+		}
+
+		/**
+		 * Declares the paths of the route tester view, served on GET and POST.
+		 * @return the route tester paths
+		 */
+		@Bean
+		UiSecuredPaths routeTesterSecuredPaths() {
+			return new UiSecuredPaths("/ui/routes/test");
 		}
 
 	}
@@ -225,6 +255,16 @@ public class GatewayUiAutoConfiguration {
 		@Bean
 		NavItem trafficNavItem() {
 			return new NavItem("traffic", "Traffic", "icon-chart", "/ui/metrics", 20);
+		}
+
+		/**
+		 * Declares the paths of the traffic view and of the charting library it loads.
+		 * @return the traffic view paths
+		 */
+		@Bean
+		UiSecuredPaths routeMetricsSecuredPaths() {
+			return new UiSecuredPaths("/ui/metrics", "/ui/metrics/data", "/js/echarts.min.js", "/js/echarts-gl.min.js",
+					"/js/gateway-metrics.js");
 		}
 
 	}
@@ -276,6 +316,15 @@ public class GatewayUiAutoConfiguration {
 		@Bean
 		NavItem auditNavItem() {
 			return new NavItem("audit", "Audit", "icon-list", "/ui/audit", 30);
+		}
+
+		/**
+		 * Declares the paths of the audit view.
+		 * @return the audit view paths
+		 */
+		@Bean
+		UiSecuredPaths auditTailSecuredPaths() {
+			return new UiSecuredPaths("/ui/audit", "/ui/audit/events", "/js/gateway-audit.js");
 		}
 
 	}

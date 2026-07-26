@@ -1,0 +1,131 @@
+/*
+ * Copyright 2025 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.nexsol.gateway.ui.autoconfigure;
+
+import ch.nexsol.gateway.audit.AuditEventPublisher;
+import org.junit.jupiter.api.Test;
+
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.FilteredClassLoader;
+import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.mock.web.server.MockServerWebExchange;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Auto-configuration tests for {@link GatewayUiSecurityAutoConfiguration}, checking that
+ * the contributed chain matches the paths the shell serves and nothing else.
+ */
+class GatewayUiSecurityAutoConfigurationTests {
+
+	private final ReactiveWebApplicationContextRunner runner = new ReactiveWebApplicationContextRunner()
+		.withConfiguration(
+				AutoConfigurations.of(GatewayUiAutoConfiguration.class, GatewayUiSecurityAutoConfiguration.class))
+		.withUserConfiguration(WebFluxSecurityConfiguration.class);
+
+	@Test
+	void chainMatchesTheShellAndItsAssets() {
+		this.runner.run((context) -> {
+			assertThat(context).hasNotFailed();
+			SecurityWebFilterChain chain = (SecurityWebFilterChain) context.getBean("gatewayUiSecurityWebFilterChain");
+			assertThat(matches(chain, "/ui")).isTrue();
+			assertThat(matches(chain, "/css/gateway-ui.css")).isTrue();
+			assertThat(matches(chain, "/js/htmx.min.js")).isTrue();
+		});
+	}
+
+	@Test
+	void chainDoesNotMatchGatewayRoutesUnderTheUiPrefix() {
+		this.runner.run((context) -> {
+			SecurityWebFilterChain chain = (SecurityWebFilterChain) context.getBean("gatewayUiSecurityWebFilterChain");
+			assertThat(matches(chain, "/ui/find_pwd")).isFalse();
+			assertThat(matches(chain, "/ui/routes/db")).isFalse();
+		});
+	}
+
+	@Test
+	void viewsThatAreNotActiveContributeNoPath() {
+		this.runner.run((context) -> {
+			SecurityWebFilterChain chain = (SecurityWebFilterChain) context.getBean("gatewayUiSecurityWebFilterChain");
+			assertThat(matches(chain, "/ui/audit")).isTrue();
+		});
+		this.runner.withClassLoader(new FilteredClassLoader(AuditEventPublisher.class)).run((context) -> {
+			SecurityWebFilterChain chain = (SecurityWebFilterChain) context.getBean("gatewayUiSecurityWebFilterChain");
+			assertThat(matches(chain, "/ui/audit")).isFalse();
+			assertThat(matches(chain, "/ui")).isTrue();
+		});
+	}
+
+	@Test
+	void chainCanBeDisabled() {
+		this.runner.withPropertyValues("spring.cloud.gateway.server.webflux.ui.security-chain-enabled=false")
+			.run((context) -> assertThat(context).doesNotHaveBean("gatewayUiSecurityWebFilterChain"));
+	}
+
+	@Test
+	void applicationChainWithTheSameNameWins() {
+		this.runner.withUserConfiguration(ApplicationChainConfiguration.class).run((context) -> {
+			assertThat(context).hasNotFailed();
+			assertThat(context.getBeansOfType(SecurityWebFilterChain.class)).hasSize(1);
+		});
+	}
+
+	private static boolean matches(SecurityWebFilterChain chain, String path) {
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get(path));
+		return Boolean.TRUE.equals(chain.matches(exchange).defaultIfEmpty(false).block());
+	}
+
+	/**
+	 * Provides the {@link ServerHttpSecurity} prototype the chain is built from, and the
+	 * default user the reactive security auto-configuration would generate.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@EnableWebFluxSecurity
+	static class WebFluxSecurityConfiguration {
+
+		@Bean
+		MapReactiveUserDetailsService userDetailsService() {
+			return new MapReactiveUserDetailsService(
+					User.withUsername("user").password("{noop}password").roles("USER").build());
+		}
+
+	}
+
+	/**
+	 * An application declaring the chain itself, under the name the plugin backs off
+	 * from.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	static class ApplicationChainConfiguration {
+
+		@Bean
+		SecurityWebFilterChain gatewayUiSecurityWebFilterChain(ServerHttpSecurity http) {
+			http.authorizeExchange((spec) -> spec.anyExchange().permitAll());
+			return http.build();
+		}
+
+	}
+
+}
