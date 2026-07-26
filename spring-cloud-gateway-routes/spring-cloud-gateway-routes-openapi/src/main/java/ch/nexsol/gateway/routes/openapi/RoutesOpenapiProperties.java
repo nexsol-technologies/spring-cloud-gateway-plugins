@@ -115,6 +115,16 @@ public class RoutesOpenapiProperties {
 		private RouteGenerationMode mode = RouteGenerationMode.AGGREGATED;
 
 		/**
+		 * Prefix added, on the gateway side, to every path the contract declares: with
+		 * {@code /patient-service}, the operation {@code /patients} is exposed as
+		 * {@code /patient-service/patients}. The prefix is stripped again before the
+		 * request is forwarded, so the backend still receives the path its contract
+		 * declares. This is what keeps two contracts declaring the same paths apart;
+		 * leave it unset to expose the contract paths as they are.
+		 */
+		private String pathPrefix;
+
+		/**
 		 * Base path prepended (as a {@code PrefixPath} filter) to the backend request,
 		 * since the OpenAPI operation paths are relative to the document server base
 		 * path. When {@code null} it is derived from the first document server; set it to
@@ -163,6 +173,14 @@ public class RoutesOpenapiProperties {
 
 		public void setMode(RouteGenerationMode mode) {
 			this.mode = mode;
+		}
+
+		public String getPathPrefix() {
+			return this.pathPrefix;
+		}
+
+		public void setPathPrefix(String pathPrefix) {
+			this.pathPrefix = pathPrefix;
 		}
 
 		public String getBasePath() {

@@ -85,13 +85,25 @@ public class StaticOpenapiDocsRouteLocator implements RouteDefinitionLocator {
 		route.setUri(URI.create(base));
 		route.setMetadata(Map.of("name", id));
 		route.setPredicates(List.of(new PredicateDefinition("Path=" + docsPath)));
-		// Proxy the contract through the gateway and advertise the gateway as the server
-		// so
-		// the "Try it out" calls target the gateway routes generated for the same
-		// contract.
+		// Proxy the contract through the gateway and advertise the gateway as its server,
+		// so "Try it out" targets the gateway routes generated for the same contract. The
+		// advertised base carries the source path prefix: without it the console would
+		// call the contract paths, which is precisely what the prefix moved away.
 		route.setFilters(List.of(new FilterDefinition("RewritePath=" + docsPath + ", " + specPath),
-				new FilterDefinition("OpenapiModifyResponseBody=/")));
+				new FilterDefinition("OpenapiModifyResponseBody=" + advertisedBase(source))));
 		return route;
+	}
+
+	private String advertisedBase(Source source) {
+		String prefix = source.getPathPrefix();
+		if (!StringUtils.hasText(prefix) || "/".equals(prefix.strip())) {
+			return "/";
+		}
+		String normalized = prefix.strip();
+		if (!normalized.startsWith("/")) {
+			normalized = "/" + normalized;
+		}
+		return normalized.endsWith("/") ? normalized.substring(0, normalized.length() - 1) : normalized;
 	}
 
 }

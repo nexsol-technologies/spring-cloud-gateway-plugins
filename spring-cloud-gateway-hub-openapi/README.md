@@ -36,7 +36,11 @@ is also on the classpath, the OpenAPI contracts it is configured with are automa
 exposed in the aggregated Swagger UI, side by side with the discovered services. This
 covers the sources declared inline **and** those read from a document through
 `sources-locations` — the hub resolves the sources the same way the generator does, so a
-contract declared in a document served by a Config Server appears in the dropdown too. Each
+contract declared in a document served by a Config Server appears in the dropdown too.
+
+A source carrying a `path-prefix` has its contract advertised with that prefix, so
+"Try it out" calls the prefixed route the generator created rather than the bare contract
+path. Each
 source's contract is proxied through the gateway (its `servers` section rewritten to the
 gateway), so there is no CORS issue and "Try it out" targets the gateway.
 

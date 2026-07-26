@@ -90,6 +90,40 @@ class StaticOpenapiDocsRouteLocatorTests {
 	}
 
 	@Test
+	void advertisesThePathPrefixSoTheConsoleCallsTheGeneratedRoutes() {
+		// The generated routes live under the prefix, so the served contract must
+		// advertise it: otherwise "Try it out" calls the bare contract paths, which is
+		// exactly what the prefix moved away.
+		RoutesOpenapiProperties properties = new RoutesOpenapiProperties();
+		Source source = new Source();
+		source.setId("patients");
+		source.setUri(URI.create("https://patient-service.example.org"));
+		source.setSpecUrl("https://patient-service.example.org/v3/api-docs");
+		source.setPathPrefix("/patient-service");
+		properties.setSources(List.of(source));
+
+		StepVerifier.create(locatorFor(properties).getRouteDefinitions()).assertNext((route) -> {
+			FilterDefinition rewriteServers = route.getFilters().get(1);
+			assertThat(rewriteServers.getName()).isEqualTo("OpenapiModifyResponseBody");
+			assertThat(rewriteServers.getArgs().values()).contains("/patient-service");
+		}).verifyComplete();
+	}
+
+	@Test
+	void advertisesTheGatewayRootWhenNoPrefixIsConfigured() {
+		RoutesOpenapiProperties properties = new RoutesOpenapiProperties();
+		Source source = new Source();
+		source.setId("petstore");
+		source.setUri(URI.create("https://petstore3.swagger.io"));
+		source.setSpecUrl("https://petstore3.swagger.io/api/v3/openapi.json");
+		properties.setSources(List.of(source));
+
+		StepVerifier.create(locatorFor(properties).getRouteDefinitions())
+			.assertNext((route) -> assertThat(route.getFilters().get(1).getArgs().values()).contains("/"))
+			.verifyComplete();
+	}
+
+	@Test
 	void skipsSourcesMissingIdOrSpecUrl() {
 		RoutesOpenapiProperties properties = new RoutesOpenapiProperties();
 		Source incomplete = new Source();

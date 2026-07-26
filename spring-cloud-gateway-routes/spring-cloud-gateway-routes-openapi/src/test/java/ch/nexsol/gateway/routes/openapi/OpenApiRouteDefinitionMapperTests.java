@@ -103,6 +103,48 @@ class OpenApiRouteDefinitionMapperTests {
 	}
 
 	@Test
+	void pathPrefixMovesTheContractPathsAsideAndIsRemovedBeforeForwarding() {
+		// Two contracts may both declare /pets: the prefix is what keeps them apart on
+		// the
+		// gateway, and the backend must still see the path its contract declares.
+		Source source = source(RouteGenerationMode.PER_OPERATION);
+		source.setPathPrefix("/pet-service");
+
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source, this.openApi);
+
+		RouteDefinition getPet = routes.stream().filter((r) -> r.getId().equals("petstore_getPet")).findFirst().get();
+		assertThat(getPet.getPredicates().get(0).getArgs().values()).contains("/pet-service/pets/{petId}");
+		// RewritePath drops the prefix, then PrefixPath adds the backend base path back.
+		assertThat(getPet.getFilters()).extracting(FilterDefinition::getName)
+			.containsExactly("RewritePath", "PrefixPath", "Retry");
+		assertThat(getPet.getFilters().get(0).getArgs().values()).contains("/pet-service(?<remaining>/?.*)",
+				"${remaining}");
+		assertThat(getPet.getFilters().get(1).getArgs().values()).contains("/api/v3");
+	}
+
+	@Test
+	void pathPrefixAppliesToEveryPathOfAnAggregatedRoute() {
+		Source source = source(RouteGenerationMode.AGGREGATED);
+		source.setPathPrefix("pet-service");
+
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source, this.openApi);
+
+		// a prefix written without its leading slash is normalized like the base path
+		assertThat(routes.get(0).getPredicates().get(0).getArgs().values())
+			.containsExactlyInAnyOrder("/pet-service/pets", "/pet-service/pets/{petId}");
+	}
+
+	@Test
+	void noPrefixLeavesThePathsAndFiltersUntouched() {
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source(RouteGenerationMode.AGGREGATED),
+				this.openApi);
+
+		assertThat(routes.get(0).getPredicates().get(0).getArgs().values()).contains("/pets");
+		assertThat(routes.get(0).getFilters()).extracting(FilterDefinition::getName)
+			.containsExactly("PrefixPath", "Retry");
+	}
+
+	@Test
 	void explicitBasePathOverridesTheDocumentServer() {
 		Source source = source(RouteGenerationMode.AGGREGATED);
 		source.setBasePath("custom/v2");
