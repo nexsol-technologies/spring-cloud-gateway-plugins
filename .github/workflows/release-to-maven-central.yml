@@ -105,11 +105,12 @@ jobs:
     needs: publish-github-release
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write
-
     steps:
+      # Push via a write-enabled deploy key so the commit bypasses the branch
+      # ruleset on 'main' (deploy keys are on the ruleset bypass list).
       - uses: actions/checkout@v5
+        with:
+          ssh-key: ${{ secrets.COMMIT_SSH_KEY }}
 
       - name: Set new SNAPSHOT version
         run: >
@@ -122,7 +123,5 @@ jobs:
 
       - name: Commit new SNAPSHOT version
         uses: stefanzweifel/git-auto-commit-action@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           commit_message: "chore: update to next SNAPSHOT version"
