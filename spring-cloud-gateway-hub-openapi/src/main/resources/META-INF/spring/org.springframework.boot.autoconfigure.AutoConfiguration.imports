@@ -1,1 +1,2 @@
 ch.nexsol.gateway.openapi.autoconfigure.HubApiAutoConfiguration
+ch.nexsol.gateway.openapi.autoconfigure.HubApiSecurityAutoConfiguration
