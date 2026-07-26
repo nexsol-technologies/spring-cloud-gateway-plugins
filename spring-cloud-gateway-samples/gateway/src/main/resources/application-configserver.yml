@@ -3,12 +3,14 @@
 # or: java -jar sample-gateway.jar --spring.profiles.active=configserver
 #
 # Requires the 'config-server' sample running on :8888, which serves the route files
-# (config-repo/orders-routes.yaml, config-repo/billing-routes.yaml) over its plain-text
-# resource endpoint /{name}/{profile}/{label}/{path}.
+# (config-repo/orders-routes.yaml, config-repo/billing-routes.yaml) and the OpenAPI sources
+# document (config-repo/openapi-sources.yaml) over its plain-text resource endpoint
+# /{name}/{profile}/{label}/{path}.
 #
 # The gateway then exposes:
 #   GET http://localhost:8181/cs-orders/**   -> https://httpbin.org (configserver_orders_route)
 #   GET http://localhost:8181/cs-billing/**  -> https://httpbin.org (configserver_billing_route)
+#   one route per petstore operation         -> https://petstore3.swagger.io (petstore_*)
 spring.cloud.gateway.server.webflux.routes-configserver:
   enabled: true
   update-interval: 30s
@@ -23,3 +25,13 @@ spring.cloud.gateway.server.webflux.routes-configserver:
   # Alternatively, address files by full URL (either form, or both, may be used):
   # urls:
   #   - http://localhost:8888/gateway/default/main/orders-routes.yaml
+
+# The OpenAPI sources are served by the same Config Server, in their own document. This is
+# a different plugin and a different channel: routes-openapi fetches the document itself,
+# so the gateway does not have to be a Config Server client, and routes-configserver never
+# sees it (it reads route definitions, not sources).
+spring.cloud.gateway.server.webflux.routes-openapi:
+  enabled: true
+  update-interval: 5m
+  sources-locations:
+    - http://localhost:8888/gateway/default/main/openapi-sources.yaml

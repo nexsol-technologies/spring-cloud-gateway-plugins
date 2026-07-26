@@ -1,0 +1,22 @@
+# OpenAPI sources served by the Config Server, read by the 'routes-openapi' plugin through
+# its 'sources-locations' (see spring-cloud-gateway-routes-openapi/README.md).
+#
+# This is a *sources* document, not a *routes* one: the plugin fetches each contract and
+# generates the routes from it. The 'routes-configserver' plugin, which reads the
+# orders-routes.yaml / billing-routes.yaml files next to this one, expects route
+# definitions instead and would ignore this document.
+#
+# Served at: http://localhost:8888/gateway/default/main/openapi-sources.yaml
+sources:
+  - id: petstore
+    # Backend target: only scheme/host/port is used, the path comes from the contract.
+    uri: https://petstore3.swagger.io
+    spec-url: https://petstore3.swagger.io/api/v3/openapi.json
+    # One route per operation, so each endpoint of the contract is routed individually.
+    mode: PER_OPERATION
+    # base-path: /api/v3   # optional; derived from the contract servers when omitted
+    metadata:
+      source: configserver
+      team: pets
+    filters:
+      - Retry=3
