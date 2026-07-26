@@ -1,0 +1,24 @@
+server.port: 8888
+spring:
+  application:
+    name: config-server
+  # 'native' backend serves files straight from the classpath repository below,
+  # so the sample needs no Git repository.
+  profiles:
+    active: native
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/config-repo/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+logging:
+  level:
+    '[org.springframework.cloud.config]': info

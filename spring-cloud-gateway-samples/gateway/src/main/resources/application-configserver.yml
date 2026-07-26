@@ -1,0 +1,25 @@
+# Profile-specific configuration, active only with the 'configserver' profile:
+#   mvn spring-boot:run -Dspring-boot.run.profiles=configserver
+# or: java -jar sample-gateway.jar --spring.profiles.active=configserver
+#
+# Requires the 'config-server' sample running on :8888, which serves the route files
+# (config-repo/orders-routes.yaml, config-repo/billing-routes.yaml) over its plain-text
+# resource endpoint /{name}/{profile}/{label}/{path}.
+#
+# The gateway then exposes:
+#   GET http://localhost:8181/cs-orders/**   -> https://httpbin.org (configserver_orders_route)
+#   GET http://localhost:8181/cs-billing/**  -> https://httpbin.org (configserver_billing_route)
+spring.cloud.gateway.server.webflux.routes-configserver:
+  enabled: true
+  update-interval: 30s
+  config-server:
+    uri: http://localhost:8888
+    name: gateway
+    profile: default
+    label: main
+    files:
+      - orders-routes.yaml
+      - billing-routes.yaml
+  # Alternatively, address files by full URL (either form, or both, may be used):
+  # urls:
+  #   - http://localhost:8888/gateway/default/main/orders-routes.yaml

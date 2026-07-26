@@ -1,0 +1,7 @@
+[
+  {
+    "id": "billing_route",
+    "uri": "https://billing.example.org",
+    "predicates": [ "Path=/billing/**" ]
+  }
+]

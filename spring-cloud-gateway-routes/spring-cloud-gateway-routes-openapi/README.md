@@ -51,3 +51,8 @@ ignored by the gateway), while the base path comes from the contract.
   a `Method` predicate listing every HTTP method.
 
 The configured `metadata` and `filters` are applied to every generated route.
+
+## Reloading
+
+Besides the optional `update-interval`, the routes are regenerated on `/actuator/refresh` and
+`/actuator/busrefresh` — see [Refreshing routes](../README.md#refreshing-routes).
