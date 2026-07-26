@@ -24,7 +24,7 @@ import ch.nexsol.gateway.openapi.hub.SpringDocOpenapiRoutes;
 import ch.nexsol.gateway.openapi.hub.StaticOpenapiDocsRouteLocator;
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
 import ch.nexsol.gateway.openapi.hub.filter.OpenapiModifyResponseBodyGatewayFilterFactory;
-import ch.nexsol.gateway.routes.openapi.RoutesOpenapiProperties;
+import ch.nexsol.gateway.routes.openapi.OpenapiSourcesLoader;
 import org.springdoc.core.properties.SwaggerUiConfigProperties;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -121,19 +121,20 @@ public class HubApiAutoConfiguration {
 	 * UI.
 	 */
 	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnClass(RoutesOpenapiProperties.class)
+	@ConditionalOnClass(OpenapiSourcesLoader.class)
 	static class RoutesOpenapiHubIntegrationConfiguration {
 
 		/**
 		 * Registers the locator emitting an OpenAPI documentation route for every
-		 * configured OpenAPI source, so they appear in the aggregated Swagger UI.
-		 * @param properties the OpenAPI route generator properties, when present
+		 * configured OpenAPI source, so they appear in the aggregated Swagger UI. The
+		 * sources are the resolved ones, so those declared in a document are included.
+		 * @param sourcesLoader the resolver of the OpenAPI sources, when present
 		 * @return the {@link StaticOpenapiDocsRouteLocator} bean
 		 */
 		@Bean
 		StaticOpenapiDocsRouteLocator staticOpenapiDocsRouteLocator(
-				ObjectProvider<RoutesOpenapiProperties> properties) {
-			return new StaticOpenapiDocsRouteLocator(properties);
+				ObjectProvider<OpenapiSourcesLoader> sourcesLoader) {
+			return new StaticOpenapiDocsRouteLocator(sourcesLoader);
 		}
 
 	}

@@ -1,0 +1,6 @@
+# An OpenAPI sources document, as a Config Server would serve it.
+sources:
+  - id: from-document
+    uri: https://petstore3.swagger.io
+    spec-url: https://petstore3.swagger.io/api/v3/openapi.json
+    mode: PER_OPERATION

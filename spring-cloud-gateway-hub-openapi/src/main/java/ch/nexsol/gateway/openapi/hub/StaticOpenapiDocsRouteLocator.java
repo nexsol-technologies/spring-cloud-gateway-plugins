@@ -21,9 +21,11 @@ import java.util.List;
 import java.util.Map;
 
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
-import ch.nexsol.gateway.routes.openapi.RoutesOpenapiProperties;
+import ch.nexsol.gateway.routes.openapi.OpenapiSourcesLoader;
 import ch.nexsol.gateway.routes.openapi.RoutesOpenapiProperties.Source;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cloud.gateway.filter.FilterDefinition;
@@ -44,23 +46,29 @@ import org.springframework.util.StringUtils;
  */
 public class StaticOpenapiDocsRouteLocator implements RouteDefinitionLocator {
 
-	private final ObjectProvider<RoutesOpenapiProperties> properties;
+	private final ObjectProvider<OpenapiSourcesLoader> sourcesLoader;
 
 	/**
 	 * Creates the locator.
-	 * @param properties the OpenAPI route generator properties, when present
+	 * @param sourcesLoader the resolver of the OpenAPI sources, when the route generator
+	 * is present
 	 */
-	public StaticOpenapiDocsRouteLocator(ObjectProvider<RoutesOpenapiProperties> properties) {
-		this.properties = properties;
+	public StaticOpenapiDocsRouteLocator(ObjectProvider<OpenapiSourcesLoader> sourcesLoader) {
+		this.sourcesLoader = sourcesLoader;
 	}
 
 	@Override
 	public Flux<RouteDefinition> getRouteDefinitions() {
-		RoutesOpenapiProperties props = this.properties.getIfAvailable();
-		if (props == null) {
+		OpenapiSourcesLoader loader = this.sourcesLoader.getIfAvailable();
+		if (loader == null) {
 			return Flux.empty();
 		}
-		return Flux.fromIterable(props.getSources())
+		// Resolved sources, not the raw properties: those declared in a document reached
+		// through 'sources-locations' belong in the aggregated Swagger UI too. Resolving
+		// them may read a remote document, hence the elastic scheduler.
+		return Mono.fromCallable(loader::load)
+			.subscribeOn(Schedulers.boundedElastic())
+			.flatMapMany(Flux::fromIterable)
 			.filter((source) -> StringUtils.hasText(source.getId()) && StringUtils.hasText(source.getSpecUrl()))
 			.map(this::toDocumentationRoute);
 	}

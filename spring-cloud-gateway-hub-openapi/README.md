@@ -33,7 +33,10 @@ spring.cloud.gateway.server.webflux:
 
 When [spring-cloud-gateway-routes-openapi](../spring-cloud-gateway-routes/spring-cloud-gateway-routes-openapi/README.md)
 is also on the classpath, the OpenAPI contracts it is configured with are automatically
-exposed in the aggregated Swagger UI, side by side with the discovered services. Each
+exposed in the aggregated Swagger UI, side by side with the discovered services. This
+covers the sources declared inline **and** those read from a document through
+`sources-locations` — the hub resolves the sources the same way the generator does, so a
+contract declared in a document served by a Config Server appears in the dropdown too. Each
 source's contract is proxied through the gateway (its `servers` section rewritten to the
 gateway), so there is no CORS issue and "Try it out" targets the gateway.
 
