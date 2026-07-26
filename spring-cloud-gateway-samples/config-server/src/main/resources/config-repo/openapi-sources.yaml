@@ -8,15 +8,23 @@
 #
 # Served at: http://localhost:8888/gateway/default/main/openapi-sources.yaml
 sources:
-  - id: petstore
-    # Backend target: only scheme/host/port is used, the path comes from the contract.
-    uri: https://petstore3.swagger.io
-    spec-url: https://petstore3.swagger.io/api/v3/openapi.json
-    # One route per operation, so each endpoint of the contract is routed individually.
-    mode: PER_OPERATION
+  - id: weather
+    uri: https://api.weather.gov
+    spec-url: https://api.weather.gov/openapi.json
+    mode: AGGREGATED
     # base-path: /api/v3   # optional; derived from the contract servers when omitted
     metadata:
       source: configserver
-      team: pets
+      team: weather
+    filters:
+      - Retry=3
+  - id: api.guru
+    uri: https://api.apis.guru
+    spec-url: https://api.apis.guru/v2/openapi.yaml
+    mode: AGGREGATED
+    # base-path: /api/v3   # optional; derived from the contract servers when omitted
+    metadata:
+      source: configserver
+      team: guru
     filters:
       - Retry=3

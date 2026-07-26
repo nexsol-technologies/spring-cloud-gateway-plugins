@@ -64,20 +64,23 @@ spring.cloud.gateway.server.webflux.routes-files:
   locations:
     - classpath:gateway-routes/*.yaml
 spring.cloud.gateway.server.webflux.routes-openapi:
-  enabled: false
-  # update-interval: 5m
-  # sources:
-  #   - id: petstore
-  #     uri: https://petstore3.swagger.io
-  #     spec-url: https://petstore3.swagger.io/api/v3/openapi.json
-  #     mode: PER_OPERATION
-  #     # base-path: /api/v3   # optional; derived from the contract servers when omitted
-  #     metadata:
-  #       team: pets
-  #     filters:
-  #       - Retry=3
+  enabled: true
+  update-interval: 5m
+  sources:
+   - id: petstore
+     uri: https://petstore3.swagger.io
+     spec-url: https://petstore3.swagger.io/api/v3/openapi.json
+     mode: PER_OPERATION
+     # base-path: /api/v3   # optional; derived from the contract servers when omitted
+     metadata:
+       team: pets
+     filters:
+       - Retry=3
 
-
+spring.cloud.gateway.server.webflux.ui.traffic:
+  excluded-routes:
+    - openapi-docs-.*
+       
 spring.r2dbc:
   url: r2dbc:h2:mem:///test_db;MODE=PostgreSQL
 

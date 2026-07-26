@@ -32,6 +32,6 @@ spring.cloud.gateway.server.webflux.routes-configserver:
 # sees it (it reads route definitions, not sources).
 spring.cloud.gateway.server.webflux.routes-openapi:
   enabled: true
-  update-interval: 5m
+  update-interval: 30s
   sources-locations:
     - http://localhost:8888/gateway/default/main/openapi-sources.yaml
