@@ -18,9 +18,6 @@ package ch.nexsol.gateway.sample;
 
 import java.util.List;
 
-import ch.nexsol.gateway.oauth2.filter.webfilter.BasicAuthExchangeToAccessTokenGatewayWebFilter;
-import ch.nexsol.gateway.oauth2.properties.BasicAuthExchangeToAccessTokenProperties;
-import ch.nexsol.gateway.oauth2.utils.SecurityUtils;
 import reactor.core.publisher.Hooks;
 
 import org.springframework.boot.SpringApplication;
@@ -28,11 +25,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.gateway.config.GlobalCorsProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Conditional;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
-import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.User;
@@ -69,21 +64,8 @@ public class ApiGatewayApplication {
 		return source;
 	}
 
-	@Bean
-	@Order(1)
-	@Conditional(ch.nexsol.gateway.oauth2.filter.webfilter.condition.BasicAuthExchangeConfiguredCondition.class)
-	SecurityWebFilterChain basicWebFilterChain(ServerHttpSecurity http,
-			BasicAuthExchangeToAccessTokenProperties properties,
-			BasicAuthExchangeToAccessTokenGatewayWebFilter basicAuthExchangeGatewayWebFilter) {
-		http.cors(withDefaults());
-		http.csrf(ServerHttpSecurity.CsrfSpec::disable);
-		http.securityMatcher(SecurityUtils.authorizationHeaderBasicMatcher(properties));
-		http.httpBasic(ServerHttpSecurity.HttpBasicSpec::disable);
-		http.formLogin(ServerHttpSecurity.FormLoginSpec::disable);
-		http.logout(ServerHttpSecurity.LogoutSpec::disable);
-		http.addFilterBefore(basicAuthExchangeGatewayWebFilter, SecurityWebFiltersOrder.AUTHENTICATION);
-		return http.build();
-	}
+	// The UI, OpenAPI hub and Basic-auth exchange chains are contributed by the ui,
+	// hub-openapi and oauth2 plugins themselves.
 
 	@Bean
 	@Order(2)
