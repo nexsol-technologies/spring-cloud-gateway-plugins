@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+	<!-- Route table, re-rendered on its own by the reload and refresh actions. -->
+	<div th:fragment="inventory" id="gr-inventory">
+		<p class="text-secondary small mb-2">
+			<span th:text="${#lists.size(routes)}">0</span> route definition(s) resolved, listed in
+			source order &mdash; the first route matching a request wins.
+		</p>
+		<div class="table-responsive">
+			<table class="table table-sm align-middle mb-0">
+				<thead>
+					<tr class="text-secondary small">
+						<th>Route</th>
+						<th>Source</th>
+						<th>Target</th>
+						<th class="text-end">Order</th>
+						<th>Predicates</th>
+						<th>Filters</th>
+					</tr>
+				</thead>
+				<tbody id="gr-tbody">
+					<tr th:each="route : ${routes}" class="gr-row"
+							th:attr="data-search=${route.routeId()} + ' ' + ${route.uri()} + ' ' + ${route.source()}">
+						<td>
+							<code th:text="${route.routeId()}">id</code>
+							<span th:if="${route.duplicated()}" class="badge text-bg-warning ms-1"
+									title="Another source declares a route with the same id; the lowest order wins.">
+								duplicate id
+							</span>
+						</td>
+						<td><span class="badge text-bg-light border fw-normal" th:text="${route.source()}">source</span></td>
+						<td class="text-break"><span th:text="${route.uri()}">uri</span></td>
+						<td class="text-end" th:text="${route.order()}">0</td>
+						<td>
+							<span th:each="predicate : ${route.predicates()}" class="gw-chip"
+									th:text="${predicate}">predicate</span>
+							<span th:if="${#lists.isEmpty(route.predicates())}" class="text-secondary">&mdash;</span>
+						</td>
+						<td>
+							<span th:each="filter : ${route.filters()}" class="gw-chip" th:text="${filter}">filter</span>
+							<span th:if="${#lists.isEmpty(route.filters())}" class="text-secondary">&mdash;</span>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<div th:if="${#lists.isEmpty(routes)}" class="text-secondary text-center py-4">
+			No route definitions found &mdash; declare routes in the properties, in the database or in
+			any other configured source.
+		</div>
+	</div>
+</body>
+</html>

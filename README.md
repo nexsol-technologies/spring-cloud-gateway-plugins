@@ -26,7 +26,7 @@ This plugin adds OAuth2 support to Spring Cloud Gateway, making it easier to imp
 This plugin aggregates the OpenAPI documentation of downstream services into a hub. (To generate routes from an OpenAPI contract instead, see [spring-cloud-gateway-routes-openapi](spring-cloud-gateway-routes/spring-cloud-gateway-routes-openapi/README.md).)
 
 [spring-cloud-gateway-ui](spring-cloud-gateway-ui/README.md)<br>
-This plugin provides a Spring Boot Admin-like web UI shell served under `/ui`: a home page with a collapsible side menu, where each gateway plugin lights up its own menu entry automatically when present on the classpath.
+This plugin provides a Spring Boot Admin-like web UI served under `/ui`, where each gateway plugin lights up its own view automatically when present on the classpath: an overview home page, the resolved routes with the source each one came from, a route tester answering which route would handle a described request (and why, predicate by predicate), a traffic chart and a live tail of the audit events.
 
 
 ## samples

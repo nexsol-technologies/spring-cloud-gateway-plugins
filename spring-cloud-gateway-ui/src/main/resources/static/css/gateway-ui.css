@@ -190,3 +190,21 @@
 .gw-sortable:hover {
 	color: var(--gw-sidebar-active-bg);
 }
+
+/* Predicate / filter chips ------------------------------------------------ */
+
+/*
+ * Used wherever a route predicate or filter is listed (routes table, route tester):
+ * a compact monospace token so a long list still scans vertically.
+ */
+.gw-chip {
+	display: inline-block;
+	margin: 0 .25rem .25rem 0;
+	padding: .1rem .4rem;
+	border: 1px solid rgba(0, 0, 0, .1);
+	border-radius: .3rem;
+	background: rgba(0, 0, 0, .03);
+	font-family: var(--bs-font-monospace);
+	font-size: .78rem;
+	white-space: nowrap;
+}

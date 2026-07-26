@@ -28,10 +28,34 @@
 			<artifactId>micrometer-core</artifactId>
 			<optional>true</optional>
 		</dependency>
+		<!-- Optional: the routes and route tester views read the gateway route
+		     definitions and route table. Always present in a gateway application. -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-gateway-server-webflux</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<!-- Optional: the audit view tails the events produced by the audit plugin. -->
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-audit-core</artifactId>
+			<version>${revision}</version>
+			<optional>true</optional>
+		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!--
+			The gateway brings spring-boot-micrometer-observation, which switches on the WebFlux
+			observation auto-configuration; introspecting it needs the metrics module. A real
+			gateway application gets it through its own actuator or metrics starter.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-micrometer-metrics</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

@@ -19,10 +19,19 @@ package ch.nexsol.gateway.ui;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.context.TypeExcludeFilter;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 
+/**
+ * Application backing the tests of this module.
+ * <p>
+ * The {@link TypeExcludeFilter} exclusion is what {@code @SpringBootApplication} adds for
+ * you: without it the scan picks up the {@code @TestConfiguration} classes of every test
+ * in these packages, so each test would see the beans contributed by all the others.
+ */
 @SpringBootConfiguration
-@ComponentScan
+@ComponentScan(excludeFilters = @ComponentScan.Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class))
 @EnableAutoConfiguration
 public class SpringAppConfiguration {
 

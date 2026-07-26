@@ -49,7 +49,29 @@ class DashboardControllerTests {
 			.value((body) -> assertThat(body).contains("gw-sidebar")
 				.contains("id=\"gw-toggle\"")
 				.contains("gw-nav-link")
-				.contains("Welcome to the gateway control panel."));
+				.contains("Where the gateway stands right now."));
+	}
+
+	@Test
+	void shouldRenderTheOverviewFiguresAndTheUptime() {
+		this.webTestClient.get()
+			.uri("/ui")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("up for").contains("Routes").contains("Views"));
+	}
+
+	@Test
+	void shouldLinkEveryPluginViewButTheHomeOneFromTheOverview() {
+		this.webTestClient.get()
+			.uri("/ui")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("/ui/widgets").contains("/ui/routes/test"));
 	}
 
 	@Test

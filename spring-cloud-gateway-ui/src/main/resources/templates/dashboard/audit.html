@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Audit', ~{:: #audit-content}, ~{:: #audit-scripts})}">
+<body>
+	<div id="audit-content">
+		<header class="mb-4">
+			<h1 class="h3 fw-bold mb-1">Audit</h1>
+			<p class="text-secondary mb-0">
+				The exchanges the audit plugin captured, newest first. Click a row for every audited
+				attribute.
+			</p>
+		</header>
+
+		<div class="card border-0 shadow-sm">
+			<div class="card-body">
+				<div class="d-flex flex-wrap gap-3 align-items-end mb-3">
+					<div>
+						<label class="form-label small text-secondary mb-1" for="ga-status">Status</label>
+						<select id="ga-status" class="form-select form-select-sm">
+							<option value="" selected>All</option>
+							<option value="2xx">2xx &mdash; success</option>
+							<option value="3xx">3xx &mdash; redirect</option>
+							<option value="4xx">4xx &mdash; client error</option>
+							<option value="5xx">5xx &mdash; server error</option>
+						</select>
+					</div>
+					<div>
+						<label class="form-label small text-secondary mb-1" for="ga-query">Search</label>
+						<input type="search" id="ga-query" class="form-control form-control-sm"
+								style="min-width: 16rem" placeholder="path, user, ip or trace id">
+					</div>
+					<div class="ms-auto d-flex align-items-center gap-3">
+						<div class="form-check form-switch mb-0">
+							<input class="form-check-input" type="checkbox" role="switch" id="ga-live" checked>
+							<label class="form-check-label small" for="ga-live">Live</label>
+						</div>
+						<button type="button" id="ga-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
+					</div>
+				</div>
+
+				<div class="table-responsive">
+					<table class="table table-sm align-middle mb-0">
+						<thead>
+							<tr class="text-secondary small">
+								<th>Time</th>
+								<th>Method</th>
+								<th>Path</th>
+								<th>Status</th>
+								<th>User</th>
+								<th>IP</th>
+								<th>Trace</th>
+							</tr>
+						</thead>
+						<tbody id="ga-tbody" th:attr="data-url=@{/ui/audit/events}" data-url="/ui/audit/events"></tbody>
+					</table>
+				</div>
+				<div id="ga-empty" class="text-secondary text-center py-5" style="display: none">
+					No audited exchange yet &mdash; send some traffic through the gateway with auditing
+					enabled on a route (or globally through the audit web filter).
+				</div>
+				<p class="text-secondary small mb-0 mt-2">
+					Kept in memory only, at most <span th:text="${capacity}">500</span> events, cleared on
+					restart. The configured audit backend keeps the durable copy.
+				</p>
+			</div>
+		</div>
+	</div>
+
+	<div id="audit-scripts">
+		<script th:src="@{/js/gateway-audit.js}" src="/js/gateway-audit.js"></script>
+	</div>
+</body>
+</html>
