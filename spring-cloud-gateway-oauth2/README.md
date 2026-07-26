@@ -47,7 +47,7 @@ It implements a token expiration-based caching mechanism to optimize performance
 <ul>
 <li>Basic to Bearer Conversion: Replaces Basic authentication with Bearer authentication for downstream services.</li>
 <li>Client Credentials Flow: Uses the standard OAuth 2.0 Client Credentials Grant flow.</li>
-<li>Caching: Caches the access token in memory, relying on the JWT expiration date (exp) to ensure only valid tokens are used.</li>
+<li>Caching: Caches the access token in memory, relying on the JWT expiration date (exp) to ensure only valid tokens are used. The application <code>CacheManager</code> is used when there is one, otherwise the filter falls back to its own in-memory cache: no caching setup is required in the host application.</li>
 </ul>  
 
 usage:

@@ -19,6 +19,9 @@ This plugin aggregates the OpenAPI documentation of downstream services into a h
 
 If Spring Cloud Gateway use route locator with discovery client (like eureka), this plugin search for openapi documentation in down stream client (with default path `/v3/api-docs`).
 
+When the application has no discovery client, the discovery-based beans simply back off:
+the hub keeps aggregating the statically configured contracts described below.
+
 ```yaml
 spring.cloud.gateway.server.webflux:
   discovery:

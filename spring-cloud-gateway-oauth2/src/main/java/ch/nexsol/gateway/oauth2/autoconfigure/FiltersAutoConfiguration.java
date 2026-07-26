@@ -22,9 +22,11 @@ import ch.nexsol.gateway.oauth2.filter.webfilter.condition.BasicAuthExchangeConf
 import ch.nexsol.gateway.oauth2.properties.BasicAuthExchangeToAccessTokenProperties;
 import io.micrometer.observation.ObservationRegistry;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 
@@ -48,12 +50,24 @@ public class FiltersAutoConfiguration {
 		return new BasicAuthExchangeToAccessTokenProperties();
 	}
 
+	/**
+	 * Registers the Basic-auth to access-token exchange web filter. The token cache and
+	 * the observation registry are taken from the application when it provides them, and
+	 * default to an in-memory cache and to a no-op registry otherwise, so that this
+	 * module does not require caching to be enabled in the host application.
+	 * @param properties the exchange configuration
+	 * @param cacheManager the optional application cache manager
+	 * @param observationRegistry the optional application observation registry
+	 * @return the Basic-auth exchange web filter bean
+	 */
 	@Bean
 	@Conditional(BasicAuthExchangeConfiguredCondition.class)
 	BasicAuthExchangeToAccessTokenGatewayWebFilter basicAuthExchangeGatewayWebFilter(
-			BasicAuthExchangeToAccessTokenProperties properties, CacheManager cacheManager,
-			ObservationRegistry registry) {
-		return new BasicAuthExchangeToAccessTokenGatewayWebFilter(properties, cacheManager, registry);
+			BasicAuthExchangeToAccessTokenProperties properties, ObjectProvider<CacheManager> cacheManager,
+			ObjectProvider<ObservationRegistry> observationRegistry) {
+		return new BasicAuthExchangeToAccessTokenGatewayWebFilter(properties,
+				cacheManager.getIfAvailable(ConcurrentMapCacheManager::new),
+				observationRegistry.getIfAvailable(() -> ObservationRegistry.NOOP));
 	}
 
 }
