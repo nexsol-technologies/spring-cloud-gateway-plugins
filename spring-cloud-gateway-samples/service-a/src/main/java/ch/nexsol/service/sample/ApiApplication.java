@@ -16,6 +16,7 @@
 
 package ch.nexsol.service.sample;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +41,7 @@ public class ApiApplication {
 	}
 
 	@RestController
+	@Tag(name = "sample service A", description = "It is just a sample.")
 	public static class Controller {
 
 		@RequestMapping("/sample")
