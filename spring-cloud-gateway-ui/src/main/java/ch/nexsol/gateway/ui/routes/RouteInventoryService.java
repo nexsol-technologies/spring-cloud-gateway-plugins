@@ -59,6 +59,9 @@ public class RouteInventoryService {
 	 */
 	private static final Pattern CAMEL_CASE_BOUNDARY = Pattern.compile("(?<=[a-z0-9])(?=[A-Z])");
 
+	/** Prefix the gateway gives an argument declared positionally, without a name. */
+	private static final String GENERATED_NAME_PREFIX = NameUtils.GENERATED_NAME_PREFIX;
+
 	private final ObjectProvider<RouteDefinitionLocator> locators;
 
 	private final ApplicationEventPublisher publisher;
@@ -120,22 +123,27 @@ public class RouteInventoryService {
 	}
 
 	/**
-	 * Renders a predicate or filter definition in the shortcut form used in YAML, so
-	 * {@code Path} with a generated argument reads as {@code Path=/api/**}.
+	 * Renders a predicate or filter definition the way it is declared.
+	 * <p>
+	 * Arguments given positionally, as the YAML shortcut syntax does, read back as that
+	 * shortcut: {@code Path=/api/**}. Named arguments are rendered as a call, so the name
+	 * of the element stays apart from the names of its arguments, as in
+	 * {@code Path(patterns=/api/**)}.
 	 * @param name the predicate or filter name
 	 * @param args the declared arguments
-	 * @return the shortcut representation
+	 * @return the representation shown in the UI
 	 */
 	static String describe(String name, Map<String, String> args) {
 		if (args == null || args.isEmpty()) {
 			return name;
 		}
+		boolean positional = args.keySet().stream().allMatch((key) -> key.startsWith(GENERATED_NAME_PREFIX));
 		String rendered = args.entrySet()
 			.stream()
-			.map((arg) -> arg.getKey().startsWith(NameUtils.GENERATED_NAME_PREFIX) ? arg.getValue()
+			.map((arg) -> arg.getKey().startsWith(GENERATED_NAME_PREFIX) ? arg.getValue()
 					: arg.getKey() + "=" + arg.getValue())
 			.collect(Collectors.joining(", "));
-		return name + "=" + rendered;
+		return positional ? name + "=" + rendered : name + "(" + rendered + ")";
 	}
 
 	private Flux<RouteView> readSource(RouteDefinitionLocator locator) {

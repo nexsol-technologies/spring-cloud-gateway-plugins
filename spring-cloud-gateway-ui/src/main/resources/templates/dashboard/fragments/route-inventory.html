@@ -8,13 +8,12 @@
 			source order &mdash; the first route matching a request wins.
 		</p>
 		<div class="table-responsive">
-			<table class="table table-sm align-middle mb-0">
+			<table class="table table-sm align-top mb-0 gw-routes">
 				<thead>
 					<tr class="text-secondary small">
-						<th>Route</th>
-						<th>Source</th>
-						<th>Target</th>
-						<th class="text-end">Order</th>
+						<th class="gw-col-route">Route</th>
+						<th class="gw-col-source">Source</th>
+						<th class="gw-col-order text-end">Order</th>
 						<th>Predicates</th>
 						<th>Filters</th>
 					</tr>
@@ -22,15 +21,19 @@
 				<tbody id="gr-tbody">
 					<tr th:each="route : ${routes}" class="gr-row"
 							th:attr="data-search=${route.routeId()} + ' ' + ${route.uri()} + ' ' + ${route.source()}">
+						<!--
+							Route id and target share a cell: the target is what the id resolves to, and
+							a URI is far too long to survive a column of its own next to the predicates.
+						-->
 						<td>
-							<code th:text="${route.routeId()}">id</code>
+							<code class="gw-route-id" th:text="${route.routeId()}">id</code>
 							<span th:if="${route.duplicated()}" class="badge text-bg-warning ms-1"
 									title="Another source declares a route with the same id; the lowest order wins.">
 								duplicate id
 							</span>
+							<span class="gw-target" th:text="${route.uri()}" th:title="${route.uri()}">uri</span>
 						</td>
 						<td><span class="badge text-bg-light border fw-normal" th:text="${route.source()}">source</span></td>
-						<td class="text-break"><span th:text="${route.uri()}">uri</span></td>
 						<td class="text-end" th:text="${route.order()}">0</td>
 						<td>
 							<span th:each="predicate : ${route.predicates()}" class="gw-chip"

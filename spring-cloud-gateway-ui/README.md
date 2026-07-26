@@ -72,9 +72,14 @@ Each source is queried individually instead of through the gateway's aggregate, 
 source name is derived from the locator class name, so a locator contributed by any plugin
 shows up correctly without this module knowing about it.
 
-**Columns** &mdash; route id, source, target, order, predicates and filters. Predicates and
-filters are rendered in the shortcut form used in YAML (`Path=/api/**`, `StripPrefix=1`)
-rather than as raw argument maps.
+**Columns** &mdash; route (its id, with the target it resolves to under it), source, order,
+predicates and filters. A predicate or filter is rendered the way it was declared, not as a
+raw argument map: positional arguments read back as the YAML shortcut (`Path=/api/**`,
+`StripPrefix=1`), named ones as a call (`Path(patterns=/api/**, matchTrailingSlash=true)`).
+
+The table scrolls horizontally rather than squeezing: a rewrite filter carries a whole
+regexp, and a target URI is shown on one line, cut with an ellipsis, with the full value in
+its tooltip.
 
 **Duplicate ids** &mdash; a route id declared by more than one source is badged. Both
 definitions do reach the route table; the lowest order is matched first.

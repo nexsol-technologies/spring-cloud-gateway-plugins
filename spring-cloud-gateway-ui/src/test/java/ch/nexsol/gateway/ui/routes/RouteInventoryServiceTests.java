@@ -66,8 +66,22 @@ class RouteInventoryServiceTests {
 
 		StepVerifier.create(serviceOver(new AlphaRouteDefinitionLocator(definition)).routes()).assertNext((routes) -> {
 			assertThat(routes.get(0).predicates()).containsExactly("Path=/alpha/**");
-			assertThat(routes.get(0).filters()).containsExactly("AddRequestHeader=name=X-Tenant, value=acme");
+			assertThat(routes.get(0).filters()).containsExactly("AddRequestHeader(name=X-Tenant, value=acme)");
 		}).verifyComplete();
+	}
+
+	@Test
+	void rendersPositionalArgumentsAsTheShortcutTheyWereDeclaredAs() {
+		assertThat(RouteInventoryService.describe("Path", Map.of("_genkey_0", "/alpha/**")))
+			.isEqualTo("Path=/alpha/**");
+	}
+
+	@Test
+	void rendersNamedArgumentsAsACallSoTheElementNameStaysApart() {
+		// A source declaring its arguments by name must not read as
+		// "Path=patterns=/alpha".
+		assertThat(RouteInventoryService.describe("Path", args("patterns", "/alpha/**", "matchTrailingSlash", "true")))
+			.isEqualTo("Path(patterns=/alpha/**, matchTrailingSlash=true)");
 	}
 
 	@Test
