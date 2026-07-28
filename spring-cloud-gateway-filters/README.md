@@ -17,7 +17,13 @@ Custom gateway and web filters for Spring Cloud Gateway.
 ### Authorization
 
 The `Authorization` filter checks the Spring Security `GrantedAuthority` entries of the
-authenticated principal against the authorities the route requires.
+authenticated principal against the authorities the route requires. Holding any one of
+them is enough, and each is matched as it is spelled — the `ROLE_` prefix included.
+
+The filter fails closed: a request carrying no authenticated principal is denied with
+`401 Unauthorized`, and one whose principal holds none of the required authorities with
+`403 Forbidden`. It never relies on an upstream security filter chain to stop anonymous
+traffic on its behalf.
 
 ```yaml
 spring.cloud.gateway.server.webflux:
@@ -29,7 +35,16 @@ spring.cloud.gateway.server.webflux:
     filters:
     - name: Authorization
       args:
-        authorities: READ
+        authorities:
+        - READ
+        - WRITE
+```
+
+The shortcut form takes the authorities as a comma-separated list:
+
+```yaml
+    filters:
+    - Authorization=READ,WRITE
 ```
 
 ### ConvertHttpMethod

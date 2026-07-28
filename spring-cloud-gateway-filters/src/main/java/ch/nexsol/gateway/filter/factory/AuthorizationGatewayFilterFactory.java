@@ -34,16 +34,17 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Gateway filter factory that authorizes the request by requiring the authenticated
- * principal to hold at least one of the configured authorities, rejecting it with
- * {@code 403 Forbidden} otherwise.
+ * principal to hold at least one of the configured authorities.
+ * <p>
+ * The filter fails closed: a request carrying no authenticated principal is denied with
+ * {@code 401 Unauthorized}, and one whose principal holds none of the configured
+ * authorities with {@code 403 Forbidden}. No request reaches the route unauthorized,
+ * whether or not a security filter chain protects it upstream.
  */
 public class AuthorizationGatewayFilterFactory
 		extends AbstractGatewayFilterFactory<AuthorizationGatewayFilterFactory.Config> {
 
-	/**
-	 * Authorities key.
-	 */
-	public static final String AUTHORITIES_KEY = "authorities";
+	private static final String AUTHORITIES_KEY = "authorities";
 
 	/**
 	 * Creates the factory bound to its {@link Config} type.
@@ -55,7 +56,7 @@ public class AuthorizationGatewayFilterFactory
 	/**
 	 * {@inheritDoc}
 	 * <p>
-	 * Maps the single shortcut argument to the {@code authorities} configuration field.
+	 * Maps the shortcut arguments to the {@code authorities} configuration field.
 	 */
 	@Override
 	public List<String> shortcutFieldOrder() {
@@ -63,29 +64,34 @@ public class AuthorizationGatewayFilterFactory
 	}
 
 	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Gathers every shortcut argument into the single {@code authorities} list, so that
+	 * {@code Authorization=READ,WRITE} requires either authority rather than silently
+	 * dropping all but the first.
+	 */
+	@Override
+	public ShortcutType shortcutType() {
+		return ShortcutType.GATHER_LIST;
+	}
+
+	/**
 	 * Builds a filter that forwards the request only when the authenticated principal
-	 * holds one of the configured authorities.
+	 * holds one of the configured authorities, and denies it otherwise.
 	 * @param config the filter configuration holding the required authorities
 	 * @return a gateway filter enforcing the authority check
 	 */
 	@Override
 	public GatewayFilter apply(Config config) {
-		return (exchange, chain) -> {
-			return exchange.getPrincipal()
-				.filter((principal) -> (principal) instanceof Authentication)
-				.cast(Authentication.class)
-				.map(Authentication::getAuthorities)
-				.flatMap((authorities) -> {
-					if (!hasAuthority(authorities, config.getAuthorities())) {
-						return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN));
-					}
-					else {
-						return Mono.just(exchange);
-					}
-				})
-				.defaultIfEmpty(exchange)
-				.flatMap(chain::filter);
-		};
+		return (exchange, chain) -> exchange.getPrincipal()
+			.ofType(Authentication.class)
+			.switchIfEmpty(Mono.defer(() -> Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED))))
+			.flatMap((authentication) -> {
+				if (!hasAuthority(authentication.getAuthorities(), config.getAuthorities())) {
+					return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN));
+				}
+				return chain.filter(exchange);
+			});
 	}
 
 	private boolean hasAuthority(Collection<? extends GrantedAuthority> userAuthorities,
