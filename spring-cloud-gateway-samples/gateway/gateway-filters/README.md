@@ -47,3 +47,8 @@ sample, whose route asks for a bare `READ`.
 The fourth filter of the plugin needs a secret key issued by Google, so the sample declares
 the route commented out in [`application.yml`](src/main/resources/application.yml) rather
 than shipping one that cannot answer.
+
+Worth knowing before enabling it: the filter denies with `403` on **every** outcome that is
+not a verified token — a missing token, a rejected one, a score below the threshold, and a
+verification endpoint that is unreachable or answers an error. It fails closed, and the
+reason goes to the log rather than to the caller.

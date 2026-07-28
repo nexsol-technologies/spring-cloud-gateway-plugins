@@ -59,7 +59,7 @@ spring.cloud.gateway.server.webflux:
   #       version: V3
   #       secret-key: ${RECAPTCHA_SECRET_KEY}
   #       recaptcha-http-header: recaptcha
-  #       score: 90
+  #       score: 50   # v3 only, on a 0-100 scale; Google recommends 0.5
   #   - StripPrefix=1
 
 management:

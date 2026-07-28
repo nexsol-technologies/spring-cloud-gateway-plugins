@@ -22,6 +22,7 @@ import ch.nexsol.gateway.filter.factory.ConvertHttpMethodGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.RecaptchaGatewayFilterFactory;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -55,12 +56,13 @@ public class FiltersAutoConfiguration {
 
 	/**
 	 * Registers the reCAPTCHA gateway filter factory.
-	 * @param webClient the web client used to call the reCAPTCHA endpoint
+	 * @param recaptchaWebClient the client dedicated to the reCAPTCHA endpoint
 	 * @return the reCAPTCHA filter factory bean
 	 */
 	@Bean
-	RecaptchaGatewayFilterFactory recaptchaGatewayFilterFactory(WebClient webClient) {
-		return new RecaptchaGatewayFilterFactory(webClient);
+	RecaptchaGatewayFilterFactory recaptchaGatewayFilterFactory(
+			@Qualifier("recaptchaWebClient") WebClient recaptchaWebClient) {
+		return new RecaptchaGatewayFilterFactory(recaptchaWebClient);
 	}
 
 	/**
@@ -76,16 +78,26 @@ public class FiltersAutoConfiguration {
 	}
 
 	/**
-	 * Provides a default {@link WebClient} for reCAPTCHA verification when none is
-	 * already defined. The client is derived from the application
-	 * {@link WebClient.Builder} when one is available, so that this module stays usable
-	 * without the WebClient auto-configuration on the classpath.
+	 * Registers the client the reCAPTCHA filter verifies tokens with.
+	 * <p>
+	 * Declared as its own bean, and injected by name, so the filter never borrows the
+	 * {@code WebClient} of the host application: that one may carry a base URL, an
+	 * {@code Authorization} header the application's own credentials, or be
+	 * {@code @LoadBalanced} &mdash; which would send the application's credentials to
+	 * Google, or resolve the verification host through the service registry and fail. An
+	 * application needing more than the defaults declares a {@code recaptchaWebClient}
+	 * bean of its own and it is used instead.
+	 * <p>
+	 * It is derived from the application {@code WebClient.Builder} when there is one, so
+	 * the codecs and customizers of the application still apply, and falls back to a
+	 * plain builder so this module stays usable without the WebClient auto-configuration
+	 * on the classpath.
 	 * @param webClientBuilder the optional application web client builder
-	 * @return the web client bean
+	 * @return the client dedicated to the reCAPTCHA endpoint
 	 */
 	@Bean
-	@ConditionalOnMissingBean(WebClient.class)
-	WebClient webClientForRecaptcha(ObjectProvider<WebClient.Builder> webClientBuilder) {
+	@ConditionalOnMissingBean(name = "recaptchaWebClient")
+	WebClient recaptchaWebClient(ObjectProvider<WebClient.Builder> webClientBuilder) {
 		return webClientBuilder.getIfAvailable(WebClient::builder).build();
 	}
 

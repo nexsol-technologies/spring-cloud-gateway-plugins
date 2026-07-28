@@ -36,11 +36,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -120,32 +120,54 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 		return (exchange, chain) -> {
 			ServerHttpRequest request = exchange.getRequest();
 			String scheme = request.getURI().getScheme();
-			if ((!HTTP_SCHEME.equalsIgnoreCase(scheme) && !HTTPS_SCHEME.equals(scheme))) {
+			if ((!HTTP_SCHEME.equalsIgnoreCase(scheme) && !HTTPS_SCHEME.equalsIgnoreCase(scheme))) {
 				return chain.filter(exchange);
 			}
 
-			return extractRecaptchaToken(request, config)
-				.flatMap((recaptcha) -> this
-					.callRecaptchaValidateToken(config.getVerifyUrl(), config.getSecretKey(), recaptcha,
-							config.getRecaptchaResponseVersion())
-					.flatMap((result) -> Mono.just(result)
-						.filter((r) -> r instanceof RecaptchaResponseV3)
-						.cast(RecaptchaResponseV3.class)
-						.flatMap((resultV3) -> validateV3(resultV3, config.getScore()))
-						.cast(RecaptchaResponseIdentifier.class)
-						.switchIfEmpty(Mono.just(result)
-							.filter((r) -> r instanceof RecaptchaResponseV2)
-							.cast(RecaptchaResponseV2.class)
-							.flatMap((resultV2) -> validateV2(resultV2))
-							.cast(RecaptchaResponseIdentifier.class))))
-				.map((recaptchaResponse) -> exchange)
+			return extractRecaptchaToken(request, config).flatMap((recaptcha) -> verify(config, recaptcha))
 				// Fail closed: if validation produced no result, deny rather than let the
 				// request through unverified.
 				.switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN,
 						"reCAPTCHA validation could not be completed")))
-				.flatMap(chain::filter);
-
+				.flatMap((recaptchaResponse) -> chain.filter(exchange));
 		};
+	}
+
+	/**
+	 * Verifies the token against the provider and validates the answer with the rules of
+	 * the configured version.
+	 * <p>
+	 * The version drives the dispatch rather than the runtime type of the answer:
+	 * {@link RecaptchaResponseV3} extends {@link RecaptchaResponseV2}, so an
+	 * {@code instanceof} chain would only be correct as long as the v3 branch came first.
+	 * @param config the reCAPTCHA verification configuration
+	 * @param recaptchaToken the token carried by the request
+	 * @return the validated response, or an error when it does not pass
+	 */
+	private Mono<RecaptchaResponseIdentifier> verify(Config config, String recaptchaToken) {
+		Mono<RecaptchaResponseIdentifier> verdict = switch (config.getVersion()) {
+			case V3 -> callRecaptchaValidateToken(config.getVerifyUrl(), config.getSecretKey(), recaptchaToken,
+					RecaptchaResponseV3.class)
+				.flatMap((response) -> validateV3(response, config.getScore()))
+				.cast(RecaptchaResponseIdentifier.class);
+			case V2 -> callRecaptchaValidateToken(config.getVerifyUrl(), config.getSecretKey(), recaptchaToken,
+					RecaptchaResponseV2.class)
+				.flatMap(this::validateV2)
+				.cast(RecaptchaResponseIdentifier.class);
+		};
+		return verdict.onErrorResume((error) -> !isRejection(error), (error) -> {
+			// No verdict could be reached: the endpoint was unreachable, timed out,
+			// refused the call or answered something unreadable. Deny, like every other
+			// path that cannot confirm the token, and log why — the caller is not the one
+			// who can act on it.
+			LOG.error("Could not verify the reCAPTCHA token against {}", config.getVerifyUrl(), error);
+			return Mono.error(rejected());
+		});
+	}
+
+	private boolean isRejection(Throwable error) {
+		return error instanceof ResponseStatusException statusException
+				&& HttpStatus.FORBIDDEN.equals(statusException.getStatusCode());
 	}
 
 	private Mono<String> extractRecaptchaToken(ServerHttpRequest request, Config config) {
@@ -170,36 +192,55 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.bodyValue(map)
 			.retrieve()
-			.onStatus(HttpStatusCode::is4xxClientError, (response) -> response.bodyToMono(String.class).map((m) -> {
-				LOG.error("Error when call {} : {} - {}", verifyUrl, response.statusCode(), m);
-				throw new ResponseStatusException(response.statusCode());
-			}))
-			.onStatus(HttpStatusCode::is5xxServerError, (response) -> response.bodyToMono(String.class).map((m) -> {
-				LOG.error("Error when call {} : {} - {}", verifyUrl, response.statusCode(), m);
-				throw new ResponseStatusException(response.statusCode());
-			}))
+			// The handler returns the error rather than throwing it, and defaults the
+			// body, so an error answer with an empty body still produces one — an empty
+			// bodyToMono would otherwise emit nothing and let the call carry on as if
+			// the status had been fine.
+			.onStatus(HttpStatusCode::is4xxClientError, (response) -> verificationFailed(verifyUrl, response))
+			.onStatus(HttpStatusCode::is5xxServerError, (response) -> verificationFailed(verifyUrl, response))
 			.bodyToMono(responseVersionType)
 			.timeout(VERIFY_TIMEOUT);
+	}
+
+	private Mono<Throwable> verificationFailed(String verifyUrl, ClientResponse response) {
+		return response.bodyToMono(String.class)
+			.defaultIfEmpty("")
+			.map((body) -> new IllegalStateException("The reCAPTCHA verification endpoint %s answered %s: %s"
+				.formatted(verifyUrl, response.statusCode(), body)));
 	}
 
 	private Mono<RecaptchaResponseV2> validateV2(RecaptchaResponseV2 recaptchaResponse) {
 		if (!recaptchaResponse.isSuccess()) {
 			LOG.debug("Invalid reCAPTCHA token {}", recaptchaResponse);
-			return Mono.error(new BadCredentialsException("Invalid reCaptcha token"));
+			return Mono.error(rejected());
 		}
 		return Mono.just(recaptchaResponse);
 	}
 
-	private Mono<RecaptchaResponseV3> validateV3(RecaptchaResponseV3 recaptchaResponse, short V3Threshold) {
+	private Mono<RecaptchaResponseV3> validateV3(RecaptchaResponseV3 recaptchaResponse, short threshold) {
 		if (!recaptchaResponse.isSuccess()) {
 			LOG.debug("Invalid reCAPTCHA token {}", recaptchaResponse);
-			return Mono.error(new BadCredentialsException("Invalid reCaptcha token"));
+			return Mono.error(rejected());
 		}
-		if (recaptchaResponse.getScore() * 100 < V3Threshold) {
-			LOG.debug("Invalid score {} reCAPTCHA token {}", V3Threshold, recaptchaResponse);
-			return Mono.error(new BadCredentialsException("Invalid reCaptcha token"));
+		// Compared on the 0.0-1.0 scale the provider answers on, rather than by scaling
+		// the score up: 0.29 * 100 is 28.999999999999996, which would reject a score
+		// exactly meeting a threshold of 29.
+		if (recaptchaResponse.getScore() < threshold / 100.0) {
+			LOG.debug("reCAPTCHA score {} below the threshold {} for token {}", recaptchaResponse.getScore(), threshold,
+					recaptchaResponse);
+			return Mono.error(rejected());
 		}
 		return Mono.just(recaptchaResponse);
+	}
+
+	/**
+	 * The verdict a failed verification is answered with. It carries a status, so the
+	 * caller is told it was refused rather than getting the 500 an exception no handler
+	 * maps produces &mdash; and the same status as a request carrying no token at all.
+	 * @return the exception denying the request
+	 */
+	private ResponseStatusException rejected() {
+		return new ResponseStatusException(HttpStatus.FORBIDDEN, "reCAPTCHA validation failed");
 	}
 
 	/**
@@ -220,13 +261,15 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 		@NotEmpty
 		private String recaptchaHttpHeader = "recaptcha";
 
+		/**
+		 * Minimum v3 score, on a 0-100 scale, for a token to be accepted. Google
+		 * recommends 0.5 as a starting point, which is what this default is: legitimate
+		 * traffic commonly scores between 0.7 and 0.9, and a stricter threshold turns
+		 * real users away.
+		 */
 		@Min(0)
 		@Max(100)
-		private short score = 90;
-
-		Class<?> getRecaptchaResponseVersion() {
-			return (this.getVersion() == Version.V3) ? RecaptchaResponseV3.class : RecaptchaResponseV2.class;
-		}
+		private short score = 50;
 
 		/**
 		 * Returns the reCAPTCHA verification endpoint URL.

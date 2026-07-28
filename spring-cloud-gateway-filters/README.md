@@ -83,5 +83,35 @@ spring.cloud.gateway.server.webflux:
         version:               # (optional) V2 or V3; default V3
         secret-key:            # the secret key issued by Google reCAPTCHA
         recaptcha-http-header: # (optional) header carrying the captcha; default 'recaptcha'
-        score:                 # (optional) minimal score to accept, 0 to 100; default 90
+        score:                 # (optional) minimal score to accept, 0 to 100; default 50
+```
+
+The `score` threshold applies to v3 only, where the provider answers a score between 0.0 and
+1.0. The default of `50` is Google's recommended starting point: legitimate traffic commonly
+scores between 0.7 and 0.9, so a stricter threshold turns real users away. In v2 the answer
+carries no score and the threshold is ignored.
+
+#### Everything that is not a pass is a 403
+
+The filter forwards a request only once the token has been verified. Every other outcome —
+no token, a token the provider rejected, a score below the threshold, an unreachable or
+failing verification endpoint, an unreadable answer — denies the request with **403**, and
+the reason is logged rather than handed to the caller. A refusal is not a failure of the
+gateway and must not read as one, and the status of the verification endpoint is never
+relayed: a misconfigured secret key is not the caller's problem to see.
+
+#### The verification client
+
+The calls to the verification endpoint go through a `recaptchaWebClient` bean of the
+plugin's own, never through the application's `WebClient`. That one may carry a base URL,
+the application's credentials or be `@LoadBalanced`, none of which belong on a call to
+Google. It is derived from the application `WebClient.Builder` when there is one, so codecs
+and customizers still apply. For anything more — a proxy, mTLS, a custom timeout — declare
+the bean yourself and it is used instead:
+
+```java
+@Bean
+WebClient recaptchaWebClient(WebClient.Builder builder) {
+    return builder.filter(myProxyFilter()).build();
+}
 ```

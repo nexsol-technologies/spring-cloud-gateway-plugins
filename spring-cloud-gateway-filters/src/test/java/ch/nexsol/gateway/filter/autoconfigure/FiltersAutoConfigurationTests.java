@@ -65,12 +65,29 @@ class FiltersAutoConfigurationTests {
 			});
 	}
 
+	/**
+	 * The application client is left alone <em>and</em> left out of the verification: it
+	 * may carry a base URL, the application's own credentials, or be load balanced, none
+	 * of which belong on a call to Google.
+	 */
 	@Test
-	void applicationWebClientIsNotReplaced() {
-		WebClient webClient = WebClient.create();
-		this.runner.withBean(WebClient.class, () -> webClient).run((context) -> {
+	void applicationWebClientIsNeitherReplacedNorBorrowed() {
+		WebClient applicationWebClient = WebClient.create();
+		this.runner.withBean("applicationWebClient", WebClient.class, () -> applicationWebClient).run((context) -> {
+			assertThat(context).hasNotFailed();
+			assertThat(context.getBean("applicationWebClient", WebClient.class)).isSameAs(applicationWebClient);
+			assertThat(context).hasBean("recaptchaWebClient");
+			assertThat(context.getBean("recaptchaWebClient", WebClient.class)).isNotSameAs(applicationWebClient);
+			assertThat(context).hasSingleBean(RecaptchaGatewayFilterFactory.class);
+		});
+	}
+
+	@Test
+	void aRecaptchaWebClientDeclaredByTheApplicationWins() {
+		WebClient dedicated = WebClient.create();
+		this.runner.withBean("recaptchaWebClient", WebClient.class, () -> dedicated).run((context) -> {
 			assertThat(context).hasSingleBean(WebClient.class);
-			assertThat(context.getBean(WebClient.class)).isSameAs(webClient);
+			assertThat(context.getBean("recaptchaWebClient", WebClient.class)).isSameAs(dedicated);
 		});
 	}
 
