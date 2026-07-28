@@ -195,7 +195,24 @@ class PrometheusRouteMetricsSourceTests {
 		RouteMetricsSnapshot snapshot = source().collect().block();
 
 		assertThat(snapshot.metrics()).isEmpty();
-		assertThat(snapshot.coverage()).contains("unreachable");
+		assertThat(snapshot.coverage()).contains("refused with 500");
+	}
+
+	@Test
+	void tellsARefusedCredentialApartFromAnUnreachableServer() {
+		// An expired token otherwise looks exactly like a network outage, on a page
+		// nobody
+		// would think to correlate with a secret rotation.
+		respondWithStatus(401);
+
+		assertThat(source().collect().block().coverage()).contains("authentication refused (401)");
+	}
+
+	@Test
+	void reportsAForbiddenAnswerAsAnAuthenticationProblemToo() {
+		respondWithStatus(403);
+
+		assertThat(source().collect().block().coverage()).contains("authentication refused (403)");
 	}
 
 	@Test

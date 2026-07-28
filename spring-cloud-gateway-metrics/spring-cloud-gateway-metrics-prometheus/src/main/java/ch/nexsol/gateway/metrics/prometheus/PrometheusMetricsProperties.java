@@ -53,6 +53,27 @@ public class PrometheusMetricsProperties {
 	private Duration timeout = Duration.ofSeconds(5);
 
 	/**
+	 * User name of the Basic credentials sent to Prometheus. Set it together with the
+	 * password; leave both unset when the server needs no Basic authentication.
+	 */
+	private String username;
+
+	/**
+	 * Password of the Basic credentials sent to Prometheus.
+	 */
+	private String password;
+
+	/**
+	 * Bearer token sent to Prometheus, for a server that authenticates with one (Thanos,
+	 * Mimir, the OpenShift monitoring stack). Ignored when Basic credentials are set.
+	 * <p>
+	 * The token is read once, at startup. A token that rotates &mdash; a Kubernetes
+	 * service account token, for instance &mdash; needs the application to declare its
+	 * own {@code prometheusMetricsWebClient} bean instead.
+	 */
+	private String token;
+
+	/**
 	 * @return the Prometheus meter base name
 	 */
 	public String getMeter() {
@@ -106,6 +127,48 @@ public class PrometheusMetricsProperties {
 	 */
 	public void setTimeout(Duration timeout) {
 		this.timeout = timeout;
+	}
+
+	/**
+	 * @return the Basic user name
+	 */
+	public String getUsername() {
+		return this.username;
+	}
+
+	/**
+	 * @param username the Basic user name
+	 */
+	public void setUsername(String username) {
+		this.username = username;
+	}
+
+	/**
+	 * @return the Basic password
+	 */
+	public String getPassword() {
+		return this.password;
+	}
+
+	/**
+	 * @param password the Basic password
+	 */
+	public void setPassword(String password) {
+		this.password = password;
+	}
+
+	/**
+	 * @return the bearer token
+	 */
+	public String getToken() {
+		return this.token;
+	}
+
+	/**
+	 * @param token the bearer token
+	 */
+	public void setToken(String token) {
+		this.token = token;
 	}
 
 }

@@ -29,6 +29,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -64,18 +65,46 @@ public class PrometheusMetricsAutoConfiguration {
 		}
 
 		/**
-		 * Registers the source querying Prometheus.
+		 * Registers the client used to query Prometheus, carrying the configured
+		 * credentials.
+		 * <p>
+		 * Declared as its own bean so an application whose Prometheus needs more than
+		 * Basic or a static bearer token &mdash; mTLS, OAuth2 client credentials, a
+		 * service account token that rotates &mdash; can declare a
+		 * {@code prometheusMetricsWebClient} bean of its own and have it used instead.
+		 * The credentials are set on a client dedicated to Prometheus rather than through
+		 * a {@code WebClientCustomizer}, which would put them on every client of the
+		 * application.
 		 * @param builder the application web client builder
+		 * @param properties the Prometheus configuration
+		 * @return the client querying Prometheus
+		 */
+		@Bean
+		@ConditionalOnMissingBean(name = "prometheusMetricsWebClient")
+		WebClient prometheusMetricsWebClient(WebClient.Builder builder, PrometheusMetricsProperties properties) {
+			WebClient.Builder prometheus = builder.baseUrl(properties.getUrl());
+			if (StringUtils.hasText(properties.getUsername())) {
+				prometheus = prometheus.defaultHeaders((headers) -> headers.setBasicAuth(properties.getUsername(),
+						(properties.getPassword() != null) ? properties.getPassword() : ""));
+			}
+			else if (StringUtils.hasText(properties.getToken())) {
+				prometheus = prometheus.defaultHeaders((headers) -> headers.setBearerAuth(properties.getToken()));
+			}
+			return prometheus.build();
+		}
+
+		/**
+		 * Registers the source querying Prometheus.
+		 * @param prometheusMetricsWebClient the client querying Prometheus
 		 * @param properties the Prometheus configuration
 		 * @param metricsProperties the shared metrics configuration
 		 * @return the Prometheus route metrics source
 		 */
 		@Bean
 		@ConditionalOnMissingBean(RouteMetricsSource.class)
-		RouteMetricsSource prometheusRouteMetricsSource(WebClient.Builder builder,
+		RouteMetricsSource prometheusRouteMetricsSource(WebClient prometheusMetricsWebClient,
 				PrometheusMetricsProperties properties, MetricsProperties metricsProperties) {
-			return new PrometheusRouteMetricsSource(builder.baseUrl(properties.getUrl()).build(), properties,
-					metricsProperties);
+			return new PrometheusRouteMetricsSource(prometheusMetricsWebClient, properties, metricsProperties);
 		}
 
 	}
