@@ -1,0 +1,33 @@
+{
+  "properties": [
+    {
+      "name": "spring.cloud.gateway.server.webflux.ui.traffic.excluded-routes",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Moved out of the UI when the metrics became a plugin of their own, the exclusions being applied by every source and not just by the view.",
+      "deprecation": {
+        "level": "error",
+        "replacement": "spring.cloud.gateway.server.webflux.metrics.excluded-routes",
+        "reason": "The route metrics are no longer owned by the UI module."
+      }
+    }
+  ],
+  "hints": [
+    {
+      "name": "spring.cloud.gateway.server.webflux.metrics.provider",
+      "values": [
+        {
+          "value": "prometheus",
+          "description": "Read the consolidated figures from Prometheus. The only source that survives an instance being replaced. Requires spring-cloud-gateway-metrics-prometheus."
+        },
+        {
+          "value": "redis",
+          "description": "Each instance publishes its figures into Redis and the view sums them. Requires spring-cloud-gateway-metrics-redis."
+        },
+        {
+          "value": "discovery",
+          "description": "Poll every instance registered in the service registry. Requires spring-cloud-gateway-metrics-discovery."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "hints": [
+    {
+      "name": "spring.cloud.gateway.server.webflux.audit.provider",
+      "values": [
+        {
+          "value": "kafka",
+          "description": "Publish the audit events to a Kafka topic. Requires spring-cloud-gateway-audit-kafka."
+        },
+        {
+          "value": "redis",
+          "description": "Publish the audit events to a Redis pub/sub channel. Requires spring-cloud-gateway-audit-redis."
+        },
+        {
+          "value": "r2dbc",
+          "description": "Insert the audit events into a relational table through R2DBC. Requires spring-cloud-gateway-audit-r2dbc."
+        }
+      ]
+    }
+  ]
+}
