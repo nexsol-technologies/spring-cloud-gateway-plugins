@@ -16,6 +16,7 @@
 	<modules>
 		<module>spring-cloud-gateway-metrics-core</module>
 		<module>spring-cloud-gateway-metrics-prometheus</module>
+		<module>spring-cloud-gateway-metrics-redis</module>
 		<module>spring-cloud-gateway-metrics-discovery</module>
 	</modules>
 
