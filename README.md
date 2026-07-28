@@ -13,6 +13,9 @@
 [spring-cloud-gateway-audit](spring-cloud-gateway-audit/README.md)<br>
 This plugin audits gateway requests and responses (JWT, request, response and trace attributes, toggled by logical group) and pushes them to a pluggable provider (Redis, Kafka, RabbitMQ, database, ...). It works per-route (the Audit gateway filter) or globally (a web filter).
 
+[spring-cloud-gateway-metrics](spring-cloud-gateway-metrics/README.md)<br>
+This plugin collects the per-route request figures the traffic view plots, from a pluggable source. The default reads the meter registry of the running instance; behind a load balancer that is only its own share of the traffic, so a provider consolidates every instance instead (Prometheus, Redis, or the service registry). Every figure is reported with the coverage it was computed over.
+
 [spring-cloud-gateway-routes](spring-cloud-gateway-routes/README.md) <br>
 This plugin manages gateway route definitions from pluggable sources aggregated into a route locator: a database (with a simple GUI), JSON/YAML files (GitOps friendly), and OpenAPI contracts.
 
