@@ -1,6 +1,7 @@
 # spring-cloud-gateway-hub-openapi
 
-This plugin aggregates the OpenAPI documentation of downstream services into a hub for Spring Cloud Gateway.
+Aggregates the OpenAPI documentation of the downstream services into a single hub, served by
+the gateway.
 
 > To generate gateway routes from an OpenAPI contract instead, use
 > [spring-cloud-gateway-routes-openapi](../spring-cloud-gateway-routes/spring-cloud-gateway-routes-openapi/README.md).
@@ -15,12 +16,13 @@ This plugin aggregates the OpenAPI documentation of downstream services into a h
     </dependencies>
 ```
 
-## Using Discovery client
+## Discovering the contracts through the discovery client
 
-If Spring Cloud Gateway use route locator with discovery client (like eureka), this plugin search for openapi documentation in down stream client (with default path `/v3/api-docs`).
+When the gateway routes through a discovery client (Eureka, for instance), the hub fetches the
+contract of every discovered service, at `/v3/api-docs` by default.
 
-When the application has no discovery client, the discovery-based beans simply back off:
-the hub keeps aggregating the statically configured contracts described below.
+An application without a discovery client makes the discovery-based beans back off; the hub then
+serves the statically configured contracts described below.
 
 ```yaml
 spring.cloud.gateway.server.webflux:
@@ -82,12 +84,11 @@ covers the sources declared inline **and** those read from a document through
 contract declared in a document served by a Config Server appears in the dropdown too.
 
 A source carrying a `path-prefix` has its contract advertised with that prefix, so
-"Try it out" calls the prefixed route the generator created rather than the bare contract
-path. Each
-source's contract is proxied through the gateway (its `servers` section rewritten to the
-gateway), so there is no CORS issue and "Try it out" targets the gateway.
+"Try it out" calls the prefixed route the generator created rather than the bare contract path.
+Each source's contract is proxied through the gateway, its `servers` section rewritten to the
+gateway, so "Try it out" targets the gateway and raises no CORS issue.
 
-No extra configuration is needed beyond enabling both plugins:
+Enabling both plugins is all that is required:
 
 ```yaml
 spring.cloud.gateway.server.webflux.hub-openapi:

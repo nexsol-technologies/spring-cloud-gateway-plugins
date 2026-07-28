@@ -1,8 +1,8 @@
 # spring-cloud-gateway-ui
 
-This plugin provides a Spring Boot Admin-like web UI shell for Spring Cloud Gateway: a
-home page served under `/ui` with a collapsible side menu. Each gateway plugin lights up
-its own menu entry automatically when it is present on the classpath.
+A Spring Boot Admin-like web UI shell for Spring Cloud Gateway: a home page served under
+`/ui` with a collapsible side menu. Each gateway plugin lights up its own menu entry
+automatically when it is present on the classpath.
 
 ```xml
     <dependencies>

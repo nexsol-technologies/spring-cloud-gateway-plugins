@@ -1,6 +1,6 @@
 # spring-cloud-gateway-filters
 
-This project provides filters for Spring Cloud Gateway
+Custom gateway and web filters for Spring Cloud Gateway.
 
 ```xml
     <dependencies>
@@ -16,9 +16,8 @@ This project provides filters for Spring Cloud Gateway
 
 ### Authorization
 
-The `Authorization` filter validates Spring security `GrantedAuthority`, when Role Based Access Control (RBAC) is activated. 
-
-usage: 
+The `Authorization` filter checks the Spring Security `GrantedAuthority` entries of the
+authenticated principal against the authorities the route requires.
 
 ```yaml
 spring.cloud.gateway.server.webflux:
@@ -35,9 +34,8 @@ spring.cloud.gateway.server.webflux:
 
 ### ConvertHttpMethod
 
-The `ConvertHttpMethod` filter converts a http method to another. ex GET to POST
-
-usage: 
+The `ConvertHttpMethod` filter rewrites the HTTP method of the forwarded request — a `GET`
+received by the gateway reaching the backend as a `POST`, for instance.
 
 ```yaml
 spring.cloud.gateway.server.webflux:
@@ -52,22 +50,24 @@ spring.cloud.gateway.server.webflux:
 ```
 
 ### CorrelationId
-The `CorrelationId` filter adds the `x-correlation-id` header to the HTTP response. Its value is the `traceId` from Micrometer Tracing observation.
+
+The `CorrelationId` filter adds an `x-correlation-id` header to the response, carrying the
+`traceId` of the current Micrometer Tracing observation.
+
 ```yaml
 spring.cloud.gateway.server.webflux:
   webfilter:
     correlation-id.enabled: true
 ```
 
-This filter relies on Micrometer Tracing observation, so you need to include `spring-boot-starter-actuator` and provide a [tracer implementation](https://docs.spring.io/spring-boot/reference/actuator/tracing.html) in your classpath.
-
+The filter reads the current observation, so it needs `spring-boot-starter-actuator` and a
+[tracer implementation](https://docs.spring.io/spring-boot/reference/actuator/tracing.html) on
+the classpath.
 
 ### Recaptcha
 
-The `Recaptcha` filter verifies and validates a CAPTCHA score using Google's reCAPTCHA.
-It provides a simple layer of protection for non-authenticated APIs.
-
-usage: 
+The `Recaptcha` filter verifies a CAPTCHA score against Google's reCAPTCHA, a layer of
+protection for the APIs that are exposed without authentication.
 
 ```yaml
 spring.cloud.gateway.server.webflux:
@@ -79,9 +79,9 @@ spring.cloud.gateway.server.webflux:
     filters:
     - name: Recaptcha
       args:
-        verify-url: the url of the site to validate the captcha.
-        version: # (optional) the version of reCAPTCHA : V2 or V3. Default is V3.
-        secret-key: # the secret key to use to validate captcha. It is generated at Google reCAPTCHA.
-        recaptcha-http-header: #(optional) where to retreive the captcha in the http header. Default is 'recaptcha'
-        score: # (optional) the minimal score to have for the request. (0 - 100). Default is '90'
+        verify-url:            # the reCAPTCHA verification endpoint
+        version:               # (optional) V2 or V3; default V3
+        secret-key:            # the secret key issued by Google reCAPTCHA
+        recaptcha-http-header: # (optional) header carrying the captcha; default 'recaptcha'
+        score:                 # (optional) minimal score to accept, 0 to 100; default 90
 ```

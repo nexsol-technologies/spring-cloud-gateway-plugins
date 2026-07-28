@@ -1,6 +1,7 @@
 # spring-cloud-gateway-routes-database
 
-This project provides a database management for routes for Spring Cloud Gateway
+Stores Spring Cloud Gateway route definitions in a relational database (R2DBC) and aggregates
+them into the route locator. Routes are managed through a REST API and a bundled management UI.
 
 ```xml
     <dependencies>
@@ -12,34 +13,29 @@ This project provides a database management for routes for Spring Cloud Gateway
     </dependencies>
 ```
 
-## Light GUI
+## Management UI
 
-A server-rendered management UI is bundled with the plugin and rendered inside the gateway UI shell at `/ui/routes/db`. It requires the `spring-cloud-gateway-ui` plugin: when that shell is present, the UI activates and appears as the **Database routes** entry in the shared side menu; without it, the plugin exposes only its REST API.
-It is built with **Thymeleaf**, **Bootstrap 5** and **HTMX** (no build step, assets
-vendored under `static/`) and drives the same REST endpoints described below.
+The plugin bundles a server-rendered management page, hosted inside the gateway UI shell at
+`/ui/routes/db`. It requires the `spring-cloud-gateway-ui` plugin: when that shell is present
+the page activates and appears as the **Database routes** entry in the shared side menu;
+without it the plugin exposes its REST API only.
 
-<p align="center">
-  <img src="doc/spring-cloud-gateway-database-ui.png" alt="spring-cloud-gateway-database-ui" width="50%"/>
-  <br>
-  <em>Manage routes saved in database from <code>/ui/routes/db</code>.</em>
-  <br>
-</p>
-
-From `/ui/routes/db` you can:
+The page is rendered with Thymeleaf and driven by HTMX, against the same REST endpoints
+described below. From `/ui/routes/db` you can:
 
 - list existing routes with their predicates and filters;
 - create and edit routes, dynamically adding predicates and filters;
-- pick a predicate/filter and have its accepted arguments loaded on the fly (HTMX);
+- pick a predicate or a filter and have its accepted arguments loaded on the fly;
 - delete routes.
 
 The page and its HTMX fragments are exposed by `RouteViewController` under `/ui/routes/db`, while
 the JSON REST API stays available under `/api/gateway/routes`.
 
-## API Gateway Routes Management
+## REST API
 
-This project provides an API for managing gateway routes in a reactive environment using **Spring WebFlux**.
+A reactive (Spring WebFlux) API for managing the stored routes, under `/api/gateway/routes`:
 
-### Features
-
-- Dynamic Route Management: Supports CRUD operations on routes. <br>
-- Predicate & Filter Support: Routes can be defined with predicates (conditions to match requests) and filters (modifications to requests/responses).
+- **CRUD on routes** — create, read, update and delete route definitions at runtime.
+- **Predicates and filters** — a route carries its predicates (the conditions matching a
+  request) and its filters (the modifications applied to the request and the response), in the
+  same form the gateway configuration uses.

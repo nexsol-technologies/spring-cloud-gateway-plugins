@@ -1,6 +1,7 @@
 # spring-cloud-gateway-oauth2
 
-This plugin provides OAuth2 support for Spring Cloud Gateway.
+OAuth2 support for Spring Cloud Gateway: per-route access token validation, an exchange of
+Basic credentials for a Bearer token, JWT authority mapping and multi-tenant issuers.
 
 ```xml
     <dependencies>
@@ -16,9 +17,9 @@ This plugin provides OAuth2 support for Spring Cloud Gateway.
 
 ### AuthorizationToken
 
-The `AuthorizationToken` filter validates an access token (JWT). It retrieves the `Principal` from Spring Security or the `Authorization` header. If the token does not meet the validation rules for the route, the filter responds with HTTP status 403 Forbidden.
-
-usage: 
+The `AuthorizationToken` filter validates an access token (JWT). It reads the `Principal` from
+Spring Security, or the `Authorization` header. A token that does not meet the validation rules
+declared on the route is answered with `403 Forbidden`.
 
 ```yaml
 spring.cloud.gateway.server.webflux:
@@ -41,16 +42,18 @@ spring.cloud.gateway.server.webflux:
 
 ### BasicAuthExchangeToAccessToken
 
-This Spring Cloud Gateway filter is designed to intercept incoming requests containing a Basic authentication header, exchange it for a Bearer token (Access Token) from an OAuth2 server, and replace the Basic header with the Bearer token for transmission to downstream services.
-It implements a token expiration-based caching mechanism to optimize performance and minimize calls to the authorization server.
-<h3> 🚀 Key Features </h3> 
-<ul>
-<li>Basic to Bearer Conversion: Replaces Basic authentication with Bearer authentication for downstream services.</li>
-<li>Client Credentials Flow: Uses the standard OAuth 2.0 Client Credentials Grant flow.</li>
-<li>Caching: Caches the access token in memory, relying on the JWT expiration date (exp) to ensure only valid tokens are used. The application <code>CacheManager</code> is used when there is one, otherwise the filter falls back to its own in-memory cache: no caching setup is required in the host application.</li>
-</ul>  
+Intercepts a request carrying a Basic authentication header, exchanges those credentials for an
+access token at an OAuth2 server, and replaces the header with the resulting Bearer token before
+the request is forwarded downstream. Tokens are cached until they expire, so the authorization
+server is not called on every request.
 
-usage:
+* **Basic to Bearer** — downstream services see Bearer authentication, whatever the caller sent.
+* **Client Credentials** — the exchange uses the standard OAuth 2.0 Client Credentials grant.
+* **Caching** — the access token is cached in memory and evicted on its JWT `exp` claim, so an
+  expired token is never reused. The application `CacheManager` is used when there is one;
+  otherwise the filter falls back to its own in-memory cache, so the host application needs no
+  caching setup.
+
 ```yaml
 spring.cloud.gateway.server.webflux:
   webfilter:
@@ -88,13 +91,13 @@ spring.cloud.gateway.server.webflux:
 > must declare its own chains.
 
 
-## Converter for GrantedAuthority
+## GrantedAuthority converter
 
-### Default Converter
+### Default converter
 
-By default, this plugin provides a converter to parse JWTs and extract Spring Security `GrantedAuthority`.
+The plugin parses the JWT and maps its claims to Spring Security `GrantedAuthority` entries.
 
-The following claims are searched in the access token to create `GrantedAuthority` entries:
+The following claims are read from the access token:
 
 | Claim Path                  | Description                                                                 |
 |-----------------------------|-----------------------------------------------------------------------------|
@@ -103,9 +106,9 @@ The following claims are searched in the access token to create `GrantedAuthorit
 | `$.permissions`             | Additional permissions.                                                     |
 | `$.roles`                   | General roles.                                                              |
 
-### Configurable Converter
+### Configurable converter
 
-You can define custom paths to locate claims in the JWT and map them to Spring Security `GrantedAuthority`:
+Declare your own claim paths to map further claims to `GrantedAuthority`:
 
 ```yaml
 spring:
@@ -120,11 +123,14 @@ spring:
 
 ## Multitenancy
 
-This plugin simplifies the implementation of multi-tenant OAuth2 authentication and JWT validation in Spring Cloud Gateway. It dynamically configures and validates requests based on tenant-specific OAuth2 settings, enabling seamless support for multiple tenants, each with its own identity provider.
+A gateway can accept tokens from several identity providers at once: each request is validated
+against the settings of the tenant that issued its token, so every tenant keeps its own
+authorization server.
 
-### Tenant-Specific OAuth2 Configurations
+### Tenant-specific configuration
 
-You can configure an OIDC issuer URI for each tenant. The issuer URI serves as a discovery endpoint that returns OpenID Connect or OAuth 2.0 metadata for the authorization server.
+Declare one OIDC issuer URI per tenant. The issuer URI is the discovery endpoint returning the
+OpenID Connect or OAuth 2.0 metadata of that authorization server.
 
 ```yaml
 spring:
@@ -138,7 +144,7 @@ spring:
             issuer-uri: https://{yourOktaOrg}
 ```
 
-### Dynamic Tenant Identification *(Not Implemented)*
+### Dynamic tenant identification *(not implemented)*
 
-Future versions may allow tenant information to be extracted dynamically from request headers, subdomains, or other sources.
+Resolving the tenant from the request itself — a header, a subdomain — is not supported yet.
 

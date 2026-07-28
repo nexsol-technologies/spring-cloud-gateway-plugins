@@ -1,70 +1,86 @@
 # spring-cloud-gateway-samples
 
-## Getting start
+Runnable applications exercising the plugins. Start the modules a scenario needs, then the
+`gateway` module.
+
+## The modules
 
 ### auth-server
-Launch auth-server: this will start an easy config of oauth2 authorization server. 
-To log-in, use these two user:password : `user:user` with role 'USER'  or `admin:admin` with role 'ADMIN'
+
+A minimally configured OAuth2 authorization server. Two accounts are declared: `user:user`
+with the `USER` role, and `admin:admin` with the `ADMIN` role.
 
 ### eureka
-Launch Eureka service discovery to test SCGateway Openapi discovery with service-a.
+
+The service registry, used to exercise the OpenAPI discovery of the hub against `service-a`.
 
 ### service-a
-Launch service-a: this will start a simple app with a controller.
+
+A backend application exposing a single controller, used as the downstream service.
 
 ### config-server
-Launch config-server: a Spring Cloud Config Server (port `8888`) serving gateway route files from
-a native classpath repository (`config-repo/orders-routes.yaml`, `config-repo/billing-routes.yaml`).
-Check a served file with:
-`curl http://localhost:8888/gateway/default/main/orders-routes.yaml`
+
+A Spring Cloud Config Server (port `8888`) serving gateway route files from a native classpath
+repository (`config-repo/orders-routes.yaml`, `config-repo/billing-routes.yaml`). Check a
+served file with:
+
+```console
+curl http://localhost:8888/gateway/default/main/orders-routes.yaml
+```
 
 ### gateway
-Launch gateway. 
 
-#### spring-cloud-gateway-filters
-In the application.yml some routes are configured to test the filters provided by the plugin
+The gateway itself, on port `8181`, with the plugins wired in. The scenarios below run
+against it.
 
-| Url | Description |
+## Scenarios
+
+### spring-cloud-gateway-filters
+
+`application.yml` declares a few routes exercising the filters the plugin provides:
+
+| Url | What it shows |
 | --- | --- |
-| http://localhost:8181/test-authorization/sample | the validation of a basic authentification |
-| http://localhost:8181/test-authorization-token/sample | the validation of jwt with 'user:user' is successful |
-| http://localhost:8181/test-authorization-token-ko/sample | the validation of jwt with 'user:user' is failed |
+| http://localhost:8181/test-authorization/sample | Basic authentication being validated |
+| http://localhost:8181/test-authorization-token/sample | a JWT obtained with `user:user` passing validation |
+| http://localhost:8181/test-authorization-token-ko/sample | the same JWT being rejected |
 
+### spring-cloud-gateway-hub-openapi
 
-#### spring-cloud-gateway-hub-openapi
-<i>For the demo, you need to run the gateway and service-a with the profile "eureka".</i>
-<br>
-To test, go to http://localhost:8181/swagger-ui.html and you should have access to swagger interface with SERVICE-A api's:
+> Run the gateway and `service-a` with the `eureka` profile.
+
+Open http://localhost:8181/swagger-ui.html: the Swagger UI serves the contracts of the
+discovered services, `SERVICE-A` among them.
+
 <p align="center">
   <img src="doc/spring-cloud-gateway-openapi.png" alt="spring-cloud-gateway-openapi" width="50%"/>
 </p>
 
-#### spring-cloud-gateway-ui
+### spring-cloud-gateway-ui
 
-The sample bundles the `spring-cloud-gateway-ui` shell. Go to http://localhost:8181/ui for
-the home page and its collapsible side menu. Because the routes-database plugin is on the
-classpath, a **Database routes** entry lights up automatically and leads to the management UI.
+The sample bundles the `spring-cloud-gateway-ui` shell. Open http://localhost:8181/ui for the
+home page and its collapsible side menu. The routes-database plugin being on the classpath, a
+**Database routes** entry lights up on its own and leads to the management UI.
 
-#### spring-cloud-gateway-routes-configserver
-<i>For the demo, run the `config-server` sample first, then start the gateway with the `configserver` profile:</i>
-<br>
-`mvn spring-boot:run -Dspring-boot.run.profiles=configserver` (from the `gateway` module).
-<br>
-The gateway loads its route files from the Config Server (via
-[`application-configserver.yml`](gateway/src/main/resources/application-configserver.yml)) and exposes:
+### spring-cloud-gateway-routes-configserver
 
-| Url | Description |
+> Start the `config-server` module first, then the gateway with the `configserver` profile:
+> `mvn spring-boot:run -Dspring-boot.run.profiles=configserver` from the `gateway` module.
+
+The gateway loads its route files from the Config Server (see
+[`application-configserver.yml`](gateway/src/main/resources/application-configserver.yml)) and
+exposes:
+
+| Url | Route |
 | --- | --- |
-| http://localhost:8181/cs-orders/get | route `configserver_orders_route` → httpbin.org |
-| http://localhost:8181/cs-billing/get | route `configserver_billing_route` → httpbin.org |
+| http://localhost:8181/cs-orders/get | `configserver_orders_route` → httpbin.org |
+| http://localhost:8181/cs-billing/get | `configserver_billing_route` → httpbin.org |
 
-Change a file in `config-server/.../config-repo/` and hit `POST http://localhost:8181/actuator/refresh`
-(or wait for `update-interval`) to reload the routes without restarting the gateway.
+Change a file under `config-server/.../config-repo/` and call
+`POST http://localhost:8181/actuator/refresh` (or wait for `update-interval`) to reload the
+routes without restarting the gateway.
 
-#### spring-cloud-gateway-routes-database
+### spring-cloud-gateway-routes-database
 
-To test, go to http://localhost:8181/ui/routes/db (or open it from the **Database routes** menu entry)
-and you should have access to the gui to manage routes:
-<p align="center">
-  <img src="../spring-cloud-gateway-routes/spring-cloud-gateway-routes-database/doc/spring-cloud-gateway-database-ui.png" alt="spring-cloud-gateway-openapi" width="50%"/>
-</p>
+Open http://localhost:8181/ui/routes/db, or the **Database routes** menu entry, to manage the
+routes stored in the database.
