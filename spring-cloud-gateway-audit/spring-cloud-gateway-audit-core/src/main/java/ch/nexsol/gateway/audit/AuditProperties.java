@@ -16,6 +16,9 @@
 
 package ch.nexsol.gateway.audit;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * Configuration properties for the auditing plugin, bound under
  * {@code spring.cloud.gateway.server.webflux.audit}. Each logical group of attributes can
@@ -35,6 +38,13 @@ public class AuditProperties {
 	 * default logging/{@code ApplicationEvent} publisher is used.
 	 */
 	private String provider;
+
+	/**
+	 * Metadata added to every audit event, audited under the {@code metadata.} prefix.
+	 * Use it to stamp the events with what identifies this gateway rather than the
+	 * exchange: the environment, the datacenter, the instance.
+	 */
+	private Map<String, String> metadata = new LinkedHashMap<>();
 
 	private Groups groups = new Groups();
 
@@ -66,6 +76,20 @@ public class AuditProperties {
 	 */
 	public void setProvider(String provider) {
 		this.provider = provider;
+	}
+
+	/**
+	 * @return the metadata added to every audit event
+	 */
+	public Map<String, String> getMetadata() {
+		return this.metadata;
+	}
+
+	/**
+	 * @param metadata the metadata added to every audit event
+	 */
+	public void setMetadata(Map<String, String> metadata) {
+		this.metadata = metadata;
 	}
 
 	/**
@@ -122,6 +146,12 @@ public class AuditProperties {
 		private boolean trace = true;
 
 		/**
+		 * Collect the {@code route.*} attributes: the id of the route that handled the
+		 * exchange and the metadata declared on it.
+		 */
+		private boolean route = true;
+
+		/**
 		 * @return whether the JWT group is collected
 		 */
 		public boolean isJwt() {
@@ -175,6 +205,20 @@ public class AuditProperties {
 		 */
 		public void setTrace(boolean trace) {
 			this.trace = trace;
+		}
+
+		/**
+		 * @return whether the route group is collected
+		 */
+		public boolean isRoute() {
+			return this.route;
+		}
+
+		/**
+		 * @param route whether the route group is collected
+		 */
+		public void setRoute(boolean route) {
+			this.route = route;
 		}
 
 	}

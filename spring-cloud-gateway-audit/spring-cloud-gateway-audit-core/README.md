@@ -23,9 +23,49 @@ Attributes are grouped so each group can be enabled or disabled independently.
 | `request`  | `request.header.accept`, `request.header.content-length`, `request.header.content-type`, `request.ip`, `request.method`, `request.parameters`, `request.path` |
 | `response` | `response.header.content-length`, `response.header.content-type`, `response.status` |
 | `trace`    | `trace.id`, `span.id` |
+| `route`    | `route.id`, `route.metadata.<key>` for every metadata declared on that route |
 
 Absent values are rendered as `_none_`; an expected-but-unresolved content type is
 rendered as `unknown`.
+
+The `route` group answers *which route handled this call, and what does the configuration
+say about it*. The metadata is read from the route that actually matched, so anything
+declared there &mdash; the owning team, the tenant, a criticality level &mdash; travels
+with the event to the audit backend:
+
+```yaml
+routes:
+  - id: patient
+    uri: https://backend
+    predicates:
+      - Path=/patient/**
+    filters:
+      - Audit
+    metadata:
+      tenant: acme
+      criticality: high
+```
+
+audits `route.id=patient`, `route.metadata.tenant=acme` and
+`route.metadata.criticality=high`. An exchange no route handled &mdash; a request that
+matched nothing, or a page the gateway served itself when the global web filter is on
+&mdash; is audited as `route.id=_none_`, with no metadata attribute.
+
+## Global metadata
+
+What identifies the gateway rather than the exchange is declared once and stamped on every
+event, under the `metadata.` prefix:
+
+```yaml
+audit:
+  metadata:
+    environment: prod
+    datacenter: geneva
+```
+
+audits `metadata.environment=prod` and `metadata.datacenter=geneva` on every event. The two
+prefixes are distinct namespaces, so a route metadata and a global one may share a name
+without either overwriting the other (`metadata.tenant` and `route.metadata.tenant` coexist).
 
 `jwt.user.id` is the JWT `preferred_username` (falling back to `sub`), or the Basic-auth
 user name when the request is authenticated with Basic credentials. `jwt.client.id` reads
@@ -46,11 +86,14 @@ spring:
           audit:
             enabled: true            # master switch (default true)
             provider:                # kafka | redis | r2dbc ; unset = default publisher
+            metadata:                # stamped on every event under metadata.*
+              environment: prod
             groups:
               jwt: true              # default true
               request: true          # default true
               response: true         # default true
               trace: true            # default true
+              route: true            # default true
             web-filter:
               enabled: false         # global auditing, opt-in (default false)
           routes:
@@ -70,7 +113,8 @@ All keys are under `spring.cloud.gateway.server.webflux.audit`.
 |----------|---------|-------------|
 | `enabled` | `true` | Master switch; when `false` no audit filter is registered |
 | `provider` | _(unset)_ | Provider selector, read by the provider modules |
-| `groups.jwt` / `groups.request` / `groups.response` / `groups.trace` | `true` | Toggle each attribute group |
+| `metadata.<key>` | _(empty)_ | Metadata added to every event as `metadata.<key>` |
+| `groups.jwt` / `groups.request` / `groups.response` / `groups.trace` / `groups.route` | `true` | Toggle each attribute group |
 | `web-filter.enabled` | `false` | Register the global auditing web filter |
 
 ## Default publisher

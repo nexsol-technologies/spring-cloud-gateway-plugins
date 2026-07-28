@@ -58,6 +58,23 @@ public final class AuditAttributes {
 	public static final String JWT_USER_ID = "jwt.user.id";
 
 	/**
+	 * Id of the gateway route that handled the exchange.
+	 */
+	public static final String ROUTE_ID = "route.id";
+
+	/**
+	 * Prefix of the attributes carrying the metadata of that route: a route metadata
+	 * named {@code tenant} is audited as {@code route.metadata.tenant}.
+	 */
+	public static final String ROUTE_METADATA_PREFIX = "route.metadata.";
+
+	/**
+	 * Prefix of the attributes carrying the metadata configured globally: a metadata
+	 * named {@code environment} is audited as {@code metadata.environment}.
+	 */
+	public static final String METADATA_PREFIX = "metadata.";
+
+	/**
 	 * Request {@code Accept} header.
 	 */
 	public static final String REQUEST_HEADER_ACCEPT = "request.header.accept";

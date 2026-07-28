@@ -30,6 +30,7 @@ import io.micrometer.tracing.Span;
 import io.micrometer.tracing.handler.TracingObservationHandler.TracingContext;
 import reactor.core.publisher.Mono;
 
+import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -48,6 +49,7 @@ import static ch.nexsol.gateway.audit.AuditAttributes.JWT_IMPERSONATOR_USER_ID;
 import static ch.nexsol.gateway.audit.AuditAttributes.JWT_IMPERSONATOR_USER_NAME;
 import static ch.nexsol.gateway.audit.AuditAttributes.JWT_ISSUER_ID;
 import static ch.nexsol.gateway.audit.AuditAttributes.JWT_USER_ID;
+import static ch.nexsol.gateway.audit.AuditAttributes.METADATA_PREFIX;
 import static ch.nexsol.gateway.audit.AuditAttributes.NONE_VALUE;
 import static ch.nexsol.gateway.audit.AuditAttributes.REQUEST_HEADER_ACCEPT;
 import static ch.nexsol.gateway.audit.AuditAttributes.REQUEST_HEADER_CONTENT_LENGTH;
@@ -59,13 +61,17 @@ import static ch.nexsol.gateway.audit.AuditAttributes.REQUEST_PATH;
 import static ch.nexsol.gateway.audit.AuditAttributes.RESPONSE_HEADER_CONTENT_LENGTH;
 import static ch.nexsol.gateway.audit.AuditAttributes.RESPONSE_HEADER_CONTENT_TYPE;
 import static ch.nexsol.gateway.audit.AuditAttributes.RESPONSE_STATUS;
+import static ch.nexsol.gateway.audit.AuditAttributes.ROUTE_ID;
+import static ch.nexsol.gateway.audit.AuditAttributes.ROUTE_METADATA_PREFIX;
 import static ch.nexsol.gateway.audit.AuditAttributes.SPAN_ID;
 import static ch.nexsol.gateway.audit.AuditAttributes.TRACE_ID;
 import static ch.nexsol.gateway.audit.AuditAttributes.UNKNOWN_VALUE;
+import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
 
 /**
  * Builds an {@link AuditEvent} from a {@link ServerWebExchange}, collecting only the
- * logical groups enabled through {@link AuditProperties.Groups}.
+ * logical groups enabled through {@link AuditProperties.Groups}, plus the metadata
+ * declared once for the whole gateway through {@link AuditProperties#getMetadata()}.
  */
 public class AuditEventFactory {
 
@@ -75,12 +81,16 @@ public class AuditEventFactory {
 
 	private final AuditProperties.Groups groups;
 
+	private final Map<String, String> metadata;
+
 	/**
 	 * Create a new factory.
-	 * @param properties the audit properties holding the group feature flags
+	 * @param properties the audit properties holding the group feature flags and the
+	 * metadata stamped on every event
 	 */
 	public AuditEventFactory(AuditProperties properties) {
 		this.groups = properties.getGroups();
+		this.metadata = new LinkedHashMap<>(properties.getMetadata());
 	}
 
 	/**
@@ -100,6 +110,10 @@ public class AuditEventFactory {
 		if (this.groups.isTrace()) {
 			collectTrace(exchange, attributes);
 		}
+		if (this.groups.isRoute()) {
+			collectRoute(exchange, attributes);
+		}
+		collectMetadata(attributes);
 		if (!this.groups.isJwt()) {
 			return Mono.just(new AuditEvent(Instant.now(), attributes));
 		}
@@ -144,6 +158,22 @@ public class AuditEventFactory {
 				}
 			}
 		}
+	}
+
+	private void collectRoute(ServerWebExchange exchange, Map<String, String> attributes) {
+		Route route = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
+		if (route == null) {
+			// No route handled the exchange: the global web filter also audits what the
+			// gateway served itself, and a request that matched nothing.
+			attributes.put(ROUTE_ID, NONE_VALUE);
+			return;
+		}
+		attributes.put(ROUTE_ID, StringUtils.hasText(route.getId()) ? route.getId() : NONE_VALUE);
+		route.getMetadata().forEach((key, value) -> attributes.put(ROUTE_METADATA_PREFIX + key, stringValue(value)));
+	}
+
+	private void collectMetadata(Map<String, String> attributes) {
+		this.metadata.forEach((key, value) -> attributes.put(METADATA_PREFIX + key, stringValue(value)));
 	}
 
 	private void collectJwt(ServerWebExchange exchange, Principal principal, Map<String, String> attributes) {
@@ -254,6 +284,10 @@ public class AuditEventFactory {
 			return httpStatus.name();
 		}
 		return String.valueOf(status.value());
+	}
+
+	private static String stringValue(Object value) {
+		return (value != null) ? value.toString() : NONE_VALUE;
 	}
 
 	private static String firstNonBlank(String first, String second) {

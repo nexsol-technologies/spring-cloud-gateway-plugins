@@ -25,6 +25,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
+import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -38,6 +39,7 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.ServerWebExchangeDecorator;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
 
 class AuditEventFactoryTests {
 
@@ -186,6 +188,76 @@ class AuditEventFactoryTests {
 	}
 
 	@Test
+	void collectsTheMetadataOfTheRouteThatHandledTheExchange() {
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/orders/42").build());
+		exchange.getAttributes().put(GATEWAY_ROUTE_ATTR, route("orders", Map.of("tenant", "acme", "criticality", 1)));
+
+		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
+
+		assertThat(attributes).containsEntry(AuditAttributes.ROUTE_ID, "orders")
+			.containsEntry(AuditAttributes.ROUTE_METADATA_PREFIX + "tenant", "acme")
+			.containsEntry(AuditAttributes.ROUTE_METADATA_PREFIX + "criticality", "1");
+	}
+
+	@Test
+	void rendersTheRouteAsNoneWhenTheExchangeWasNotRouted() {
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/orders/42").build());
+
+		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
+
+		assertThat(attributes).containsEntry(AuditAttributes.ROUTE_ID, AuditAttributes.NONE_VALUE);
+		assertThat(attributes.keySet()).noneMatch((key) -> key.startsWith(AuditAttributes.ROUTE_METADATA_PREFIX));
+	}
+
+	@Test
+	void skipsTheRouteGroupWhenDisabled() {
+		AuditProperties properties = new AuditProperties();
+		properties.getGroups().setRoute(false);
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/orders/42").build());
+		exchange.getAttributes().put(GATEWAY_ROUTE_ATTR, route("orders", Map.of("tenant", "acme")));
+
+		Map<String, String> attributes = new AuditEventFactory(properties).create(exchange).block().attributes();
+
+		assertThat(attributes).doesNotContainKey(AuditAttributes.ROUTE_ID)
+			.doesNotContainKey(AuditAttributes.ROUTE_METADATA_PREFIX + "tenant");
+	}
+
+	@Test
+	void stampsEveryEventWithTheGloballyConfiguredMetadata() {
+		AuditProperties properties = new AuditProperties();
+		properties.getMetadata().put("environment", "prod");
+		properties.getMetadata().put("datacenter", "geneva");
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/orders/42").build());
+
+		Map<String, String> attributes = new AuditEventFactory(properties).create(exchange).block().attributes();
+
+		assertThat(attributes).containsEntry(AuditAttributes.METADATA_PREFIX + "environment", "prod")
+			.containsEntry(AuditAttributes.METADATA_PREFIX + "datacenter", "geneva");
+	}
+
+	@Test
+	void keepsGlobalAndRouteMetadataInSeparateNamespaces() {
+		AuditProperties properties = new AuditProperties();
+		properties.getMetadata().put("tenant", "shared");
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/orders/42").build());
+		exchange.getAttributes().put(GATEWAY_ROUTE_ATTR, route("orders", Map.of("tenant", "acme")));
+
+		Map<String, String> attributes = new AuditEventFactory(properties).create(exchange).block().attributes();
+
+		assertThat(attributes).containsEntry(AuditAttributes.METADATA_PREFIX + "tenant", "shared")
+			.containsEntry(AuditAttributes.ROUTE_METADATA_PREFIX + "tenant", "acme");
+	}
+
+	@Test
+	void addsNoMetadataAttributeWhenNoneIsConfigured() {
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/orders/42").build());
+
+		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
+
+		assertThat(attributes.keySet()).noneMatch((key) -> key.startsWith(AuditAttributes.METADATA_PREFIX));
+	}
+
+	@Test
 	void usesPrincipalNameWhenNeitherJwtNorBasic() {
 		ServerWebExchange exchange = withPrincipal(
 				MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build()),
@@ -194,6 +266,10 @@ class AuditEventFactoryTests {
 		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
 
 		assertThat(attributes).containsEntry(AuditAttributes.JWT_USER_ID, "svc");
+	}
+
+	private static Route route(String id, Map<String, Object> metadata) {
+		return Route.async().id(id).uri("http://orders").predicate((exchange) -> true).metadata(metadata).build();
 	}
 
 	private MockServerWebExchange exchangeWithResponse(MockServerHttpRequest request) {
