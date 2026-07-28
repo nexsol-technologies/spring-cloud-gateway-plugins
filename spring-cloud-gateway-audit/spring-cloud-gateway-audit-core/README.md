@@ -28,6 +28,13 @@ Attributes are grouped so each group can be enabled or disabled independently.
 Absent values are rendered as `_none_`; an expected-but-unresolved content type is
 rendered as `unknown`.
 
+The `trace` group is read from the current Micrometer Tracing observation, so it needs a
+tracer that is actually wired. Since Spring Boot 4 that takes two dependencies &mdash; the
+bridge *and* its auto-configuration module &mdash; and declaring only the bridge yields
+empty `trace.id` and `span.id` on every event without any error. See
+[wiring a real tracer](../../spring-cloud-gateway-filters/README.md#wiring-a-real-tracer)
+for the Brave and OpenTelemetry pairs.
+
 The `route` group answers *which route handled this call, and what does the configuration
 say about it*. The metadata is read from the route that actually matched, so anything
 declared there &mdash; the owning team, the tenant, a criticality level &mdash; travels

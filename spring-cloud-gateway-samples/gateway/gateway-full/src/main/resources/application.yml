@@ -1,8 +1,6 @@
 server.port: 8181
 spring.application.name: gateway
 
-
-
 spring.cloud.gateway.server.webflux:
   webfilter:
     correlation-id.enabled: true
@@ -125,9 +123,11 @@ management:
     gateway:
       access: read-only
   tracing:
-    enabled: true
     sampling:
       probability: 1
+    export:
+      enabled: true
+    
 logging:
   level:
     '[ch.nexsol]': debug

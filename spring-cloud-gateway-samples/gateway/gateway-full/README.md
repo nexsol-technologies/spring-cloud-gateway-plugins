@@ -88,3 +88,13 @@ application events, and the traffic figures are those of this instance. The
 [gateway-audit](../gateway-audit/README.md) and
 [gateway-metrics](../gateway-metrics/README.md) samples are where the Redis, Kafka, R2DBC,
 Prometheus and discovery backends are exercised.
+
+## Tracing
+
+This sample traces with Brave, which since Spring Boot 4 takes two dependencies: the bridge
+`micrometer-tracing-bridge-brave` **and** the auto-configuration module
+`spring-boot-micrometer-tracing-brave`. Without the second one nothing wires a `Tracer`, and
+the trace id silently comes out empty everywhere &mdash; no `x-correlation-id` on the
+responses, empty `trace.id` in the audit events, empty `traceId` in the logs. See
+[wiring a real tracer](../../../spring-cloud-gateway-filters/README.md#wiring-a-real-tracer)
+for that pair and its OpenTelemetry equivalent.

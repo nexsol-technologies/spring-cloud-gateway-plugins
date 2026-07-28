@@ -75,9 +75,49 @@ spring.cloud.gateway.server.webflux:
     correlation-id.enabled: true
 ```
 
+#### Wiring a real tracer
+
 The filter reads the current observation, so it needs `spring-boot-starter-actuator` and a
-[tracer implementation](https://docs.spring.io/spring-boot/reference/actuator/tracing.html) on
-the classpath.
+[tracer implementation](https://docs.spring.io/spring-boot/reference/actuator/tracing.html).
+Since Spring Boot 4 the bridge alone is not enough: the auto-configuration that wires it
+moved out of `spring-boot-autoconfigure` into a module of its own, which has to be declared
+too. With Brave:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-micrometer-tracing-brave</artifactId>
+</dependency>
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-tracing-bridge-brave</artifactId>
+</dependency>
+```
+
+With OpenTelemetry:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
+</dependency>
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-tracing-bridge-otel</artifactId>
+</dependency>
+```
+
+Both pairs are version-managed by the Spring Boot BOM. `spring-boot-starter-opentelemetry`
+bundles the OpenTelemetry pair and adds the OTLP exporter; it then tries to reach a collector
+on `localhost:4318`, so set `management.tracing.export.enabled: false` until one is running.
+
+Declaring the bridge without its auto-configuration module fails silently, which is worth
+recognising: no bean creates a `Tracer`, so `NoopTracerAutoConfiguration` supplies
+`Tracer.NOOP`, every observation carries `Span.NOOP`, and `span.context().traceId()` is the
+empty string. The filter finds nothing to write and adds no header &mdash; no warning, no
+error, just a response without `x-correlation-id`. The same empty trace id shows up in the
+log MDC and in the `trace.*` attributes of the
+[audit plugin](../spring-cloud-gateway-audit/spring-cloud-gateway-audit-core/README.md).
 
 ### Recaptcha
 
