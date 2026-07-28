@@ -35,7 +35,36 @@ spring:
 | `publish-interval` | `10s` | How often an instance publishes its figures |
 | `time-to-live` | `45s` | How long a published key survives |
 
-The connection itself comes from the usual `spring.data.redis.*` properties.
+## The connection
+
+It brings `spring-boot-starter-data-redis-reactive`, so Spring Boot auto-configures a
+`ReactiveStringRedisTemplate` from your `spring.data.redis.*` properties and this provider
+reuses it:
+
+```yaml
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0                    # the logical database the keys land in
+      # username: default            # Redis ACL user (optional)
+      # password: ${REDIS_PASSWORD}
+      # ssl:
+      #   enabled: true
+```
+
+The plugin declares no connection property of its own, `database` included: it would
+duplicate `spring.data.redis.database` and give the same setting two places to disagree.
+
+Two consequences worth knowing:
+
+- **The database index is shared.** Everything reusing that connection — the audit plugin,
+  your cache, your sessions — lives in the same logical database. The keys still do not
+  collide, since this provider only ever reads and writes its own `key-prefix`, but you
+  cannot put the metrics in one database and the rest elsewhere.
+- **Redis Cluster only has database 0.** Setting `database` there is ignored, so do not
+  count on it to separate anything in a clustered deployment.
 
 ## How it works
 
