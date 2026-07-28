@@ -212,7 +212,7 @@ Some routes carry no traffic worth reading &mdash; the documentation routes the 
 publishes are contracts being fetched, not usage. They are left out by default:
 
 ```yaml
-spring.cloud.gateway.server.webflux.ui.traffic:
+spring.cloud.gateway.server.webflux.metrics:
   excluded-routes:
     - openapi-docs-.*            # the default
 ```
@@ -222,7 +222,7 @@ match (`docs` excludes `docs`, not `docs-public`). Setting the property replaces
 list, so keep `openapi-docs-.*` if you want to keep hiding them:
 
 ```yaml
-spring.cloud.gateway.server.webflux.ui.traffic:
+spring.cloud.gateway.server.webflux.metrics:
   excluded-routes:
     - openapi-docs-.*
     - internal_.*

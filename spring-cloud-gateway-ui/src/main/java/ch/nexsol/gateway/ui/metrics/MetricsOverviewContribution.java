@@ -18,9 +18,13 @@ package ch.nexsol.gateway.ui.metrics;
 
 import java.util.List;
 
+import ch.nexsol.gateway.metrics.RouteMetric;
+import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.ui.overview.OverviewContribution;
 import ch.nexsol.gateway.ui.overview.OverviewStat;
 import reactor.core.publisher.Flux;
+
+import org.springframework.beans.factory.ObjectProvider;
 
 /**
  * Contributes the traffic figures to the home page: the calls the gateway routed, the
@@ -28,33 +32,45 @@ import reactor.core.publisher.Flux;
  */
 public class MetricsOverviewContribution implements OverviewContribution {
 
-	private final RouteMetricsService metricsService;
+	private final ObjectProvider<RouteMetricsSource> metricsSource;
 
 	/**
-	 * Creates the contribution over the per-route metrics.
-	 * @param metricsService the service aggregating the gateway request metrics
+	 * Creates the contribution over the (optional) active metrics source.
+	 * @param metricsSource the provider over the source the per-route figures are read
+	 * from
 	 */
-	public MetricsOverviewContribution(RouteMetricsService metricsService) {
-		this.metricsService = metricsService;
+	public MetricsOverviewContribution(ObjectProvider<RouteMetricsSource> metricsSource) {
+		this.metricsSource = metricsSource;
 	}
 
 	@Override
 	public Flux<OverviewStat> stats() {
-		return Flux.defer(() -> Flux.fromIterable(toStats(this.metricsService.collect())));
+		return Flux.defer(() -> {
+			RouteMetricsSource source = this.metricsSource.getIfAvailable();
+			if (source == null) {
+				return Flux.empty();
+			}
+			return source.collect()
+				.flatMapMany((snapshot) -> Flux.fromIterable(toStats(snapshot.metrics(), snapshot.coverage())));
+		});
 	}
 
 	/**
-	 * Folds the per-route metrics into the three traffic figures shown on the home page.
+	 * Folds the per-route metrics into the traffic figures shown on the home page. The
+	 * coverage rides along with the call count: a number that only covers one instance
+	 * must say so where it is read, not in the documentation.
 	 * @param metrics the per-route metrics
+	 * @param coverage what those metrics cover
 	 * @return the contributed figures
 	 */
-	static List<OverviewStat> toStats(List<RouteMetric> metrics) {
+	static List<OverviewStat> toStats(List<RouteMetric> metrics, String coverage) {
 		long calls = metrics.stream().mapToLong(RouteMetric::count).sum();
 		long clientErrors = metrics.stream().mapToLong(RouteMetric::clientErrorCount).sum();
 		long errors = metrics.stream().mapToLong(RouteMetric::errorCount).sum();
 		double totalMs = metrics.stream().mapToDouble((metric) -> metric.avgMs() * metric.count()).sum();
 		String latency = (calls > 0) ? Math.round(totalMs / calls) + " ms" : "—";
-		return List.of(new OverviewStat("Calls", String.valueOf(calls), metrics.size() + " route(s) called", 20),
+		return List.of(
+				new OverviewStat("Calls", String.valueOf(calls), metrics.size() + " route(s) called — " + coverage, 20),
 				new OverviewStat("Avg latency", latency, "weighted across every call", 30),
 				new OverviewStat("Client errors", String.valueOf(clientErrors), shareOfCalls(clientErrors, calls), 35),
 				new OverviewStat("Server errors", String.valueOf(errors), shareOfCalls(errors, calls), 40));

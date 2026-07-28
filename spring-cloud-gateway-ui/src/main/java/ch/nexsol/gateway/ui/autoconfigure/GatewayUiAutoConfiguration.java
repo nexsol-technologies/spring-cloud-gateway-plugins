@@ -17,6 +17,8 @@
 package ch.nexsol.gateway.ui.autoconfigure;
 
 import ch.nexsol.gateway.audit.AuditEventPublisher;
+import ch.nexsol.gateway.metrics.RouteMetricsSource;
+import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
 import ch.nexsol.gateway.ui.audit.AuditOverviewContribution;
 import ch.nexsol.gateway.ui.audit.AuditTailBeanPostProcessor;
 import ch.nexsol.gateway.ui.audit.AuditTailBuffer;
@@ -25,8 +27,6 @@ import ch.nexsol.gateway.ui.controller.DashboardController;
 import ch.nexsol.gateway.ui.controller.GatewayUiModelAttributes;
 import ch.nexsol.gateway.ui.metrics.MetricsOverviewContribution;
 import ch.nexsol.gateway.ui.metrics.RouteMetricsController;
-import ch.nexsol.gateway.ui.metrics.RouteMetricsProperties;
-import ch.nexsol.gateway.ui.metrics.RouteMetricsService;
 import ch.nexsol.gateway.ui.nav.GatewayUiMenu;
 import ch.nexsol.gateway.ui.nav.NavItem;
 import ch.nexsol.gateway.ui.openapi.OpenapiViewController;
@@ -45,7 +45,6 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.ApplicationContext;
@@ -68,7 +67,7 @@ import org.springframework.context.annotation.Import;
  * beans it reads through an {@link ObjectProvider}: a view whose source of data is absent
  * reports that it has nothing to show rather than breaking the context.
  */
-@AutoConfiguration
+@AutoConfiguration(after = MetricsAutoConfiguration.class)
 @Import({ DashboardController.class, GatewayUiModelAttributes.class })
 public class GatewayUiAutoConfiguration {
 
@@ -223,36 +222,30 @@ public class GatewayUiAutoConfiguration {
 	}
 
 	/**
-	 * Activates the traffic bubble chart only when Micrometer is on the classpath: the
-	 * view plots the gateway routes from their request metrics read off the meter
-	 * registry.
+	 * Activates the traffic bubble chart when the metrics plugin is active: the view
+	 * plots the gateway routes from whatever {@link RouteMetricsSource} that plugin
+	 * resolved &mdash; the local meter registry by default, a consolidated figure when a
+	 * provider module is on the classpath.
+	 * <p>
+	 * The conditions mirror those of {@code MetricsAutoConfiguration} rather than testing
+	 * for the source bean itself: {@code @ConditionalOnBean} depends on the order the
+	 * configurations are applied in, which does not hold when this class is reached by a
+	 * component scan instead of the auto-configuration import.
 	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(MeterRegistry.class)
-	@EnableConfigurationProperties(RouteMetricsProperties.class)
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.enabled", matchIfMissing = true)
 	@Import(RouteMetricsController.class)
 	static class RouteMetricsConfiguration {
 
 		/**
-		 * Registers the metrics aggregation service.
-		 * @param meterRegistry the provider over the application meter registry
-		 * @param properties the traffic view configuration
-		 * @return the metrics service
-		 */
-		@Bean
-		RouteMetricsService routeMetricsService(ObjectProvider<MeterRegistry> meterRegistry,
-				RouteMetricsProperties properties) {
-			return new RouteMetricsService(meterRegistry, properties);
-		}
-
-		/**
 		 * Contributes the traffic figures to the home page.
-		 * @param metricsService the metrics aggregation service
+		 * @param metricsSource the provider over the active metrics source
 		 * @return the traffic overview contribution
 		 */
 		@Bean
-		MetricsOverviewContribution metricsOverviewContribution(RouteMetricsService metricsService) {
-			return new MetricsOverviewContribution(metricsService);
+		MetricsOverviewContribution metricsOverviewContribution(ObjectProvider<RouteMetricsSource> metricsSource) {
+			return new MetricsOverviewContribution(metricsSource);
 		}
 
 		/**
