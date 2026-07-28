@@ -251,13 +251,10 @@ public class AuthorizationTokenGatewayFilterFactory
 	@Validated
 	public static class Config {
 
-		@Valid
 		private List<@NotEmpty String> issuers = new ArrayList<>(0);
 
-		@Valid
 		private List<@NotEmpty String> clientIds = new ArrayList<>(0);
 
-		@Valid
 		private List<@Valid GrantAccess> grantAccesses = new ArrayList<>(0);
 
 		/**
@@ -345,7 +342,6 @@ public class AuthorizationTokenGatewayFilterFactory
 		private String jsonPath;
 
 		@NotEmpty
-		@Valid
 		private List<@NotEmpty String> roles;
 
 		/**

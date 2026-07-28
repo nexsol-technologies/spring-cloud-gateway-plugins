@@ -44,8 +44,7 @@ public class ResourceServerPluginsProperties {
 	/**
 	 * List of multi-tenant
 	 */
-	@Valid
-	private List<@NotNull OAuth2ResourceServerProperties> multitenant = new ArrayList<>();
+	private List<@Valid @NotNull OAuth2ResourceServerProperties> multitenant = new ArrayList<>();
 
 	/**
 	 * @return the multi-tenant
