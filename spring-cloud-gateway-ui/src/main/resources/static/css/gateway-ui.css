@@ -171,6 +171,18 @@
 	padding: .6rem 0;
 }
 
+/* Pinned below the scrolling navigation: the link to the project repository. */
+.gw-sidebar-footer {
+	flex: 0 0 auto;
+	padding: .5rem;
+	border-top: 1px solid rgba(255, 255, 255, .08);
+}
+
+.gw-sidebar-footer .gw-nav-link {
+	margin-bottom: 0;
+	color: var(--gw-sidebar-fg-muted);
+}
+
 /* Content ----------------------------------------------------------------- */
 
 .gw-content {
