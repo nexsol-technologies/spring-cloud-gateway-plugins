@@ -309,11 +309,15 @@ public class GatewayUiAutoConfiguration {
 	}
 
 	/**
-	 * Activates the audit view only when the audit plugin is on the classpath: the view
-	 * tails the events on their way to whichever backend the plugin publishes to.
+	 * Activates the audit view only when the audit plugin is on the classpath and
+	 * enabled: the view tails the events on their way to whichever backend the plugin
+	 * publishes to. The property condition mirrors the one guarding the plugin itself, so
+	 * a gateway that turned auditing off is not offered a view over events nobody
+	 * publishes.
 	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(AuditEventPublisher.class)
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.audit.enabled", matchIfMissing = true)
 	@Import(AuditTailController.class)
 	static class AuditTailConfiguration {
 

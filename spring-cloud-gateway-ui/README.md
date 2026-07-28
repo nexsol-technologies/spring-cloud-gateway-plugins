@@ -38,7 +38,7 @@ what the application actually runs:
 | Database routes | `/ui/routes/db` | `spring-cloud-gateway-routes-database` is present |
 | Route tester | `/ui/routes/test` | the gateway route table type is present |
 | Traffic | `/ui/metrics` | Micrometer is present |
-| Audit | `/ui/audit` | `spring-cloud-gateway-audit-core` is present |
+| Audit | `/ui/audit` | `spring-cloud-gateway-audit-core` is present and `spring.cloud.gateway.server.webflux.audit.enabled` is not `false` |
 
 ## Home page
 
@@ -154,6 +154,10 @@ The tail is a bounded in-memory buffer of at most 500 events, cleared on restart
 the gateway's own recent traffic without querying the backend, which keeps the durable copy.
 Auditing must be enabled on a route (the `Audit` gateway filter) or globally (the audit web
 filter) for anything to show up.
+
+Setting `spring.cloud.gateway.server.webflux.audit.enabled=false` turns the audit plugin off,
+and with it this view: the menu entry, the home page figure and the `/ui/audit` paths all
+disappear, exactly as if the plugin were not on the classpath.
 
 ## Traffic view
 
