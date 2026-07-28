@@ -1,0 +1,98 @@
+server.port: 8202
+spring.application.name: gateway-oauth2
+
+# Requires the 'auth-server' sample on :9090, which issues the tokens this sample
+# validates. Start it first, or the gateway fails to fetch the issuer metadata.
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9090
+        # Multitenancy: one issuer per tenant, each request validated against the
+        # settings of the tenant that issued its token. The sample declares the same
+        # authorization server twice, since it only runs one.
+        multitenant:
+        - id: local
+          issuer-uri: http://localhost:9090
+        - id: local2
+          issuer-uri: http://localhost:9090
+        # Map further claims to GrantedAuthority entries, on top of the realm_access,
+        # resource_access, permissions and roles claims the plugin already reads.
+        # granted-authorities-mapping:
+        #   json-path:
+        #   - '$.my-custom-roles'
+
+spring.cloud.gateway.server.webflux:
+  webfilter:
+    # BasicAuthExchangeToAccessToken: a caller sending Basic credentials of one of the
+    # clients below has them exchanged for a Bearer token at the authorization server,
+    # and the backend only ever sees the Bearer. The token is cached until its exp.
+    basicauth-exchange-oauth2:
+      token-uris:
+        messaging-client: http://localhost:9090/oauth2/token
+  routes:
+
+  # AuthorizationToken, accepting the tokens of the sample authorization server.
+  - id: token_issuer_granted
+    uri: http://localhost:8080
+    predicates:
+    - Path=/token/**
+    filters:
+    - name: AuthorizationToken
+      args:
+        issuers: http://localhost:9090
+    - StripPrefix=1
+
+  # The same filter, asking for an issuer this token does not come from: 403.
+  - id: token_issuer_denied
+    uri: http://localhost:8080
+    predicates:
+    - Path=/token-ko/**
+    filters:
+    - name: AuthorizationToken
+      args:
+        issuers: https://another-issuer.example.org
+    - StripPrefix=1
+
+  # Validating roles rather than the issuer. Several grant-accesses are an AND: the
+  # token must satisfy every rule. The 'roles' claim is the one the sample authorization
+  # server stamps on the access token, and it carries the roles of the authenticated
+  # user — so this route answers 403 to a client_credentials token, which has none.
+  - id: token_roles
+    uri: http://localhost:8080
+    predicates:
+    - Path=/token-roles/**
+    filters:
+    - name: AuthorizationToken
+      args:
+        grant-accesses:
+        - jsonPath: '$.roles'
+          roles: 'READ'
+    - StripPrefix=1
+
+  # The Basic-to-Bearer exchange applies to whatever the client is routed to: the
+  # gateway receives Basic credentials, httpbin.org/headers echoes the Bearer that
+  # replaced them.
+  - id: basic_to_bearer
+    uri: https://httpbin.org
+    predicates:
+    - Path=/exchange/**
+    filters:
+    - StripPrefix=1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+  endpoint:
+    gateway:
+      access: read-only
+
+logging:
+  level:
+    '[ch.nexsol]': debug

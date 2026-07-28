@@ -1,0 +1,21 @@
+routes:
+  # The health check of a backend, exposed without a token. routes-security replays the
+  # predicates ahead of Spring Security, resolves this route, sees the flag, and serves
+  # the request with its permissive chain.
+  - id: public_health
+    uri: http://localhost:8080
+    predicates:
+      - Path=/public/**
+    filters:
+      - StripPrefix=1
+    metadata:
+      public: true
+
+  # The same backend, without the flag: this one needs a Bearer token like everything
+  # else. Declared next to the public route so the difference is one line of metadata.
+  - id: private_from_files
+    uri: http://localhost:8080
+    predicates:
+      - Path=/private/**
+    filters:
+      - StripPrefix=1

@@ -1,0 +1,22 @@
+# The database backing the routes-database source under the 'pgsql' profile. The default
+# profile needs nothing: it runs on an in-memory H2.
+#   docker compose up -d
+#   mvn spring-boot:run -Dspring-boot.run.profiles=pgsql
+services:
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: gateway-routes-postgres
+    # 15432, so it does not collide with a local PostgreSQL or with the database the
+    # gateway-audit sample starts on 15433.
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_DB: gateway_routes
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: gateway
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway -d gateway_routes"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

@@ -1,0 +1,83 @@
+server.port: 8201
+spring.application.name: gateway-filters
+
+spring.cloud.gateway.server.webflux:
+  webfilter:
+    # CorrelationId: every response carries an x-correlation-id header holding the
+    # traceId of the current observation. It is a web filter, not a route filter, so it
+    # applies to everything the gateway answers.
+    correlation-id.enabled: true
+  routes:
+
+  # Authorization: the authenticated principal must carry one of the declared
+  # authorities. 'user:user' is built with roles("READ"), which Spring Security renders
+  # as the ROLE_READ authority — the value the filter compares against, prefix included.
+  - id: authorization_granted
+    uri: http://localhost:8080
+    predicates:
+    - Path=/authorization/**
+    filters:
+    - name: Authorization
+      args:
+        authorities: ROLE_READ
+    - StripPrefix=1
+
+  # The same route asking for an authority neither account holds: authenticated, and
+  # still answered 403 by the filter.
+  - id: authorization_denied
+    uri: http://localhost:8080
+    predicates:
+    - Path=/authorization-ko/**
+    filters:
+    - name: Authorization
+      args:
+        authorities: ROLE_UNKNOWN
+    - StripPrefix=1
+
+  # ConvertHttpMethod: the gateway receives a GET, the backend receives a POST.
+  # httpbin.org/anything echoes the method it was called with, which is the proof.
+  - id: convert_http_method
+    uri: https://httpbin.org
+    predicates:
+    - Path=/convert-method/**
+    - Method=GET
+    filters:
+    - ConvertHttpMethod=POST
+    - StripPrefix=1
+
+  # Recaptcha: verifies a CAPTCHA score against Google reCAPTCHA. It needs a secret key
+  # issued by Google, so the sample declares it commented out rather than shipping a
+  # route that cannot answer.
+  # - id: recaptcha
+  #   uri: http://localhost:8080
+  #   predicates:
+  #   - Path=/recaptcha/**
+  #   filters:
+  #   - name: Recaptcha
+  #     args:
+  #       verify-url: https://www.google.com/recaptcha/api/siteverify
+  #       version: V3
+  #       secret-key: ${RECAPTCHA_SECRET_KEY}
+  #       recaptcha-http-header: recaptcha
+  #       score: 90
+  #   - StripPrefix=1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+  endpoint:
+    gateway:
+      access: read-only
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1
+
+logging:
+  level:
+    '[ch.nexsol]': debug

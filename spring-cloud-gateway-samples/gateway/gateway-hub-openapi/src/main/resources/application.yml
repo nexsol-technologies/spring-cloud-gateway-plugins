@@ -1,0 +1,57 @@
+server.port: 8203
+spring.application.name: gateway-hub-openapi
+
+# Requires the 'eureka' sample on :8761 and 'service-a' started with the eureka profile,
+# so there is a registry with something in it to discover.
+eureka:
+  client:
+    enabled: true
+    fetch-registry: true
+    register-with-eureka: true
+
+spring.cloud.gateway.server.webflux:
+  discovery:
+    locator:
+      enabled: true
+
+spring.cloud.gateway.server.webflux.hub-openapi:
+  enabled: true
+  # Required: the hub rewrites the 'servers' section of every contract to this URI, so
+  # 'Try it out' targets the gateway rather than the backend, and raises no CORS issue.
+  gateway-uri: http://localhost:${server.port}
+  # Bounds the cost of discovering the contracts. The defaults keep it constant whatever
+  # the size of the registry; they matter on a registry holding hundreds of services,
+  # not on this sample, and are spelled out here to show where the knobs are.
+  discovery:
+    timeout: 2s
+    concurrency: 16
+    max-connections: 50
+    cache-ttl: 5m
+
+# Statically configured contracts. They are aggregated in the same Swagger UI as the
+# discovered services, which is what this sample shows next to the discovery.
+spring.cloud.gateway.server.webflux.routes-openapi:
+  enabled: true
+  update-interval: 5m
+  sources:
+  - id: petstore
+    uri: https://petstore3.swagger.io
+    spec-url: https://petstore3.swagger.io/api/v3/openapi.json
+    mode: PER_OPERATION
+    path-prefix: /petstore
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+  endpoint:
+    gateway:
+      access: read-only
+
+logging:
+  level:
+    '[ch.nexsol]': debug

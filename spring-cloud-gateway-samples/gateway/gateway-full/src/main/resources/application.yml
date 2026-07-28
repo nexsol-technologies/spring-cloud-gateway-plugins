@@ -21,9 +21,11 @@ spring.cloud.gateway.server.webflux:
     predicates:
     - Path=/test-authorization/sample
     filters:
+    # The Basic-auth user is built with roles("READ"), which Spring Security renders as
+    # the ROLE_READ authority — the value the filter compares against, prefix included.
     - name: Authorization
       args:
-        authorities: READ
+        authorities: ROLE_READ
     - RewritePath=/test-authorization/?(?<segment>.*), /$\{segment}
 
   - id: test-authorization-token-OK
@@ -77,12 +79,26 @@ spring.cloud.gateway.server.webflux.routes-openapi:
      filters:
        - Retry=3
 
+# Traffic figures (spring-cloud-gateway-metrics). No provider: the figures are those of
+# this instance. See the gateway-metrics sample for the consolidating sources.
 spring.cloud.gateway.server.webflux.metrics:
   excluded-routes:
     - openapi-docs-.*
-       
+
+# Auditing (spring-cloud-gateway-audit). No provider either: the default publisher logs
+# each event and republishes it as a Spring application event. See the gateway-audit
+# sample for the Redis, Kafka and R2DBC providers.
+spring.cloud.gateway.server.webflux.audit:
+  enabled: true
+  metadata:
+    environment: sample
+  web-filter:
+    enabled: true
+
+# CASE_INSENSITIVE_IDENTIFIERS is what makes H2 accept the quoted lower-case identifiers
+# Spring Data R2DBC generates against the schema the plugin ships, whose DDL is unquoted.
 spring.r2dbc:
-  url: r2dbc:h2:mem:///test_db;MODE=PostgreSQL
+  url: r2dbc:h2:mem:///test_db?options=DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
 
 spring:
   security:

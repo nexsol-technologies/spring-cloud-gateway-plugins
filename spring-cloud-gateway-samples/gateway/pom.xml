@@ -9,16 +9,36 @@
 		<version>${revision}</version>
 		<relativePath>../pom.xml </relativePath>
 	</parent>
-	<artifactId>sample-gateway</artifactId>
-	<name>sample-gateway</name>
-	<description>Api Gateway with SPring Cloud Gateway</description>
-	<properties>
-		<java.version>25</java.version>
-	</properties>
+	<artifactId>sample-gateways</artifactId>
+	<name>sample-gateways</name>
+	<description>Gateway samples, one per plugin plus a few combinations</description>
+	<packaging>pom</packaging>
+
+	<modules>
+		<!-- One plugin each -->
+		<module>gateway-filters</module>
+		<module>gateway-oauth2</module>
+		<module>gateway-hub-openapi</module>
+		<module>gateway-ui</module>
+		<module>gateway-audit</module>
+		<module>gateway-metrics</module>
+		<module>gateway-routes-files</module>
+		<!-- Combinations -->
+		<module>gateway-routes-all</module>
+		<module>gateway-secured</module>
+		<module>gateway-full</module>
+	</modules>
+
+	<!--
+		What every gateway sample needs: the gateway itself, and the actuator the plugins
+		read the meter registry and the refresh endpoint through. Anything beyond that is
+		declared by the sample that exercises it, so each pom reads as the list of plugins
+		its scenario is about.
+	-->
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+			<artifactId>spring-cloud-gateway-server-webflux</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -26,69 +46,12 @@
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-redis-reactive</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>io.micrometer</groupId>
-			<artifactId>micrometer-tracing-bridge-brave</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-gateway-server-webflux</artifactId>
-		</dependency>
-
-		<dependency>
-			<groupId>ch.nexsol-tech.gateway</groupId>
-			<artifactId>spring-cloud-gateway-filters</artifactId>
-			<version>${revision}</version>
-		</dependency>
-		<dependency>
-			<groupId>ch.nexsol-tech.gateway</groupId>
-			<artifactId>spring-cloud-gateway-routes-database</artifactId>
-			<version>${revision}</version>
-		</dependency>
-		<dependency>
-			<groupId>ch.nexsol-tech.gateway</groupId>
-			<artifactId>spring-cloud-gateway-routes-files</artifactId>
-			<version>${revision}</version>
-		</dependency>
-		<dependency>
-			<groupId>ch.nexsol-tech.gateway</groupId>
-			<artifactId>spring-cloud-gateway-routes-configserver</artifactId>
-			<version>${revision}</version>
-		</dependency>
-		<dependency>
-			<groupId>ch.nexsol-tech.gateway</groupId>
-			<artifactId>spring-cloud-gateway-routes-openapi</artifactId>
-			<version>${revision}</version>
-		</dependency>
-		<dependency>
-			<groupId>ch.nexsol-tech.gateway</groupId>
-			<artifactId>spring-cloud-gateway-routes-security</artifactId>
-			<version>${revision}</version>
-		</dependency>
-		<dependency>
-			<groupId>ch.nexsol-tech.gateway</groupId>
-			<artifactId>spring-cloud-gateway-oauth2</artifactId>
-			<version>${revision}</version>
-		</dependency>
-		<dependency>
-			<groupId>ch.nexsol-tech.gateway</groupId>
-			<artifactId>spring-cloud-gateway-hub-openapi</artifactId>
-			<version>${revision}</version>
-		</dependency>
-		<dependency>
-			<groupId>ch.nexsol-tech.gateway</groupId>
-			<artifactId>spring-cloud-gateway-ui</artifactId>
-			<version>${revision}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-webtestclient</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -97,37 +60,13 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
-	<dependencyManagement>
-		<dependencies>
-			<dependency>
-				<groupId>org.springframework.cloud</groupId>
-				<artifactId>spring-cloud-dependencies</artifactId>
-				<version>${spring-cloud.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-		</dependencies>
-	</dependencyManagement>
 
 	<build>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-			<plugin>
-				<groupId>io.spring.javaformat</groupId>
-				<artifactId>spring-javaformat-maven-plugin</artifactId>
-				<version>0.0.42</version>
-				<executions>
-					<execution>
-						<phase>generate-sources</phase>
-						<inherited>true</inherited>
-						<goals>
-							<goal>validate</goal>
-						</goals>
-					</execution>
-				</executions>
+				<version>${spring-boot.version}</version>
 			</plugin>
 		</plugins>
 	</build>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>ch.nexsol-tech.gateway</groupId>
+		<artifactId>sample-gateways</artifactId>
+		<version>${revision}</version>
+		<relativePath>../pom.xml </relativePath>
+	</parent>
+	<artifactId>sample-gateway-hub-openapi</artifactId>
+	<name>sample-gateway-hub-openapi</name>
+	<description>Gateway sample exercising spring-cloud-gateway-hub-openapi</description>
+
+	<dependencies>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-hub-openapi</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<!--
+			routes-openapi is not needed by the hub. It is here to show the second half of
+			the story: the contracts it is configured with are aggregated in the same
+			Swagger UI as the discovered services.
+		-->
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-openapi</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<!-- The hub discovers the contracts through the discovery client. -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+		</dependency>
+	</dependencies>
+
+</project>
