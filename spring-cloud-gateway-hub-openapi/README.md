@@ -29,6 +29,49 @@ spring.cloud.gateway.server.webflux:
       enabled: true
 ```
 
+A service can declare where its document is, in its instance metadata, instead of letting
+the hub probe the well-known SpringDoc paths. This is one HTTP call per service instead of
+up to three, and it is worth doing on a large registry:
+
+```yaml
+eureka.instance.metadata-map.openapi_path: /v3/api-docs
+```
+
+### Sizing the discovery
+
+The gateway refreshes its routes on every discovery heartbeat, and each refresh probes the
+services it does not know about yet. The defaults below keep that cost constant whatever
+the size of the registry: on a registry holding hundreds of services, probing them all at
+once saturates the connection pool, and the probes then fail with
+`PoolAcquirePendingLimitException` or `PoolAcquireTimeoutException` while the gateway stops
+routing.
+
+```yaml
+spring.cloud.gateway.server.webflux.hub-openapi:
+  enabled: true
+  gateway-uri: http://localhost:8181
+  discovery:
+    timeout: 2s              # gives up on a service that does not answer
+    concurrency: 16          # services probed at the same time
+    max-connections: 50      # size of the pool dedicated to the probes
+    cache-ttl: 5m            # how long a probe result is remembered
+```
+
+| Setting | What it does |
+|---|---|
+| `timeout` | Bounds a single probe, connection included. Without it a service that accepts connections but never answers holds the whole route refresh, and the connection it uses. |
+| `concurrency` | Number of services probed at the same time, whatever the number of discovered services. |
+| `max-connections` | The probes use a connection pool of their own, so they never compete for the connections the gateway proxies its traffic on. |
+| `cache-ttl` | The path a document was found at &mdash; or the confirmed absence of a document &mdash; is remembered per service instance, so the next heartbeat does not probe the whole registry again. Set to `0` to probe on every refresh. |
+
+Only a service that answered has its result cached. A service that could not be reached is
+probed again on the next refresh, so a service that was down when the gateway started
+appears in the hub as soon as it comes back, without waiting for `cache-ttl`.
+
+The documents themselves are never buffered by the discovery: only the path each document
+was found at is kept, and the response body is released. The documents are fetched, and
+their `servers` section rewritten, when the Swagger UI actually asks for them.
+
 ## Aggregating statically configured OpenAPI contracts
 
 When [spring-cloud-gateway-routes-openapi](../spring-cloud-gateway-routes/spring-cloud-gateway-routes-openapi/README.md)

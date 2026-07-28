@@ -19,6 +19,7 @@ package ch.nexsol.gateway.openapi.autoconfigure;
 import java.net.URI;
 import java.util.Set;
 
+import ch.nexsol.gateway.openapi.HubOpenapiProperties;
 import ch.nexsol.gateway.openapi.hub.OpenapiService;
 import ch.nexsol.gateway.openapi.hub.SpringDocOpenapiRoutes;
 import ch.nexsol.gateway.openapi.hub.StaticOpenapiDocsRouteLocator;
@@ -33,6 +34,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
 import org.springframework.cloud.client.discovery.composite.reactive.ReactiveCompositeDiscoveryClientAutoConfiguration;
 import org.springframework.cloud.gateway.config.conditional.ConditionalOnEnabledFilter;
@@ -53,6 +55,7 @@ import org.springframework.http.codec.ServerCodecConfigurer;
 @AutoConfiguration(after = ReactiveCompositeDiscoveryClientAutoConfiguration.class)
 @ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.hub-openapi.enabled", havingValue = "true",
 		matchIfMissing = false)
+@EnableConfigurationProperties(HubOpenapiProperties.class)
 public class HubApiAutoConfiguration {
 
 	/**
@@ -73,12 +76,13 @@ public class HubApiAutoConfiguration {
 	 * discovered service instance, only when the application actually has a discovery
 	 * client: without one the hub keeps serving the statically configured contracts.
 	 * @param discoveryClient the reactive discovery client
+	 * @param hubProperties the hub configuration, bounding the probes
 	 * @return the {@link OpenapiService} bean
 	 */
 	@Bean
 	@ConditionalOnBean(ReactiveDiscoveryClient.class)
-	OpenapiService openapiService(ReactiveDiscoveryClient discoveryClient) {
-		return new OpenapiService(discoveryClient);
+	OpenapiService openapiService(ReactiveDiscoveryClient discoveryClient, HubOpenapiProperties hubProperties) {
+		return new OpenapiService(discoveryClient, hubProperties.getDiscovery());
 	}
 
 	/**
@@ -87,13 +91,14 @@ public class HubApiAutoConfiguration {
 	 * @param discoveryClient the reactive discovery client
 	 * @param properties the discovery locator properties
 	 * @param openapiService the service used to discover OpenAPI endpoints
+	 * @param hubProperties the hub configuration, bounding the probes
 	 * @return the {@link HubDiscoveryRouteLocator} bean
 	 */
 	@Bean
 	@ConditionalOnBean(ReactiveDiscoveryClient.class)
 	HubDiscoveryRouteLocator hubDiscoveryRouteLocator(ReactiveDiscoveryClient discoveryClient,
-			DiscoveryLocatorProperties properties, OpenapiService openapiService) {
-		return new HubDiscoveryRouteLocator(discoveryClient, properties, openapiService);
+			DiscoveryLocatorProperties properties, OpenapiService openapiService, HubOpenapiProperties hubProperties) {
+		return new HubDiscoveryRouteLocator(discoveryClient, properties, openapiService, hubProperties.getDiscovery());
 	}
 
 	/**

@@ -19,6 +19,7 @@ package ch.nexsol.gateway.openapi.hub.discovery;
 import java.util.List;
 import java.util.Map;
 
+import ch.nexsol.gateway.openapi.HubOpenapiProperties;
 import ch.nexsol.gateway.openapi.hub.OpenapiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,19 +55,34 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 
 	private final OpenapiService openapiService;
 
+	private final int concurrency;
+
 	// because it's private in DiscoveryClientRouteDefinitionLocator
 	private final String routeIdPrefix;
 
 	/**
-	 * Creates a new locator.
+	 * Creates a new locator probing with the default settings.
 	 * @param discoveryClient the reactive discovery client
 	 * @param properties the discovery locator properties
 	 * @param openapiService the service used to discover the OpenAPI endpoints
 	 */
 	public HubDiscoveryRouteLocator(ReactiveDiscoveryClient discoveryClient, DiscoveryLocatorProperties properties,
 			OpenapiService openapiService) {
+		this(discoveryClient, properties, openapiService, new HubOpenapiProperties.Discovery());
+	}
+
+	/**
+	 * Creates a new locator.
+	 * @param discoveryClient the reactive discovery client
+	 * @param properties the discovery locator properties
+	 * @param openapiService the service used to discover the OpenAPI endpoints
+	 * @param hubProperties the settings bounding the probes
+	 */
+	public HubDiscoveryRouteLocator(ReactiveDiscoveryClient discoveryClient, DiscoveryLocatorProperties properties,
+			OpenapiService openapiService, HubOpenapiProperties.Discovery hubProperties) {
 		super(discoveryClient, properties);
 		this.openapiService = openapiService;
+		this.concurrency = hubProperties.getConcurrency();
 
 		if (StringUtils.hasText(properties.getRouteIdPrefix())) {
 			this.routeIdPrefix = properties.getRouteIdPrefix();
@@ -87,6 +103,9 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 		return super.getRouteDefinitions()
 			// do not process existing api doc routes
 			.filter((route) -> !route.getId().startsWith(ROUTE_ID_PREFIX))
+			// Bounded concurrency, where flatMap would otherwise default to 256: a route
+			// refresh must cost the same whether the registry holds ten services or
+			// several hundred.
 			.flatMap((routeDefinition) -> {
 				String routeId = routeDefinition.getId().replace(this.routeIdPrefix, "");
 				// Isolate failures per route: a single unreachable/erroring service must
@@ -95,7 +114,7 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 					LOG.warn("Skipping OpenAPI discovery for route {} : {}", routeId, ex.getMessage());
 					return Mono.empty();
 				});
-			})
+			}, this.concurrency)
 			.map((openapiDiscover) -> {
 				RouteDefinition routeDefinition = openapiDiscover.routeDefinition();
 
