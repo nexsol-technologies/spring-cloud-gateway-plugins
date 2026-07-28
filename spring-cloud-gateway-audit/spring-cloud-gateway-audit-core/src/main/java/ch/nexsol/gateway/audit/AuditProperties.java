@@ -16,7 +16,9 @@
 
 package ch.nexsol.gateway.audit;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -235,6 +237,15 @@ public class AuditProperties {
 		private boolean enabled = false;
 
 		/**
+		 * Path patterns the global web filter never audits, for example {@code /ui/**} or
+		 * {@code /actuator/health}. Empty by default: whatever the gateway serves belongs
+		 * to its audit trail unless it is explicitly declared not to. The gateway UI adds
+		 * the paths of its own console here, so browsing the console does not fill the
+		 * audit trail with its own traffic.
+		 */
+		private List<String> excludePaths = new ArrayList<>();
+
+		/**
 		 * @return whether the global web filter is enabled
 		 */
 		public boolean isEnabled() {
@@ -246,6 +257,20 @@ public class AuditProperties {
 		 */
 		public void setEnabled(boolean enabled) {
 			this.enabled = enabled;
+		}
+
+		/**
+		 * @return the path patterns never audited by the global web filter
+		 */
+		public List<String> getExcludePaths() {
+			return this.excludePaths;
+		}
+
+		/**
+		 * @param excludePaths the path patterns never audited by the global web filter
+		 */
+		public void setExcludePaths(List<String> excludePaths) {
+			this.excludePaths = excludePaths;
 		}
 
 	}

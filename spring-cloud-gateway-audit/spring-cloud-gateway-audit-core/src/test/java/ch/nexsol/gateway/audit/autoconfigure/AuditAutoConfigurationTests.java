@@ -19,12 +19,14 @@ package ch.nexsol.gateway.audit.autoconfigure;
 import ch.nexsol.gateway.audit.AuditEvent;
 import ch.nexsol.gateway.audit.AuditEventFactory;
 import ch.nexsol.gateway.audit.AuditEventPublisher;
+import ch.nexsol.gateway.audit.AuditProperties;
 import ch.nexsol.gateway.audit.DefaultAuditEventPublisher;
 import ch.nexsol.gateway.audit.factory.AuditGatewayFilterFactory;
 import ch.nexsol.gateway.audit.webfilter.AuditWebFilter;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -50,6 +52,15 @@ class AuditAutoConfigurationTests {
 	void registersWebFilterWhenEnabled() {
 		this.runner.withPropertyValues("spring.cloud.gateway.server.webflux.audit.web-filter.enabled=true")
 			.run((context) -> assertThat(context).hasSingleBean(AuditWebFilter.class));
+	}
+
+	@Test
+	void bindsTheExcludedPathsOfTheWebFilter() {
+		this.runner.withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
+			.withPropertyValues("spring.cloud.gateway.server.webflux.audit.web-filter.enabled=true",
+					"spring.cloud.gateway.server.webflux.audit.web-filter.exclude-paths=/ui/**,/js/**")
+			.run((context) -> assertThat(context.getBean(AuditProperties.class).getWebFilter().getExcludePaths())
+				.containsExactly("/ui/**", "/js/**"));
 	}
 
 	@Test

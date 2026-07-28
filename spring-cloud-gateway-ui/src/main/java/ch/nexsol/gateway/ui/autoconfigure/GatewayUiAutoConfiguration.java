@@ -19,6 +19,7 @@ package ch.nexsol.gateway.ui.autoconfigure;
 import ch.nexsol.gateway.audit.AuditEventPublisher;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
+import ch.nexsol.gateway.ui.audit.AuditExclusionBeanPostProcessor;
 import ch.nexsol.gateway.ui.audit.AuditOverviewContribution;
 import ch.nexsol.gateway.ui.audit.AuditTailBeanPostProcessor;
 import ch.nexsol.gateway.ui.audit.AuditTailBuffer;
@@ -333,6 +334,19 @@ public class GatewayUiAutoConfiguration {
 		@Bean
 		static BeanPostProcessor auditTailBeanPostProcessor(ObjectProvider<AuditTailBuffer> buffer) {
 			return new AuditTailBeanPostProcessor(buffer);
+		}
+
+		/**
+		 * Keeps the traffic of the console out of the audit trail, by excluding the paths
+		 * the active views serve from the global auditing web filter. Declared
+		 * {@code static} because a bean post-processor must not force the enclosing
+		 * configuration to be created early.
+		 * @param securedPaths the provider over the paths contributed by the active views
+		 * @return the post-processor excluding the console paths
+		 */
+		@Bean
+		static BeanPostProcessor auditExclusionBeanPostProcessor(ObjectProvider<UiSecuredPaths> securedPaths) {
+			return new AuditExclusionBeanPostProcessor(securedPaths);
 		}
 
 		/**

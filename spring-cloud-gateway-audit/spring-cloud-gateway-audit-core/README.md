@@ -96,6 +96,8 @@ spring:
               route: true            # default true
             web-filter:
               enabled: false         # global auditing, opt-in (default false)
+              exclude-paths:         # paths the global filter never audits (default none)
+                - /actuator/**
           routes:
             - id: patient
               uri: https://backend
@@ -104,6 +106,19 @@ spring:
               filters:
                 - Audit
 ```
+
+### Excluding paths from the global filter
+
+The global filter audits every exchange the gateway serves, including the ones it answers
+itself. `web-filter.exclude-paths` takes it back: an exchange whose path matches one of the
+patterns is passed straight through, so no event is built and nothing reaches the publisher.
+The list is empty by default — what a gateway serves belongs to its audit trail unless it is
+explicitly declared not to.
+
+The gateway UI adds the paths of its own console to that list, so browsing the console does
+not fill the audit trail with the console's own traffic. Only the exact paths the active
+views serve are excluded, never a `/ui/**` pattern: a gateway route declared under `/ui`
+keeps being audited.
 
 ## Configuration properties
 
@@ -116,6 +131,7 @@ All keys are under `spring.cloud.gateway.server.webflux.audit`.
 | `metadata.<key>` | _(empty)_ | Metadata added to every event as `metadata.<key>` |
 | `groups.jwt` / `groups.request` / `groups.response` / `groups.trace` / `groups.route` | `true` | Toggle each attribute group |
 | `web-filter.enabled` | `false` | Register the global auditing web filter |
+| `web-filter.exclude-paths` | _(empty)_ | Path patterns the global filter never audits; a matching exchange produces no event at all |
 
 ## Default publisher
 

@@ -17,6 +17,7 @@
 package ch.nexsol.gateway.audit.webfilter;
 
 import java.net.ConnectException;
+import java.util.List;
 
 import ch.nexsol.gateway.audit.AuditAttributes;
 import ch.nexsol.gateway.audit.AuditEvent;
@@ -38,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -48,7 +50,7 @@ class AuditWebFilterTests {
 	@Test
 	void auditsResponseAfterChainCompletes() {
 		AuditEventPublisher publisher = mock(AuditEventPublisher.class);
-		AuditWebFilter filter = new AuditWebFilter(this.eventFactory, publisher);
+		AuditWebFilter filter = new AuditWebFilter(this.eventFactory, publisher, List.of());
 		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build());
 		WebFilterChain chain = (ex) -> {
 			ex.getResponse().setStatusCode(HttpStatus.OK);
@@ -65,7 +67,7 @@ class AuditWebFilterTests {
 	@Test
 	void auditsAndPropagatesWhenTheChainFails() {
 		AuditEventPublisher publisher = mock(AuditEventPublisher.class);
-		AuditWebFilter filter = new AuditWebFilter(this.eventFactory, publisher);
+		AuditWebFilter filter = new AuditWebFilter(this.eventFactory, publisher, List.of());
 		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build());
 		ConnectException failure = new ConnectException("connection refused");
 
@@ -81,7 +83,7 @@ class AuditWebFilterTests {
 	void swallowsPublisherError() {
 		AuditEventPublisher publisher = mock(AuditEventPublisher.class);
 		doThrow(new RuntimeException("boom")).when(publisher).publish(any());
-		AuditWebFilter filter = new AuditWebFilter(this.eventFactory, publisher);
+		AuditWebFilter filter = new AuditWebFilter(this.eventFactory, publisher, List.of());
 		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build());
 
 		StepVerifier.create(filter.filter(exchange, (ex) -> Mono.empty())).verifyComplete();
@@ -90,8 +92,33 @@ class AuditWebFilterTests {
 	}
 
 	@Test
+	void doesNotAuditAnExcludedPath() {
+		AuditEventPublisher publisher = mock(AuditEventPublisher.class);
+		AuditWebFilter filter = new AuditWebFilter(this.eventFactory, publisher, List.of("/ui/audit/events", "/js/**"));
+		MockServerWebExchange exchange = MockServerWebExchange
+			.from(MockServerHttpRequest.get("/js/echarts.min.js").build());
+
+		StepVerifier.create(filter.filter(exchange, (ex) -> Mono.empty())).verifyComplete();
+
+		verify(publisher, never()).publish(any());
+	}
+
+	@Test
+	void auditsAPathTheExclusionsDoNotCover() {
+		AuditEventPublisher publisher = mock(AuditEventPublisher.class);
+		AuditWebFilter filter = new AuditWebFilter(this.eventFactory, publisher, List.of("/ui/audit"));
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/ui/find_pwd").build());
+
+		StepVerifier.create(filter.filter(exchange, (ex) -> Mono.empty())).verifyComplete();
+
+		ArgumentCaptor<AuditEvent> captor = ArgumentCaptor.forClass(AuditEvent.class);
+		verify(publisher, times(1)).publish(captor.capture());
+		assertThat(captor.getValue().attributes()).containsEntry(AuditAttributes.REQUEST_PATH, "/ui/find_pwd");
+	}
+
+	@Test
 	void runsAtLowestPrecedence() {
-		AuditWebFilter filter = new AuditWebFilter(this.eventFactory, mock(AuditEventPublisher.class));
+		AuditWebFilter filter = new AuditWebFilter(this.eventFactory, mock(AuditEventPublisher.class), List.of());
 
 		assertThat(filter.getOrder()).isEqualTo(Ordered.LOWEST_PRECEDENCE);
 	}

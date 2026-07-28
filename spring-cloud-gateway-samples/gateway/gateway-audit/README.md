@@ -34,11 +34,16 @@ INFO  c.n.g.s.audit.AuditEventListener : audit {request.method=GET, request.path
 | http://localhost:8205/not-audited/get | no — same backend, no filter |
 
 The `global` profile swaps the per-route filter for the web filter and audits **everything**
-the gateway answers, the `/ui` pages and the actuator endpoints included:
+the gateway answers, the actuator endpoints included:
 
 ```console
 mvn spring-boot:run -Dspring-boot.run.profiles=global
 ```
+
+The console is the exception: it excludes the paths it serves itself, so browsing
+http://localhost:8205/ui does not fill the trail with the pages, fragments and assets of the
+console. Exclude more with
+`spring.cloud.gateway.server.webflux.audit.web-filter.exclude-paths`.
 
 ## What travels with an event
 

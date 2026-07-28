@@ -85,12 +85,14 @@ public class AuditAutoConfiguration {
 	 * Registers the global auditing web filter when explicitly enabled.
 	 * @param eventFactory the audit event factory
 	 * @param publisher the audit event publisher
+	 * @param properties the audit properties holding the excluded paths
 	 * @return the audit web filter bean
 	 */
 	@Bean
 	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.audit.web-filter.enabled", havingValue = "true")
-	AuditWebFilter auditWebFilter(AuditEventFactory eventFactory, AuditEventPublisher publisher) {
-		return new AuditWebFilter(eventFactory, publisher);
+	AuditWebFilter auditWebFilter(AuditEventFactory eventFactory, AuditEventPublisher publisher,
+			AuditProperties properties) {
+		return new AuditWebFilter(eventFactory, publisher, properties.getWebFilter().getExcludePaths());
 	}
 
 }

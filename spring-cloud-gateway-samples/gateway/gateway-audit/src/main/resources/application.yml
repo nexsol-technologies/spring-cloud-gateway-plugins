@@ -142,8 +142,9 @@ spring.cloud.gateway.server.webflux.audit:
   r2dbc:
     table: audit_event
 ---
-# Audits every request instead of the routes carrying the Audit filter, the /ui pages
-# and the actuator endpoints included. Combine it with a provider:
+# Audits every request instead of the routes carrying the Audit filter, the actuator
+# endpoints included. The console excludes the paths it serves itself, so browsing /ui
+# does not fill the trail with its own traffic. Combine it with a provider:
 #   mvn spring-boot:run -Dspring-boot.run.profiles=global,redis
 spring:
   config:

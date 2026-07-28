@@ -155,6 +155,15 @@ the gateway's own recent traffic without querying the backend, which keeps the d
 Auditing must be enabled on a route (the `Audit` gateway filter) or globally (the audit web
 filter) for anything to show up.
 
+The console keeps itself out of the trail. Its own paths &mdash; the pages, the HTMX
+fragments they poll (`/ui/audit/events`, `/ui/metrics/data`) and the static assets
+(`/js/echarts.min.js` and the rest) &mdash; are added to
+`spring.cloud.gateway.server.webflux.audit.web-filter.exclude-paths`, so the global audit
+web filter never records them: the view shows the traffic the gateway routed, not the
+traffic of looking at it. The exclusions are the exact paths the active views declare
+through `UiSecuredPaths`, never a `/ui/**` pattern, so a gateway route declared under `/ui`
+keeps being audited. Add your own with the same property.
+
 Setting `spring.cloud.gateway.server.webflux.audit.enabled=false` turns the audit plugin off,
 and with it this view: the menu entry, the home page figure and the `/ui/audit` paths all
 disappear, exactly as if the plugin were not on the classpath.
