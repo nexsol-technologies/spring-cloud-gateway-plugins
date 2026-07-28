@@ -37,8 +37,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Verifies what the sample audits, and what it deliberately does not: the {@code Audit}
  * filter is declared per route, so an exchange no audited route handled publishes
- * nothing. The backends are never reached — the event is published once the response is
- * produced, whatever that response is.
+ * nothing. The backends are never reached: the event is published once the exchange is
+ * over, whether the upstream answered or refused the connection.
  */
 @SpringBootTest
 @AutoConfigureWebTestClient

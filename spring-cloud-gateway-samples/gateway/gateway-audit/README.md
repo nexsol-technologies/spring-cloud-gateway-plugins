@@ -29,7 +29,7 @@ INFO  c.n.g.s.audit.AuditEventListener : audit {request.method=GET, request.path
 
 | Url | Audited |
 | --- | --- |
-| http://localhost:8205/audited/sample | yes — the route carries the `Audit` filter (backend: `service-a` on `:8080`) |
+| http://localhost:8205/audited/sample | yes — the route carries the `Audit` filter (backend: `service-a` on `:8080`, audited even when nothing answers there) |
 | http://localhost:8205/audited-httpbin/get | yes — the route carries the `Audit` filter |
 | http://localhost:8205/not-audited/get | no — same backend, no filter |
 

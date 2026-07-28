@@ -16,6 +16,8 @@
 
 package ch.nexsol.gateway.audit.factory;
 
+import java.net.ConnectException;
+
 import ch.nexsol.gateway.audit.AuditAttributes;
 import ch.nexsol.gateway.audit.AuditEvent;
 import ch.nexsol.gateway.audit.AuditEventFactory;
@@ -59,6 +61,22 @@ class AuditGatewayFilterFactoryTests {
 		ArgumentCaptor<AuditEvent> captor = ArgumentCaptor.forClass(AuditEvent.class);
 		verify(publisher, times(1)).publish(captor.capture());
 		assertThat(captor.getValue().attributes()).containsEntry(AuditAttributes.RESPONSE_STATUS, "NOT_FOUND");
+	}
+
+	@Test
+	void auditsAndPropagatesWhenTheChainFails() {
+		AuditEventPublisher publisher = mock(AuditEventPublisher.class);
+		GatewayFilter filter = new AuditGatewayFilterFactory(this.eventFactory, publisher)
+			.apply(new AuditGatewayFilterFactory.Config());
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build());
+		ConnectException failure = new ConnectException("connection refused");
+
+		StepVerifier.create(filter.filter(exchange, (ex) -> Mono.error(failure)))
+			.verifyErrorMatches((ex) -> ex == failure);
+
+		ArgumentCaptor<AuditEvent> captor = ArgumentCaptor.forClass(AuditEvent.class);
+		verify(publisher, times(1)).publish(captor.capture());
+		assertThat(captor.getValue().attributes()).containsEntry(AuditAttributes.REQUEST_PATH, "/patient");
 	}
 
 	@Test

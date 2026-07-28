@@ -24,6 +24,7 @@ import reactor.core.publisher.Mono;
 
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.web.server.ServerWebExchange;
 
 /**
  * Gateway filter factory that audits the request and response of the route it is applied
@@ -50,12 +51,22 @@ public class AuditGatewayFilterFactory extends AbstractGatewayFilterFactory<Audi
 
 	@Override
 	public GatewayFilter apply(Config config) {
+		// The exchange is audited whatever its outcome: an upstream that refused the
+		// connection or timed out is exactly what an audit trail has to keep, so the
+		// event is published before the failure is propagated.
 		return (exchange, chain) -> chain.filter(exchange)
-			.then(Mono.defer(
-					() -> this.eventFactory.create(exchange).doOnNext(this.publisher::publish).onErrorResume((ex) -> {
-						LOG.warn("audit event publication failed", ex);
-						return Mono.empty();
-					}).then()));
+			.then(audit(exchange))
+			.onErrorResume((ex) -> audit(exchange).then(Mono.error(ex)));
+	}
+
+	private Mono<Void> audit(ServerWebExchange exchange) {
+		return Mono.defer(() -> this.eventFactory.create(exchange))
+			.doOnNext(this.publisher::publish)
+			.onErrorResume((ex) -> {
+				LOG.warn("audit event publication failed", ex);
+				return Mono.empty();
+			})
+			.then();
 	}
 
 	/**
