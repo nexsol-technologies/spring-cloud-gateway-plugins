@@ -1,0 +1,30 @@
+# A top-level 'routes' array. Predicates and filters accept both the shorthand string
+# form and the object form; both are used below.
+routes:
+  - id: files_httpbin_get
+    uri: https://httpbin.org
+    order: 1
+    predicates:
+      - Path=/files/**
+      - Method=GET
+    filters:
+      - StripPrefix=1
+      - name: AddRequestHeader
+        args:
+          name: X-Source
+          value: routes-files
+    metadata:
+      source: files
+      tier: gold
+
+  - id: files_httpbin_beta
+    uri: https://httpbin.org
+    predicates:
+      - name: Path
+        args:
+          pattern: /files-beta/**
+      - Header=X-Beta, true
+    filters:
+      - StripPrefix=1
+    metadata:
+      source: files

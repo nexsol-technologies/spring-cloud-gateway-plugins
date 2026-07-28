@@ -1,0 +1,128 @@
+server.port: 8206
+spring.application.name: gateway-metrics
+
+eureka:
+  client:
+    # Only the discovery profile needs a registry.
+    enabled: false
+
+spring.cloud.gateway.server.webflux.metrics:
+  enabled: true
+  # No provider: the traffic view reports what this JVM counted, and says so. Behind a
+  # load balancer that is a share of the traffic, not the traffic — which is what the
+  # profiles below fix, each in its own way.
+  provider:
+  # Defaults to the host name, the pod name on Kubernetes. Set here so the coverage line
+  # under the chart reads the same whatever machine the sample runs on.
+  instance-id: gateway-metrics-1
+  excluded-routes:
+  - openapi-docs-.*
+
+spring.cloud.gateway.server.webflux:
+  routes:
+  - id: httpbin_traffic
+    uri: https://httpbin.org
+    predicates:
+    - Path=/traffic/**
+    filters:
+    - StripPrefix=1
+
+  - id: httpbin_errors
+    uri: https://httpbin.org
+    predicates:
+    - Path=/errors/**
+    filters:
+    - StripPrefix=1
+
+  - id: service_a_traffic
+    uri: http://localhost:8080
+    predicates:
+    - Path=/service-a/**
+    filters:
+    - StripPrefix=1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+        - metrics
+        - prometheus
+  endpoint:
+    gateway:
+      access: read-only
+
+logging:
+  level:
+    '[ch.nexsol]': debug
+---
+# Reads the consolidated figures from Prometheus. The only source that survives a
+# restart: the series outlive the JVM that produced them.
+#   docker compose up -d prometheus
+#   mvn spring-boot:run -Dspring-boot.run.profiles=prometheus
+spring:
+  config:
+    activate:
+      on-profile:
+      - prometheus
+spring.cloud.gateway.server.webflux.metrics:
+  provider: prometheus
+  prometheus:
+    url: http://localhost:9091
+    # Set it unless this gateway is the only publisher of the meter: a shared Prometheus
+    # otherwise mixes the traffic of every gateway into one figure.
+    selector: job="gateway-metrics"
+    meter: spring_cloud_gateway_requests_seconds
+    timeout: 5s
+---
+# Each instance publishes what it counted into Redis; the view sums whatever is there.
+#   docker compose up -d redis
+#   mvn spring-boot:run -Dspring-boot.run.profiles=redis
+# Start a second instance to see the figures consolidate:
+#   mvn spring-boot:run -Dspring-boot.run.profiles=redis \
+#       -Dspring-boot.run.arguments="--server.port=8216 \
+#       --spring.cloud.gateway.server.webflux.metrics.instance-id=gateway-metrics-2"
+spring:
+  config:
+    activate:
+      on-profile:
+      - redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+spring.cloud.gateway.server.webflux.metrics:
+  provider: redis
+  redis:
+    key-prefix: "gateway:metrics:"
+    publish-interval: 10s
+    # Comfortably longer than the publish interval, or an instance disappears from the
+    # figures between two of its own writes.
+    time-to-live: 45s
+---
+# Polls every instance registered under this gateway's own service id and sums the
+# answers. Needs the 'eureka' sample on :8761, and a second instance to consolidate.
+#   mvn spring-boot:run -Dspring-boot.run.profiles=discovery
+#   mvn spring-boot:run -Dspring-boot.run.profiles=discovery \
+#       -Dspring-boot.run.arguments=--server.port=8216
+spring:
+  config:
+    activate:
+      on-profile:
+      - discovery
+eureka:
+  client:
+    enabled: true
+    fetch-registry: true
+    register-with-eureka: true
+spring.cloud.gateway.server.webflux.metrics:
+  provider: discovery
+  discovery:
+    # Left to spring.application.name, which is what the instances register under.
+    service-id:
+    path: /ui/metrics/local
+    timeout: 3s

@@ -1,0 +1,14 @@
+# Scrapes the gateway running on the host. The job name is what the sample's
+# 'selector: job="gateway-metrics"' matches on, so the figures of this gateway are not
+# mixed with those of anything else publishing the same meter.
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: gateway-metrics
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - host.docker.internal:8206
+          # A second instance, when one is started to watch the figures consolidate.
+          # - host.docker.internal:8216

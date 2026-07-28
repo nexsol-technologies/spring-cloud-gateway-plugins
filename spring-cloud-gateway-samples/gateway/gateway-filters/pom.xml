@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>ch.nexsol-tech.gateway</groupId>
+		<artifactId>sample-gateways</artifactId>
+		<version>${revision}</version>
+		<relativePath>../pom.xml </relativePath>
+	</parent>
+	<artifactId>sample-gateway-filters</artifactId>
+	<name>sample-gateway-filters</name>
+	<description>Gateway sample exercising spring-cloud-gateway-filters</description>
+
+	<dependencies>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-filters</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<!-- The Authorization filter reads the authenticated principal. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<!-- The CorrelationId filter reads the traceId of the current observation. -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-tracing-bridge-brave</artifactId>
+		</dependency>
+	</dependencies>
+
+</project>

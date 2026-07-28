@@ -1,0 +1,154 @@
+server.port: 8205
+spring.application.name: gateway-audit
+
+spring.cloud.gateway.server.webflux.audit:
+  enabled: true
+  # No provider: the core default publisher logs each event at DEBUG and republishes it
+  # as a Spring application event, which AuditEventListener picks up. The redis, kafka
+  # and r2dbc profiles below each select one instead.
+  provider:
+  # Stamped on every event under metadata.*, whatever the exchange. This is what
+  # identifies the gateway rather than the call.
+  metadata:
+    environment: sample
+    datacenter: geneva
+  groups:
+    jwt: true
+    request: true
+    response: true
+    trace: true
+    route: true
+  web-filter:
+    # Off by default: only the routes carrying the Audit filter are audited. The 'global'
+    # profile turns it on, and then everything the gateway answers is audited, the pages
+    # it serves itself included.
+    enabled: false
+
+spring.cloud.gateway.server.webflux:
+  routes:
+
+  # Audited, and carrying metadata: the route group audits route.id plus one
+  # route.metadata.<key> attribute per entry declared here.
+  - id: audited_service_a
+    uri: http://localhost:8080
+    predicates:
+    - Path=/audited/**
+    filters:
+    - Audit
+    - StripPrefix=1
+    metadata:
+      tenant: acme
+      criticality: high
+
+  - id: audited_httpbin
+    uri: https://httpbin.org
+    predicates:
+    - Path=/audited-httpbin/**
+    filters:
+    - Audit
+    - StripPrefix=1
+    metadata:
+      tenant: globex
+      criticality: low
+
+  # No Audit filter: nothing is published for this route, which is the comparison point.
+  - id: not_audited
+    uri: https://httpbin.org
+    predicates:
+    - Path=/not-audited/**
+    filters:
+    - StripPrefix=1
+
+# The R2DBC starter comes with the audit-r2dbc provider and always wants a URL, so an
+# in-memory H2 backs the profiles that do not use a database. schema.sql creates the
+# audit_event table the r2dbc provider inserts into.
+spring.r2dbc:
+  url: r2dbc:h2:mem:///audit_db;MODE=PostgreSQL
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+  endpoint:
+    gateway:
+      access: read-only
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1
+
+logging:
+  level:
+    '[ch.nexsol]': debug
+---
+# Publishes every event to a Redis pub/sub channel.
+#   docker compose up -d redis
+#   mvn spring-boot:run -Dspring-boot.run.profiles=redis
+#   redis-cli SUBSCRIBE gateway-audit
+spring:
+  config:
+    activate:
+      on-profile:
+      - redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+spring.cloud.gateway.server.webflux.audit:
+  provider: redis
+  redis:
+    channel: gateway-audit
+---
+# Publishes every event to a Kafka topic.
+#   docker compose up -d kafka
+#   mvn spring-boot:run -Dspring-boot.run.profiles=kafka
+spring:
+  config:
+    activate:
+      on-profile:
+      - kafka
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+spring.cloud.gateway.server.webflux.audit:
+  provider: kafka
+  kafka:
+    topic: gateway-audit
+---
+# Inserts every event into a PostgreSQL table.
+#   docker compose up -d postgres
+#   mvn spring-boot:run -Dspring-boot.run.profiles=r2dbc
+spring:
+  config:
+    activate:
+      on-profile:
+      - r2dbc
+  r2dbc:
+    url: r2dbc:postgresql://localhost:15433/gateway_audit
+    username: gateway
+    password: gateway
+  sql:
+    init:
+      mode: always
+spring.cloud.gateway.server.webflux.audit:
+  provider: r2dbc
+  r2dbc:
+    table: audit_event
+---
+# Audits every request instead of the routes carrying the Audit filter, the /ui pages
+# and the actuator endpoints included. Combine it with a provider:
+#   mvn spring-boot:run -Dspring-boot.run.profiles=global,redis
+spring:
+  config:
+    activate:
+      on-profile:
+      - global
+spring.cloud.gateway.server.webflux.audit.web-filter:
+  enabled: true

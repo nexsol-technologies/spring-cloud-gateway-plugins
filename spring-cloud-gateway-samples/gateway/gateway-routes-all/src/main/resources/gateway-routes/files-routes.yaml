@@ -1,0 +1,23 @@
+routes:
+  # Authenticated: this one falls through to the application's Basic-auth chain.
+  - id: files_private
+    uri: https://httpbin.org
+    predicates:
+      - Path=/files-private/**
+    filters:
+      - StripPrefix=1
+    metadata:
+      source: files
+
+  # Public: routes-security replays the predicates ahead of Spring Security, resolves
+  # this route, sees the flag, and serves the request with its permissive chain — the
+  # Basic-auth chain is never reached.
+  - id: files_public
+    uri: http://localhost:8080
+    predicates:
+      - Path=/files-public/**
+    filters:
+      - StripPrefix=1
+    metadata:
+      source: files
+      public: true

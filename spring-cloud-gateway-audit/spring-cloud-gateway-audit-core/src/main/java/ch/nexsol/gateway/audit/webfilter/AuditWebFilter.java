@@ -59,12 +59,20 @@ public class AuditWebFilter implements WebFilter, Ordered {
 
 	@Override
 	public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-		return chain.filter(exchange)
-			.then(Mono.defer(
-					() -> this.eventFactory.create(exchange).doOnNext(this.publisher::publish).onErrorResume((ex) -> {
-						LOG.warn("audit event publication failed", ex);
-						return Mono.empty();
-					}).then()));
+		// The exchange is audited whatever its outcome: an upstream that refused the
+		// connection or timed out is exactly what an audit trail has to keep, so the
+		// event is published before the failure is propagated.
+		return chain.filter(exchange).then(audit(exchange)).onErrorResume((ex) -> audit(exchange).then(Mono.error(ex)));
+	}
+
+	private Mono<Void> audit(ServerWebExchange exchange) {
+		return Mono.defer(() -> this.eventFactory.create(exchange))
+			.doOnNext(this.publisher::publish)
+			.onErrorResume((ex) -> {
+				LOG.warn("audit event publication failed", ex);
+				return Mono.empty();
+			})
+			.then();
 	}
 
 }

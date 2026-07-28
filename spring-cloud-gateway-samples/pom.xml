@@ -14,10 +14,50 @@
 	<description>Samples for spring-cloud-gateway-plugins</description>
 	<packaging>pom</packaging>
 
+	<properties>
+		<java.version>25</java.version>
+		<!--
+			The samples are demonstrations, not artifacts anyone depends on: they are
+			built and run from the repository, never resolved from a repository. Both
+			deployment paths are turned off here and inherited by every sample module.
+			'maven.deploy.skip' covers the SNAPSHOT deployment to GitHub Packages
+			(maven-deploy-plugin), 'skipPublishing' the release to Maven Central
+			(central-publishing-maven-plugin, under the 'central-deploy' profile).
+		-->
+		<maven.deploy.skip>true</maven.deploy.skip>
+		<skipPublishing>true</skipPublishing>
+		<!--
+			Signing exists to satisfy Maven Central, which never sees these artifacts.
+			Signing them would cost a GPG round trip per module, under the
+			'central-deploy' profile, for a signature nobody verifies.
+		-->
+		<gpg.skip>true</gpg.skip>
+		<!--
+			Same reasoning for the sources and javadoc jars: Maven Central requires them
+			of every published artifact, and nothing here is published. The sources are
+			already in the repository, which is where a sample is read.
+		-->
+		<maven.source.skip>true</maven.source.skip>
+		<maven.javadoc.skip>true</maven.javadoc.skip>
+	</properties>
+
     <modules>
         <module>gateway</module>
         <module>service-a</module>
         <module>eureka</module>
         <module>config-server</module>
+        <module>auth-server</module>
     </modules>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 </project>

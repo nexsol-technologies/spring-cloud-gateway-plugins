@@ -1,0 +1,54 @@
+server.port: 8204
+spring.application.name: gateway-ui
+
+# Routes declared in the properties, so the routes view has something to show and the
+# route tester something to match against. The source column reads 'Properties' for all
+# of them: this sample runs no route source plugin.
+spring.cloud.gateway.server.webflux:
+  routes:
+  - id: httpbin_get
+    uri: https://httpbin.org
+    predicates:
+    - Path=/httpbin/**
+    filters:
+    - StripPrefix=1
+    metadata:
+      team: platform
+      tier: gold
+
+  - id: service_a
+    uri: http://localhost:8080
+    predicates:
+    - Path=/service-a/**
+    - Method=GET,POST
+    filters:
+    - StripPrefix=1
+    metadata:
+      team: back-office
+
+  - id: header_routed
+    uri: https://httpbin.org
+    predicates:
+    - Path=/beta/**
+    - Header=X-Beta, true
+    filters:
+    - StripPrefix=1
+    - AddRequestHeader=X-Channel, beta
+    order: -1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+        - metrics
+  endpoint:
+    gateway:
+      access: read-only
+
+logging:
+  level:
+    '[ch.nexsol]': debug

@@ -33,7 +33,7 @@ A Spring Boot Admin-like web UI served under `/ui`, where each gateway plugin li
 
 ## Samples
 
-[spring-cloud-gateway-samples](spring-cloud-gateway-samples/README.md) — runnable applications exercising each plugin.
+[spring-cloud-gateway-samples](spring-cloud-gateway-samples/README.md) — one runnable gateway per plugin, plus a few exercising them in combination.
 
 ## Spring Cloud Gateway documentation
 

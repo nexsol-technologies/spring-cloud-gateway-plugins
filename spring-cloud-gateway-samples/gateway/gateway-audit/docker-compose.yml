@@ -1,0 +1,55 @@
+# Backends the audit providers publish to. Start only the one the profile you run needs:
+#   docker compose up -d redis      # --spring.profiles.active=redis
+#   docker compose up -d kafka      # --spring.profiles.active=kafka
+#   docker compose up -d postgres   # --spring.profiles.active=r2dbc
+# The default profile needs none of them: it logs the events and republishes them as
+# Spring application events.
+services:
+
+  redis:
+    image: redis:8-alpine
+    container_name: gateway-audit-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  kafka:
+    image: apache/kafka:4.0.0
+    container_name: gateway-audit-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # Single-node KRaft: the broker is its own controller, no ZooKeeper.
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: gateway-audit-postgres
+    # 15433, so it does not collide with a local PostgreSQL or with the database the
+    # gateway-routes-all sample starts.
+    ports:
+      - "15433:5432"
+    environment:
+      POSTGRES_DB: gateway_audit
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: gateway
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway -d gateway_audit"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

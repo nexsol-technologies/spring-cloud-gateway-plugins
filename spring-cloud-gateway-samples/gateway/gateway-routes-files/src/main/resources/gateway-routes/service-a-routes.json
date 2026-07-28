@@ -1,0 +1,16 @@
+[
+  {
+    "id": "files_service_a",
+    "uri": "http://localhost:8080",
+    "predicates": [
+      "Path=/files-service-a/**"
+    ],
+    "filters": [
+      "StripPrefix=1"
+    ],
+    "metadata": {
+      "source": "files",
+      "format": "json"
+    }
+  }
+]

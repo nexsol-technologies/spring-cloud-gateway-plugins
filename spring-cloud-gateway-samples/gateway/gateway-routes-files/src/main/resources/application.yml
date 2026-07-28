@@ -1,0 +1,41 @@
+server.port: 8207
+spring.application.name: gateway-routes-files
+
+spring.cloud.gateway.server.webflux.routes-files:
+  enabled: true
+  # Reloads a route file when it changes. Only 'file:' locations are watched — a
+  # classpath resource is read once, at startup.
+  watch: true
+  locations:
+  - classpath:gateway-routes/*.yaml
+  - classpath:gateway-routes/*.json
+  - file:./config/routes/*.yaml
+
+# One route declared the usual way, so the routes view shows the two sources side by side
+# and answers 'which configuration actually won'.
+spring.cloud.gateway.server.webflux:
+  routes:
+  - id: properties_route
+    uri: https://httpbin.org
+    predicates:
+    - Path=/from-properties/**
+    filters:
+    - StripPrefix=1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+        # Rereads every file source from scratch, not just the cached snapshot.
+        - refresh
+  endpoint:
+    gateway:
+      access: read-only
+
+logging:
+  level:
+    '[ch.nexsol]': debug

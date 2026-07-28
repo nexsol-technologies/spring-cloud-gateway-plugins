@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>ch.nexsol-tech.gateway</groupId>
+		<artifactId>sample-gateways</artifactId>
+		<version>${revision}</version>
+		<relativePath>../pom.xml </relativePath>
+	</parent>
+	<artifactId>sample-gateway-routes-all</artifactId>
+	<name>sample-gateway-routes-all</name>
+	<description>Gateway sample combining every spring-cloud-gateway-routes source</description>
+
+	<dependencies>
+		<!-- The five sources, aggregated into one route locator. -->
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-database</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-files</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-configserver</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-openapi</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<!-- Cross-cutting: a route flagged public bypasses the security chains. -->
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-security</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<!-- The routes view, which attributes each route to the source it came from. -->
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-ui</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<!-- routes-security only has something to bypass if there is a chain. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+	</dependencies>
+
+</project>

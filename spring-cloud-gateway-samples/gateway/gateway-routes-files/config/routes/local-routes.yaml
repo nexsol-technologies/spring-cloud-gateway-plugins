@@ -1,0 +1,14 @@
+# Read from disk rather than the classpath, at ./config/routes/ relative to the working
+# directory the gateway runs from. This is the one the file watch applies to: edit it
+# while the gateway runs and the routes reload on their own — no restart, no
+# /actuator/refresh.
+routes:
+  - id: watched_local_route
+    uri: https://httpbin.org
+    predicates:
+      - Path=/watched/**
+    filters:
+      - StripPrefix=1
+    metadata:
+      source: files
+      watched: true

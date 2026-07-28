@@ -146,8 +146,12 @@ AuditEventPublisher customAuditEventPublisher() {
 }
 ```
 
-Publishing happens after the response is produced. An `AuditEventPublisher` must not block
-the event loop; offload blocking backends to their own scheduler.
+Publishing happens once the exchange is over, whatever its outcome: an exchange that failed
+&mdash; an upstream that refused the connection or timed out &mdash; is audited too, and the
+failure is propagated afterwards. The `response` group of such an event only reports what
+the response carried when the exchange failed, which is before the error handler wrote the
+status. An `AuditEventPublisher` must not block the event loop; offload blocking backends
+to their own scheduler.
 
 ## SPI
 
