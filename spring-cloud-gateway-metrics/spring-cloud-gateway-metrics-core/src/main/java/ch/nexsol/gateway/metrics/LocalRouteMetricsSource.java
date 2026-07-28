@@ -19,13 +19,9 @@ package ch.nexsol.gateway.metrics;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -45,11 +41,9 @@ public class LocalRouteMetricsSource implements RouteMetricsSource {
 	/** Name of the timer published by the gateway metrics filter for each request. */
 	public static final String REQUESTS_METER = "spring.cloud.gateway.requests";
 
-	private static final Logger LOG = LoggerFactory.getLogger(LocalRouteMetricsSource.class);
-
 	private final ObjectProvider<MeterRegistry> meterRegistry;
 
-	private final List<Pattern> excludedRoutes;
+	private final RouteExclusions excludedRoutes;
 
 	private final String coverage;
 
@@ -62,28 +56,8 @@ public class LocalRouteMetricsSource implements RouteMetricsSource {
 	public LocalRouteMetricsSource(ObjectProvider<MeterRegistry> meterRegistry, MetricsProperties properties,
 			InstanceIdentity identity) {
 		this.meterRegistry = meterRegistry;
-		this.excludedRoutes = compile(properties.getExcludedRoutes());
+		this.excludedRoutes = new RouteExclusions(properties.getExcludedRoutes());
 		this.coverage = "this instance only (" + identity.id() + ")";
-	}
-
-	// An unusable expression is dropped rather than failing the application: the traffic
-	// view is a read-only page, and losing a filter is a lesser evil than a gateway that
-	// does not start.
-	private static List<Pattern> compile(List<String> expressions) {
-		List<Pattern> patterns = new ArrayList<>();
-		for (String expression : expressions) {
-			try {
-				patterns.add(Pattern.compile(expression));
-			}
-			catch (PatternSyntaxException ex) {
-				LOG.warn("Ignoring the metrics route exclusion '{}': {}", expression, ex.getMessage());
-			}
-		}
-		return List.copyOf(patterns);
-	}
-
-	private boolean isExcluded(String routeId) {
-		return this.excludedRoutes.stream().anyMatch((pattern) -> pattern.matcher(routeId).matches());
 	}
 
 	@Override
@@ -105,7 +79,7 @@ public class LocalRouteMetricsSource implements RouteMetricsSource {
 		List<RouteMetric> metrics = new ArrayList<>();
 		for (Timer timer : registry.find(REQUESTS_METER).timers()) {
 			String routeId = timer.getId().getTag("routeId");
-			if (routeId == null || routeId.isBlank() || isExcluded(routeId)) {
+			if (this.excludedRoutes.excludes(routeId)) {
 				continue;
 			}
 			long count = timer.count();

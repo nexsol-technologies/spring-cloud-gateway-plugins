@@ -15,6 +15,7 @@
 	<packaging>pom</packaging>
 	<modules>
 		<module>spring-cloud-gateway-metrics-core</module>
+		<module>spring-cloud-gateway-metrics-prometheus</module>
 	</modules>
 
 </project>
