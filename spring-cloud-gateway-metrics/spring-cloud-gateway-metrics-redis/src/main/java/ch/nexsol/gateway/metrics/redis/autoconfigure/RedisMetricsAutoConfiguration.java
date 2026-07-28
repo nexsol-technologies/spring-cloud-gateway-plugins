@@ -34,6 +34,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnSingleCandidate;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -44,7 +45,7 @@ import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
  * Ordered before the core auto-configuration so its source wins over the local meter
  * registry.
  */
-@AutoConfiguration(before = MetricsAutoConfiguration.class)
+@AutoConfiguration(after = DataRedisReactiveAutoConfiguration.class, before = MetricsAutoConfiguration.class)
 @ConditionalOnClass({ ReactiveStringRedisTemplate.class, MeterRegistry.class })
 @ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.enabled", matchIfMissing = true)
 public class RedisMetricsAutoConfiguration {

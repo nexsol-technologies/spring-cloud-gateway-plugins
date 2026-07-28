@@ -90,7 +90,8 @@ public class DiscoveryMetricsAutoConfiguration {
 		 * Registers the source consolidating every registered instance. Marked primary
 		 * because the local source is a {@link RouteMetricsSource} too: the views must
 		 * get the consolidated figures, the endpoint keeps the local ones.
-		 * @param discoveryClient the registry the siblings are listed from
+		 * @param discoveryClient the provider over the registry the siblings are listed
+		 * from
 		 * @param builder the application web client builder
 		 * @param properties the discovery configuration
 		 * @param environment the environment the default service id is read from
@@ -99,7 +100,7 @@ public class DiscoveryMetricsAutoConfiguration {
 		@Bean
 		@Primary
 		@ConditionalOnMissingBean(DiscoveryRouteMetricsSource.class)
-		DiscoveryRouteMetricsSource discoveryRouteMetricsSource(ReactiveDiscoveryClient discoveryClient,
+		DiscoveryRouteMetricsSource discoveryRouteMetricsSource(ObjectProvider<ReactiveDiscoveryClient> discoveryClient,
 				WebClient.Builder builder, DiscoveryMetricsProperties properties, Environment environment) {
 			String serviceId = StringUtils.hasText(properties.getServiceId()) ? properties.getServiceId()
 					: environment.getProperty("spring.application.name", "");

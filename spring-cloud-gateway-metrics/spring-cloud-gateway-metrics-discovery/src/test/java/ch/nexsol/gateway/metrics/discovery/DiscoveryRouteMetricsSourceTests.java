@@ -32,6 +32,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cloud.client.DefaultServiceInstance;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
@@ -41,6 +42,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests the source consolidating what every registered instance counted.
@@ -113,7 +116,28 @@ class DiscoveryRouteMetricsSourceTests {
 		};
 		DiscoveryMetricsProperties properties = new DiscoveryMetricsProperties();
 		properties.setTimeout(Duration.ofSeconds(5));
-		return new DiscoveryRouteMetricsSource(client, WebClient.builder().build(), properties, "gateway");
+		return new DiscoveryRouteMetricsSource(providerOf(client), WebClient.builder().build(), properties, "gateway");
+	}
+
+	@SuppressWarnings("unchecked")
+	private static ObjectProvider<ReactiveDiscoveryClient> providerOf(ReactiveDiscoveryClient client) {
+		ObjectProvider<ReactiveDiscoveryClient> provider = mock(ObjectProvider.class);
+		when(provider.getIfAvailable()).thenReturn(client);
+		return provider;
+	}
+
+	@Test
+	void saysSoWhenTheApplicationRegisteredNoDiscoveryClient() {
+		// The starter is on the classpath but discovery is turned off: reporting the
+		// local
+		// figures instead would be the very thing this source exists to avoid.
+		DiscoveryRouteMetricsSource source = new DiscoveryRouteMetricsSource(providerOf(null),
+				WebClient.builder().build(), new DiscoveryMetricsProperties(), "gateway");
+
+		RouteMetricsSnapshot snapshot = source.collect().block();
+
+		assertThat(snapshot.metrics()).isEmpty();
+		assertThat(snapshot.coverage()).isEqualTo("service discovery is not enabled");
 	}
 
 	@Test

@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
 import org.springframework.core.ParameterizedTypeReference;
@@ -54,7 +55,7 @@ public class DiscoveryRouteMetricsSource implements RouteMetricsSource {
 	private static final ParameterizedTypeReference<List<RouteMetric>> METRIC_LIST = new ParameterizedTypeReference<>() {
 	};
 
-	private final ReactiveDiscoveryClient discoveryClient;
+	private final ObjectProvider<ReactiveDiscoveryClient> discoveryClient;
 
 	private final WebClient webClient;
 
@@ -64,12 +65,13 @@ public class DiscoveryRouteMetricsSource implements RouteMetricsSource {
 
 	/**
 	 * Creates the source fanning out over the registered instances.
-	 * @param discoveryClient the registry the sibling instances are listed from
+	 * @param discoveryClient the provider over the registry the sibling instances are
+	 * listed from
 	 * @param webClient the client used to poll them
 	 * @param properties the discovery configuration
 	 * @param serviceId the id this gateway is registered under
 	 */
-	public DiscoveryRouteMetricsSource(ReactiveDiscoveryClient discoveryClient, WebClient webClient,
+	public DiscoveryRouteMetricsSource(ObjectProvider<ReactiveDiscoveryClient> discoveryClient, WebClient webClient,
 			DiscoveryMetricsProperties properties, String serviceId) {
 		this.discoveryClient = discoveryClient;
 		this.webClient = webClient;
@@ -79,9 +81,17 @@ public class DiscoveryRouteMetricsSource implements RouteMetricsSource {
 
 	@Override
 	public Mono<RouteMetricsSnapshot> collect() {
+		ReactiveDiscoveryClient registry = this.discoveryClient.getIfAvailable();
+		if (registry == null) {
+			// The classpath carries a discovery client but the application registered
+			// none, discovery being turned off. Say it rather than quietly reporting the
+			// figures of whichever instance answered, which is the very thing this source
+			// exists to avoid.
+			return Mono.just(RouteMetricsSnapshot.empty("service discovery is not enabled"));
+		}
 		AtomicInteger reached = new AtomicInteger();
 		AtomicInteger discovered = new AtomicInteger();
-		return this.discoveryClient.getInstances(this.serviceId)
+		return registry.getInstances(this.serviceId)
 			.doOnNext((instance) -> discovered.incrementAndGet())
 			.flatMap((instance) -> poll(instance).doOnNext((metrics) -> reached.incrementAndGet()))
 			.flatMapIterable((metrics) -> metrics)
