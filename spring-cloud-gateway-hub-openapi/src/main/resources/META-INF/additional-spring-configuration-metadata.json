@@ -1,0 +1,16 @@
+{
+  "properties": [
+    {
+      "name": "spring.cloud.gateway.server.webflux.hub-openapi.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether the OpenAPI hub is active. It aggregates the contracts of the services the gateway discovers, and lights up the OpenAPI view of the UI. Opt-in: unlike the other plugins, the hub does nothing until it is explicitly turned on.",
+      "defaultValue": false
+    },
+    {
+      "name": "spring.cloud.gateway.server.webflux.hub-openapi.security-chain-enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether the hub contributes its own security filter chain, permitting the exact paths the aggregated contracts are served on. Turn it off to secure those paths from the application instead.",
+      "defaultValue": true
+    }
+  ]
+}

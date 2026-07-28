@@ -1,0 +1,10 @@
+{
+  "properties": [
+    {
+      "name": "spring.cloud.gateway.server.webflux.ui.security-chain-enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether the shell contributes its own security filter chain. It permits the exact paths the active views declared, never a /ui/** pattern, so a gateway route under /ui does not inherit the UI permissions. Turn it off to secure those paths from the application instead.",
+      "defaultValue": true
+    }
+  ]
+}

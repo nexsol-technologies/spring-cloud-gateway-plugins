@@ -408,7 +408,14 @@
 				return response.json();
 			})
 			.then(function (json) {
-				rows = json || [];
+				rows = (json && json.metrics) || [];
+				// What these figures cover: one instance, or every instance consolidated
+				// by a metrics provider. Shown next to the chart so a count is never read
+				// as more than it is.
+				var coverage = sel('gm-coverage');
+				if (coverage) {
+					coverage.textContent = (json && json.coverage) ? json.coverage : '';
+				}
 				render();
 			})
 			.catch(function () {

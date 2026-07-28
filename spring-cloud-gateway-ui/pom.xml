@@ -42,6 +42,13 @@
 			<version>${revision}</version>
 			<optional>true</optional>
 		</dependency>
+		<!-- The traffic view reads whichever RouteMetricsSource is active: the local meter
+		     registry by default, a consolidating one when a provider module is added. -->
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-metrics-core</artifactId>
+			<version>${revision}</version>
+		</dependency>
 		<!-- Optional: the shell contributes its own security filter chain when the
 		     application secures the gateway with Spring Security. -->
 		<dependency>
@@ -90,6 +97,11 @@
 			<groupId>io.projectreactor</groupId>
 			<artifactId>reactor-test</artifactId>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
+			<optional>true</optional>
 		</dependency>
 	</dependencies>
 	<build>

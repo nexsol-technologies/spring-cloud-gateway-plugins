@@ -1,0 +1,10 @@
+{
+  "properties": [
+    {
+      "name": "spring.cloud.gateway.server.webflux.webfilter.correlation-id.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether the correlation-id web filter is registered. It stamps every exchange with a correlation id, reusing the one the caller sent when there is one.",
+      "defaultValue": true
+    }
+  ]
+}

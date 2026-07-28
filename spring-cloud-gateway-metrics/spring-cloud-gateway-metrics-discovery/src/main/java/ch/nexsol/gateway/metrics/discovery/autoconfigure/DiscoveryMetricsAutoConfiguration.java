@@ -1,0 +1,112 @@
+/*
+ * Copyright 2025 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.nexsol.gateway.metrics.discovery.autoconfigure;
+
+import ch.nexsol.gateway.metrics.InstanceIdentity;
+import ch.nexsol.gateway.metrics.LocalRouteMetricsSource;
+import ch.nexsol.gateway.metrics.MetricsProperties;
+import ch.nexsol.gateway.metrics.RouteMetricsSource;
+import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
+import ch.nexsol.gateway.metrics.discovery.DiscoveryMetricsProperties;
+import ch.nexsol.gateway.metrics.discovery.DiscoveryRouteMetricsSource;
+import ch.nexsol.gateway.metrics.discovery.LocalRouteMetricsController;
+import io.micrometer.core.instrument.MeterRegistry;
+
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import org.springframework.core.env.Environment;
+import org.springframework.util.StringUtils;
+import org.springframework.web.reactive.function.client.WebClient;
+
+/**
+ * Registers the service discovery {@link RouteMetricsSource} when
+ * {@code metrics.provider=discovery}. Ordered before the core auto-configuration so its
+ * source wins over the local meter registry.
+ */
+@AutoConfiguration(before = MetricsAutoConfiguration.class)
+@ConditionalOnClass({ ReactiveDiscoveryClient.class, WebClient.class, MeterRegistry.class })
+@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.enabled", matchIfMissing = true)
+public class DiscoveryMetricsAutoConfiguration {
+
+	/**
+	 * Holds the beans behind the provider selector. Two levels because
+	 * {@code @ConditionalOnProperty} is not repeatable.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.provider", havingValue = "discovery")
+	@Import(LocalRouteMetricsController.class)
+	static class DiscoverySourceConfiguration {
+
+		/**
+		 * Binds the discovery metrics properties.
+		 * @return the discovery metrics properties bean
+		 */
+		@Bean
+		@ConfigurationProperties(prefix = "spring.cloud.gateway.server.webflux.metrics.discovery")
+		DiscoveryMetricsProperties discoveryMetricsProperties() {
+			return new DiscoveryMetricsProperties();
+		}
+
+		/**
+		 * Registers the local source explicitly. The core would have declared it, but
+		 * only as long as no other source exists &mdash; and this module declares one.
+		 * The endpoint the siblings poll is bound to this bean, so it keeps answering
+		 * with this instance's own figures.
+		 * @param meterRegistry the provider over the application meter registry
+		 * @param properties the shared metrics configuration
+		 * @param identity the identity of the running instance
+		 * @return the local route metrics source
+		 */
+		@Bean
+		LocalRouteMetricsSource localRouteMetricsSource(ObjectProvider<MeterRegistry> meterRegistry,
+				MetricsProperties properties, InstanceIdentity identity) {
+			return new LocalRouteMetricsSource(meterRegistry, properties, identity);
+		}
+
+		/**
+		 * Registers the source consolidating every registered instance. Marked primary
+		 * because the local source is a {@link RouteMetricsSource} too: the views must
+		 * get the consolidated figures, the endpoint keeps the local ones.
+		 * @param discoveryClient the provider over the registry the siblings are listed
+		 * from
+		 * @param builder the application web client builder
+		 * @param properties the discovery configuration
+		 * @param environment the environment the default service id is read from
+		 * @return the discovery route metrics source
+		 */
+		@Bean
+		@Primary
+		@ConditionalOnMissingBean(DiscoveryRouteMetricsSource.class)
+		DiscoveryRouteMetricsSource discoveryRouteMetricsSource(ObjectProvider<ReactiveDiscoveryClient> discoveryClient,
+				WebClient.Builder builder, DiscoveryMetricsProperties properties, Environment environment) {
+			String serviceId = StringUtils.hasText(properties.getServiceId()) ? properties.getServiceId()
+					: environment.getProperty("spring.application.name", "");
+			return new DiscoveryRouteMetricsSource(discoveryClient, builder.build(), properties, serviceId);
+		}
+
+	}
+
+}

@@ -32,11 +32,18 @@ spring:
     redis:
       host: localhost
       port: 6379
+      database: 0                    # the logical database the channel is published on
       # username: default            # Redis ACL user (optional)
       # password: ${REDIS_PASSWORD}
       # ssl:
       #   enabled: true
 ```
+
+The plugin declares no connection property of its own, `database` included: it would
+duplicate `spring.data.redis.database` and give the same setting two places to disagree.
+That index is shared with everything else reusing the connection — the metrics plugin, your
+cache, your sessions. Note that Redis Cluster only has database 0, so `database` is ignored
+in a clustered deployment.
 
 | Property | Default | Description |
 |----------|---------|-------------|

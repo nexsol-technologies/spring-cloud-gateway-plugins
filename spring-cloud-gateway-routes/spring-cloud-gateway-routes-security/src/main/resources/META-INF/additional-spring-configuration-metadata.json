@@ -1,0 +1,10 @@
+{
+  "properties": [
+    {
+      "name": "spring.cloud.gateway.server.webflux.routes-security.public-routes.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether the public-routes security chain is contributed. It permits the paths of the routes declared public through their metadata, ahead of the chains the application declares.",
+      "defaultValue": true
+    }
+  ]
+}

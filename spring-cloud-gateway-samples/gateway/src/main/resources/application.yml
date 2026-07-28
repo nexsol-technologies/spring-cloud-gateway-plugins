@@ -77,7 +77,7 @@ spring.cloud.gateway.server.webflux.routes-openapi:
      filters:
        - Retry=3
 
-spring.cloud.gateway.server.webflux.ui.traffic:
+spring.cloud.gateway.server.webflux.metrics:
   excluded-routes:
     - openapi-docs-.*
        

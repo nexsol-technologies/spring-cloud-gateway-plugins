@@ -18,6 +18,7 @@ package ch.nexsol.gateway.ui.metrics;
 
 import java.util.concurrent.TimeUnit;
 
+import ch.nexsol.gateway.metrics.LocalRouteMetricsSource;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -65,10 +66,36 @@ class RouteMetricsControllerTests {
 			.expectStatus()
 			.isOk()
 			.expectBody()
-			.jsonPath("$[0].routeId")
+			.jsonPath("$.metrics[0].routeId")
 			.isEqualTo("alpha")
-			.jsonPath("$[0].count")
+			.jsonPath("$.metrics[0].count")
 			.isEqualTo(1);
+	}
+
+	@Test
+	void shouldStateWhatTheFiguresCover() {
+		// Without a provider module the figures are those of the answering instance, and
+		// the payload says so rather than letting the page pass them off as the
+		// gateway's.
+		this.webTestClient.get()
+			.uri("/ui/metrics/data")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody()
+			.jsonPath("$.coverage")
+			.value((String coverage) -> assertThat(coverage).contains("this instance only"));
+	}
+
+	@Test
+	void shouldExposeTheCoveragePlaceholderOnThePage() {
+		this.webTestClient.get()
+			.uri("/ui/metrics")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("id=\"gm-coverage\""));
 	}
 
 	@TestConfiguration
@@ -77,7 +104,7 @@ class RouteMetricsControllerTests {
 		@Bean
 		MeterRegistry meterRegistry() {
 			SimpleMeterRegistry registry = new SimpleMeterRegistry();
-			Timer.builder(RouteMetricsService.REQUESTS_METER)
+			Timer.builder(LocalRouteMetricsSource.REQUESTS_METER)
 				.tags("routeId", "alpha", "routeUri", "http://alpha", "httpStatusCode", "200")
 				.register(registry)
 				.record(50, TimeUnit.MILLISECONDS);

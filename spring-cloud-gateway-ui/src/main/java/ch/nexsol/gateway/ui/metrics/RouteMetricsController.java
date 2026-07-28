@@ -16,8 +16,11 @@
 
 package ch.nexsol.gateway.ui.metrics;
 
-import java.util.List;
+import ch.nexsol.gateway.metrics.RouteMetricsSnapshot;
+import ch.nexsol.gateway.metrics.RouteMetricsSource;
+import reactor.core.publisher.Mono;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,22 +28,29 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Serves the traffic view: a bubble chart of the gateway routes plotted from their
- * request metrics. The full page renders inside the shell, and the {@code /data} endpoint
- * feeds the chart with the current per-route metrics as JSON.
+ * Serves the traffic view: the page hosting the bubble chart, and the endpoint that feeds
+ * it with the current per-route figures as JSON.
+ * <p>
+ * The figures come from whichever {@link RouteMetricsSource} is active, and are served
+ * with the coverage they were computed over so the page can state whose traffic it is
+ * showing.
  */
 @Controller
 @RequestMapping("/ui/metrics")
 public class RouteMetricsController {
 
-	private final RouteMetricsService metricsService;
+	/** Reported when the metrics plugin resolved no source at all. */
+	static final String NO_SOURCE = "no metrics source available";
+
+	private final ObjectProvider<RouteMetricsSource> metricsSource;
 
 	/**
-	 * Creates the controller with the metrics aggregation service.
-	 * @param metricsService the service aggregating the per-route request metrics
+	 * Creates the controller over the (optional) active metrics source.
+	 * @param metricsSource the provider over the source the per-route figures are read
+	 * from
 	 */
-	public RouteMetricsController(RouteMetricsService metricsService) {
-		this.metricsService = metricsService;
+	public RouteMetricsController(ObjectProvider<RouteMetricsSource> metricsSource) {
+		this.metricsSource = metricsSource;
 	}
 
 	/**
@@ -55,13 +65,16 @@ public class RouteMetricsController {
 	}
 
 	/**
-	 * Returns the current per-route metrics as JSON for the chart.
-	 * @return the aggregated per-route metrics
+	 * Returns the current per-route figures and their coverage, for the chart. A view
+	 * whose source is absent reports that it has nothing to show rather than breaking the
+	 * page.
+	 * @return the current snapshot
 	 */
 	@GetMapping("/data")
 	@ResponseBody
-	public List<RouteMetric> data() {
-		return this.metricsService.collect();
+	public Mono<RouteMetricsSnapshot> data() {
+		RouteMetricsSource source = this.metricsSource.getIfAvailable();
+		return (source != null) ? source.collect() : Mono.just(RouteMetricsSnapshot.empty(NO_SOURCE));
 	}
 
 }

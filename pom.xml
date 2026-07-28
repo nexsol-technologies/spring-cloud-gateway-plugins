@@ -75,6 +75,7 @@
 
 	<modules>
 		<module>spring-cloud-gateway-audit</module>
+		<module>spring-cloud-gateway-metrics</module>
 		<module>spring-cloud-gateway-routes</module>
 		<module>spring-cloud-gateway-filters</module>
 		<module>spring-cloud-gateway-oauth2</module>
@@ -126,6 +127,18 @@
 					<parameters>true</parameters>
 					<source>${maven.compiler.source}</source>
 					<target>${maven.compiler.target}</target>
+					<!--
+						Declared explicitly rather than discovered from the classpath: since JDK 23
+						javac no longer runs processors it merely finds there, so without this the
+						configuration metadata the IDEs read is silently never generated.
+					-->
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-configuration-processor</artifactId>
+							<version>${spring-boot.version}</version>
+						</path>
+					</annotationProcessorPaths>
 				</configuration>
 			</plugin>
            <plugin>

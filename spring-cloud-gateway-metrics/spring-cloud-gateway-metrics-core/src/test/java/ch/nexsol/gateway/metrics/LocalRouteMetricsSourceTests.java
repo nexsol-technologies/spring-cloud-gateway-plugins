@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.ui.metrics;
+package ch.nexsol.gateway.metrics;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -31,23 +31,34 @@ import static org.assertj.core.data.Offset.offset;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class RouteMetricsServiceTests {
+/**
+ * Tests the source reading the meter registry of the running instance.
+ */
+class LocalRouteMetricsSourceTests {
 
-	private RouteMetricsService serviceFor(MeterRegistry registry) {
-		return serviceFor(registry, new RouteMetricsProperties());
+	private LocalRouteMetricsSource sourceFor(MeterRegistry registry) {
+		return sourceFor(registry, new MetricsProperties());
 	}
 
 	@SuppressWarnings("unchecked")
-	private RouteMetricsService serviceFor(MeterRegistry registry, RouteMetricsProperties properties) {
+	private LocalRouteMetricsSource sourceFor(MeterRegistry registry, MetricsProperties properties) {
 		ObjectProvider<MeterRegistry> provider = mock(ObjectProvider.class);
 		when(provider.getIfAvailable()).thenReturn(registry);
-		return new RouteMetricsService(provider, properties);
+		return new LocalRouteMetricsSource(provider, properties, new InstanceIdentity("gateway-1"));
+	}
+
+	private List<RouteMetric> collect(MeterRegistry registry) {
+		return sourceFor(registry).collect().block().metrics();
+	}
+
+	private List<RouteMetric> collect(MeterRegistry registry, MetricsProperties properties) {
+		return sourceFor(registry, properties).collect().block().metrics();
 	}
 
 	private static SimpleMeterRegistry registryWith(String... routeIds) {
 		SimpleMeterRegistry registry = new SimpleMeterRegistry();
 		for (String routeId : routeIds) {
-			Timer.builder(RouteMetricsService.REQUESTS_METER)
+			Timer.builder(LocalRouteMetricsSource.REQUESTS_METER)
 				.tags("routeId", routeId, "httpStatusCode", "200")
 				.register(registry)
 				.record(10, TimeUnit.MILLISECONDS);
@@ -56,19 +67,26 @@ class RouteMetricsServiceTests {
 	}
 
 	@Test
+	void namesTheInstanceTheFiguresCameFrom() {
+		RouteMetricsSnapshot snapshot = sourceFor(registryWith("orders")).collect().block();
+
+		assertThat(snapshot.coverage()).contains("this instance only").contains("gateway-1");
+	}
+
+	@Test
 	void aggregatesTimersOfTheSameRouteAndComputesErrorRate() {
 		SimpleMeterRegistry registry = new SimpleMeterRegistry();
-		Timer ok = Timer.builder(RouteMetricsService.REQUESTS_METER)
+		Timer ok = Timer.builder(LocalRouteMetricsSource.REQUESTS_METER)
 			.tags("routeId", "alpha", "routeUri", "http://alpha", "httpStatusCode", "200")
 			.register(registry);
 		ok.record(100, TimeUnit.MILLISECONDS);
 		ok.record(200, TimeUnit.MILLISECONDS);
-		Timer failed = Timer.builder(RouteMetricsService.REQUESTS_METER)
+		Timer failed = Timer.builder(LocalRouteMetricsSource.REQUESTS_METER)
 			.tags("routeId", "alpha", "routeUri", "http://alpha", "httpStatusCode", "500")
 			.register(registry);
 		failed.record(300, TimeUnit.MILLISECONDS);
 
-		List<RouteMetric> metrics = serviceFor(registry).collect();
+		List<RouteMetric> metrics = collect(registry);
 
 		assertThat(metrics).hasSize(1);
 		RouteMetric alpha = metrics.get(0);
@@ -84,37 +102,35 @@ class RouteMetricsServiceTests {
 	@Test
 	void ordersRoutesByCallCountDescending() {
 		SimpleMeterRegistry registry = new SimpleMeterRegistry();
-		Timer.builder(RouteMetricsService.REQUESTS_METER)
+		Timer.builder(LocalRouteMetricsSource.REQUESTS_METER)
 			.tags("routeId", "low", "httpStatusCode", "200")
 			.register(registry)
 			.record(10, TimeUnit.MILLISECONDS);
-		Timer busy = Timer.builder(RouteMetricsService.REQUESTS_METER)
+		Timer busy = Timer.builder(LocalRouteMetricsSource.REQUESTS_METER)
 			.tags("routeId", "busy", "httpStatusCode", "200")
 			.register(registry);
 		busy.record(10, TimeUnit.MILLISECONDS);
 		busy.record(10, TimeUnit.MILLISECONDS);
 
-		List<RouteMetric> metrics = serviceFor(registry).collect();
-
-		assertThat(metrics).extracting(RouteMetric::routeId).containsExactly("busy", "low");
+		assertThat(collect(registry)).extracting(RouteMetric::routeId).containsExactly("busy", "low");
 	}
 
 	@Test
 	void returnsEmptyWhenNoRegistryIsAvailable() {
-		assertThat(serviceFor(null).collect()).isEmpty();
+		assertThat(collect(null)).isEmpty();
 	}
 
 	@Test
 	void countsClientErrorsApartFromServerErrors() {
 		SimpleMeterRegistry registry = new SimpleMeterRegistry();
 		for (String status : List.of("200", "403", "404", "500")) {
-			Timer.builder(RouteMetricsService.REQUESTS_METER)
+			Timer.builder(LocalRouteMetricsSource.REQUESTS_METER)
 				.tags("routeId", "orders", "httpStatusCode", status)
 				.register(registry)
 				.record(10, TimeUnit.MILLISECONDS);
 		}
 
-		RouteMetric orders = serviceFor(registry).collect().get(0);
+		RouteMetric orders = collect(registry).get(0);
 
 		assertThat(orders.count()).isEqualTo(4);
 		// 403 and 404 are the caller being turned away, not the backend failing.
@@ -129,54 +145,63 @@ class RouteMetricsServiceTests {
 		SimpleMeterRegistry registry = registryWith("orders", "openapi-docs-discovery-petstore",
 				"openapi-docs-discovery-SERVICE-A");
 
-		List<RouteMetric> metrics = serviceFor(registry).collect();
-
-		assertThat(metrics).extracting(RouteMetric::routeId).containsExactly("orders");
+		assertThat(collect(registry)).extracting(RouteMetric::routeId).containsExactly("orders");
 	}
 
 	@Test
 	void excludesEveryRouteMatchingAConfiguredExpression() {
-		RouteMetricsProperties properties = new RouteMetricsProperties();
+		MetricsProperties properties = new MetricsProperties();
 		properties.setExcludedRoutes(List.of("internal_.*", ".*_healthcheck"));
 		SimpleMeterRegistry registry = registryWith("orders", "internal_metrics", "billing_healthcheck");
 
-		List<RouteMetric> metrics = serviceFor(registry, properties).collect();
-
-		assertThat(metrics).extracting(RouteMetric::routeId).containsExactly("orders");
+		assertThat(collect(registry, properties)).extracting(RouteMetric::routeId).containsExactly("orders");
 	}
 
 	@Test
 	void matchesTheWholeRouteIdRatherThanAFragment() {
-		RouteMetricsProperties properties = new RouteMetricsProperties();
+		MetricsProperties properties = new MetricsProperties();
 		properties.setExcludedRoutes(List.of("docs"));
 		SimpleMeterRegistry registry = registryWith("docs", "docs-public");
 
-		List<RouteMetric> metrics = serviceFor(registry, properties).collect();
-
-		assertThat(metrics).extracting(RouteMetric::routeId).containsExactly("docs-public");
+		assertThat(collect(registry, properties)).extracting(RouteMetric::routeId).containsExactly("docs-public");
 	}
 
 	@Test
 	void showsEveryRouteWhenTheExclusionsAreCleared() {
-		RouteMetricsProperties properties = new RouteMetricsProperties();
+		MetricsProperties properties = new MetricsProperties();
 		properties.setExcludedRoutes(List.of());
 		SimpleMeterRegistry registry = registryWith("orders", "openapi-docs-discovery-petstore");
 
-		List<RouteMetric> metrics = serviceFor(registry, properties).collect();
-
-		assertThat(metrics).extracting(RouteMetric::routeId)
+		assertThat(collect(registry, properties)).extracting(RouteMetric::routeId)
 			.containsExactlyInAnyOrder("orders", "openapi-docs-discovery-petstore");
 	}
 
 	@Test
 	void keepsTheUsableExpressionsWhenOneIsMalformed() {
-		RouteMetricsProperties properties = new RouteMetricsProperties();
+		MetricsProperties properties = new MetricsProperties();
 		properties.setExcludedRoutes(List.of("[unclosed", "internal_.*"));
 		SimpleMeterRegistry registry = registryWith("orders", "internal_metrics");
 
-		List<RouteMetric> metrics = serviceFor(registry, properties).collect();
+		assertThat(collect(registry, properties)).extracting(RouteMetric::routeId).containsExactly("orders");
+	}
 
-		assertThat(metrics).extracting(RouteMetric::routeId).containsExactly("orders");
+	@Test
+	void exposesTheRawLocalReadingForAConsolidatingProvider() {
+		SimpleMeterRegistry registry = new SimpleMeterRegistry();
+		for (String status : List.of("200", "500")) {
+			Timer.builder(LocalRouteMetricsSource.REQUESTS_METER)
+				.tags("routeId", "orders", "httpStatusCode", status)
+				.register(registry)
+				.record(10, TimeUnit.MILLISECONDS);
+		}
+
+		// One partial figure per timer, left unmerged so a provider can merge it with
+		// what
+		// the other instances reported.
+		assertThat(sourceFor(registry).read()).hasSize(2).allSatisfy((metric) -> {
+			assertThat(metric.routeId()).isEqualTo("orders");
+			assertThat(metric.count()).isEqualTo(1);
+		});
 	}
 
 }
