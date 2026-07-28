@@ -122,10 +122,20 @@ patterns is passed straight through, so no event is built and nothing reaches th
 The list is empty by default — what a gateway serves belongs to its audit trail unless it is
 explicitly declared not to.
 
-The gateway UI adds the paths of its own console to that list, so browsing the console does
-not fill the audit trail with the console's own traffic. Only the exact paths the active
-views serve are excluded, never a `/ui/**` pattern: a gateway route declared under `/ui`
-keeps being audited.
+Two plugins fill that list in for themselves, so their own chatter never reaches the trail:
+
+- the [gateway UI](../../spring-cloud-gateway-ui/README.md) adds the paths of its console,
+  so browsing it does not fill the trail with its pages, fragments and assets. Only the
+  exact paths the active views serve are excluded, never a `/ui/**` pattern: a gateway route
+  declared under `/ui` keeps being audited.
+- the [OpenAPI hub](../../spring-cloud-gateway-hub-openapi/README.md) adds its documentation
+  endpoints, which a Swagger or Scalar console polls relentlessly. That list includes
+  `/v3/api-docs/*`, the aggregated contracts, which *are* proxied routes &mdash; so this one
+  does take genuinely routed traffic out of the trail.
+
+Both are additive: what the application configured is kept, and only the missing paths are
+appended. Neither affects the per-route `Audit` gateway filter, which audits whatever route
+carries it.
 
 ## Configuration properties
 

@@ -50,6 +50,17 @@
 			<version>${revision}</version>
 			<optional>true</optional>
 		</dependency>
+		<!--
+			Optional integration: when the application also audits its traffic, keep the
+			documentation endpoints out of the audit trail. Only the properties model is
+			needed; kept optional so auditing is not forced on hub-only consumers.
+		-->
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-audit-core</artifactId>
+			<version>${revision}</version>
+			<optional>true</optional>
+		</dependency>
 		<!-- Optional: the hub contributes its own security filter chain when the
 		     application secures the gateway with Spring Security. -->
 		<dependency>

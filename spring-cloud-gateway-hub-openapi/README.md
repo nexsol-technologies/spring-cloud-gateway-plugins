@@ -139,3 +139,22 @@ spring.cloud.gateway.server.webflux.hub-openapi:
 > As with any `SecurityWebFilterChain` bean, its presence makes Spring Boot back off from
 > its default "everything authenticated" chain. An application that was relying on that
 > default must declare its own chains.
+
+## Auditing
+
+When the [auditing plugin](../spring-cloud-gateway-audit/spring-cloud-gateway-audit-core/README.md)
+is on the classpath, the hub keeps its documentation endpoints out of the audit trail: a
+console polling the contracts calls them over and over, and that traffic says nothing about
+what the gateway routed. The dependency is optional, so auditing is never forced on a
+gateway that only wants the hub.
+
+The excluded paths are the very ones listed above &mdash; the security chain and the audit
+exclusion read the same resolved list, so a path opened by one is never audited by the
+other. That includes `/v3/api-docs/*`, which are **real proxied routes** to the backends:
+excluding them takes genuinely routed traffic out of the trail. If you would rather keep it,
+set the exclusions yourself with
+`spring.cloud.gateway.server.webflux.audit.web-filter.exclude-paths` &mdash; the list is
+additive, so what you configure is kept and only the missing hub paths are appended.
+
+The exclusion only applies to the global audit web filter. A route carrying the `Audit`
+gateway filter is audited whatever this says.

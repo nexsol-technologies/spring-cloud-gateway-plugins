@@ -16,13 +16,10 @@
 
 package ch.nexsol.gateway.openapi.autoconfigure;
 
-import java.util.LinkedHashSet;
-import java.util.Set;
-
+import ch.nexsol.gateway.openapi.hub.HubOpenapiPaths;
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
 import org.springdoc.core.properties.SpringDocConfigProperties;
 import org.springdoc.core.properties.SwaggerUiConfigProperties;
-import org.springdoc.core.utils.Constants;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -91,35 +88,10 @@ public class HubApiSecurityAutoConfiguration {
 			ObjectProvider<SwaggerUiConfigProperties> swaggerUiProperties) {
 		http.cors(withDefaults());
 		http.csrf(ServerHttpSecurity.CsrfSpec::disable);
-		http.securityMatcher(
-				ServerWebExchangeMatchers.pathMatchers(documentationPaths(springDocProperties, swaggerUiProperties)));
+		http.securityMatcher(ServerWebExchangeMatchers.pathMatchers(
+				HubOpenapiPaths.documentationPaths(springDocProperties, swaggerUiProperties).toArray(String[]::new)));
 		http.authorizeExchange((spec) -> spec.anyExchange().permitAll());
 		return http.build();
-	}
-
-	private static String[] documentationPaths(ObjectProvider<SpringDocConfigProperties> springDocProperties,
-			ObjectProvider<SwaggerUiConfigProperties> swaggerUiProperties) {
-		String apiDocs = springDocProperties.stream()
-			.map((properties) -> properties.getApiDocs().getPath())
-			.findFirst()
-			.orElse(Constants.DEFAULT_API_DOCS_URL);
-		String swaggerUi = swaggerUiProperties.stream()
-			.map(SwaggerUiConfigProperties::getPath)
-			.filter((path) -> path != null)
-			.findFirst()
-			.orElse(Constants.DEFAULT_SWAGGER_UI_PATH);
-		Set<String> paths = new LinkedHashSet<>();
-		// The contract of the gateway itself, and the SpringDoc endpoints driving the UI.
-		paths.add(apiDocs);
-		paths.add(apiDocs + ".yaml");
-		paths.add(apiDocs + "/swagger-config");
-		paths.add(swaggerUi);
-		// The aggregated contracts, published as gateway routes named after each service.
-		paths.add(HubDiscoveryRouteLocator.API_DOCS_URL + "/*");
-		// The Swagger UI assets, whose file names belong to the shipped webjar.
-		paths.add(Constants.SWAGGER_UI_PREFIX + "/**");
-		paths.add(Constants.DEFAULT_WEB_JARS_PREFIX_URL + Constants.SWAGGER_UI_PREFIX + "/**");
-		return paths.toArray(String[]::new);
 	}
 
 }

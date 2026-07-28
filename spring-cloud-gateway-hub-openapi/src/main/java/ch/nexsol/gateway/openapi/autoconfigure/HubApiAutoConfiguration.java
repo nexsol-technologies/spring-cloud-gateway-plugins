@@ -19,17 +19,21 @@ package ch.nexsol.gateway.openapi.autoconfigure;
 import java.net.URI;
 import java.util.Set;
 
+import ch.nexsol.gateway.audit.AuditProperties;
 import ch.nexsol.gateway.openapi.HubOpenapiProperties;
+import ch.nexsol.gateway.openapi.hub.AuditExclusionBeanPostProcessor;
 import ch.nexsol.gateway.openapi.hub.OpenapiService;
 import ch.nexsol.gateway.openapi.hub.SpringDocOpenapiRoutes;
 import ch.nexsol.gateway.openapi.hub.StaticOpenapiDocsRouteLocator;
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
 import ch.nexsol.gateway.openapi.hub.filter.OpenapiModifyResponseBodyGatewayFilterFactory;
 import ch.nexsol.gateway.routes.openapi.OpenapiSourcesLoader;
+import org.springdoc.core.properties.SpringDocConfigProperties;
 import org.springdoc.core.properties.SwaggerUiConfigProperties;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -118,6 +122,32 @@ public class HubApiAutoConfiguration {
 			@Value("${spring.cloud.gateway.server.webflux.hub-openapi.gateway-uri}") URI apiGatewayUri) {
 		return new OpenapiModifyResponseBodyGatewayFilterFactory(codecConfigurer.getReaders(), bodyDecoders,
 				bodyEncoders, apiGatewayUri);
+	}
+
+	/**
+	 * Optional integration active only when the auditing plugin is on the classpath:
+	 * keeps the documentation endpoints out of the audit trail, which a console polling
+	 * the contracts would otherwise flood.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(AuditProperties.class)
+	static class AuditHubIntegrationConfiguration {
+
+		/**
+		 * Excludes the paths the hub serves from the global auditing web filter. Declared
+		 * {@code static} because a bean post-processor must not force the enclosing
+		 * configuration to be created early.
+		 * @param springDocProperties the SpringDoc configuration, when it is on
+		 * @param swaggerUiProperties the Swagger UI configuration, when it is on
+		 * @return the post-processor excluding the documentation endpoints
+		 */
+		@Bean
+		static BeanPostProcessor hubOpenapiAuditExclusionBeanPostProcessor(
+				ObjectProvider<SpringDocConfigProperties> springDocProperties,
+				ObjectProvider<SwaggerUiConfigProperties> swaggerUiProperties) {
+			return new AuditExclusionBeanPostProcessor(springDocProperties, swaggerUiProperties);
+		}
+
 	}
 
 	/**
