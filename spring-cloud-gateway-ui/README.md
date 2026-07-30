@@ -38,6 +38,7 @@ what the application actually runs:
 | Database routes | `/ui/routes/db` | `spring-cloud-gateway-routes-database` is present |
 | Route tester | `/ui/routes/test` | the gateway route table type is present |
 | Traffic | `/ui/metrics` | Micrometer is present |
+| OpenAPI | `/ui/openapi` | `spring-cloud-gateway-hub-openapi` is present and `spring.cloud.gateway.server.webflux.hub-openapi.enabled` is `true` |
 | Audit | `/ui/audit` | `spring-cloud-gateway-audit-core` is present and `spring.cloud.gateway.server.webflux.audit.enabled` is not `false` |
 
 ## Home page
@@ -265,10 +266,11 @@ NavItem routesNavItem() {
 Any module can light up its own entry the same way, simply by declaring a `NavItem` bean
 (optionally guarded by a condition). Icons reference the SVG sprite declared in
 `templates/dashboard/fragments/layout.html` (`icon-home`, `icon-plugin`, `icon-route`,
-`icon-target`, `icon-chart`, `icon-list`).
+`icon-target`, `icon-chart`, `icon-book`, `icon-list`).
 
 The built-in entries are ordered `home` (0), `Routes` (5), `Database routes` (10),
-`Route tester` (15), `Traffic` (20) and `Audit` (30), leaving room for your own in between.
+`Route tester` (15), `Traffic` (20), `OpenAPI` (25) and `Audit` (30), leaving room for your
+own in between.
 
 ## Hosting a plugin page inside the shell
 
