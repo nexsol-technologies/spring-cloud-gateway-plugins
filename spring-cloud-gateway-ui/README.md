@@ -314,6 +314,25 @@ directly. When nothing has been aggregated, the contract of the gateway itself i
 A custom `springdoc.api-docs.path` is honoured &mdash; the view is handed the configured
 paths, it does not assume `/v3/api-docs`.
 
+**Vendor extensions** &mdash; Scalar renders only the extensions it knows about (`x-internal`,
+`x-displayName`, `x-codeSamples`, `x-tagGroups`, `x-enumDescriptions`, `x-scalar-*`); anything
+a service documents of its own &mdash; the Keycloak roles a resource requires, the team owning
+it &mdash; is dropped at render time. Rendering an arbitrary extension the way Scalar does its
+own means registering a plugin component, which the standalone bundle cannot do: it exports
+`createApiReference` alone, with neither Vue nor a template compiler. The view therefore folds
+those extensions into the Markdown descriptions before handing the contract over, which is why
+it fetches the contracts itself and passes Scalar their content rather than their URL:
+
+| Extension on | Shown in |
+| --- | --- |
+| an operation | that operation's description |
+| a path item | the description of each of its operations; an operation redeclaring the key wins |
+| a `components.schemas` entry | that schema's description, in the Models section |
+| the document root | the description of `info`, at the top of the contract |
+
+Values are rendered as inline code, arrays as a comma-separated series, objects as a JSON
+block. The extensions Scalar already renders are left alone, so nothing is shown twice.
+
 The Scalar bundle ships with the plugin (`/js/scalar.standalone.js`, 2.7 MB) and its default
 web fonts are switched off, so the view works on an isolated network without reaching any CDN.
 
