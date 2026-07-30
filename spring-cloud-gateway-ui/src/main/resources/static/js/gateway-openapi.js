@@ -26,8 +26,9 @@
 	 * those into a description would show them twice. Kept in step with the bundled
 	 * version, which is stated at the top of scalar.standalone.js.
 	 */
-	var NATIVE = ['x-internal', 'x-displayName', 'x-codeSamples', 'x-code-samples', 'x-tagGroups',
-		'x-enumDescriptions', 'x-additionalPropertiesName'];
+	var NATIVE = ['x-internal', 'x-displayName', 'x-badges', 'x-codeSamples', 'x-code-samples',
+		'x-tagGroups', 'x-enumDescriptions', 'x-enum-descriptions', 'x-enumNames', 'x-enum-varnames',
+		'x-example', 'x-examples', 'x-additionalPropertiesName'];
 
 	var mount = document.getElementById('gw-openapi');
 	var error = document.getElementById('gw-openapi-error');
