@@ -17,9 +17,11 @@
 package ch.nexsol.gateway.ui.routes;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -118,6 +120,56 @@ class RouteInventoryServiceTests {
 		StepVerifier.create(service.routes())
 			.assertNext((routes) -> assertThat(routes).extracting(RouteView::routeId).containsExactly("alpha"))
 			.verifyComplete();
+	}
+
+	@Test
+	void dropsASourceThatDoesNotAnswerInTime() {
+		// The silent source comes first: the routes of the ones behind it must still be
+		// listed, and the page must not wait on it beyond the bound.
+		StepVerifier
+			.withVirtualTime(() -> serviceOver(new SilentRouteDefinitionLocator(),
+					new AlphaRouteDefinitionLocator(definition("alpha", "http://alpha")))
+				.routes())
+			.thenAwait(Duration.ofSeconds(5))
+			.assertNext((routes) -> assertThat(routes).extracting(RouteView::routeId).containsExactly("alpha"))
+			.verifyComplete();
+	}
+
+	@Test
+	void readsEverySourceOnceAndServesTheSnapshotToTheNextReader() {
+		CountingRouteDefinitionLocator locator = new CountingRouteDefinitionLocator();
+		RouteInventoryService service = serviceOver(locator);
+
+		StepVerifier.create(service.routes()).expectNextCount(1).verifyComplete();
+		StepVerifier.create(service.routes()).expectNextCount(1).verifyComplete();
+
+		assertThat(locator.reads()).isEqualTo(1);
+	}
+
+	@Test
+	void readsTheSourcesAgainOnceTheGatewayRebuiltItsRouteTable() {
+		CountingRouteDefinitionLocator locator = new CountingRouteDefinitionLocator();
+		RouteInventoryService service = serviceOver(locator);
+
+		StepVerifier.create(service.routes()).expectNextCount(1).verifyComplete();
+		service.onApplicationEvent(new RefreshRoutesEvent(this));
+		StepVerifier.create(service.routes()).expectNextCount(1).verifyComplete();
+
+		assertThat(locator.reads()).isEqualTo(2);
+	}
+
+	@Test
+	void refreshingTheViewReadsTheSourcesAgain() {
+		CountingRouteDefinitionLocator locator = new CountingRouteDefinitionLocator();
+		RouteInventoryService service = serviceOver(locator);
+
+		StepVerifier.create(service.routes()).expectNextCount(1).verifyComplete();
+		StepVerifier.create(service.refreshedRoutes()).expectNextCount(1).verifyComplete();
+		StepVerifier.create(service.routes()).expectNextCount(1).verifyComplete();
+
+		// Once for the first display, once for the explicit refresh, and the snapshot
+		// left behind serves the display that follows.
+		assertThat(locator.reads()).isEqualTo(2);
 	}
 
 	@Test
@@ -228,6 +280,37 @@ class RouteInventoryServiceTests {
 		@Override
 		public Flux<RouteDefinition> getRouteDefinitions() {
 			return Flux.error(new IllegalStateException("source down"));
+		}
+
+	}
+
+	/**
+	 * A source that never answers, as an unreachable one probed over the network does.
+	 */
+	private static final class SilentRouteDefinitionLocator implements RouteDefinitionLocator {
+
+		@Override
+		public Flux<RouteDefinition> getRouteDefinitions() {
+			return Flux.never();
+		}
+
+	}
+
+	/** Counts how many times the source was actually read, to observe the caching. */
+	private static final class CountingRouteDefinitionLocator implements RouteDefinitionLocator {
+
+		private final AtomicInteger reads = new AtomicInteger();
+
+		@Override
+		public Flux<RouteDefinition> getRouteDefinitions() {
+			return Flux.defer(() -> {
+				this.reads.incrementAndGet();
+				return Flux.just(definition("counted", "http://counted"));
+			});
+		}
+
+		int reads() {
+			return this.reads.get();
 		}
 
 	}

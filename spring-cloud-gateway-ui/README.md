@@ -38,6 +38,7 @@ what the application actually runs:
 | Database routes | `/ui/routes/db` | `spring-cloud-gateway-routes-database` is present |
 | Route tester | `/ui/routes/test` | the gateway route table type is present |
 | Traffic | `/ui/metrics` | Micrometer is present |
+| OpenAPI | `/ui/openapi` | `spring-cloud-gateway-hub-openapi` is present and `spring.cloud.gateway.server.webflux.hub-openapi.enabled` is `true` |
 | Audit | `/ui/audit` | `spring-cloud-gateway-audit-core` is present and `spring.cloud.gateway.server.webflux.audit.enabled` is not `false` |
 
 ## Home page
@@ -75,6 +76,14 @@ Each source is queried individually instead of through the gateway's aggregate, 
 source name is derived from the locator class name, so a locator contributed by any plugin
 shows up correctly without this module knowing about it.
 
+The resulting inventory is **read once and cached** until the gateway signals a route change
+through a `RefreshRoutesEvent`, the same way the gateway itself only queries its locators on
+that event. Displaying this page or the home page therefore costs nothing: a locator that
+reaches the network &mdash; discovery probing every service for its OpenAPI document, a
+remote contract &mdash; is not queried again on every navigation. Each source is also given
+five seconds to answer, after which it is dropped from the snapshot with a warning, exactly
+as a source that fails to be read is: one unreachable source cannot hold the page.
+
 **Columns** &mdash; route (its id, with the target it resolves to under it), source, order,
 predicates and filters. A predicate or filter is rendered the way it was declared, not as a
 raw argument map: positional arguments read back as the YAML shortcut (`Path=/api/**`,
@@ -97,10 +106,10 @@ refresh:
 | Does | re-reads the sources, re-renders this table | publishes a `RefreshRoutesEvent`, then re-renders |
 | Affects | this page only | the gateway route table used to route traffic |
 
-*Refresh view* calls every locator again. What that picks up depends on the locator: a
-database or discovery source is queried live, while a file or Config Server source serves the
-snapshot it last loaded &mdash; those reload through their own plugin (a file watch, a poll,
-`/actuator/refresh`), never through this page.
+*Refresh view* drops the cached inventory and calls every locator again. What that picks up
+depends on the locator: a database or discovery source is queried live, while a file or
+Config Server source serves the snapshot it last loaded &mdash; those reload through their
+own plugin (a file watch, a poll, `/actuator/refresh`), never through this page.
 
 *Rebuild gateway routes* aims at the gateway: `CachingRouteLocator` drops its cached `Route`
 objects and rebuilds them from the current definitions, exactly as the gateway actuator
@@ -265,10 +274,11 @@ NavItem routesNavItem() {
 Any module can light up its own entry the same way, simply by declaring a `NavItem` bean
 (optionally guarded by a condition). Icons reference the SVG sprite declared in
 `templates/dashboard/fragments/layout.html` (`icon-home`, `icon-plugin`, `icon-route`,
-`icon-target`, `icon-chart`, `icon-list`).
+`icon-target`, `icon-chart`, `icon-book`, `icon-list`).
 
 The built-in entries are ordered `home` (0), `Routes` (5), `Database routes` (10),
-`Route tester` (15), `Traffic` (20) and `Audit` (30), leaving room for your own in between.
+`Route tester` (15), `Traffic` (20), `OpenAPI` (25) and `Audit` (30), leaving room for your
+own in between.
 
 ## Hosting a plugin page inside the shell
 
@@ -304,8 +314,46 @@ directly. When nothing has been aggregated, the contract of the gateway itself i
 A custom `springdoc.api-docs.path` is honoured &mdash; the view is handed the configured
 paths, it does not assume `/v3/api-docs`.
 
-The Scalar bundle ships with the plugin (`/js/scalar.standalone.js`, 2.7 MB) and its default
-web fonts are switched off, so the view works on an isolated network without reaching any CDN.
+**Vendor extensions** &mdash; Scalar renders only the extensions it knows about (`x-internal`,
+`x-displayName`, `x-badges`, `x-codeSamples`, `x-tagGroups`, the `x-enum*` family, `x-example`,
+`x-scalar-*`); anything a service documents of its own &mdash; the Keycloak roles a resource
+requires, the team owning it &mdash; is dropped at render time. Rendering an arbitrary
+extension the way Scalar does its own means registering a plugin component, which the
+standalone bundle cannot do: it exports `createApiReference` alone, with neither Vue nor a
+template compiler. The view therefore folds those extensions into the Markdown descriptions
+before handing the contract over, which is why it fetches the contracts itself and passes
+Scalar their content rather than their URL:
+
+| Extension on | Shown in |
+| --- | --- |
+| an operation | that operation's description |
+| a path item | the description of each of its operations; an operation redeclaring the key wins |
+| a `components.schemas` entry | that schema's description, in the Models section |
+| the document root | the description of `info`, at the top of the contract |
+
+Values are rendered as inline code, arrays as a comma-separated series, objects as a JSON
+block. The extensions Scalar already renders are left alone, so nothing is shown twice
+&mdash; `x-badges` in particular reaches Scalar untouched and comes out as a badge next to
+the operation, which is worth shaping your own extension as when the value is a short label.
+
+**Nothing has to be declared** for an extension to show up: an unknown one reads under its
+own name. Give it a label when the raw key is not what you want your readers to see:
+
+```yaml
+spring.cloud.gateway.server.webflux.ui.openapi:
+  extensions:
+    x-roles: Required roles
+    x-from-application-version: Since
+```
+
+The line an operation showed under **x-roles** then reads **Required roles**, the value
+untouched. The labels are carried by the page, so adding one is a matter of configuration
+and a restart, with nothing to rebuild. An extension left out of the mapping keeps showing under its own name,
+which is what keeps a newly documented extension from going unnoticed.
+
+The Scalar bundle ships with the plugin (`/js/scalar.standalone.js`, `@scalar/api-reference`
+1.63.0, 3.6 MB) and its default web fonts are switched off, so the view works on an isolated
+network without reaching any CDN.
 
 ## Spring Security
 
