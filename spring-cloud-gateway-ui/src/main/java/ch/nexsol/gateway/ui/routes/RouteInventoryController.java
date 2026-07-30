@@ -16,6 +16,8 @@
 
 package ch.nexsol.gateway.ui.routes;
 
+import java.util.List;
+
 import reactor.core.publisher.Mono;
 
 import org.springframework.stereotype.Controller;
@@ -54,13 +56,16 @@ public class RouteInventoryController {
 	}
 
 	/**
-	 * Renders the route table fragment, used to refresh the list in place.
+	 * Renders the route table fragment, used to refresh the list in place. Being the
+	 * action asking for fresh figures, it re-reads the sources rather than serving the
+	 * cached inventory.
 	 * @param model the view model
 	 * @return the table fragment view name
 	 */
 	@GetMapping("/list")
 	public Mono<String> list(Model model) {
-		return populate(model).thenReturn("dashboard/fragments/route-inventory :: inventory");
+		return populate(model, this.inventoryService.refreshedRoutes())
+			.thenReturn("dashboard/fragments/route-inventory :: inventory");
 	}
 
 	/**
@@ -71,12 +76,17 @@ public class RouteInventoryController {
 	@PostMapping("/reload")
 	public Mono<String> reload(Model model) {
 		this.inventoryService.reload();
-		return populate(model).thenReturn("dashboard/fragments/route-inventory :: inventory");
+		return populate(model, this.inventoryService.refreshedRoutes())
+			.thenReturn("dashboard/fragments/route-inventory :: inventory");
 	}
 
 	private Mono<Void> populate(Model model) {
-		return this.inventoryService.routes().doOnNext((routes) -> {
-			model.addAttribute("routes", routes);
+		return populate(model, this.inventoryService.routes());
+	}
+
+	private Mono<Void> populate(Model model, Mono<List<RouteView>> routes) {
+		return routes.doOnNext((resolved) -> {
+			model.addAttribute("routes", resolved);
 			model.addAttribute("activeNav", "routes-all");
 		}).then();
 	}

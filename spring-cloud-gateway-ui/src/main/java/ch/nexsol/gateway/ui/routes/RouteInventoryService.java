@@ -16,10 +16,12 @@
 
 package ch.nexsol.gateway.ui.routes;
 
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -35,6 +37,7 @@ import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.cloud.gateway.support.NameUtils;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.ApplicationListener;
 import org.springframework.util.ClassUtils;
 
 /**
@@ -45,10 +48,22 @@ import org.springframework.util.ClassUtils;
  * {@link CompositeRouteDefinitionLocator} aggregate, which is what makes the origin of a
  * route visible: properties, database, files, OpenAPI contracts, Config Server or any
  * third-party source contributed to the context.
+ * <p>
+ * The resulting snapshot is cached until the gateway signals a route change, the same way
+ * the gateway itself only queries its locators on a {@link RefreshRoutesEvent}: a locator
+ * is free to reach the network on every call, and the views built on this inventory are
+ * rendered on every page load.
  */
-public class RouteInventoryService {
+public class RouteInventoryService implements ApplicationListener<RefreshRoutesEvent> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RouteInventoryService.class);
+
+	/**
+	 * Time a single source is given to answer. A locator reaching the network (service
+	 * discovery probes, remote documents) must not hold the page hostage: past this delay
+	 * it is dropped from the snapshot, exactly as a source that fails to be read is.
+	 */
+	private static final Duration SOURCE_TIMEOUT = Duration.ofSeconds(5);
 
 	/** Locator class-name suffixes stripped when deriving the displayed source name. */
 	private static final List<String> LOCATOR_SUFFIXES = List.of("RouteDefinitionLocator", "RouteDefinitionRepository",
@@ -66,6 +81,8 @@ public class RouteInventoryService {
 
 	private final ApplicationEventPublisher publisher;
 
+	private final AtomicReference<Mono<List<RouteView>>> snapshot = new AtomicReference<>();
+
 	/**
 	 * Creates the service over every route definition source in the context.
 	 * @param locators the provider over every {@link RouteDefinitionLocator} bean
@@ -79,16 +96,49 @@ public class RouteInventoryService {
 	/**
 	 * Collects the route definitions of every source, in locator order, flagging the ids
 	 * declared by more than one source.
+	 * <p>
+	 * The snapshot is read once and shared by every reader until a
+	 * {@link RefreshRoutesEvent} drops it, so displaying a view never re-queries the
+	 * sources.
 	 * @return the resolved routes, source by source
 	 */
 	public Mono<List<RouteView>> routes() {
+		return Mono.defer(() -> this.snapshot.updateAndGet((cached) -> (cached != null) ? cached : readSources()));
+	}
+
+	/**
+	 * Re-reads every source, dropping the cached snapshot first. This is what the
+	 * <em>Refresh view</em> action asks for, as opposed to merely displaying a view.
+	 * @return the freshly resolved routes, source by source
+	 */
+	public Mono<List<RouteView>> refreshedRoutes() {
+		return Mono.defer(() -> {
+			this.snapshot.set(null);
+			return routes();
+		});
+	}
+
+	/**
+	 * Drops the cached snapshot whenever the gateway rebuilds its route table, so the
+	 * next reader sees the routes the gateway just resolved.
+	 * @param event the route refresh event
+	 */
+	@Override
+	public void onApplicationEvent(RefreshRoutesEvent event) {
+		this.snapshot.set(null);
+	}
+
+	private Mono<List<RouteView>> readSources() {
 		List<RouteDefinitionLocator> sources = this.locators.orderedStream()
 			.filter((locator) -> !(locator instanceof CompositeRouteDefinitionLocator))
 			.toList();
 		return Flux.fromIterable(sources)
-			.concatMap(this::readSource)
+			// Sources are read concurrently but emitted in locator order: a slow source
+			// costs its own latency, not that of every source queued before it.
+			.flatMapSequential(this::readSource)
 			.collectList()
-			.map(RouteInventoryService::flagDuplicates);
+			.map(RouteInventoryService::flagDuplicates)
+			.cache();
 	}
 
 	/**
@@ -148,10 +198,17 @@ public class RouteInventoryService {
 
 	private Flux<RouteView> readSource(RouteDefinitionLocator locator) {
 		String source = sourceName(locator);
-		return locator.getRouteDefinitions().map((definition) -> toView(definition, source)).onErrorResume((ex) -> {
-			LOG.warn("Route definition source {} could not be read", source, ex);
-			return Flux.empty();
-		});
+		// Collected before the timeout is applied, so the delay bounds the whole read of
+		// the source rather than the gap between two of its routes.
+		return locator.getRouteDefinitions()
+			.map((definition) -> toView(definition, source))
+			.collectList()
+			.timeout(SOURCE_TIMEOUT)
+			.onErrorResume((ex) -> {
+				LOG.warn("Route definition source {} could not be read", source, ex);
+				return Mono.just(List.of());
+			})
+			.flatMapMany(Flux::fromIterable);
 	}
 
 	private static RouteView toView(RouteDefinition definition, String source) {

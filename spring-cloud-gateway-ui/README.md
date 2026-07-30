@@ -76,6 +76,14 @@ Each source is queried individually instead of through the gateway's aggregate, 
 source name is derived from the locator class name, so a locator contributed by any plugin
 shows up correctly without this module knowing about it.
 
+The resulting inventory is **read once and cached** until the gateway signals a route change
+through a `RefreshRoutesEvent`, the same way the gateway itself only queries its locators on
+that event. Displaying this page or the home page therefore costs nothing: a locator that
+reaches the network &mdash; discovery probing every service for its OpenAPI document, a
+remote contract &mdash; is not queried again on every navigation. Each source is also given
+five seconds to answer, after which it is dropped from the snapshot with a warning, exactly
+as a source that fails to be read is: one unreachable source cannot hold the page.
+
 **Columns** &mdash; route (its id, with the target it resolves to under it), source, order,
 predicates and filters. A predicate or filter is rendered the way it was declared, not as a
 raw argument map: positional arguments read back as the YAML shortcut (`Path=/api/**`,
@@ -98,10 +106,10 @@ refresh:
 | Does | re-reads the sources, re-renders this table | publishes a `RefreshRoutesEvent`, then re-renders |
 | Affects | this page only | the gateway route table used to route traffic |
 
-*Refresh view* calls every locator again. What that picks up depends on the locator: a
-database or discovery source is queried live, while a file or Config Server source serves the
-snapshot it last loaded &mdash; those reload through their own plugin (a file watch, a poll,
-`/actuator/refresh`), never through this page.
+*Refresh view* drops the cached inventory and calls every locator again. What that picks up
+depends on the locator: a database or discovery source is queried live, while a file or
+Config Server source serves the snapshot it last loaded &mdash; those reload through their
+own plugin (a file watch, a poll, `/actuator/refresh`), never through this page.
 
 *Rebuild gateway routes* aims at the gateway: `CachingRouteLocator` drops its cached `Route`
 objects and rebuilds them from the current definitions, exactly as the gateway actuator
