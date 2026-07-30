@@ -31,6 +31,7 @@ import ch.nexsol.gateway.ui.metrics.RouteMetricsController;
 import ch.nexsol.gateway.ui.nav.GatewayUiMenu;
 import ch.nexsol.gateway.ui.nav.NavItem;
 import ch.nexsol.gateway.ui.openapi.OpenapiViewController;
+import ch.nexsol.gateway.ui.openapi.OpenapiViewProperties;
 import ch.nexsol.gateway.ui.overview.OverviewContribution;
 import ch.nexsol.gateway.ui.overview.OverviewService;
 import ch.nexsol.gateway.ui.routes.RouteInventoryController;
@@ -46,6 +47,7 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.ApplicationContext;
@@ -278,6 +280,7 @@ public class GatewayUiAutoConfiguration {
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(name = "ch.nexsol.gateway.openapi.hub.SpringDocOpenapiRoutes")
 	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.hub-openapi.enabled", havingValue = "true")
+	@EnableConfigurationProperties(OpenapiViewProperties.class)
 	@Import(OpenapiViewController.class)
 	static class OpenapiViewConfiguration {
 

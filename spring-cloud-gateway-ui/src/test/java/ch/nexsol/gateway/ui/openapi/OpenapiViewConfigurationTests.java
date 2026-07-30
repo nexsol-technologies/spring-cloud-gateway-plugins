@@ -82,6 +82,32 @@ class OpenapiViewConfigurationTests {
 			});
 	}
 
+	@Test
+	void extensionLabelsReachThePageInTheOrderTheyAreDeclared() {
+		this.runner
+			.withPropertyValues("spring.cloud.gateway.server.webflux.hub-openapi.enabled=true",
+					"spring.cloud.gateway.server.webflux.ui.openapi.extensions.x-roles=Required roles",
+					"spring.cloud.gateway.server.webflux.ui.openapi.extensions.x-from-application-version=Since")
+			.run((context) -> {
+				Model model = new ConcurrentModel();
+				context.getBean(OpenapiViewController.class).page(model);
+				assertThat(model.getAttribute("openapiExtensionLabels"))
+					.isEqualTo("{\"x-roles\":\"Required roles\",\"x-from-application-version\":\"Since\"}");
+			});
+	}
+
+	@Test
+	void pageCarriesAnEmptyMappingWhenNoLabelIsDeclared() {
+		// The page must still parse the attribute, so an undeclared extension keeps
+		// showing under its own name rather than breaking the script.
+		this.runner.withPropertyValues("spring.cloud.gateway.server.webflux.hub-openapi.enabled=true")
+			.run((context) -> {
+				Model model = new ConcurrentModel();
+				context.getBean(OpenapiViewController.class).page(model);
+				assertThat(model.getAttribute("openapiExtensionLabels")).isEqualTo("{}");
+			});
+	}
+
 	private static List<String> navIds(AssertableApplicationContext context) {
 		return context.getBeansOfType(NavItem.class).values().stream().map(NavItem::id).toList();
 	}

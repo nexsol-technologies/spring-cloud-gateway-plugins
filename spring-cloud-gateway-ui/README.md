@@ -336,6 +336,21 @@ block. The extensions Scalar already renders are left alone, so nothing is shown
 &mdash; `x-badges` in particular reaches Scalar untouched and comes out as a badge next to
 the operation, which is worth shaping your own extension as when the value is a short label.
 
+**Nothing has to be declared** for an extension to show up: an unknown one reads under its
+own name. Give it a label when the raw key is not what you want your readers to see:
+
+```yaml
+spring.cloud.gateway.server.webflux.ui.openapi:
+  extensions:
+    x-roles: Required roles
+    x-from-application-version: Since
+```
+
+The line an operation showed under **x-roles** then reads **Required roles**, the value
+untouched. The labels are carried by the page, so adding one is a matter of configuration
+and a restart, with nothing to rebuild. An extension left out of the mapping keeps showing under its own name,
+which is what keeps a newly documented extension from going unnoticed.
+
 The Scalar bundle ships with the plugin (`/js/scalar.standalone.js`, `@scalar/api-reference`
 1.63.0, 3.6 MB) and its default web fonts are switched off, so the view works on an isolated
 network without reaching any CDN.

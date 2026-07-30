@@ -11,7 +11,9 @@
  * Vendor extensions are folded into the descriptions before Scalar is handed the contract:
  * Scalar only renders the handful of extensions it knows about, so anything a service
  * documents of its own (the Keycloak roles a resource requires, for one) would otherwise be
- * dropped silently at render time.
+ * dropped silently at render time. The label each one reads under is declared in the
+ * configuration of the gateway and carried by the page, so naming an extension takes a
+ * property rather than a change here.
  */
 (function () {
 	'use strict';
@@ -42,6 +44,20 @@
 	var instance = null;
 	var signature = null;
 	var pollTimer = null;
+
+	/**
+	 * Labels the extensions are shown under, declared in the configuration of the gateway
+	 * and carried by the page. An extension left undeclared keeps its own name, so a new
+	 * one shows up without anything to configure.
+	 */
+	var labels = (function () {
+		try {
+			return JSON.parse(mount.dataset.extensionLabels || '{}');
+		}
+		catch (ignored) {
+			return {};
+		}
+	})();
 
 	function configuration(sources) {
 		return {
@@ -86,7 +102,7 @@
 				return !skip || skip.indexOf(key) === -1;
 			})
 			.map(function (key) {
-				return '**' + key + '** — ' + markdown(node[key]);
+				return '**' + (labels[key] || key) + '** — ' + markdown(node[key]);
 			})
 			.join('\n\n');
 	}
