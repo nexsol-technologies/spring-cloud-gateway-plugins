@@ -32,8 +32,8 @@ import org.springframework.beans.factory.ObjectProvider;
  * actually set.
  * <p>
  * This is the authoritative list of what the hub answers, and the single source both the
- * security chain and the audit exclusion read: a path opened by one and audited by the
- * other would be a discrepancy nobody notices until it matters.
+ * security chain and the audit exclusion read, so a path cannot be opened by one and
+ * audited by the other.
  */
 public final class HubOpenapiPaths {
 
@@ -66,6 +66,9 @@ public final class HubOpenapiPaths {
 		Set<String> paths = new LinkedHashSet<>();
 		// The contract of the gateway itself, and the SpringDoc endpoints driving the UI.
 		paths.add(apiDocs);
+		// Both suffixed variants: SpringDoc serves them, and the discovery probes them on
+		// every registered instance, the gateway's own included.
+		paths.add(apiDocs + ".json");
 		paths.add(apiDocs + ".yaml");
 		paths.add(apiDocs + "/swagger-config");
 		paths.add(swaggerUi);

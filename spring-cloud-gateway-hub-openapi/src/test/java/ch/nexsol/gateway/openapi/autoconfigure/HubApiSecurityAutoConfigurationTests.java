@@ -61,6 +61,9 @@ class HubApiSecurityAutoConfigurationTests {
 			assertThat(context).hasNotFailed();
 			SecurityWebFilterChain chain = chain(context.getBean("hubOpenapiSecurityWebFilterChain"));
 			assertThat(matches(chain, "/v3/api-docs")).isTrue();
+			// Both suffixed variants: the hub probes them on every discovered instance,
+			// the gateway's own included when it registers itself.
+			assertThat(matches(chain, "/v3/api-docs.json")).isTrue();
 			assertThat(matches(chain, "/v3/api-docs.yaml")).isTrue();
 			assertThat(matches(chain, "/v3/api-docs/swagger-config")).isTrue();
 			assertThat(matches(chain, "/v3/api-docs/service-a")).isTrue();

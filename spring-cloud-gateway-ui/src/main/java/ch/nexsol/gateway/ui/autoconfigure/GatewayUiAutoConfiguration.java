@@ -112,8 +112,12 @@ public class GatewayUiAutoConfiguration {
 	 */
 	@Bean
 	public UiSecuredPaths shellSecuredPaths() {
-		return new UiSecuredPaths("/ui", "/css/bootstrap.min.css", "/css/gateway-ui.css", "/js/htmx.min.js",
-				"/js/bootstrap.bundle.min.js", "/js/gateway-ui.js");
+		// The minified Bootstrap files carry a sourceMappingURL, so a browser with its
+		// developer tools open requests maps this module does not ship. Declared so those
+		// requests answer as the 404 they are, and stay out of the audit trail.
+		return new UiSecuredPaths("/ui", "/css/bootstrap.min.css", "/css/bootstrap.min.css.map", "/css/gateway-ui.css",
+				"/js/htmx.min.js", "/js/bootstrap.bundle.min.js", "/js/bootstrap.bundle.min.js.map",
+				"/js/gateway-ui.js");
 	}
 
 	/**
@@ -125,6 +129,21 @@ public class GatewayUiAutoConfiguration {
 	@ConditionalOnClass(name = "ch.nexsol.gateway.database.controller.RouteViewController")
 	public NavItem routesNavItem() {
 		return new NavItem("routes", "Database routes", "icon-plugin", "/ui/routes/db", 10);
+	}
+
+	/**
+	 * Declares the paths of the database-backed routes view. That view belongs to the
+	 * routes-database plugin, which depends on this module in test scope alone: its paths
+	 * are declared here, next to its menu entry and under the same condition, so it needs
+	 * no compile dependency on the console.
+	 * @return the database routes view paths
+	 */
+	@Bean
+	@ConditionalOnClass(name = "ch.nexsol.gateway.database.controller.RouteViewController")
+	public UiSecuredPaths routesSecuredPaths() {
+		return new UiSecuredPaths("/ui/routes/db", "/ui/routes/db/list", "/ui/routes/db/new",
+				"/ui/routes/db/predicate-row", "/ui/routes/db/filter-row", "/ui/routes/db/element-args/{kind}/{index}",
+				"/ui/routes/db/{id}", "/ui/routes/db/{id}/edit");
 	}
 
 	/**
@@ -309,8 +328,8 @@ public class GatewayUiAutoConfiguration {
 	 * Activates the audit view only when the audit plugin is on the classpath and
 	 * enabled: the view tails the events on their way to whichever backend the plugin
 	 * publishes to. The property condition mirrors the one guarding the plugin itself, so
-	 * a gateway that turned auditing off is not offered a view over events nobody
-	 * publishes.
+	 * a gateway with auditing turned off is not offered a view over events that are never
+	 * published.
 	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(AuditEventPublisher.class)
