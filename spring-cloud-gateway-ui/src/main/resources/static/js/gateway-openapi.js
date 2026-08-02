@@ -8,29 +8,17 @@
  * exactly as the reader left it. When the hub aggregated nothing, the contract of the
  * gateway itself is shown, so the view is never empty for no reason.
  *
- * Vendor extensions are folded into the descriptions before Scalar is handed the contract:
- * Scalar only renders the handful of extensions it knows about, so anything a service
- * documents of its own (the Keycloak roles a resource requires, for one) would otherwise be
- * dropped silently at render time. The label each one reads under is declared in the
- * configuration of the gateway and carried by the page, so naming an extension takes a
- * property rather than a change here.
+ * Scalar receives the addresses of the contracts rather than their content, so it fetches
+ * and parses only the one on screen, whichever format it is served in.
+ *
+ * The vendor extensions Scalar does not know about are rendered by a plugin, from the
+ * mapping of extension name to label the page carries. The plugin registry matches an
+ * extension by its exact name, so an undeclared extension is not rendered.
  */
 (function () {
 	'use strict';
 
 	var POLL_MS = 15000;
-
-	/** The operation keys of a path item, as opposed to its parameters, servers or $ref. */
-	var METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'];
-
-	/**
-	 * Extensions Scalar renders on its own, plus its own `x-scalar-` namespace: folding
-	 * those into a description would show them twice. Kept in step with the bundled
-	 * version, which is stated at the top of scalar.standalone.js.
-	 */
-	var NATIVE = ['x-internal', 'x-displayName', 'x-badges', 'x-codeSamples', 'x-code-samples',
-		'x-tagGroups', 'x-enumDescriptions', 'x-enum-descriptions', 'x-enumNames', 'x-enum-varnames',
-		'x-example', 'x-examples', 'x-additionalPropertiesName'];
 
 	var mount = document.getElementById('gw-openapi');
 	var error = document.getElementById('gw-openapi-error');
@@ -45,12 +33,8 @@
 	var signature = null;
 	var pollTimer = null;
 
-	/**
-	 * Labels the extensions are shown under, declared in the configuration of the gateway
-	 * and carried by the page. An extension left undeclared keeps its own name, so a new
-	 * one shows up without anything to configure.
-	 */
-	var labels = (function () {
+	/** The extensions to render, keyed by name, each with the label it reads under. */
+	var extensions = (function () {
 		try {
 			return JSON.parse(mount.dataset.extensionLabels || '{}');
 		}
@@ -59,6 +43,46 @@
 		}
 	})();
 
+	function readable(value) {
+		if (Array.isArray(value)) {
+			return value
+				.map(function (item) {
+					return item !== null && typeof item === 'object' ? JSON.stringify(item) : item;
+				})
+				.join(', ');
+		}
+		if (value !== null && typeof value === 'object') {
+			return JSON.stringify(value);
+		}
+		return String(value);
+	}
+
+	/**
+	 * The component Scalar renders for one extension.
+	 *
+	 * The value comes from the attributes rather than from a declared prop, since Vue
+	 * camel-cases prop names and `x-roles` would be looked up as `xRoles`. The render
+	 * function returns a string because the standalone bundle ships no template compiler.
+	 */
+	function extensionComponent(name, label) {
+		return {
+			inheritAttrs: false,
+			render: function () {
+				return label + ' — ' + readable(this.$attrs[name]);
+			}
+		};
+	}
+
+	/** Scalar calls the plugin to build it, hence a factory rather than an object. */
+	function extensionsPlugin() {
+		return {
+			name: 'gateway-ui-extensions',
+			extensions: Object.keys(extensions).map(function (name) {
+				return { name: name, component: extensionComponent(name, extensions[name] || name) };
+			})
+		};
+	}
+
 	function configuration(sources) {
 		return {
 			sources: sources,
@@ -66,87 +90,9 @@
 			// external CDN, so the view still works on an isolated network.
 			withDefaultFonts: false,
 			darkMode: false,
-			hideDarkModeToggle: true
+			hideDarkModeToggle: true,
+			plugins: [extensionsPlugin]
 		};
-	}
-
-	function foldable(key) {
-		return key.indexOf('x-') === 0 && key.indexOf('x-scalar-') !== 0 && NATIVE.indexOf(key) === -1;
-	}
-
-	function markdown(value) {
-		if (Array.isArray(value)) {
-			return value
-				.map(function (item) {
-					return '`' + (item !== null && typeof item === 'object' ? JSON.stringify(item) : item) + '`';
-				})
-				.join(', ');
-		}
-		if (value !== null && typeof value === 'object') {
-			return '\n\n```json\n' + JSON.stringify(value, null, 2) + '\n```';
-		}
-		return '`' + value + '`';
-	}
-
-	/**
-	 * Renders the extensions of a node as the Markdown lines appended to a description,
-	 * leaving out the keys the caller already renders from somewhere more specific.
-	 */
-	function lines(node, skip) {
-		if (!node || typeof node !== 'object') {
-			return '';
-		}
-		return Object.keys(node)
-			.filter(foldable)
-			.filter(function (key) {
-				return !skip || skip.indexOf(key) === -1;
-			})
-			.map(function (key) {
-				return '**' + (labels[key] || key) + '** — ' + markdown(node[key]);
-			})
-			.join('\n\n');
-	}
-
-	/** Appends the rendered extensions to the description the target already carries. */
-	function append(target, rendered) {
-		if (!target || typeof target !== 'object' || !rendered) {
-			return;
-		}
-		target.description = (target.description ? target.description + '\n\n' : '') + rendered;
-	}
-
-	/**
-	 * Moves every extension of the contract into the description of the node that carries
-	 * it, which is the only part of the document Scalar renders as Markdown.
-	 *
-	 * The root carries no description of its own, so its extensions land on `info`. A path
-	 * item is not rendered as such either: its extensions are repeated on each of its
-	 * operations, where they belong from the reader's point of view.
-	 */
-	function foldExtensions(contract) {
-		if (!contract || typeof contract !== 'object') {
-			return contract;
-		}
-		if (contract.info) {
-			append(contract.info, lines(contract));
-		}
-		Object.keys(contract.paths || {}).forEach(function (path) {
-			var item = contract.paths[path];
-			METHODS.forEach(function (method) {
-				var operation = item ? item[method] : null;
-				if (operation) {
-					// An extension the operation declares itself wins over the one of its
-					// path item, rather than being shown twice with two values.
-					var shared = lines(item, Object.keys(operation));
-					append(operation, [shared, lines(operation)].filter(Boolean).join('\n\n'));
-				}
-			});
-		});
-		var schemas = (contract.components || {}).schemas || {};
-		Object.keys(schemas).forEach(function (name) {
-			append(schemas[name], lines(schemas[name]));
-		});
-		return contract;
 	}
 
 	function fail() {
@@ -177,24 +123,7 @@
 		if (count) {
 			count.textContent = descriptors.length + (descriptors.length > 1 ? ' contracts' : ' contract');
 		}
-		Promise.all(descriptors.map(read)).then(render);
-	}
-
-	/**
-	 * Reads a contract so its extensions can be folded in before rendering. One that cannot
-	 * be read as JSON is handed to Scalar by URL, exactly as it was before.
-	 */
-	function read(descriptor) {
-		return fetch(descriptor.url, { headers: { Accept: 'application/json' }, cache: 'no-store' })
-			.then(function (response) {
-				return response.ok ? response.json() : null;
-			})
-			.then(function (contract) {
-				return contract ? { title: descriptor.title, content: foldExtensions(contract) } : descriptor;
-			})
-			.catch(function () {
-				return descriptor;
-			});
+		render(descriptors);
 	}
 
 	function render(sources) {

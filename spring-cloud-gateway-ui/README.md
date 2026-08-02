@@ -314,30 +314,15 @@ directly. When nothing has been aggregated, the contract of the gateway itself i
 A custom `springdoc.api-docs.path` is honoured &mdash; the view is handed the configured
 paths, it does not assume `/v3/api-docs`.
 
-**Vendor extensions** &mdash; Scalar renders only the extensions it knows about (`x-internal`,
+**Vendor extensions** &mdash; Scalar renders the extensions it knows about (`x-internal`,
 `x-displayName`, `x-badges`, `x-codeSamples`, `x-tagGroups`, the `x-enum*` family, `x-example`,
-`x-scalar-*`); anything a service documents of its own &mdash; the Keycloak roles a resource
-requires, the team owning it &mdash; is dropped at render time. Rendering an arbitrary
-extension the way Scalar does its own means registering a plugin component, which the
-standalone bundle cannot do: it exports `createApiReference` alone, with neither Vue nor a
-template compiler. The view therefore folds those extensions into the Markdown descriptions
-before handing the contract over, which is why it fetches the contracts itself and passes
-Scalar their content rather than their URL:
+`x-scalar-*`) and drops the others, so what a service documents of its own &mdash; the roles a
+resource requires, the version it appeared in &mdash; is never displayed. A Scalar plugin
+takes those over. The contracts are left untouched: Scalar fetches only the one on
+screen and parses it itself, YAML included.
 
-| Extension on | Shown in |
-| --- | --- |
-| an operation | that operation's description |
-| a path item | the description of each of its operations; an operation redeclaring the key wins |
-| a `components.schemas` entry | that schema's description, in the Models section |
-| the document root | the description of `info`, at the top of the contract |
-
-Values are rendered as inline code, arrays as a comma-separated series, objects as a JSON
-block. The extensions Scalar already renders are left alone, so nothing is shown twice
-&mdash; `x-badges` in particular reaches Scalar untouched and comes out as a badge next to
-the operation, which is worth shaping your own extension as when the value is a short label.
-
-**Nothing has to be declared** for an extension to show up: an unknown one reads under its
-own name. Give it a label when the raw key is not what you want your readers to see:
+Each extension is declared with the label it reads under, the plugin registry matching an
+extension by its exact name:
 
 ```yaml
 spring.cloud.gateway.server.webflux.ui.openapi:
@@ -346,10 +331,14 @@ spring.cloud.gateway.server.webflux.ui.openapi:
     x-from-application-version: Since
 ```
 
-The line an operation showed under **x-roles** then reads **Required roles**, the value
-untouched. The labels are carried by the page, so adding one is a matter of configuration
-and a restart, with nothing to rebuild. An extension left out of the mapping keeps showing under its own name,
-which is what keeps a newly documented extension from going unnoticed.
+An operation carrying `x-roles` then reads `Required roles — admin, auditor`, a list shown
+comma-separated and an object as JSON. An extension left out of the mapping is not shown, and
+adding one takes a restart, not a rebuild.
+
+Scalar renders extensions on the document, on `info`, on a tag, on a schema and on an
+operation. A path item is not one of its rendering points, so an extension declared there
+does not reach the operations under it. `x-badges` is rendered natively, as a badge next to
+the operation, which suits a short label better than this mapping does.
 
 The Scalar bundle ships with the plugin (`/js/scalar.standalone.js`, `@scalar/api-reference`
 1.63.0, 3.6 MB) and its default web fonts are switched off, so the view works on an isolated

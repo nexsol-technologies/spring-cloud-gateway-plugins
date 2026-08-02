@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * <p>
  * The page carries the two SpringDoc URLs it reads at runtime, so a custom
  * {@code springdoc.api-docs.path} is honoured without this module depending on SpringDoc.
- * It carries the configured extension labels the same way, so naming an extension is a
+ * The configured vendor extensions travel to the page the same way, so declaring one is a
  * matter of configuration rather than of rebuilding the page script.
  */
 @Controller
@@ -49,10 +49,9 @@ public class OpenapiViewController {
 	/**
 	 * Creates the controller from the configured SpringDoc documentation path.
 	 * <p>
-	 * The properties are resolved through a provider: an application scanning this
-	 * package itself picks the controller up outside the auto-configuration that binds
-	 * them, and a view without labels reads under the extension names rather than
-	 * breaking the context.
+	 * The properties are resolved through a provider: an application component-scanning
+	 * this package picks the controller up outside the auto-configuration that binds
+	 * them, and a view with no declared extension is preferable to a context that fails.
 	 * @param apiDocsPath the SpringDoc documentation path
 	 * @param properties the provider over the OpenAPI view properties
 	 */

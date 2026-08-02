@@ -97,9 +97,9 @@ class OpenapiViewConfigurationTests {
 	}
 
 	@Test
-	void pageCarriesAnEmptyMappingWhenNoLabelIsDeclared() {
-		// The page must still parse the attribute, so an undeclared extension keeps
-		// showing under its own name rather than breaking the script.
+	void pageCarriesAnEmptyMappingWhenNoExtensionIsDeclared() {
+		// The page parses the attribute whether or not anything was declared, so a view
+		// configured with no extension renders rather than breaking on it.
 		this.runner.withPropertyValues("spring.cloud.gateway.server.webflux.hub-openapi.enabled=true")
 			.run((context) -> {
 				Model model = new ConcurrentModel();
