@@ -314,8 +314,9 @@ directly. When nothing has been aggregated, the contract of the gateway itself i
 A custom `springdoc.api-docs.path` is honoured &mdash; the view is handed the configured
 paths, it does not assume `/v3/api-docs`.
 
-The Scalar bundle ships with the plugin (`/js/scalar.standalone.js`, 2.7 MB) and its default
-web fonts are switched off, so the view works on an isolated network without reaching any CDN.
+The Scalar bundle ships with the plugin (`/js/scalar.standalone.js`, `@scalar/api-reference`
+1.63.0, 3.6 MB) and its default web fonts are switched off, so the view works on an isolated
+network without reaching any CDN.
 
 ## Spring Security
 
