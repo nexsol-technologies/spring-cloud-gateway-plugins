@@ -24,6 +24,9 @@ The plugin auto-configures itself; no extra setup is required. Start the gateway
   choice is remembered across page loads.
 * **Thin scrollbar** &mdash; the menu scrolls independently with a slim scrollbar.
 * **Home page** &mdash; the overview of the gateway, rendered inside the shell.
+* **Remembered controls** &mdash; the switches and drop-downs of a view are restored as they
+  were last left. Search boxes are not: a forgotten query hiding every row reads as an empty
+  view.
 
 Built with Thymeleaf, Bootstrap, HTMX and plain CSS/JS, served as static resources (no
 CDN, offline friendly).
