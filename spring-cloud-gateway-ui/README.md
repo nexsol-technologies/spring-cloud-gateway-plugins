@@ -314,6 +314,36 @@ directly. When nothing has been aggregated, the contract of the gateway itself i
 A custom `springdoc.api-docs.path` is honoured &mdash; the view is handed the configured
 paths, it does not assume `/v3/api-docs`.
 
+**Vendor extensions** &mdash; Scalar renders only the extensions it knows about (`x-internal`,
+`x-displayName`, `x-badges`, `x-codeSamples`, `x-tagGroups`, the `x-enum*` family, `x-example`,
+`x-scalar-*`); anything a service documents of its own &mdash; the roles a resource requires,
+the version it appeared in &mdash; is dropped at render time. The view takes those over
+through a **Scalar plugin**, which is the extension point Scalar offers for exactly this, so
+nothing rewrites the contracts: Scalar keeps fetching only the one on screen, and parses the
+YAML ones itself.
+
+The plugin registry matches an extension **by its exact name**, so each one is declared:
+
+```yaml
+spring.cloud.gateway.server.webflux.ui.openapi:
+  extensions:
+    x-roles: Required roles
+    x-from-application-version: Since
+```
+
+An operation carrying `x-roles` then reads `Required roles — admin, auditor` where Scalar
+draws the extensions it knows. The value is shown as it is written: a list comma-separated,
+an object as JSON. An extension left out of the mapping is not displayed &mdash; declaring it
+is what makes it visible, and the label is what it reads under. Adding one is a matter of
+configuration and a restart, with nothing to rebuild.
+
+Scalar renders the extensions of the document, of `info`, of a tag, of a schema and of an
+operation; a path item is not one of its rendering points, so an extension declared there is
+not repeated on its operations.
+
+`x-badges` is worth knowing about: Scalar renders it natively, as a badge next to the
+operation, so a short label is better shaped as one than declared here.
+
 The Scalar bundle ships with the plugin (`/js/scalar.standalone.js`, `@scalar/api-reference`
 1.63.0, 3.6 MB) and its default web fonts are switched off, so the view works on an isolated
 network without reaching any CDN.

@@ -23,8 +23,10 @@
 			<div class="card-body p-0">
 				<!-- Scalar renders the reference in place, from the contracts listed by SpringDoc. -->
 				<div id="gw-openapi" style="min-height: 70vh"
-						th:attr="data-config-url=${openapiConfigUrl}, data-document-url=${openapiDocumentUrl}"
-						data-config-url="/v3/api-docs/swagger-config" data-document-url="/v3/api-docs"></div>
+						th:attr="data-config-url=${openapiConfigUrl}, data-document-url=${openapiDocumentUrl},
+								data-extension-labels=${openapiExtensionLabels}"
+						data-config-url="/v3/api-docs/swagger-config" data-document-url="/v3/api-docs"
+						data-extension-labels="{}"></div>
 				<div id="gw-openapi-error" class="text-secondary text-center py-5" style="display: none">
 					No contract could be loaded &mdash; check that the OpenAPI hub is enabled and that the
 					documentation endpoints are reachable.

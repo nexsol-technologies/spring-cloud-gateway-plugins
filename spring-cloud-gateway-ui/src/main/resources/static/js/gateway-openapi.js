@@ -7,6 +7,17 @@
  * is only re-configured when the list actually changed: an unchanged poll leaves the page
  * exactly as the reader left it. When the hub aggregated nothing, the contract of the
  * gateway itself is shown, so the view is never empty for no reason.
+ *
+ * Scalar is handed the addresses of the contracts, not their content: it then fetches only
+ * the one on screen, and each contract is fetched and parsed once, by Scalar itself, which
+ * is what keeps the view fluid and handles the contracts SpringDoc serves as YAML.
+ *
+ * The vendor extensions a service documents of its own — the roles a resource requires, the
+ * version it appeared in — are displayed through a Scalar plugin: Scalar renders the handful
+ * of extensions it knows about and drops the rest, and a plugin is where it lets a page take
+ * over the ones it does not know. Each extension is declared in the configuration of the
+ * gateway, which is what the page carries: the plugin registry matches an extension by its
+ * exact name, so an undeclared extension is not rendered.
  */
 (function () {
 	'use strict';
@@ -26,6 +37,60 @@
 	var signature = null;
 	var pollTimer = null;
 
+	/**
+	 * The extensions to display, keyed by name, each with the label it reads under. They
+	 * are declared in the configuration of the gateway and carried by the page.
+	 */
+	var extensions = (function () {
+		try {
+			return JSON.parse(mount.dataset.extensionLabels || '{}');
+		}
+		catch (ignored) {
+			return {};
+		}
+	})();
+
+	function readable(value) {
+		if (Array.isArray(value)) {
+			return value
+				.map(function (item) {
+					return item !== null && typeof item === 'object' ? JSON.stringify(item) : item;
+				})
+				.join(', ');
+		}
+		if (value !== null && typeof value === 'object') {
+			return JSON.stringify(value);
+		}
+		return String(value);
+	}
+
+	/**
+	 * The component Scalar renders for one extension.
+	 *
+	 * The value is read from the attributes rather than from a declared prop: Vue camel-cases
+	 * the name of a declared prop, so `x-roles` would be looked up as `xRoles` and the value
+	 * would be lost. Returning a string from `render` is deliberate too — the standalone
+	 * bundle ships no template compiler, so a template string could not be compiled.
+	 */
+	function extensionComponent(name, label) {
+		return {
+			inheritAttrs: false,
+			render: function () {
+				return label + ' — ' + readable(this.$attrs[name]);
+			}
+		};
+	}
+
+	/** Scalar calls the plugin to build it, hence a factory rather than an object. */
+	function extensionsPlugin() {
+		return {
+			name: 'gateway-ui-extensions',
+			extensions: Object.keys(extensions).map(function (name) {
+				return { name: name, component: extensionComponent(name, extensions[name] || name) };
+			})
+		};
+	}
+
 	function configuration(sources) {
 		return {
 			sources: sources,
@@ -33,7 +98,8 @@
 			// external CDN, so the view still works on an isolated network.
 			withDefaultFonts: false,
 			darkMode: false,
-			hideDarkModeToggle: true
+			hideDarkModeToggle: true,
+			plugins: [extensionsPlugin]
 		};
 	}
 
@@ -44,14 +110,16 @@
 		}
 	}
 
-	function apply(sources) {
-		if (!sources.length) {
+	function apply(descriptors) {
+		if (!descriptors.length) {
 			if (!instance) {
 				fail();
 			}
 			return;
 		}
-		var next = JSON.stringify(sources);
+		// The signature covers the list of contracts, not their content: an unchanged poll
+		// must neither re-render the page nor re-download every document.
+		var next = JSON.stringify(descriptors);
 		if (next === signature) {
 			return;
 		}
@@ -61,8 +129,12 @@
 		}
 		signature = next;
 		if (count) {
-			count.textContent = sources.length + (sources.length > 1 ? ' contracts' : ' contract');
+			count.textContent = descriptors.length + (descriptors.length > 1 ? ' contracts' : ' contract');
 		}
+		render(descriptors);
+	}
+
+	function render(sources) {
 		if (instance && instance.updateConfiguration) {
 			instance.updateConfiguration(configuration(sources));
 			return;

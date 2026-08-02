@@ -16,6 +16,9 @@
 
 package ch.nexsol.gateway.ui.openapi;
 
+import tools.jackson.databind.ObjectMapper;
+
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -28,22 +31,37 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * <p>
  * The page carries the two SpringDoc URLs it reads at runtime, so a custom
  * {@code springdoc.api-docs.path} is honoured without this module depending on SpringDoc.
+ * It carries the configured extension labels the same way, so naming an extension is a
+ * matter of configuration rather than of rebuilding the page script.
  */
 @Controller
 @RequestMapping("/ui/openapi")
 public class OpenapiViewController {
 
+	private static final ObjectMapper MAPPER = new ObjectMapper();
+
 	private final String documentUrl;
 
 	private final String configUrl;
 
+	private final String extensionLabels;
+
 	/**
 	 * Creates the controller from the configured SpringDoc documentation path.
+	 * <p>
+	 * The properties are resolved through a provider: an application scanning this
+	 * package itself picks the controller up outside the auto-configuration that binds
+	 * them, and a view without labels reads under the extension names rather than
+	 * breaking the context.
 	 * @param apiDocsPath the SpringDoc documentation path
+	 * @param properties the provider over the OpenAPI view properties
 	 */
-	public OpenapiViewController(@Value("${springdoc.api-docs.path:/v3/api-docs}") String apiDocsPath) {
+	public OpenapiViewController(@Value("${springdoc.api-docs.path:/v3/api-docs}") String apiDocsPath,
+			ObjectProvider<OpenapiViewProperties> properties) {
 		this.documentUrl = apiDocsPath;
 		this.configUrl = apiDocsPath + "/swagger-config";
+		this.extensionLabels = MAPPER
+			.writeValueAsString(properties.getIfAvailable(OpenapiViewProperties::new).getExtensions());
 	}
 
 	/**
@@ -56,6 +74,7 @@ public class OpenapiViewController {
 		model.addAttribute("activeNav", "openapi");
 		model.addAttribute("openapiDocumentUrl", this.documentUrl);
 		model.addAttribute("openapiConfigUrl", this.configUrl);
+		model.addAttribute("openapiExtensionLabels", this.extensionLabels);
 		return "dashboard/openapi";
 	}
 
