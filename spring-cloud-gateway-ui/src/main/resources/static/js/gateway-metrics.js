@@ -457,5 +457,17 @@
 		chart.resize();
 	});
 
+	// Restored before the first render, so the view draws the chart it was left on rather
+	// than the default one.
+	['gm-preset', 'gm-x', 'gm-y', 'gm-size', 'gm-z', 'gm-show-4xx', 'gm-3d', 'gm-auto']
+		.forEach(function (id) {
+			window.gatewayUi.remember(sel(id));
+		});
+	// The auto switch drives a timer started by its change handler, which restoring the
+	// switch does not fire.
+	if (sel('gm-auto').checked) {
+		pollTimer = setInterval(load, 5000);
+	}
+
 	load();
 })();

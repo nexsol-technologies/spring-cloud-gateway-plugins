@@ -214,6 +214,9 @@
 		});
 	}
 
+	// Restored before the first load, which polls or not according to it.
+	window.gatewayUi.remember(auto);
+
 	load();
 	if (!auto || auto.checked) {
 		startPolling();
