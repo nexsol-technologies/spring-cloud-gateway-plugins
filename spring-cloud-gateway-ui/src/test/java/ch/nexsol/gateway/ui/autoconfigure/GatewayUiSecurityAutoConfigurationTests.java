@@ -57,10 +57,24 @@ class GatewayUiSecurityAutoConfigurationTests {
 	}
 
 	@Test
+	void chainMatchesTheSourceMapsTheShippedAssetsPointAt() {
+		// The minified Bootstrap files carry a sourceMappingURL, so a browser with its
+		// developer tools open asks for maps this module does not ship. Those requests
+		// must read as the 404 they are, not as a 401.
+		this.runner.run((context) -> {
+			SecurityWebFilterChain chain = (SecurityWebFilterChain) context.getBean("gatewayUiSecurityWebFilterChain");
+			assertThat(matches(chain, "/js/bootstrap.bundle.min.js.map")).isTrue();
+			assertThat(matches(chain, "/css/bootstrap.min.css.map")).isTrue();
+		});
+	}
+
+	@Test
 	void chainDoesNotMatchGatewayRoutesUnderTheUiPrefix() {
 		this.runner.run((context) -> {
 			SecurityWebFilterChain chain = (SecurityWebFilterChain) context.getBean("gatewayUiSecurityWebFilterChain");
 			assertThat(matches(chain, "/ui/find_pwd")).isFalse();
+			// The database routes view declares its own paths, and only when the plugin
+			// serving it is on the classpath, which it is not here.
 			assertThat(matches(chain, "/ui/routes/db")).isFalse();
 		});
 	}

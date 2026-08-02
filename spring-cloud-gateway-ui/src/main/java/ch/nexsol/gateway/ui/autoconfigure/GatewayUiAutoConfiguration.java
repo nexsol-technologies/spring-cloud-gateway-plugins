@@ -112,8 +112,13 @@ public class GatewayUiAutoConfiguration {
 	 */
 	@Bean
 	public UiSecuredPaths shellSecuredPaths() {
-		return new UiSecuredPaths("/ui", "/css/bootstrap.min.css", "/css/gateway-ui.css", "/js/htmx.min.js",
-				"/js/bootstrap.bundle.min.js", "/js/gateway-ui.js");
+		// The source maps sit next to the assets pointing at them: the minified Bootstrap
+		// files carry a sourceMappingURL, so a browser with its developer tools open asks
+		// for maps this module does not ship. Leaving them undeclared audits a 404 on
+		// every page load, and answers it with a 401 rather than with the 404 it is.
+		return new UiSecuredPaths("/ui", "/css/bootstrap.min.css", "/css/bootstrap.min.css.map", "/css/gateway-ui.css",
+				"/js/htmx.min.js", "/js/bootstrap.bundle.min.js", "/js/bootstrap.bundle.min.js.map",
+				"/js/gateway-ui.js");
 	}
 
 	/**
@@ -125,6 +130,21 @@ public class GatewayUiAutoConfiguration {
 	@ConditionalOnClass(name = "ch.nexsol.gateway.database.controller.RouteViewController")
 	public NavItem routesNavItem() {
 		return new NavItem("routes", "Database routes", "icon-plugin", "/ui/routes/db", 10);
+	}
+
+	/**
+	 * Declares the paths of the database-backed routes view. The view belongs to the
+	 * routes-database plugin, which depends on this module only to be rendered inside the
+	 * shell: the paths are declared here, next to its menu entry and under the same
+	 * condition, so that plugin needs no compile dependency on the console.
+	 * @return the database routes view paths
+	 */
+	@Bean
+	@ConditionalOnClass(name = "ch.nexsol.gateway.database.controller.RouteViewController")
+	public UiSecuredPaths routesSecuredPaths() {
+		return new UiSecuredPaths("/ui/routes/db", "/ui/routes/db/list", "/ui/routes/db/new",
+				"/ui/routes/db/predicate-row", "/ui/routes/db/filter-row", "/ui/routes/db/element-args/{kind}/{index}",
+				"/ui/routes/db/{id}", "/ui/routes/db/{id}/edit");
 	}
 
 	/**
