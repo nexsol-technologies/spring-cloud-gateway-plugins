@@ -66,6 +66,10 @@ public final class HubOpenapiPaths {
 		Set<String> paths = new LinkedHashSet<>();
 		// The contract of the gateway itself, and the SpringDoc endpoints driving the UI.
 		paths.add(apiDocs);
+		// Both suffixed variants: SpringDoc serves them, and the hub probes them on every
+		// discovered instance — the gateway's own instance included, when it registers
+		// itself, which is how they end up as inbound traffic.
+		paths.add(apiDocs + ".json");
 		paths.add(apiDocs + ".yaml");
 		paths.add(apiDocs + "/swagger-config");
 		paths.add(swaggerUi);
