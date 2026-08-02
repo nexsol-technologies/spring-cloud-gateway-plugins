@@ -40,7 +40,7 @@ what answers *which configuration actually won* — see
 
 ## The two refresh actions
 
-They are named after what they refresh, because they aim at different things:
+Each one aims at something different:
 
 - **Refresh view** re-reads the sources and re-renders the table. This page only.
 - **Rebuild gateway routes** publishes a `RefreshRoutesEvent`, so the route table used to

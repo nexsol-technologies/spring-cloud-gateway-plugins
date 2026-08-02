@@ -164,8 +164,9 @@
 		live(sel('ga-live').checked);
 	});
 
-	// Restored before the first load, which reads them. The search box is left out: a
-	// forgotten query hiding every row reads as an empty audit trail.
+	// Restored before the first load, which reads them. The search box is not remembered:
+	// a query kept across page loads would hide every row and read as an empty audit
+	// trail.
 	['ga-status', 'ga-live'].forEach(function (id) {
 		window.gatewayUi.remember(sel(id));
 	});
