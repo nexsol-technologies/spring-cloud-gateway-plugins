@@ -16,6 +16,9 @@
 
 package ch.nexsol.service.sample;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.extensions.Extension;
+import io.swagger.v3.oas.annotations.extensions.ExtensionProperty;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +29,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.support.WebExchangeBindException;
@@ -46,6 +50,13 @@ public class ApiApplication {
 
 		@RequestMapping("/sample")
 		public ResponseEntity<Void> sample() {
+			return ResponseEntity.ok().build();
+		}
+
+		@GetMapping("/samples")
+		@Operation(description = "http get sample", extensions = { @Extension(name = "x-roles",
+				properties = { @ExtensionProperty(name = "role-name", value = "role-value") }) })
+		public ResponseEntity<Void> samples() {
 			return ResponseEntity.ok().build();
 		}
 

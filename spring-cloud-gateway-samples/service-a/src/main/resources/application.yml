@@ -3,6 +3,12 @@ spring.application.name: service-a
 eureka:
   client:
     enabled: false
+springdoc:
+  swagger-ui:
+    show-extensions: true
+    show-common-extensions: true
+  api-docs:
+    resolve-extensions-properties: true
 ---
 spring:
   config:
