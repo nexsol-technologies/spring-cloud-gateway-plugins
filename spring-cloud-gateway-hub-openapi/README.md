@@ -70,6 +70,12 @@ Only a service that answered has its result cached. A service that could not be 
 probed again on the next refresh, so a service that was down when the gateway started
 appears in the hub as soon as it comes back, without waiting for `cache-ttl`.
 
+Probing an instance stops at the first path it could not be reached on, instead of trying
+the remaining ones: they lead to the same instance and fail the same way. An unreachable
+service therefore costs one `timeout`, not one per candidate path &mdash; which is what
+keeps the few services that are always down or draining in a large registry from dominating
+the refresh.
+
 The documents themselves are never buffered by the discovery: only the path each document
 was found at is kept, and the response body is released. The documents are fetched, and
 their `servers` section rewritten, when the Swagger UI actually asks for them.

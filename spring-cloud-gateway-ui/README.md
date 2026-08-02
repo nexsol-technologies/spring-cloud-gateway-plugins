@@ -79,13 +79,20 @@ Each source is queried individually instead of through the gateway's aggregate, 
 source name is derived from the locator class name, so a locator contributed by any plugin
 shows up correctly without this module knowing about it.
 
-The inventory is **read once and cached** until a `RefreshRoutesEvent` signals a route
-change, which is when the gateway queries its own locators. Navigating between this page and
-the home page therefore queries nothing, and a locator that reaches the network &mdash;
-service discovery, a remote contract &mdash; is not called again on every page load. Each
-source is given five seconds to answer; past that it is dropped from the snapshot with a
-warning, as a source that fails to be read is, so one unreachable source cannot hold the
-page.
+The inventory is **read once, then served while it is refreshed**. Only the very first
+reader waits on the sources; a `RefreshRoutesEvent` marks the snapshot stale instead of
+dropping it, and the read it triggers runs in the background. Navigating between this page
+and the home page therefore queries nothing, and a locator that reaches the network &mdash;
+service discovery, a remote contract &mdash; is never called in the middle of a page render.
+This matters behind a discovery client: a refresh event arrives on every heartbeat, so a
+snapshot dropped on each event would leave every view paying for a full read of a registry
+holding hundreds of services. The page then shows the inventory as of the previous read; the
+*Refresh view* action is what waits for a current one.
+
+A refresh already in flight is shared rather than started again, so several views opened at
+once cost one read. Each source is given five seconds to answer; past that it is dropped
+from the snapshot with a warning, as a source that fails to be read is, so one unreachable
+source cannot hold the page.
 
 **Columns** &mdash; route (its id, with the target it resolves to under it), source, order,
 predicates and filters. A predicate or filter is rendered the way it was declared, not as a
