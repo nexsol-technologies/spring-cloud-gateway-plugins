@@ -25,8 +25,8 @@ The plugin auto-configures itself; no extra setup is required. Start the gateway
 * **Thin scrollbar** &mdash; the menu scrolls independently with a slim scrollbar.
 * **Home page** &mdash; the overview of the gateway, rendered inside the shell.
 * **Remembered controls** &mdash; the switches and drop-downs of a view are restored as they
-  were last left. Search boxes are not: a forgotten query hiding every row reads as an empty
-  view.
+  were last left. Search boxes are not: a query kept across page loads would hide rows
+  without the reader knowing why.
 
 Built with Thymeleaf, Bootstrap, HTMX and plain CSS/JS, served as static resources (no
 CDN, offline friendly).
@@ -101,8 +101,7 @@ definitions do reach the route table; the lowest order is matched first.
 
 **Filter** &mdash; the search box narrows the table on route id, target or source.
 
-**The two actions have different targets**, which is why they are named after what they
-refresh:
+**The two actions have different targets**, each named after what it refreshes:
 
 | | Refresh view | Rebuild gateway routes |
 | --- | --- | --- |
@@ -131,8 +130,8 @@ The verdict comes from the route table itself: the routes are read from the `Rou
 and each one is evaluated with the very predicates the gateway would apply, in the very
 order it applies them. The first match wins, as it does at runtime.
 
-Each candidate is then broken down **predicate by predicate**, which is what turns a bare
-"no match" into an answer:
+Each candidate is then broken down **predicate by predicate**, so a bare "no match" comes
+with the reason:
 
 ```
 ✗ no match   alpha → http://alpha.example.com        Properties   order 0
@@ -200,8 +199,8 @@ axis options and the question built on them &mdash; for reading the traffic as p
 server-side health. A metric selection pointing at a hidden column falls back rather than
 plotting what was just removed.
 
-**Map** &mdash; one bubble per route (ECharts, vendored locally). Rather than exposing raw
-axes, the chart answers a named question that also picks the metrics:
+**Map** &mdash; one bubble per route (ECharts, vendored locally). The chart is driven by a
+named question, which picks the metrics of both axes:
 
 | Question | Reads as |
 | --- | --- |
@@ -250,8 +249,8 @@ spring.cloud.gateway.server.webflux.metrics:
     - .*_healthcheck
 ```
 
-An empty list shows every route. A malformed expression is dropped with a warning rather
-than failing the application &mdash; losing a filter beats a gateway that does not start.
+An empty list shows every route. A malformed expression is dropped with a warning and the
+application still starts.
 
 The exclusion applies to the whole view: the summary, the map, the table and the traffic
 figures on the home page all read the same filtered set.
@@ -320,11 +319,11 @@ paths, it does not assume `/v3/api-docs`.
 **Vendor extensions** &mdash; Scalar renders the extensions it knows about (`x-internal`,
 `x-displayName`, `x-badges`, `x-codeSamples`, `x-tagGroups`, the `x-enum*` family, `x-example`,
 `x-scalar-*`) and drops the others, so what a service documents of its own &mdash; the roles a
-resource requires, the version it appeared in &mdash; is never displayed. A Scalar plugin
-takes those over. The contracts are left untouched: Scalar fetches only the one on
-screen and parses it itself, YAML included.
+resource requires, the version it appeared in &mdash; would not be displayed. A Scalar plugin
+renders those, from the mapping declared below. The contracts themselves are handed to Scalar
+by URL: it fetches only the one on screen and parses it, YAML included.
 
-Each extension is declared with the label it reads under, the plugin registry matching an
+Each extension is declared with the label it reads under, and the plugin registry matches an
 extension by its exact name:
 
 ```yaml

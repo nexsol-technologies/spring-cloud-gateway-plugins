@@ -8,8 +8,8 @@
  * exactly as the reader left it. When the hub aggregated nothing, the contract of the
  * gateway itself is shown, so the view is never empty for no reason.
  *
- * Scalar receives the addresses of the contracts rather than their content, so it fetches
- * and parses only the one on screen, whichever format it is served in.
+ * Scalar is handed the addresses of the contracts, so it fetches and parses only the one
+ * on screen, whichever format it is served in.
  *
  * The vendor extensions Scalar does not know about are rendered by a plugin, from the
  * mapping of extension name to label the page carries. The plugin registry matches an
@@ -60,9 +60,9 @@
 	/**
 	 * The component Scalar renders for one extension.
 	 *
-	 * The value comes from the attributes rather than from a declared prop, since Vue
-	 * camel-cases prop names and `x-roles` would be looked up as `xRoles`. The render
-	 * function returns a string because the standalone bundle ships no template compiler.
+	 * The value is read off the attributes: Vue camel-cases declared prop names, so
+	 * `x-roles` would be looked up as `xRoles`. The render function returns a string
+	 * because the standalone bundle ships no template compiler.
 	 */
 	function extensionComponent(name, label) {
 		return {
@@ -73,7 +73,7 @@
 		};
 	}
 
-	/** Scalar calls the plugin to build it, hence a factory rather than an object. */
+	/** Scalar builds the plugin by calling it, so the registry is handed this factory. */
 	function extensionsPlugin() {
 		return {
 			name: 'gateway-ui-extensions',
@@ -85,8 +85,8 @@
 
 	function configuration(sources) {
 		return {
-			// The agent flag is read off the active source, hence set on each of them as
-			// well as on the page.
+			// The agent flag is read off the active source, so it is set on each of them
+			// as well as on the page.
 			sources: sources.map(function (source) {
 				return Object.assign({ agent: { disabled: true } }, source);
 			}),
@@ -97,7 +97,7 @@
 			hideDarkModeToggle: true,
 			// Scalar enables its AI agent by itself when the page is served from localhost.
 			// Its control is a form next to the search box, and it captures the clicks of
-			// its own area; this console reaches no third party anyway.
+			// its own area.
 			agent: { disabled: true },
 			// On by default. The gateway this console documents may be the only host it is
 			// allowed to reach.

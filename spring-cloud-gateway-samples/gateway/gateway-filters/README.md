@@ -44,9 +44,9 @@ sample, whose route asks for a bare `READ`.
 
 ## Recaptcha
 
-The fourth filter of the plugin needs a secret key issued by Google, so the sample declares
-the route commented out in [`application.yml`](src/main/resources/application.yml) rather
-than shipping one that cannot answer.
+The fourth filter of the plugin needs a secret key issued by Google. Its route sits
+commented out in [`application.yml`](src/main/resources/application.yml): uncomment it and
+fill in your own key.
 
 Before enabling it, note that the filter denies with `403` on **every** outcome that is
 not a verified token — a missing token, a rejected one, a score below the threshold, and a

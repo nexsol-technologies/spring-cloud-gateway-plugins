@@ -51,7 +51,7 @@ public class OpenapiViewController {
 	 * <p>
 	 * The properties are resolved through a provider: an application component-scanning
 	 * this package picks the controller up outside the auto-configuration that binds
-	 * them, and a view with no declared extension is preferable to a context that fails.
+	 * them, and the view then renders with no declared extension instead of failing.
 	 * @param apiDocsPath the SpringDoc documentation path
 	 * @param properties the provider over the OpenAPI view properties
 	 */

@@ -2,8 +2,8 @@
  * Gateway UI shell behaviour: toggle the side menu between the expanded (icon + label)
  * and collapsed (icon only) states, and remember the choice across page loads.
  *
- * It also exposes the helper the views remember their own controls with, so where that
- * state lives is decided once, here.
+ * It also exposes the helper the views remember their own controls with, which is where
+ * that state is written and read.
  */
 
 /**
@@ -37,8 +37,8 @@ window.gatewayUi = (function () {
 			else {
 				var shipped = element.value;
 				element.value = stored;
-				// A stored option that no longer exists would leave the control empty:
-				// fall back on the default rather than on nothing.
+				// A stored option that no longer exists leaves the control empty: the
+				// default it was rendered with is put back.
 				if (element.value !== stored) {
 					element.value = shipped;
 				}

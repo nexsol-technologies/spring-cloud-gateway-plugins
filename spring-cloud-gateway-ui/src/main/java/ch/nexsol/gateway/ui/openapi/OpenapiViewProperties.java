@@ -40,7 +40,7 @@ public class OpenapiViewProperties {
 
 	/**
 	 * Returns the extensions to show, keyed by extension name.
-	 * @return the labels, keyed by extension name
+	 * @return the extensions to show, keyed by extension name
 	 */
 	public Map<String, String> getExtensions() {
 		return this.extensions;
