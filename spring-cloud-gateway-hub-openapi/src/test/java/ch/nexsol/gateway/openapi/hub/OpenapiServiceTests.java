@@ -165,7 +165,35 @@ class OpenapiServiceTests {
 
 		// Failing to reach a service says nothing about its document: caching that would
 		// keep it out of the hub long after it came back.
-		assertThat(this.probedUrls).containsExactly(JSON_URL, YAML_URL, PLAIN_URL, JSON_URL, YAML_URL, PLAIN_URL);
+		assertThat(this.probedUrls).containsExactly(JSON_URL, JSON_URL);
+	}
+
+	@Test
+	void probingStopsAtTheFirstPathTheInstanceCouldNotBeReachedOn() {
+		givenInstance(Map.of());
+		this.exchange = (url) -> Mono.error(new IllegalStateException("connection refused"));
+
+		StepVerifier.create(discover()).verifyComplete();
+
+		// The remaining paths lead to the same instance and would fail the same way, each
+		// costing another full timeout. With a registry holding hundreds of services,
+		// that is the difference between one timeout per unreachable service and one per
+		// candidate path.
+		assertThat(this.probedUrls).containsExactly(JSON_URL);
+	}
+
+	@Test
+	void aPathTheInstanceAnsweredForDoesNotStopTheProbing() {
+		givenInstance(Map.of());
+		this.exchange = (url) -> Mono.just(url.equals(PLAIN_URL) ? okDocument() : notFound());
+
+		StepVerifier.create(discover())
+			.assertNext((discovered) -> assertThat(discovered.path()).isEqualTo("/v3/api-docs"))
+			.verifyComplete();
+
+		// A 404 is an answer: the instance is reachable and the next path is worth
+		// trying.
+		assertThat(this.probedUrls).containsExactly(JSON_URL, YAML_URL, PLAIN_URL);
 	}
 
 	@Test

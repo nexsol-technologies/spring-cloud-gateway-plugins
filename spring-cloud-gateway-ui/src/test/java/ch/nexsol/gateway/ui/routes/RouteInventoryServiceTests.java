@@ -159,6 +159,41 @@ class RouteInventoryServiceTests {
 	}
 
 	@Test
+	void servesThePreviousInventoryInsteadOfWaitingOnTheSourcesAgain() {
+		// A source that stopped answering must not hold the page: behind service
+		// discovery, reading the sources outlasts what a page load can wait for.
+		RouteInventoryService service = serviceOver(new SilentAfterFirstReadRouteDefinitionLocator());
+
+		StepVerifier.create(service.routes()).expectNextCount(1).verifyComplete();
+		service.onApplicationEvent(new RefreshRoutesEvent(this));
+
+		StepVerifier.create(service.routes())
+			.assertNext((routes) -> assertThat(routes).extracting(RouteView::routeId).containsExactly("counted"))
+			.expectComplete()
+			// Well inside the bound a single source is given to answer: the view was
+			// served from the previous inventory, not from the read it just triggered.
+			.verify(Duration.ofSeconds(1));
+	}
+
+	@Test
+	void readsTheSourcesOnceForABurstOfRefreshEvents() {
+		CountingRouteDefinitionLocator locator = new CountingRouteDefinitionLocator();
+		RouteInventoryService service = serviceOver(locator);
+
+		StepVerifier.create(service.routes()).expectNextCount(1).verifyComplete();
+		service.onApplicationEvent(new RefreshRoutesEvent(this));
+		service.onApplicationEvent(new RefreshRoutesEvent(this));
+		service.onApplicationEvent(new RefreshRoutesEvent(this));
+
+		StepVerifier.create(service.routes()).expectNextCount(1).verifyComplete();
+		StepVerifier.create(service.routes()).expectNextCount(1).verifyComplete();
+
+		// A discovery heartbeat publishes a refresh event on every tick: a burst of them
+		// costs one read, not one per event nor one per view rendered.
+		assertThat(locator.reads()).isEqualTo(2);
+	}
+
+	@Test
 	void refreshingTheViewReadsTheSourcesAgain() {
 		CountingRouteDefinitionLocator locator = new CountingRouteDefinitionLocator();
 		RouteInventoryService service = serviceOver(locator);
@@ -292,6 +327,22 @@ class RouteInventoryServiceTests {
 		@Override
 		public Flux<RouteDefinition> getRouteDefinitions() {
 			return Flux.never();
+		}
+
+	}
+
+	/**
+	 * Answers the first read, then never answers again, as a source whose registry became
+	 * unreachable does.
+	 */
+	private static final class SilentAfterFirstReadRouteDefinitionLocator implements RouteDefinitionLocator {
+
+		private final AtomicInteger reads = new AtomicInteger();
+
+		@Override
+		public Flux<RouteDefinition> getRouteDefinitions() {
+			return Flux.defer(() -> (this.reads.getAndIncrement() == 0)
+					? Flux.just(definition("counted", "http://counted")) : Flux.never());
 		}
 
 	}

@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -49,10 +50,11 @@ import org.springframework.util.ClassUtils;
  * route visible: properties, database, files, OpenAPI contracts, Config Server or any
  * third-party source contributed to the context.
  * <p>
- * The resulting snapshot is cached until the gateway signals a route change, the same way
- * the gateway itself only queries its locators on a {@link RefreshRoutesEvent}: a locator
- * is free to reach the network on every call, and the views built on this inventory are
- * rendered on every page load.
+ * The resulting snapshot is cached and served while it is refreshed, the same way the
+ * gateway itself only queries its locators on a {@link RefreshRoutesEvent}: a locator is
+ * free to reach the network on every call, and the views built on this inventory are
+ * rendered on every page load. A {@link RefreshRoutesEvent} therefore marks the snapshot
+ * stale instead of dropping it, and the read it triggers runs in the background.
  */
 public class RouteInventoryService implements ApplicationListener<RefreshRoutesEvent> {
 
@@ -84,6 +86,18 @@ public class RouteInventoryService implements ApplicationListener<RefreshRoutesE
 	private final AtomicReference<Mono<List<RouteView>>> snapshot = new AtomicReference<>();
 
 	/**
+	 * Last inventory resolved in full. It is what every view is served from while a
+	 * refresh runs, so a page render never waits on a read of every source.
+	 */
+	private final AtomicReference<List<RouteView>> lastKnown = new AtomicReference<>();
+
+	/**
+	 * Set when the gateway signalled a route change. The next reader consumes it to
+	 * trigger a single background refresh, so a burst of refresh events costs one read.
+	 */
+	private final AtomicBoolean stale = new AtomicBoolean();
+
+	/**
 	 * Creates the service over every route definition source in the context.
 	 * @param locators the provider over every {@link RouteDefinitionLocator} bean
 	 * @param publisher the publisher used to ask the gateway to rebuild its route table
@@ -97,35 +111,71 @@ public class RouteInventoryService implements ApplicationListener<RefreshRoutesE
 	 * Collects the route definitions of every source, in locator order, flagging the ids
 	 * declared by more than one source.
 	 * <p>
-	 * The snapshot is read once and shared by every reader until a
-	 * {@link RefreshRoutesEvent} drops it, so displaying a view never re-queries the
-	 * sources.
+	 * Only the very first reader waits on the sources. Afterwards the last resolved
+	 * inventory is served straight away and a {@link RefreshRoutesEvent} merely marks it
+	 * stale, so the read that follows runs in the background rather than in the middle of
+	 * a page render. A locator backed by service discovery re-reads the registry, and
+	 * probes it, on every call; with a few hundred services that read outlasts any
+	 * acceptable page load, and refresh events arrive on every discovery heartbeat, so a
+	 * snapshot dropped on each event would leave every view paying for a full read.
 	 * @return the resolved routes, source by source
 	 */
 	public Mono<List<RouteView>> routes() {
-		return Mono.defer(() -> this.snapshot.updateAndGet((cached) -> (cached != null) ? cached : readSources()));
+		return Mono.defer(() -> {
+			List<RouteView> known = this.lastKnown.get();
+			if (known == null) {
+				return read();
+			}
+			if (this.stale.compareAndSet(true, false)) {
+				revalidate();
+			}
+			return Mono.just(known);
+		});
 	}
 
 	/**
-	 * Re-reads every source, dropping the cached snapshot first. This is what the
-	 * <em>Refresh view</em> action asks for, as opposed to merely displaying a view.
+	 * Re-reads every source, dropping the cached snapshot first, and waits for the
+	 * result. This is what the <em>Refresh view</em> action asks for, as opposed to
+	 * merely displaying a view.
 	 * @return the freshly resolved routes, source by source
 	 */
 	public Mono<List<RouteView>> refreshedRoutes() {
 		return Mono.defer(() -> {
 			this.snapshot.set(null);
-			return routes();
+			this.stale.set(false);
+			return read();
 		});
 	}
 
 	/**
-	 * Drops the cached snapshot whenever the gateway rebuilds its route table, so the
-	 * next reader sees the routes the gateway just resolved.
+	 * Marks the inventory stale whenever the gateway rebuilds its route table, so the
+	 * next reader triggers a background read and later views see the routes the gateway
+	 * just resolved. The current inventory is kept in place: dropping it would make the
+	 * next page render wait on every source.
 	 * @param event the route refresh event
 	 */
 	@Override
 	public void onApplicationEvent(RefreshRoutesEvent event) {
 		this.snapshot.set(null);
+		this.stale.set(true);
+	}
+
+	/**
+	 * Subscribes to a read whose result later views are served from, without holding the
+	 * caller. Failures are logged only: the previous inventory stays in place.
+	 */
+	private void revalidate() {
+		read().subscribe((refreshed) -> LOG.debug("Refreshed the route inventory in the background: {} route(s)",
+				refreshed.size()), (ex) -> LOG.warn("Background route inventory refresh failed", ex));
+	}
+
+	/**
+	 * Reads every source, sharing a read already in flight rather than starting a second
+	 * one: a view opened while a refresh runs must not double the load on the sources.
+	 * @return the resolved routes
+	 */
+	private Mono<List<RouteView>> read() {
+		return this.snapshot.updateAndGet((cached) -> (cached != null) ? cached : readSources());
 	}
 
 	private Mono<List<RouteView>> readSources() {
@@ -138,6 +188,7 @@ public class RouteInventoryService implements ApplicationListener<RefreshRoutesE
 			.flatMapSequential(this::readSource)
 			.collectList()
 			.map(RouteInventoryService::flagDuplicates)
+			.doOnNext(this.lastKnown::set)
 			.cache();
 	}
 

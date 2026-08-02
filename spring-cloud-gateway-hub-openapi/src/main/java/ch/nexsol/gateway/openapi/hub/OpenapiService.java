@@ -150,9 +150,12 @@ public class OpenapiService implements DisposableBean {
 
 		// concatMap preserves the .json -> .yaml -> plain preference order and takeUntil
 		// stops at the first match, instead of firing all the probes in parallel.
+		// A probe that could not reach the instance stops the sequence too: the remaining
+		// paths fail the same way, each costing another full timeout, so an unreachable
+		// service costs one timeout rather than one per candidate path.
 		return Flux.fromIterable(paths)
 			.concatMap((path) -> probe(uri, path, routeDefinition))
-			.takeUntil(Probe::found)
+			.takeUntil((probe) -> probe.found() || !probe.answered())
 			.collectList()
 			.flatMap((probes) -> toDiscover(uri, probes, routeDefinition));
 	}
