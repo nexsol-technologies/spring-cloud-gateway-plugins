@@ -93,6 +93,12 @@ spring.cloud.gateway.server.webflux.audit:
   web-filter:
     enabled: true
 
+spring.cloud.gateway.server.webflux.ui:
+  openapi:
+    extensions:
+      x-roles: Required roles
+      x-from-application-version: Since
+
 # CASE_INSENSITIVE_IDENTIFIERS is what makes H2 accept the quoted lower-case identifiers
 # Spring Data R2DBC generates against the schema the plugin ships, whose DDL is unquoted.
 spring.r2dbc:
