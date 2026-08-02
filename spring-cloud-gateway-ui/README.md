@@ -51,7 +51,7 @@ contributed by the active views (routes and their sources, calls, average latenc
 errors, server errors, audited exchanges) and a link to every view that lit up.
 
 Client and server errors get a tile each, for the same reason the traffic view separates
-them: a wave of 404 and a backend outage are not the same news.
+them: a wave of 404 and a backend outage call for different actions.
 
 The figures come from the views themselves: each one contributes an `OverviewContribution`
 bean declared next to it and guarded by the same condition, so the home page never
@@ -79,13 +79,13 @@ Each source is queried individually instead of through the gateway's aggregate, 
 source name is derived from the locator class name, so a locator contributed by any plugin
 shows up correctly without this module knowing about it.
 
-The resulting inventory is **read once and cached** until the gateway signals a route change
-through a `RefreshRoutesEvent`, the same way the gateway itself only queries its locators on
-that event. Displaying this page or the home page therefore costs nothing: a locator that
-reaches the network &mdash; discovery probing every service for its OpenAPI document, a
-remote contract &mdash; is not queried again on every navigation. Each source is also given
-five seconds to answer, after which it is dropped from the snapshot with a warning, exactly
-as a source that fails to be read is: one unreachable source cannot hold the page.
+The inventory is **read once and cached** until a `RefreshRoutesEvent` signals a route
+change, which is when the gateway queries its own locators. Navigating between this page and
+the home page therefore queries nothing, and a locator that reaches the network &mdash;
+service discovery, a remote contract &mdash; is not called again on every page load. Each
+source is given five seconds to answer; past that it is dropped from the snapshot with a
+warning, as a source that fails to be read is, so one unreachable source cannot hold the
+page.
 
 **Columns** &mdash; route (its id, with the target it resolves to under it), source, order,
 predicates and filters. A predicate or filter is rendered the way it was declared, not as a

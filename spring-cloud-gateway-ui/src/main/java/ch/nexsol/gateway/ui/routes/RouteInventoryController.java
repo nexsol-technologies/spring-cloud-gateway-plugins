@@ -56,9 +56,9 @@ public class RouteInventoryController {
 	}
 
 	/**
-	 * Renders the route table fragment, used to refresh the list in place. Being the
-	 * action asking for fresh figures, it re-reads the sources rather than serving the
-	 * cached inventory.
+	 * Renders the route table fragment, used to refresh the list in place. It re-reads
+	 * the sources rather than serving the cached inventory, which is what the action asks
+	 * for.
 	 * @param model the view model
 	 * @return the table fragment view name
 	 */

@@ -24,10 +24,10 @@ Open http://localhost:8204/ui.
 | Route tester | `/ui/routes/test` | which route would handle a described request, and why |
 | Traffic | `/ui/metrics` | the per-route figures of this instance |
 
-## What it deliberately does not show
+## What it does not show
 
-This sample runs **only** the UI plugin, which is the point: each view activates from what
-is on the classpath, so the menu here has no **Database routes** entry and no **Audit** entry.
+This sample runs **only** the UI plugin. Each view activates from what is on the classpath,
+so the menu here has no **Database routes** entry and no **Audit** entry.
 Add `spring-cloud-gateway-routes-database` and they light up on their own — the
 [gateway-full](../gateway-full/README.md) sample is the same shell with every plugin present.
 
