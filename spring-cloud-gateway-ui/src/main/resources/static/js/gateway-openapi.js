@@ -85,12 +85,28 @@
 
 	function configuration(sources) {
 		return {
-			sources: sources,
+			// The agent flag is read off the active source, hence set on each of them as
+			// well as on the page.
+			sources: sources.map(function (source) {
+				return Object.assign({ agent: { disabled: true } }, source);
+			}),
 			// Everything this page loads is served by the gateway itself: no font from an
 			// external CDN, so the view still works on an isolated network.
 			withDefaultFonts: false,
 			darkMode: false,
 			hideDarkModeToggle: true,
+			// Scalar enables its AI agent by itself when the page is served from localhost.
+			// Its control is a form next to the search box, and it captures the clicks of
+			// its own area; this console reaches no third party anyway.
+			agent: { disabled: true },
+			// On by default. The gateway this console documents may be the only host it is
+			// allowed to reach.
+			telemetry: false,
+			// The search modal opens with its input focused but stays invisible: it carries
+			// the utility class `opacity-0`, and the animation revealing it is declared in
+			// a stylesheet the bundle does not inject in this integration. Remove once the
+			// bundle ships those styles.
+			customCss: '.scalar-modal-layout, .scalar-modal { opacity: 1 !important; }',
 			plugins: [extensionsPlugin]
 		};
 	}
