@@ -17,7 +17,7 @@ a granted call reach a backend. The other routes need nothing beyond an internet
 | Url | Filter | What happens |
 | --- | --- | --- |
 | http://localhost:8201/authorization/sample | `Authorization` | `user:user` holds `ROLE_READ` and is let through; `admin:admin` is answered `403` |
-| http://localhost:8201/authorization-ko/sample | `Authorization` | the route asks for an authority nobody holds, so every account is answered `403` |
+| http://localhost:8201/authorization-ko/sample | `Authorization` | the route asks for an authority no account holds, so every request is answered `403` |
 | http://localhost:8201/convert-method/anything | `ConvertHttpMethod` | a `GET` reaches httpbin.org as a `POST` |
 | any response | `CorrelationId` | an `x-correlation-id` header carrying the traceId of the exchange |
 
@@ -48,7 +48,7 @@ The fourth filter of the plugin needs a secret key issued by Google, so the samp
 the route commented out in [`application.yml`](src/main/resources/application.yml) rather
 than shipping one that cannot answer.
 
-Worth knowing before enabling it: the filter denies with `403` on **every** outcome that is
+Before enabling it, note that the filter denies with `403` on **every** outcome that is
 not a verified token — a missing token, a rejected one, a score below the threshold, and a
 verification endpoint that is unreachable or answers an error. It fails closed, and the
 reason goes to the log rather than to the caller.

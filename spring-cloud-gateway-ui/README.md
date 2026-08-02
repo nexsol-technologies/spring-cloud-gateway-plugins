@@ -51,7 +51,7 @@ contributed by the active views (routes and their sources, calls, average latenc
 errors, server errors, audited exchanges) and a link to every view that lit up.
 
 Client and server errors get a tile each, for the same reason the traffic view separates
-them: a wave of 404 and a backend outage are not the same news.
+them: a wave of 404 and a backend outage call for different actions.
 
 The figures come from the views themselves: each one contributes an `OverviewContribution`
 bean declared next to it and guarded by the same condition, so the home page never
@@ -79,13 +79,13 @@ Each source is queried individually instead of through the gateway's aggregate, 
 source name is derived from the locator class name, so a locator contributed by any plugin
 shows up correctly without this module knowing about it.
 
-The resulting inventory is **read once and cached** until the gateway signals a route change
-through a `RefreshRoutesEvent`, the same way the gateway itself only queries its locators on
-that event. Displaying this page or the home page therefore costs nothing: a locator that
-reaches the network &mdash; discovery probing every service for its OpenAPI document, a
-remote contract &mdash; is not queried again on every navigation. Each source is also given
-five seconds to answer, after which it is dropped from the snapshot with a warning, exactly
-as a source that fails to be read is: one unreachable source cannot hold the page.
+The inventory is **read once and cached** until a `RefreshRoutesEvent` signals a route
+change, which is when the gateway queries its own locators. Navigating between this page and
+the home page therefore queries nothing, and a locator that reaches the network &mdash;
+service discovery, a remote contract &mdash; is not called again on every page load. Each
+source is given five seconds to answer; past that it is dropped from the snapshot with a
+warning, as a source that fails to be read is, so one unreachable source cannot hold the
+page.
 
 **Columns** &mdash; route (its id, with the target it resolves to under it), source, order,
 predicates and filters. A predicate or filter is rendered the way it was declared, not as a
@@ -317,15 +317,15 @@ directly. When nothing has been aggregated, the contract of the gateway itself i
 A custom `springdoc.api-docs.path` is honoured &mdash; the view is handed the configured
 paths, it does not assume `/v3/api-docs`.
 
-**Vendor extensions** &mdash; Scalar renders only the extensions it knows about (`x-internal`,
+**Vendor extensions** &mdash; Scalar renders the extensions it knows about (`x-internal`,
 `x-displayName`, `x-badges`, `x-codeSamples`, `x-tagGroups`, the `x-enum*` family, `x-example`,
-`x-scalar-*`); anything a service documents of its own &mdash; the roles a resource requires,
-the version it appeared in &mdash; is dropped at render time. The view takes those over
-through a **Scalar plugin**, which is the extension point Scalar offers for exactly this, so
-nothing rewrites the contracts: Scalar keeps fetching only the one on screen, and parses the
-YAML ones itself.
+`x-scalar-*`) and drops the others, so what a service documents of its own &mdash; the roles a
+resource requires, the version it appeared in &mdash; is never displayed. A Scalar plugin
+takes those over. The contracts are left untouched: Scalar fetches only the one on
+screen and parses it itself, YAML included.
 
-The plugin registry matches an extension **by its exact name**, so each one is declared:
+Each extension is declared with the label it reads under, the plugin registry matching an
+extension by its exact name:
 
 ```yaml
 spring.cloud.gateway.server.webflux.ui.openapi:
@@ -334,18 +334,14 @@ spring.cloud.gateway.server.webflux.ui.openapi:
     x-from-application-version: Since
 ```
 
-An operation carrying `x-roles` then reads `Required roles — admin, auditor` where Scalar
-draws the extensions it knows. The value is shown as it is written: a list comma-separated,
-an object as JSON. An extension left out of the mapping is not displayed &mdash; declaring it
-is what makes it visible, and the label is what it reads under. Adding one is a matter of
-configuration and a restart, with nothing to rebuild.
+An operation carrying `x-roles` then reads `Required roles — admin, auditor`, a list shown
+comma-separated and an object as JSON. An extension left out of the mapping is not shown, and
+adding one takes a restart, not a rebuild.
 
-Scalar renders the extensions of the document, of `info`, of a tag, of a schema and of an
-operation; a path item is not one of its rendering points, so an extension declared there is
-not repeated on its operations.
-
-`x-badges` is worth knowing about: Scalar renders it natively, as a badge next to the
-operation, so a short label is better shaped as one than declared here.
+Scalar renders extensions on the document, on `info`, on a tag, on a schema and on an
+operation. A path item is not one of its rendering points, so an extension declared there
+does not reach the operations under it. `x-badges` is rendered natively, as a badge next to
+the operation, which suits a short label better than this mapping does.
 
 The Scalar bundle ships with the plugin (`/js/scalar.standalone.js`, `@scalar/api-reference`
 1.63.0, 3.6 MB) and its default web fonts are switched off, so the view works on an isolated

@@ -70,7 +70,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=redis
 redis-cli SUBSCRIBE gateway-audit
 ```
 
-Genuine pub/sub: events published while nobody is subscribed are gone. Subscribe **before**
+Genuine pub/sub: events published without a subscriber are lost. Subscribe **before**
 calling a route, or nothing shows up.
 
 ### Kafka

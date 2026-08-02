@@ -28,14 +28,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class OpenapiViewProperties {
 
 	/**
-	 * The vendor extensions of the contracts to show in the OpenAPI view, keyed by
-	 * extension name, each with the label it reads under, in the order they are declared.
+	 * The vendor extensions to show in the OpenAPI view, keyed by extension name, each
+	 * with the label it reads under, in the order they are declared.
 	 * <p>
-	 * Declaring an extension is what makes it visible: the renderer displays the handful
-	 * it knows about and matches the others by their exact name, so an extension left out
-	 * of this mapping is not shown. Declaring {@code x-roles: Required roles} has an
-	 * operation carrying {@code x-roles} read as {@code Required roles}, the value
-	 * untouched, without changing the contract itself.
+	 * The renderer displays the extensions it knows about and matches the others by their
+	 * exact name, so an extension left out of this mapping is not shown. With
+	 * {@code x-roles: Required roles}, an operation carrying {@code x-roles} reads as
+	 * {@code Required roles}, its value untouched and its contract unchanged.
 	 */
 	private final Map<String, String> extensions = new LinkedHashMap<>();
 

@@ -33,7 +33,7 @@ spring.cloud.gateway.server.webflux:
 
 A service can declare where its document is, in its instance metadata, instead of letting
 the hub probe the well-known SpringDoc paths. This is one HTTP call per service instead of
-up to three, and it is worth doing on a large registry:
+up to three, which matters on a large registry:
 
 ```yaml
 eureka.instance.metadata-map.openapi_path: /v3/api-docs

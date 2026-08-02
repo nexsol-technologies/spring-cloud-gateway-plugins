@@ -57,7 +57,7 @@ spring:
 The plugin declares no connection property of its own, `database` included: it would
 duplicate `spring.data.redis.database` and give the same setting two places to disagree.
 
-Two consequences worth knowing:
+Two consequences:
 
 - **The database index is shared.** Everything reusing that connection — the audit plugin,
   your cache, your sessions — lives in the same logical database. The keys still do not

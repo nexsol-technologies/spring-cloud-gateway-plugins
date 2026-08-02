@@ -8,16 +8,12 @@
  * exactly as the reader left it. When the hub aggregated nothing, the contract of the
  * gateway itself is shown, so the view is never empty for no reason.
  *
- * Scalar is handed the addresses of the contracts, not their content: it then fetches only
- * the one on screen, and each contract is fetched and parsed once, by Scalar itself, which
- * is what keeps the view fluid and handles the contracts SpringDoc serves as YAML.
+ * Scalar receives the addresses of the contracts rather than their content, so it fetches
+ * and parses only the one on screen, whichever format it is served in.
  *
- * The vendor extensions a service documents of its own — the roles a resource requires, the
- * version it appeared in — are displayed through a Scalar plugin: Scalar renders the handful
- * of extensions it knows about and drops the rest, and a plugin is where it lets a page take
- * over the ones it does not know. Each extension is declared in the configuration of the
- * gateway, which is what the page carries: the plugin registry matches an extension by its
- * exact name, so an undeclared extension is not rendered.
+ * The vendor extensions Scalar does not know about are rendered by a plugin, from the
+ * mapping of extension name to label the page carries. The plugin registry matches an
+ * extension by its exact name, so an undeclared extension is not rendered.
  */
 (function () {
 	'use strict';
@@ -37,10 +33,7 @@
 	var signature = null;
 	var pollTimer = null;
 
-	/**
-	 * The extensions to display, keyed by name, each with the label it reads under. They
-	 * are declared in the configuration of the gateway and carried by the page.
-	 */
+	/** The extensions to render, keyed by name, each with the label it reads under. */
 	var extensions = (function () {
 		try {
 			return JSON.parse(mount.dataset.extensionLabels || '{}');
@@ -67,10 +60,9 @@
 	/**
 	 * The component Scalar renders for one extension.
 	 *
-	 * The value is read from the attributes rather than from a declared prop: Vue camel-cases
-	 * the name of a declared prop, so `x-roles` would be looked up as `xRoles` and the value
-	 * would be lost. Returning a string from `render` is deliberate too — the standalone
-	 * bundle ships no template compiler, so a template string could not be compiled.
+	 * The value comes from the attributes rather than from a declared prop, since Vue
+	 * camel-cases prop names and `x-roles` would be looked up as `xRoles`. The render
+	 * function returns a string because the standalone bundle ships no template compiler.
 	 */
 	function extensionComponent(name, label) {
 		return {
@@ -93,8 +85,8 @@
 
 	function configuration(sources) {
 		return {
-			// Scalar reads the agent flag off the active source, so it is set on each of
-			// them rather than once for the page.
+			// The agent flag is read off the active source, hence set on each of them as
+			// well as on the page.
 			sources: sources.map(function (source) {
 				return Object.assign({ agent: { disabled: true } }, source);
 			}),
@@ -103,18 +95,17 @@
 			withDefaultFonts: false,
 			darkMode: false,
 			hideDarkModeToggle: true,
-			// Scalar turns its AI agent on by itself whenever the page is served from
-			// localhost, which puts an "Ask AI" form next to the search box and takes the
-			// focus the search box expects. This console talks to no third party.
+			// Scalar enables its AI agent by itself when the page is served from localhost.
+			// Its control is a form next to the search box, and it captures the clicks of
+			// its own area; this console reaches no third party anyway.
 			agent: { disabled: true },
-			// On by default, and this console must not phone home: the gateway it
-			// documents may well be the only host it is allowed to reach.
+			// On by default. The gateway this console documents may be the only host it is
+			// allowed to reach.
 			telemetry: false,
-			// The search modal opens with its input focused, but it carries the utility
-			// class `opacity-0` and is revealed by a `fadein-layout` animation the bundle
-			// declares in a stylesheet that never reaches the page: the reader ends up
-			// typing into an invisible field. Reveal it rather than let the search look
-			// broken. Drop this once the bundle ships that stylesheet.
+			// The search modal opens with its input focused but stays invisible: it carries
+			// the utility class `opacity-0`, and the animation revealing it is declared in
+			// a stylesheet the bundle does not inject in this integration. Remove once the
+			// bundle ships those styles.
 			customCss: '.scalar-modal-layout, .scalar-modal { opacity: 1 !important; }',
 			plugins: [extensionsPlugin]
 		};

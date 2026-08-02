@@ -112,10 +112,9 @@ public class GatewayUiAutoConfiguration {
 	 */
 	@Bean
 	public UiSecuredPaths shellSecuredPaths() {
-		// The source maps sit next to the assets pointing at them: the minified Bootstrap
-		// files carry a sourceMappingURL, so a browser with its developer tools open asks
-		// for maps this module does not ship. Leaving them undeclared audits a 404 on
-		// every page load, and answers it with a 401 rather than with the 404 it is.
+		// The minified Bootstrap files carry a sourceMappingURL, so a browser with its
+		// developer tools open requests maps this module does not ship. Declared so those
+		// requests answer as the 404 they are, and stay out of the audit trail.
 		return new UiSecuredPaths("/ui", "/css/bootstrap.min.css", "/css/bootstrap.min.css.map", "/css/gateway-ui.css",
 				"/js/htmx.min.js", "/js/bootstrap.bundle.min.js", "/js/bootstrap.bundle.min.js.map",
 				"/js/gateway-ui.js");
@@ -133,10 +132,10 @@ public class GatewayUiAutoConfiguration {
 	}
 
 	/**
-	 * Declares the paths of the database-backed routes view. The view belongs to the
-	 * routes-database plugin, which depends on this module only to be rendered inside the
-	 * shell: the paths are declared here, next to its menu entry and under the same
-	 * condition, so that plugin needs no compile dependency on the console.
+	 * Declares the paths of the database-backed routes view. That view belongs to the
+	 * routes-database plugin, which depends on this module in test scope alone: its paths
+	 * are declared here, next to its menu entry and under the same condition, so it needs
+	 * no compile dependency on the console.
 	 * @return the database routes view paths
 	 */
 	@Bean
@@ -329,8 +328,8 @@ public class GatewayUiAutoConfiguration {
 	 * Activates the audit view only when the audit plugin is on the classpath and
 	 * enabled: the view tails the events on their way to whichever backend the plugin
 	 * publishes to. The property condition mirrors the one guarding the plugin itself, so
-	 * a gateway that turned auditing off is not offered a view over events nobody
-	 * publishes.
+	 * a gateway with auditing turned off is not offered a view over events that are never
+	 * published.
 	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(AuditEventPublisher.class)

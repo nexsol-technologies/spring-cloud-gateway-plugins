@@ -60,8 +60,8 @@ public class RouteInventoryService implements ApplicationListener<RefreshRoutesE
 
 	/**
 	 * Time a single source is given to answer. A locator reaching the network (service
-	 * discovery probes, remote documents) must not hold the page hostage: past this delay
-	 * it is dropped from the snapshot, exactly as a source that fails to be read is.
+	 * discovery probes, remote documents) must not hold the page: past this delay it is
+	 * dropped from the snapshot, as a source that fails to be read is.
 	 */
 	private static final Duration SOURCE_TIMEOUT = Duration.ofSeconds(5);
 
