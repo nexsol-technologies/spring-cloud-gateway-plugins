@@ -27,16 +27,20 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "spring.cloud.gateway.server.webflux.ui.openapi")
 public class OpenapiViewProperties {
 
+	/**
+	 * The vendor extensions of the contracts to show in the OpenAPI view, keyed by
+	 * extension name, each with the label it reads under, in the order they are declared.
+	 * <p>
+	 * Declaring an extension is what makes it visible: the renderer displays the handful
+	 * it knows about and matches the others by their exact name, so an extension left out
+	 * of this mapping is not shown. Declaring {@code x-roles: Required roles} has an
+	 * operation carrying {@code x-roles} read as {@code Required roles}, the value
+	 * untouched, without changing the contract itself.
+	 */
 	private final Map<String, String> extensions = new LinkedHashMap<>();
 
 	/**
-	 * Labels the vendor extensions of the contracts are shown under, keyed by extension
-	 * name, in the order they are declared.
-	 * <p>
-	 * Naming an extension here only changes how it reads: an extension left undeclared is
-	 * still shown, under its own name. Declaring {@code x-roles: Required roles} turns
-	 * the {@code **x-roles**} line of an operation into {@code **Required roles**},
-	 * without touching the contract itself.
+	 * Returns the extensions to show, keyed by extension name.
 	 * @return the labels, keyed by extension name
 	 */
 	public Map<String, String> getExtensions() {
