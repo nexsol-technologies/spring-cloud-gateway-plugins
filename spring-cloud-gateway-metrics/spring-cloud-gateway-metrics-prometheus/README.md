@@ -30,6 +30,8 @@ spring:
               url: http://prometheus:9090
               selector: job="gateway",namespace="prod"   # see below
               meter: spring_cloud_gateway_requests_seconds
+              instance-label: instance
+              stale-after: 2m
               timeout: 5s
 ```
 
@@ -38,6 +40,8 @@ spring:
 | `url` | _(unset)_ | Base URL of the Prometheus server |
 | `selector` | _(empty)_ | Extra label matchers, without the braces |
 | `meter` | `spring_cloud_gateway_requests_seconds` | Base name of the gateway request timer |
+| `instance-label` | `instance` | Label identifying a gateway instance |
+| `stale-after` | `2m` | How far back an instance must have reported to still be listed |
 | `timeout` | `5s` | How long to wait before reporting no data |
 | `username` / `password` | _(unset)_ | Basic credentials, when the server asks for them |
 | `token` | _(unset)_ | Bearer token, ignored when Basic credentials are set |
@@ -97,6 +101,36 @@ a fourth round trip. Durations are converted from seconds to milliseconds.
 
 The gateway must publish its metrics to Prometheus for any of this to exist — add
 `micrometer-registry-prometheus` and let Prometheus scrape `/actuator/prometheus`.
+
+## The instance figures
+
+**One query, not one per counter.** The twenty-odd JVM, system and Reactor Netty series are
+selected by name in a single expression and grouped per instance on this side:
+
+```promql
+last_over_time({__name__=~"jvm_memory_used_bytes|process_cpu_usage|…",job="gateway"}[120s])
+```
+
+Twenty round trips to read twenty counters would make this by far the most expensive
+provider instead of the cheapest.
+
+Two things need care here, and they are the reverse of what makes this source the best one
+for the route figures:
+
+**Instances that no longer run.** Prometheus keeps their series — the very property that
+lets the route figures survive a rolling restart — but a list of instances is meant to name
+the ones running now. `last_over_time(…[stale-after])` is what drops an instance that
+stopped reporting, the way a Redis key expires.
+
+**How rows are named.** The default `instance` label is the scrape target, a host and port,
+not the `instance-id` the plugin resolves. The instances view therefore names its rows
+differently under this provider than under the others. Set `instance-label` to a label
+carrying the pod or application instance name when the deployment publishes one.
+
+One thing cannot be answered from here: Prometheus does not know how a remote instance was
+configured, so the view reports the pool and event loop counters as collected when their
+series exist and as off when they do not. From this distance those are one and the same
+situation.
 
 ## When Prometheus cannot be reached
 

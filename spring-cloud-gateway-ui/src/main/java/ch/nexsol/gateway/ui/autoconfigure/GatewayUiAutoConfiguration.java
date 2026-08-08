@@ -17,6 +17,7 @@
 package ch.nexsol.gateway.ui.autoconfigure;
 
 import ch.nexsol.gateway.audit.AuditEventPublisher;
+import ch.nexsol.gateway.metrics.InstanceMetricsSource;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
 import ch.nexsol.gateway.ui.audit.AuditExclusionBeanPostProcessor;
@@ -26,6 +27,8 @@ import ch.nexsol.gateway.ui.audit.AuditTailBuffer;
 import ch.nexsol.gateway.ui.audit.AuditTailController;
 import ch.nexsol.gateway.ui.controller.DashboardController;
 import ch.nexsol.gateway.ui.controller.GatewayUiModelAttributes;
+import ch.nexsol.gateway.ui.metrics.InstanceMetricsController;
+import ch.nexsol.gateway.ui.metrics.InstancesOverviewContribution;
 import ch.nexsol.gateway.ui.metrics.MetricsOverviewContribution;
 import ch.nexsol.gateway.ui.metrics.RouteMetricsController;
 import ch.nexsol.gateway.ui.nav.GatewayUiMenu;
@@ -287,6 +290,52 @@ public class GatewayUiAutoConfiguration {
 		UiSecuredPaths routeMetricsSecuredPaths() {
 			return new UiSecuredPaths("/ui/metrics", "/ui/metrics/data", "/js/echarts.min.js", "/js/echarts-gl.min.js",
 					"/js/gateway-metrics.js");
+		}
+
+		/**
+		 * Activates the instances view, which reads a source of its own: the technical
+		 * health of each instance rather than the traffic of each route.
+		 * <p>
+		 * Nested inside the traffic configuration so it inherits its conditions and only
+		 * adds its own switch, {@code @ConditionalOnProperty} not being repeatable.
+		 */
+		@Configuration(proxyBeanMethods = false)
+		@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.instance.enabled",
+				matchIfMissing = true)
+		@Import(InstanceMetricsController.class)
+		static class InstanceMetricsConfiguration {
+
+			/**
+			 * Contributes the instance count to the home page.
+			 * @param instanceMetricsSource the provider over the active instance source
+			 * @return the instances overview contribution
+			 */
+			@Bean
+			InstancesOverviewContribution instancesOverviewContribution(
+					ObjectProvider<InstanceMetricsSource> instanceMetricsSource) {
+				return new InstancesOverviewContribution(instanceMetricsSource);
+			}
+
+			/**
+			 * Contributes the instances entry to the side menu, right after the traffic
+			 * one: the same figures seen per instance rather than per route.
+			 * @return the instances menu entry
+			 */
+			@Bean
+			NavItem instancesNavItem() {
+				return new NavItem("instances", "Instances", "icon-server", "/ui/metrics/instances", 21);
+			}
+
+			/**
+			 * Declares the paths of the instances view.
+			 * @return the instances view paths
+			 */
+			@Bean
+			UiSecuredPaths instanceMetricsSecuredPaths() {
+				return new UiSecuredPaths("/ui/metrics/instances", "/ui/metrics/instances/data",
+						"/js/gateway-instances.js");
+			}
+
 		}
 
 	}

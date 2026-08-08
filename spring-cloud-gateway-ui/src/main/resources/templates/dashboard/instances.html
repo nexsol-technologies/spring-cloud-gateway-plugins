@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Instances', ~{:: #instances-content}, ~{:: #instances-scripts})}">
+<body>
+	<div id="instances-content">
+		<header class="mb-4">
+			<h1 class="h3 fw-bold mb-1">Instances</h1>
+			<p class="text-secondary mb-0">
+				The technical health of each gateway instance: memory, processor, threads and the
+				connection pools towards the downstream services.
+			</p>
+		</header>
+
+		<div class="card border-0 shadow-sm mb-3">
+			<div class="card-body py-3">
+				<div class="d-flex flex-wrap gap-3 align-items-center justify-content-between">
+					<!-- Whose figures these are: this instance alone, or every instance reached
+					     by a metrics provider. Filled from the payload on every refresh. -->
+					<p class="text-secondary small mb-0" id="gi-coverage">&mdash;</p>
+					<div class="d-flex gap-3 align-items-center">
+						<div class="form-check form-switch mb-0">
+							<input class="form-check-input" type="checkbox" id="gi-auto" checked>
+							<label class="form-check-label small" for="gi-auto">Auto</label>
+						</div>
+						<button type="button" id="gi-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- One card per instance, rendered from the payload. -->
+		<div id="gi-instances" th:attr="data-url=@{/ui/metrics/instances/data}"
+				data-url="/ui/metrics/instances/data"></div>
+
+		<div id="gi-empty" class="text-secondary text-center py-5" style="display: none">
+			No instance reported its figures.
+		</div>
+	</div>
+
+	<div id="instances-scripts">
+		<script th:src="@{/js/gateway-instances.js}" src="/js/gateway-instances.js"></script>
+	</div>
+</body>
+</html>

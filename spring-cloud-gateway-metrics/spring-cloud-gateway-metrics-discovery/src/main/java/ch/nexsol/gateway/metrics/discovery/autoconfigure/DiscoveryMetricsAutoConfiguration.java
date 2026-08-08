@@ -17,12 +17,16 @@
 package ch.nexsol.gateway.metrics.discovery.autoconfigure;
 
 import ch.nexsol.gateway.metrics.InstanceIdentity;
+import ch.nexsol.gateway.metrics.InstanceMetricsSource;
+import ch.nexsol.gateway.metrics.LocalInstanceMetricsSource;
 import ch.nexsol.gateway.metrics.LocalRouteMetricsSource;
 import ch.nexsol.gateway.metrics.MetricsProperties;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
+import ch.nexsol.gateway.metrics.discovery.DiscoveryInstanceMetricsSource;
 import ch.nexsol.gateway.metrics.discovery.DiscoveryMetricsProperties;
 import ch.nexsol.gateway.metrics.discovery.DiscoveryRouteMetricsSource;
+import ch.nexsol.gateway.metrics.discovery.LocalInstanceMetricsController;
 import ch.nexsol.gateway.metrics.discovery.LocalRouteMetricsController;
 import io.micrometer.core.instrument.MeterRegistry;
 
@@ -33,6 +37,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
+import org.springframework.cloud.gateway.config.HttpClientProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -57,7 +62,7 @@ public class DiscoveryMetricsAutoConfiguration {
 	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.provider", havingValue = "discovery")
-	@Import(LocalRouteMetricsController.class)
+	@Import({ LocalRouteMetricsController.class, LocalInstanceMetricsController.class })
 	static class DiscoverySourceConfiguration {
 
 		/**
@@ -105,6 +110,46 @@ public class DiscoveryMetricsAutoConfiguration {
 			String serviceId = StringUtils.hasText(properties.getServiceId()) ? properties.getServiceId()
 					: environment.getProperty("spring.application.name", "");
 			return new DiscoveryRouteMetricsSource(discoveryClient, builder.build(), properties, serviceId);
+		}
+
+		/**
+		 * Registers the local instance source explicitly, for the same reason the local
+		 * route source is: the endpoint the siblings poll is bound to this bean and has
+		 * to keep answering with this instance's own figures.
+		 * @param meterRegistry the provider over the application meter registry
+		 * @param httpClientProperties the provider over the gateway HTTP client
+		 * configuration
+		 * @param properties the shared metrics configuration
+		 * @param identity the identity of the running instance
+		 * @return the local instance metrics source
+		 */
+		@Bean
+		LocalInstanceMetricsSource localInstanceMetricsSource(ObjectProvider<MeterRegistry> meterRegistry,
+				ObjectProvider<HttpClientProperties> httpClientProperties, MetricsProperties properties,
+				InstanceIdentity identity) {
+			return new LocalInstanceMetricsSource(meterRegistry, httpClientProperties, properties, identity);
+		}
+
+		/**
+		 * Registers the source listing every registered instance. Marked primary because
+		 * the local source is an {@link InstanceMetricsSource} too: the views must get
+		 * every instance, the endpoint keeps answering with this one.
+		 * @param discoveryClient the provider over the registry the siblings are listed
+		 * from
+		 * @param builder the application web client builder
+		 * @param properties the discovery configuration
+		 * @param environment the environment the default service id is read from
+		 * @return the discovery instance metrics source
+		 */
+		@Bean
+		@Primary
+		@ConditionalOnMissingBean(DiscoveryInstanceMetricsSource.class)
+		DiscoveryInstanceMetricsSource discoveryInstanceMetricsSource(
+				ObjectProvider<ReactiveDiscoveryClient> discoveryClient, WebClient.Builder builder,
+				DiscoveryMetricsProperties properties, Environment environment) {
+			String serviceId = StringUtils.hasText(properties.getServiceId()) ? properties.getServiceId()
+					: environment.getProperty("spring.application.name", "");
+			return new DiscoveryInstanceMetricsSource(discoveryClient, builder.build(), properties, serviceId);
 		}
 
 	}

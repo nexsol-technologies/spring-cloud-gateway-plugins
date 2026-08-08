@@ -32,15 +32,26 @@ public class DiscoveryMetricsProperties {
 	public static final String DEFAULT_PATH = "/ui/metrics/local";
 
 	/**
+	 * Path each instance serves its own technical figures on, polled the same way and for
+	 * the same reason as {@link #DEFAULT_PATH}.
+	 */
+	public static final String DEFAULT_INSTANCE_PATH = "/ui/metrics/local/instance";
+
+	/**
 	 * Id of this gateway in the service registry, used to discover the sibling instances.
 	 * Defaults to {@code spring.application.name}.
 	 */
 	private String serviceId;
 
 	/**
-	 * Path the sibling instances are polled on.
+	 * Path the sibling instances are polled on for their route figures.
 	 */
 	private String path = DEFAULT_PATH;
+
+	/**
+	 * Path the sibling instances are polled on for their technical figures.
+	 */
+	private String instancePath = DEFAULT_INSTANCE_PATH;
 
 	/**
 	 * How long to wait for a sibling before leaving it out of the figures.
@@ -73,6 +84,20 @@ public class DiscoveryMetricsProperties {
 	 */
 	public void setPath(String path) {
 		this.path = path;
+	}
+
+	/**
+	 * @return the path the siblings are polled on for their technical figures
+	 */
+	public String getInstancePath() {
+		return this.instancePath;
+	}
+
+	/**
+	 * @param instancePath the path the siblings are polled on for their technical figures
+	 */
+	public void setInstancePath(String instancePath) {
+		this.instancePath = instancePath;
 	}
 
 	/**

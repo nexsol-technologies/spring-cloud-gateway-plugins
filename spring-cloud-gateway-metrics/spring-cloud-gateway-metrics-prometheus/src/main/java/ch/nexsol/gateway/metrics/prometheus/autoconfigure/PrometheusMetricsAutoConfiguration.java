@@ -16,9 +16,11 @@
 
 package ch.nexsol.gateway.metrics.prometheus.autoconfigure;
 
+import ch.nexsol.gateway.metrics.InstanceMetricsSource;
 import ch.nexsol.gateway.metrics.MetricsProperties;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
+import ch.nexsol.gateway.metrics.prometheus.PrometheusInstanceMetricsSource;
 import ch.nexsol.gateway.metrics.prometheus.PrometheusMetricsProperties;
 import ch.nexsol.gateway.metrics.prometheus.PrometheusRouteMetricsSource;
 
@@ -105,6 +107,19 @@ public class PrometheusMetricsAutoConfiguration {
 		RouteMetricsSource prometheusRouteMetricsSource(WebClient prometheusMetricsWebClient,
 				PrometheusMetricsProperties properties, MetricsProperties metricsProperties) {
 			return new PrometheusRouteMetricsSource(prometheusMetricsWebClient, properties, metricsProperties);
+		}
+
+		/**
+		 * Registers the source listing the instances Prometheus heard from recently.
+		 * @param prometheusMetricsWebClient the client querying Prometheus
+		 * @param properties the Prometheus configuration
+		 * @return the Prometheus instance metrics source
+		 */
+		@Bean
+		@ConditionalOnMissingBean(InstanceMetricsSource.class)
+		InstanceMetricsSource prometheusInstanceMetricsSource(WebClient prometheusMetricsWebClient,
+				PrometheusMetricsProperties properties) {
+			return new PrometheusInstanceMetricsSource(prometheusMetricsWebClient, properties);
 		}
 
 	}

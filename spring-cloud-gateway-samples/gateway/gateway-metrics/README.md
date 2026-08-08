@@ -17,6 +17,28 @@ curl http://localhost:8206/errors/status/500
 curl http://localhost:8206/errors/status/404
 ```
 
+## Two views, one plugin
+
+http://localhost:8206/ui/metrics answers *which route carries the load*.
+http://localhost:8206/ui/metrics/instances answers *which instance is in trouble*: heap,
+processor, threads, and the connection pools towards the downstream services.
+
+This sample turns both instrumentation switches on, which is what makes the pool and event
+loop sections appear at all:
+
+```yaml
+spring.cloud.gateway.server.webflux.httpclient.pool.metrics: true
+spring.cloud.gateway.server.webflux.metrics.instance.instrument-http-client: true
+```
+
+Neither is on by default: they add a metrics recorder to the pipeline of every connection,
+so they cost something on the data path. Turn them off here and the view keeps working —
+it reports the counters as disabled and names the property to set, per instance, rather
+than showing an empty table.
+
+The pool rows only appear once a downstream has actually been called, so send the `curl`
+calls above first. `httpbin.org` and `localhost:8080` then show up as two separate pools.
+
 ## Coverage is part of the answer
 
 Every source reports **what its figures cover**, under the chart and on the home page tile.

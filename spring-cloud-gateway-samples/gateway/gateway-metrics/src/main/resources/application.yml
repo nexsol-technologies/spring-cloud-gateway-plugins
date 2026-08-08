@@ -17,6 +17,16 @@ spring.cloud.gateway.server.webflux.metrics:
   instance-id: gateway-metrics-1
   excluded-routes:
   - openapi-docs-.*
+  instance:
+    enabled: true
+    # Publishes the Reactor Netty event loop and HTTP client counters, which the gateway
+    # leaves off. It puts a metrics recorder in the pipeline of every connection, so it
+    # is a real cost on the data path — on here because this sample exists to show them.
+    instrument-http-client: true
+
+# Publishes the connection pool counters. Read while the HTTP client is being built, too
+# early for any bean to turn it on, so it lives under the gateway's own properties.
+spring.cloud.gateway.server.webflux.httpclient.pool.metrics: true
 
 spring.cloud.gateway.server.webflux:
   routes:
@@ -77,6 +87,13 @@ spring.cloud.gateway.server.webflux.metrics:
     selector: job="gateway-metrics"
     meter: spring_cloud_gateway_requests_seconds
     timeout: 5s
+    # The scrape target Prometheus stamps every series with, a host and port rather than
+    # the instance-id above: the instances view names its rows differently here than
+    # under the other providers.
+    instance-label: instance
+    # Prometheus keeps the series of instances that no longer run. Anything that stopped
+    # reporting for longer than this drops out of the instances view.
+    stale-after: 2m
 ---
 # Each instance publishes what it counted into Redis; the view sums whatever is there.
 #   docker compose up -d redis
@@ -99,6 +116,10 @@ spring.cloud.gateway.server.webflux.metrics:
   provider: redis
   redis:
     key-prefix: "gateway:metrics:"
+    # A namespace of its own rather than a suffix under key-prefix: the route source
+    # scans that prefix with a wildcard and would pick these entries up only to discard
+    # them, one warning each, on every refresh.
+    instance-key-prefix: "gateway:instances:"
     publish-interval: 10s
     # Comfortably longer than the publish interval, or an instance disappears from the
     # figures between two of its own writes.
@@ -125,4 +146,5 @@ spring.cloud.gateway.server.webflux.metrics:
     # Left to spring.application.name, which is what the instances register under.
     service-id:
     path: /ui/metrics/local
+    instance-path: /ui/metrics/local/instance
     timeout: 3s

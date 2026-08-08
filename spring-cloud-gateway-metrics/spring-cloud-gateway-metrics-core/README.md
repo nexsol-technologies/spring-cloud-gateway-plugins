@@ -47,6 +47,30 @@ public class MyMetricsAutoConfiguration {
 }
 ```
 
+## The second SPI
+
+```java
+public interface InstanceMetricsSource {
+    Mono<InstanceMetricsSnapshot> collect();
+}
+```
+
+Deliberately a separate contract rather than a specialisation of the first, because the two
+differ on the one thing that matters: route figures are **merged** across instances — three
+instances serving one route produce one number — while instance figures never are. Each
+instance is a row of its own, and the average heap of a cluster is not a thing that exists.
+Behind a shared abstraction, merging would have to become configurable.
+
+`InstanceMetric` therefore carries raw counters and no derived ratios: the saturation and
+the heap share are computed by the view, so they cannot drift from the numbers they came
+from. A figure the JVM does not publish is `-1`, never `0` — `jvm.memory.max` already
+answers `-1` for an unbounded pool, and the file descriptor counters do not exist outside
+Unix, where a zero would read as "no file open".
+
+It also carries which instrumentation the instance runs with, per instance rather than once
+per snapshot: nothing guarantees every instance was configured alike, and the one that was
+not is exactly what the view should reveal.
+
 ## Merging
 
 `RouteMetricsAggregator.merge` folds partial figures sharing a route id into one figure per
@@ -71,6 +95,33 @@ share of the traffic, not the traffic.
 instances can reuse the local reading as its own contribution.
 
 When no meter registry is present the source reports no data instead of failing.
+
+## The local instance source
+
+`LocalInstanceMetricsSource` reads the JVM and system meters Spring Boot binds out of the
+box (`jvm.memory.*`, `jvm.gc.*`, `jvm.threads.*`, `process.*`, `system.*`) and the Reactor
+Netty ones the gateway does not: `reactor.netty.connection.provider.*` for the pools and
+`reactor.netty.eventloop.pending.tasks` for the event loops.
+
+The pool gauges are folded per connection provider and downstream address. Reactor Netty
+also tags them with an `id` identifying a pool instance, whose cardinality follows the
+internals of the transport; what an operator reads is "the pool towards service-a is full",
+so the instances behind that are summed.
+
+`read()` returns the single row, for the same reason as above — the discovery endpoint and
+the Redis publisher both hand it out as is.
+
+## Instrumentation
+
+`GatewayHttpClientInstrumentation` is an `HttpClientCustomizer` turning on the Reactor Netty
+recorder the gateway never asks for. Without it those counters do not exist, however the
+registry is queried — `HttpClientFactory` never calls `metrics(...)`, and no gateway
+property exposes it.
+
+`HttpClient` has no plain `metrics(boolean)` overload: the URI mapper is mandatory, because
+the `uri` tag would otherwise carry the downstream path and create one meter per distinct
+path of every service behind the gateway. Every path is folded to a single value, which
+keeps the `remote.address` tag — the distinction worth paying for.
 
 ## Configuration
 

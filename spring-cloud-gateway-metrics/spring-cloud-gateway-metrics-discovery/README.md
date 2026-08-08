@@ -29,14 +29,28 @@ spring:
             discovery:
               service-id: gateway        # defaults to spring.application.name
               path: /ui/metrics/local
+              instance-path: /ui/metrics/local/instance
               timeout: 3s
 ```
 
 | Property | Default | Description |
 |----------|---------|-------------|
 | `service-id` | `spring.application.name` | Id this gateway is registered under |
-| `path` | `/ui/metrics/local` | Path the sibling instances are polled on |
+| `path` | `/ui/metrics/local` | Path the siblings are polled on for their route figures |
+| `instance-path` | `/ui/metrics/local/instance` | Path the siblings are polled on for their technical figures |
 | `timeout` | `3s` | How long to wait for a sibling before leaving it out |
+
+## The best fit for the instance figures
+
+This is the provider that suits the per-instance figures best, which is the reverse of how
+it ranks for the route figures. A per-instance reading is native to the instance: the
+registry hands out exactly one row per live instance, in real time, with no identity to
+reconstruct and nothing to merge. An instance that stops is gone from the next refresh
+rather than lingering until a key or a series expires.
+
+The rows are concatenated, never summed — a gateway with the combined heap of three
+instances is not a thing that exists. The address each row is stamped with comes from the
+registry rather than from the instance, which cannot know where it is reachable from.
 
 ## The registry
 
@@ -130,23 +144,24 @@ Note that the pods are polled directly, one by one, and never through the Servic
 ClusterIP — which would load-balance every poll onto a random pod and count the same one
 several times.
 
-## The endpoint the siblings poll
+## The endpoints the siblings poll
 
-This module registers `GET /ui/metrics/local`, which answers with **this instance's own**
-meter registry — never with the consolidated figures.
+This module registers `GET /ui/metrics/local` and `GET /ui/metrics/local/instance`, which
+answer with **this instance's own** meter registry — never with the consolidated figures.
 
 That distinction is the whole design. Were the fan-out to poll the consolidated endpoint,
 every instance would poll every other one, which would poll it back, forever. The local
 endpoint is the base case that terminates the recursion.
 
-**The path must be reachable between instances.** This module does not depend on the UI, so
-it cannot declare the path to the shell's security chain: an application that secures
-everything must permit it itself, or the siblings answer 401 and each instance ends up
+**The paths must be reachable between instances.** This module does not depend on the UI, so
+it cannot declare them to the shell's security chain: an application that secures
+everything must permit them itself, or the siblings answer 401 and each instance ends up
 reporting only its own traffic.
 
 ## What it costs
 
-- One HTTP call per instance, on every refresh — the traffic view repolls every 5 seconds.
+- One HTTP call per instance and per view, on every refresh — both views repoll every
+  5 seconds.
 - Counters live in memory, so an instance that restarts loses what it had counted. Only the
   Prometheus source keeps history across restarts.
 

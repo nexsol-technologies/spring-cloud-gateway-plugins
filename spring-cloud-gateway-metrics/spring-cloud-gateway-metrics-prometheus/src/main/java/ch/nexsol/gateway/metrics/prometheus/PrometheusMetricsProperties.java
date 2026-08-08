@@ -48,6 +48,28 @@ public class PrometheusMetricsProperties {
 	private String selector = "";
 
 	/**
+	 * Label identifying a gateway instance in Prometheus.
+	 * <p>
+	 * Defaults to {@code instance}, the scrape target Prometheus stamps every series
+	 * with. That is a host and port, not the {@code instance-id} the plugin resolves, so
+	 * the instances view names its rows differently from the other sources &mdash; set
+	 * this to a label carrying the pod or application instance name when the deployment
+	 * publishes one.
+	 */
+	private String instanceLabel = "instance";
+
+	/**
+	 * How far back an instance must have reported to still be listed.
+	 * <p>
+	 * Prometheus keeps the series of instances that no longer exist, which is exactly
+	 * what makes it the best source for route figures and the trickiest one here: a list
+	 * of instances is meant to be a list of live instances, not of every instance that
+	 * ever ran. Anything that stopped reporting for longer than this drops out on its
+	 * own, the way a Redis key expires.
+	 */
+	private Duration staleAfter = Duration.ofMinutes(2);
+
+	/**
 	 * How long to wait for Prometheus before reporting no data.
 	 */
 	private Duration timeout = Duration.ofSeconds(5);
@@ -113,6 +135,34 @@ public class PrometheusMetricsProperties {
 	 */
 	public void setSelector(String selector) {
 		this.selector = selector;
+	}
+
+	/**
+	 * @return the label identifying an instance
+	 */
+	public String getInstanceLabel() {
+		return this.instanceLabel;
+	}
+
+	/**
+	 * @param instanceLabel the label identifying an instance
+	 */
+	public void setInstanceLabel(String instanceLabel) {
+		this.instanceLabel = instanceLabel;
+	}
+
+	/**
+	 * @return how far back an instance must have reported to still be listed
+	 */
+	public Duration getStaleAfter() {
+		return this.staleAfter;
+	}
+
+	/**
+	 * @param staleAfter how far back an instance must have reported to still be listed
+	 */
+	public void setStaleAfter(Duration staleAfter) {
+		this.staleAfter = staleAfter;
 	}
 
 	/**

@@ -27,7 +27,7 @@ each name what they additionally need.
 | `routes-database` | `/ui/routes/db` |
 | `routes-security` | on the classpath; this gateway permits everything, so nothing here needs exempting — see [gateway-secured](../gateway-secured/README.md) |
 | `hub-openapi` | `/swagger-ui.html`, under the `eureka` profile |
-| `metrics` | `/ui/metrics` |
+| `metrics` | `/ui/metrics` and `/ui/metrics/instances`, both instrumentation switches on |
 | `audit` | `/ui/audit`, with the global web filter on |
 | `ui` | `/ui` |
 
@@ -47,8 +47,8 @@ backend is [`service-a`](../../service-a) on `:8080`.
 ### The UI
 
 http://localhost:8181/ui. Every view lights up here, since every plugin is present: the home
-page, the routes with their sources, the route tester, the traffic chart, the audit tail and
-the **Database routes** management page.
+page, the routes with their sources, the route tester, the traffic chart, the instances
+view, the audit tail and the **Database routes** management page.
 
 ### OpenAPI hub
 
@@ -84,10 +84,27 @@ starting one on that port.
 ## Auditing and metrics here
 
 Both run with **no provider**: the audit events are logged and republished as Spring
-application events, and the traffic figures are those of this instance. The
+application events, and the figures are those of this instance. The
 [gateway-audit](../gateway-audit/README.md) and
 [gateway-metrics](../gateway-metrics/README.md) samples are where the Redis, Kafka, R2DBC,
 Prometheus and discovery backends are exercised.
+
+The metrics plugin serves two views here. http://localhost:8181/ui/metrics answers *which
+route carries the load*; http://localhost:8181/ui/metrics/instances answers *which instance
+is in trouble* — heap, processor, threads, and the connection pools towards the downstream
+services.
+
+Both instrumentation switches are on, which is what makes the pool and event loop sections
+exist at all:
+
+```yaml
+spring.cloud.gateway.server.webflux.httpclient.pool.metrics: true
+spring.cloud.gateway.server.webflux.metrics.instance.instrument-http-client: true
+```
+
+Neither is on by default — they add a metrics recorder to the pipeline of every connection,
+so they cost something on the data path. The pool rows appear once a downstream has actually
+been called, so send some traffic through first.
 
 ## Tracing
 

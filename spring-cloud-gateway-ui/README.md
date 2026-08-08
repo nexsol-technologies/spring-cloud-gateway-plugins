@@ -41,6 +41,7 @@ what the application actually runs:
 | Database routes | `/ui/routes/db` | `spring-cloud-gateway-routes-database` is present |
 | Route tester | `/ui/routes/test` | the gateway route table type is present |
 | Traffic | `/ui/metrics` | Micrometer is present |
+| Instances | `/ui/metrics/instances` | Micrometer is present and `spring.cloud.gateway.server.webflux.metrics.instance.enabled` is not `false` |
 | OpenAPI | `/ui/openapi` | `spring-cloud-gateway-hub-openapi` is present and `spring.cloud.gateway.server.webflux.hub-openapi.enabled` is `true` |
 | Audit | `/ui/audit` | `spring-cloud-gateway-audit-core` is present and `spring.cloud.gateway.server.webflux.audit.enabled` is not `false` |
 
@@ -261,6 +262,50 @@ application still starts.
 
 The exclusion applies to the whole view: the summary, the map, the table and the traffic
 figures on the home page all read the same filtered set.
+
+## Instances view
+
+The other half of the metrics plugin: not which route carries the load, but **which
+instance is in trouble**. One card per running gateway, read from the same provider as the
+traffic view and headed by the same coverage line.
+
+Each card carries the JVM figures &mdash; heap against its ceiling, process CPU, live and
+peak threads, garbage collection overhead, non-heap, open file descriptors &mdash; and then
+the part no per-route figure can show:
+
+```
+gateway-7f9c4   http://10.0.3.21:8080                          up 4d 02h
+Heap ▓▓▓▓▓▓▓░░░ 71%  1.4 / 2.0 GB   CPU 34%   Threads 87 (peak 112)   GC 0.4%
+
+Pools
+  proxy → service-a:8080   ▓▓▓▓▓▓▓▓▓░   47 / 50 active   3 idle   12 / 100 pending   340 ms
+  proxy → service-b:8443   ▓░░░░░░░░░    2 / 50 active  14 idle    0 / 100 pending     0 ms
+Event loop — 0 pending task(s) across 8 loop(s).
+```
+
+**The connection pools are why this view exists.** A pool filling up towards a slow
+backend takes down every route pointing at that address at once, while the JVM itself
+still looks perfectly healthy: nothing in the traffic view separates that from the backend
+being slow, and nothing in a generic JVM dashboard shows it at all. The rows are sorted
+fullest first, and folded per connection provider and downstream address rather than per
+internal pool instance.
+
+The event loop line is the WebFlux-specific counterpart: pending tasks are what says
+something is blocking the loop, which slows every route down for a reason no route-level
+figure explains.
+
+Both sections depend on instrumentation the gateway leaves off. When it is off the view
+says so, per instance, and names the property to set &mdash; an empty pool table would
+otherwise read as "no downstream called yet", which calls for waiting rather than for a
+configuration change. See
+[spring-cloud-gateway-metrics](../spring-cloud-gateway-metrics/README.md#instrumentation).
+
+A figure the JVM does not publish &mdash; open file descriptors outside Unix, a heap with
+no ceiling &mdash; is shown as a dash rather than as a zero.
+
+Plain markup and CSS, no charting library: these are bars, and the page already costs a
+poll. The auto-refresh switch is remembered across page loads like every other control of
+the shell.
 
 ## Menu entries (Spring Boot Admin style)
 
