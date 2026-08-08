@@ -1,0 +1,284 @@
+/*
+ * Copyright 2025 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.nexsol.gateway.metrics;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import ch.nexsol.gateway.metrics.InstanceMetric.InstanceInstrumentation;
+import ch.nexsol.gateway.metrics.InstanceMetric.JvmStats;
+import ch.nexsol.gateway.metrics.InstanceMetric.NettyStats;
+import ch.nexsol.gateway.metrics.InstanceMetric.PoolStats;
+import ch.nexsol.gateway.metrics.InstanceMetric.SystemStats;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.Meter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.TimeGauge;
+import io.micrometer.core.instrument.Timer;
+import reactor.core.publisher.Mono;
+
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.cloud.gateway.config.HttpClientProperties;
+
+/**
+ * Reads the technical figures of the running instance from its meter registry.
+ * <p>
+ * The JVM and system figures are always there: Spring Boot binds them out of the box. The
+ * Reactor Netty figures are not &mdash; the gateway leaves that instrumentation off
+ * &mdash; so what is missing is reported as such through {@link InstanceInstrumentation}
+ * instead of being shown as an empty table.
+ */
+public class LocalInstanceMetricsSource implements InstanceMetricsSource {
+
+	/** Micrometer tag separating the heap pools from the rest of the memory. */
+	public static final String AREA_TAG = "area";
+
+	/** Reactor Netty tag naming the connection provider a pool counter belongs to. */
+	public static final String POOL_NAME_TAG = "name";
+
+	/** Reactor Netty tag naming the downstream address a pool connects to. */
+	public static final String REMOTE_ADDRESS_TAG = "remote.address";
+
+	/** Prefix shared by every Reactor Netty connection pool counter. */
+	public static final String POOL_PREFIX = "reactor.netty.connection.provider.";
+
+	/** Counter of the tasks queued on a Reactor Netty event loop. */
+	public static final String EVENT_LOOP_PENDING_TASKS = "reactor.netty.eventloop.pending.tasks";
+
+	private static final String HEAP = "heap";
+
+	private static final String NON_HEAP = "nonheap";
+
+	private static final long MISSING = -1L;
+
+	private final ObjectProvider<MeterRegistry> meterRegistry;
+
+	private final ObjectProvider<HttpClientProperties> httpClientProperties;
+
+	private final boolean httpClientInstrumented;
+
+	private final String instanceId;
+
+	private final String coverage;
+
+	/**
+	 * Creates the source reading from the (optional) meter registry.
+	 * @param meterRegistry the provider over the application meter registry
+	 * @param httpClientProperties the provider over the gateway HTTP client
+	 * configuration, read to tell whether the pool counters are collected
+	 * @param properties the metrics configuration
+	 * @param identity the identity of the running instance
+	 */
+	public LocalInstanceMetricsSource(ObjectProvider<MeterRegistry> meterRegistry,
+			ObjectProvider<HttpClientProperties> httpClientProperties, MetricsProperties properties,
+			InstanceIdentity identity) {
+		this.meterRegistry = meterRegistry;
+		this.httpClientProperties = httpClientProperties;
+		this.httpClientInstrumented = properties.getInstance().isInstrumentHttpClient();
+		this.instanceId = identity.id();
+		this.coverage = "this instance only (" + identity.id() + ")";
+	}
+
+	@Override
+	public Mono<InstanceMetricsSnapshot> collect() {
+		return Mono.fromSupplier(() -> new InstanceMetricsSnapshot(this.coverage, List.of(read())));
+	}
+
+	/**
+	 * Reads the figures of this instance, left un-merged. Exposed so a provider
+	 * consolidating several instances can reuse the local reading as its own row.
+	 * @return the figures of this instance
+	 */
+	public InstanceMetric read() {
+		MeterRegistry registry = this.meterRegistry.getIfAvailable();
+		if (registry == null) {
+			return new InstanceMetric(this.instanceId, null, 0, emptyJvm(), emptySystem(), new NettyStats(0, 0),
+					List.of(), instrumentation());
+		}
+		return new InstanceMetric(this.instanceId, null, uptimeSeconds(registry), jvm(registry), system(registry),
+				netty(registry), pools(registry), instrumentation());
+	}
+
+	private InstanceInstrumentation instrumentation() {
+		HttpClientProperties properties = this.httpClientProperties.getIfAvailable();
+		boolean pool = properties != null && properties.getPool().isMetrics();
+		return new InstanceInstrumentation(pool, this.httpClientInstrumented);
+	}
+
+	private static long uptimeSeconds(MeterRegistry registry) {
+		TimeGauge uptime = registry.find("process.uptime").timeGauge();
+		return (uptime != null) ? (long) uptime.value(TimeUnit.SECONDS) : 0;
+	}
+
+	private static JvmStats jvm(MeterRegistry registry) {
+		double pauseTotalMs = 0.0;
+		long pauseCount = 0;
+		for (Timer timer : registry.find("jvm.gc.pause").timers()) {
+			pauseTotalMs += timer.totalTime(TimeUnit.MILLISECONDS);
+			pauseCount += timer.count();
+		}
+		return new JvmStats(bytes(sumGauges(registry, "jvm.memory.used", AREA_TAG, HEAP)),
+				bytes(sumGauges(registry, "jvm.memory.max", AREA_TAG, HEAP)),
+				bytes(sumGauges(registry, "jvm.memory.used", AREA_TAG, NON_HEAP)),
+				orZero(gauge(registry, "jvm.gc.overhead")), pauseTotalMs, pauseCount,
+				(int) orZero(gauge(registry, "jvm.threads.live")), (int) orZero(gauge(registry, "jvm.threads.peak")),
+				(int) orZero(gauge(registry, "jvm.threads.daemon")));
+	}
+
+	private static SystemStats system(MeterRegistry registry) {
+		return new SystemStats(orZero(gauge(registry, "process.cpu.usage")),
+				orZero(gauge(registry, "system.cpu.usage")), orMissing(gauge(registry, "system.load.average.1m")),
+				(int) orZero(gauge(registry, "system.cpu.count")), bytes(gauge(registry, "process.files.open")),
+				bytes(gauge(registry, "process.files.max")));
+	}
+
+	private static NettyStats netty(MeterRegistry registry) {
+		long pending = 0;
+		int loops = 0;
+		for (Gauge loop : registry.find(EVENT_LOOP_PENDING_TASKS).gauges()) {
+			pending += (long) loop.value();
+			loops++;
+		}
+		return new NettyStats(pending, loops);
+	}
+
+	/**
+	 * Folds the pool counters into one row per connection provider and downstream
+	 * address.
+	 * <p>
+	 * The {@code id} tag Reactor Netty also carries identifies a pool instance, and its
+	 * cardinality follows the internals of the transport. What an operator reads is "the
+	 * pool towards service-a is full", so the rows are keyed on the name and the address
+	 * and the instances behind them are summed.
+	 */
+	private static List<PoolStats> pools(MeterRegistry registry) {
+		Map<String, PoolAccumulator> byPool = new LinkedHashMap<>();
+		for (Gauge value : registry.find(POOL_PREFIX + "active.connections").gauges()) {
+			accumulator(byPool, value).active += value.value();
+		}
+		for (Gauge value : registry.find(POOL_PREFIX + "idle.connections").gauges()) {
+			accumulator(byPool, value).idle += value.value();
+		}
+		for (Gauge value : registry.find(POOL_PREFIX + "pending.connections").gauges()) {
+			accumulator(byPool, value).pending += value.value();
+		}
+		for (Gauge value : registry.find(POOL_PREFIX + "max.connections").gauges()) {
+			accumulator(byPool, value).max += value.value();
+		}
+		for (Gauge value : registry.find(POOL_PREFIX + "max.pending.connections").gauges()) {
+			accumulator(byPool, value).maxPending += value.value();
+		}
+		for (Timer wait : registry.find(POOL_PREFIX + "pending.connections.time").timers()) {
+			PoolAccumulator pool = accumulator(byPool, wait);
+			pool.pendingTimeMs += wait.totalTime(TimeUnit.MILLISECONDS);
+			pool.pendingTimeCount += wait.count();
+		}
+		List<PoolStats> pools = new ArrayList<>(byPool.size());
+		for (PoolAccumulator pool : byPool.values()) {
+			pools.add(pool.toStats());
+		}
+		return pools;
+	}
+
+	private static PoolAccumulator accumulator(Map<String, PoolAccumulator> byPool, Meter meter) {
+		String name = tagOrEmpty(meter, POOL_NAME_TAG);
+		String remoteAddress = tagOrEmpty(meter, REMOTE_ADDRESS_TAG);
+		return byPool.computeIfAbsent(name + '|' + remoteAddress, (key) -> new PoolAccumulator(name, remoteAddress));
+	}
+
+	private static String tagOrEmpty(Meter meter, String tag) {
+		String value = meter.getId().getTag(tag);
+		return (value != null) ? value : "";
+	}
+
+	private static double gauge(MeterRegistry registry, String name) {
+		Gauge gauge = registry.find(name).gauge();
+		return (gauge != null) ? gauge.value() : Double.NaN;
+	}
+
+	/**
+	 * Sums the gauges published per memory pool. A pool without a ceiling reports
+	 * {@code -1}, which must not be added to the pools that have one.
+	 */
+	private static double sumGauges(MeterRegistry registry, String name, String tag, String value) {
+		double total = Double.NaN;
+		for (Gauge gauge : registry.find(name).tag(tag, value).gauges()) {
+			if (gauge.value() >= 0) {
+				total = Double.isNaN(total) ? gauge.value() : total + gauge.value();
+			}
+		}
+		return total;
+	}
+
+	private static long bytes(double value) {
+		return Double.isNaN(value) ? MISSING : (long) value;
+	}
+
+	private static double orZero(double value) {
+		return Double.isNaN(value) ? 0.0 : value;
+	}
+
+	private static double orMissing(double value) {
+		return Double.isNaN(value) ? MISSING : value;
+	}
+
+	private static JvmStats emptyJvm() {
+		return new JvmStats(MISSING, MISSING, MISSING, 0.0, 0.0, 0, 0, 0, 0);
+	}
+
+	private static SystemStats emptySystem() {
+		return new SystemStats(0.0, 0.0, MISSING, 0, MISSING, MISSING);
+	}
+
+	/** Mutable per-pool accumulator, folding the counters of every pool instance. */
+	private static final class PoolAccumulator {
+
+		private final String name;
+
+		private final String remoteAddress;
+
+		private double active;
+
+		private double idle;
+
+		private double pending;
+
+		private double max;
+
+		private double maxPending;
+
+		private double pendingTimeMs;
+
+		private long pendingTimeCount;
+
+		private PoolAccumulator(String name, String remoteAddress) {
+			this.name = name;
+			this.remoteAddress = remoteAddress;
+		}
+
+		private PoolStats toStats() {
+			double average = (this.pendingTimeCount > 0) ? this.pendingTimeMs / this.pendingTimeCount : 0.0;
+			return new PoolStats(this.name, this.remoteAddress, this.active, this.idle, this.pending, this.max,
+					this.maxPending, average);
+		}
+
+	}
+
+}

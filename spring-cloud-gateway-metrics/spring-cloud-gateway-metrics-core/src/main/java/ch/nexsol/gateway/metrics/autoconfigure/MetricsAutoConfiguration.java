@@ -16,7 +16,10 @@
 
 package ch.nexsol.gateway.metrics.autoconfigure;
 
+import ch.nexsol.gateway.metrics.GatewayHttpClientInstrumentation;
 import ch.nexsol.gateway.metrics.InstanceIdentity;
+import ch.nexsol.gateway.metrics.InstanceMetricsSource;
+import ch.nexsol.gateway.metrics.LocalInstanceMetricsSource;
 import ch.nexsol.gateway.metrics.LocalRouteMetricsSource;
 import ch.nexsol.gateway.metrics.MetricsProperties;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
@@ -28,6 +31,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.cloud.gateway.config.HttpClientProperties;
 import org.springframework.context.annotation.Bean;
 
 /**
@@ -77,6 +81,38 @@ public class MetricsAutoConfiguration {
 	public LocalRouteMetricsSource localRouteMetricsSource(ObjectProvider<MeterRegistry> meterRegistry,
 			MetricsProperties properties, InstanceIdentity identity) {
 		return new LocalRouteMetricsSource(meterRegistry, properties, identity);
+	}
+
+	/**
+	 * Registers the local instance source unless a provider module already contributed
+	 * one.
+	 * @param meterRegistry the provider over the application meter registry
+	 * @param httpClientProperties the provider over the gateway HTTP client configuration
+	 * @param properties the metrics properties
+	 * @param identity the identity of the running instance
+	 * @return the local instance metrics source
+	 */
+	@Bean
+	@ConditionalOnMissingBean(InstanceMetricsSource.class)
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.instance.enabled", matchIfMissing = true)
+	public LocalInstanceMetricsSource localInstanceMetricsSource(ObjectProvider<MeterRegistry> meterRegistry,
+			ObjectProvider<HttpClientProperties> httpClientProperties, MetricsProperties properties,
+			InstanceIdentity identity) {
+		return new LocalInstanceMetricsSource(meterRegistry, httpClientProperties, properties, identity);
+	}
+
+	/**
+	 * Instruments the gateway HTTP client, which is what brings the event loop and HTTP
+	 * client counters into existence. Off unless asked for: it adds a handler to the
+	 * pipeline of every connection.
+	 * @return the HTTP client customizer turning the Reactor Netty metrics on
+	 */
+	@Bean
+	@ConditionalOnMissingBean(GatewayHttpClientInstrumentation.class)
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.instance.instrument-http-client",
+			havingValue = "true")
+	public GatewayHttpClientInstrumentation gatewayHttpClientInstrumentation() {
+		return new GatewayHttpClientInstrumentation();
 	}
 
 }

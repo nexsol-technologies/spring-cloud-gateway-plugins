@@ -17,10 +17,14 @@
 package ch.nexsol.gateway.metrics.redis.autoconfigure;
 
 import ch.nexsol.gateway.metrics.InstanceIdentity;
+import ch.nexsol.gateway.metrics.InstanceMetricsSource;
+import ch.nexsol.gateway.metrics.LocalInstanceMetricsSource;
 import ch.nexsol.gateway.metrics.LocalRouteMetricsSource;
 import ch.nexsol.gateway.metrics.MetricsProperties;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
+import ch.nexsol.gateway.metrics.redis.RedisInstanceMetricsPublisher;
+import ch.nexsol.gateway.metrics.redis.RedisInstanceMetricsSource;
 import ch.nexsol.gateway.metrics.redis.RedisMetricsProperties;
 import ch.nexsol.gateway.metrics.redis.RedisRouteMetricsPublisher;
 import ch.nexsol.gateway.metrics.redis.RedisRouteMetricsSource;
@@ -35,6 +39,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnSingleCandidate;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration;
+import org.springframework.cloud.gateway.config.HttpClientProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -116,6 +121,59 @@ public class RedisMetricsAutoConfiguration {
 		RedisRouteMetricsSource redisRouteMetricsSource(ReactiveStringRedisTemplate redisTemplate,
 				RedisMetricsProperties properties, ObjectMapper objectMapper) {
 			return new RedisRouteMetricsSource(redisTemplate, properties, objectMapper);
+		}
+
+		/**
+		 * Registers the local instance source explicitly, for the same reason the local
+		 * route source is: this instance still has to read its own meter registry to
+		 * publish it.
+		 * @param meterRegistry the provider over the application meter registry
+		 * @param httpClientProperties the provider over the gateway HTTP client
+		 * configuration
+		 * @param properties the shared metrics configuration
+		 * @param identity the identity of the running instance
+		 * @return the local instance metrics source
+		 */
+		@Bean
+		LocalInstanceMetricsSource localInstanceMetricsSource(ObjectProvider<MeterRegistry> meterRegistry,
+				ObjectProvider<HttpClientProperties> httpClientProperties, MetricsProperties properties,
+				InstanceIdentity identity) {
+			return new LocalInstanceMetricsSource(meterRegistry, httpClientProperties, properties, identity);
+		}
+
+		/**
+		 * Registers the task publishing this instance's technical figures.
+		 * @param redisTemplate the reactive Redis template
+		 * @param localSource the local instance metrics source
+		 * @param properties the Redis configuration
+		 * @param objectMapper the mapper rendering the figures
+		 * @param identity the identity of the running instance
+		 * @return the publisher
+		 */
+		@Bean
+		@ConditionalOnSingleCandidate(ReactiveStringRedisTemplate.class)
+		RedisInstanceMetricsPublisher redisInstanceMetricsPublisher(ReactiveStringRedisTemplate redisTemplate,
+				LocalInstanceMetricsSource localSource, RedisMetricsProperties properties, ObjectMapper objectMapper,
+				InstanceIdentity identity) {
+			return new RedisInstanceMetricsPublisher(redisTemplate, localSource, properties, objectMapper, identity);
+		}
+
+		/**
+		 * Registers the source reading what every instance published. Marked primary
+		 * because the local source is an {@link InstanceMetricsSource} too: the views
+		 * must get every instance.
+		 * @param redisTemplate the reactive Redis template
+		 * @param properties the Redis configuration
+		 * @param objectMapper the mapper reading the published figures
+		 * @return the Redis instance metrics source
+		 */
+		@Bean
+		@Primary
+		@ConditionalOnMissingBean(RedisInstanceMetricsSource.class)
+		@ConditionalOnSingleCandidate(ReactiveStringRedisTemplate.class)
+		RedisInstanceMetricsSource redisInstanceMetricsSource(ReactiveStringRedisTemplate redisTemplate,
+				RedisMetricsProperties properties, ObjectMapper objectMapper) {
+			return new RedisInstanceMetricsSource(redisTemplate, properties, objectMapper);
 		}
 
 	}

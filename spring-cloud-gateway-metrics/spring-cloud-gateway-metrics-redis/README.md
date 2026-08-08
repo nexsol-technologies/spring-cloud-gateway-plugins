@@ -25,15 +25,22 @@ spring:
             provider: redis
             redis:
               key-prefix: "gateway:metrics:"
+              instance-key-prefix: "gateway:instances:"
               publish-interval: 10s
               time-to-live: 45s
 ```
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `key-prefix` | `gateway:metrics:` | Prefix of the key each instance writes under |
+| `key-prefix` | `gateway:metrics:` | Prefix of the route figures key each instance writes under |
+| `instance-key-prefix` | `gateway:instances:` | Prefix of the technical figures key each instance writes under |
 | `publish-interval` | `10s` | How often an instance publishes its figures |
 | `time-to-live` | `45s` | How long a published key survives |
+
+**The two prefixes must not nest.** The route source scans `key-prefix` with a wildcard, so
+an instance prefix placed under it — `gateway:metrics:instance:` — would come back in that
+scan and be discarded as unreadable, one warning per entry, on every single refresh. Hence
+a namespace of its own rather than the more obvious suffix.
 
 ## The connection
 
@@ -69,7 +76,12 @@ Two consequences:
 ## How it works
 
 Each instance writes **its own key** (`<prefix><instance-id>`) and never touches the
-others'. That is what lets every instance write concurrently without any locking.
+others'. That is what lets every instance write concurrently without any locking. Two keys
+per instance, one per family of figures.
+
+The route figures are summed on read; the technical ones are not. One instance is one row,
+so they are concatenated: a gateway with the combined heap of three instances is not a
+thing that exists.
 
 Keys carry a time to live, so an instance that stops publishing fades out of the figures on
 its own — a replaced pod stops being counted without anyone cleaning up after it.

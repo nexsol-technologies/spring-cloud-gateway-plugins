@@ -77,11 +77,22 @@ spring.cloud.gateway.server.webflux.routes-openapi:
      filters:
        - Retry=3
 
-# Traffic figures (spring-cloud-gateway-metrics). No provider: the figures are those of
-# this instance. See the gateway-metrics sample for the consolidating sources.
+# Traffic and instance figures (spring-cloud-gateway-metrics). No provider: the figures
+# are those of this instance. See the gateway-metrics sample for the consolidating
+# sources.
 spring.cloud.gateway.server.webflux.metrics:
   excluded-routes:
     - openapi-docs-.*
+  instance:
+    # Publishes the Reactor Netty event loop and HTTP client counters, which the gateway
+    # leaves off. It puts a metrics recorder in the pipeline of every connection, so it
+    # is a real cost on the data path — on here so the instances view is complete.
+    instrument-http-client: true
+
+# Publishes the connection pool counters the instances view plots. A gateway property
+# rather than a plugin one: it is read while the HTTP client is being built, too early
+# for any bean to turn it on.
+spring.cloud.gateway.server.webflux.httpclient.pool.metrics: true
 
 # Auditing (spring-cloud-gateway-audit). No provider either: the default publisher logs
 # each event and republishes it as a Spring application event. See the gateway-audit

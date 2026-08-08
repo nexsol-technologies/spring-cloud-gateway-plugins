@@ -31,6 +31,17 @@ public class RedisMetricsProperties {
 	private String keyPrefix = "gateway:metrics:";
 
 	/**
+	 * Prefix of the key each instance publishes its technical figures under. The instance
+	 * id is appended, so one key exists per live instance.
+	 * <p>
+	 * A separate namespace rather than a suffix under {@link #keyPrefix}: the route
+	 * source scans that prefix with a wildcard, so anything nested below it would come
+	 * back in its scan and be discarded one entry at a time, with a warning, on every
+	 * single refresh.
+	 */
+	private String instanceKeyPrefix = "gateway:instances:";
+
+	/**
 	 * How often each instance publishes its figures.
 	 */
 	private Duration publishInterval = Duration.ofSeconds(10);
@@ -54,6 +65,20 @@ public class RedisMetricsProperties {
 	 */
 	public void setKeyPrefix(String keyPrefix) {
 		this.keyPrefix = keyPrefix;
+	}
+
+	/**
+	 * @return the instance figures key prefix
+	 */
+	public String getInstanceKeyPrefix() {
+		return this.instanceKeyPrefix;
+	}
+
+	/**
+	 * @param instanceKeyPrefix the instance figures key prefix
+	 */
+	public void setInstanceKeyPrefix(String instanceKeyPrefix) {
+		this.instanceKeyPrefix = instanceKeyPrefix;
 	}
 
 	/**

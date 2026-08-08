@@ -59,6 +59,11 @@ public class MetricsProperties {
 	private List<String> excludedRoutes = new ArrayList<>(List.of(OPENAPI_DOCS_PATTERN));
 
 	/**
+	 * Configuration of the per-instance figures.
+	 */
+	private Instance instance = new Instance();
+
+	/**
 	 * @return whether the metrics plugin is enabled
 	 */
 	public boolean isEnabled() {
@@ -112,6 +117,78 @@ public class MetricsProperties {
 	 */
 	public void setExcludedRoutes(List<String> excludedRoutes) {
 		this.excludedRoutes = excludedRoutes;
+	}
+
+	/**
+	 * @return the per-instance figures configuration
+	 */
+	public Instance getInstance() {
+		return this.instance;
+	}
+
+	/**
+	 * @param instance the per-instance figures configuration
+	 */
+	public void setInstance(Instance instance) {
+		this.instance = instance;
+	}
+
+	/**
+	 * Configuration of the per-instance technical figures.
+	 */
+	public static class Instance {
+
+		/**
+		 * Whether the per-instance figures are collected. When {@code false} no source is
+		 * registered and the instances view stays closed. Independent from the route
+		 * figures: turning one off without the other is a legitimate need both ways
+		 * round.
+		 */
+		private boolean enabled = true;
+
+		/**
+		 * Whether the gateway HTTP client is instrumented, which is what publishes the
+		 * event loop and HTTP client counters. Reactor Netty only registers them once the
+		 * transport carries a metrics recorder, and the gateway never asks for one.
+		 * <p>
+		 * Off by default: the recorder adds a handler to the pipeline of every
+		 * connection, so it costs something on the data path of the gateway. Turning that
+		 * on is the operator's call, not an observation plugin's.
+		 * <p>
+		 * The connection pool counters are governed separately by
+		 * {@code spring.cloud.gateway.server.webflux.httpclient.pool.metrics}, read too
+		 * early for any bean to influence it.
+		 */
+		private boolean instrumentHttpClient;
+
+		/**
+		 * @return whether the per-instance figures are collected
+		 */
+		public boolean isEnabled() {
+			return this.enabled;
+		}
+
+		/**
+		 * @param enabled whether the per-instance figures are collected
+		 */
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		/**
+		 * @return whether the gateway HTTP client is instrumented
+		 */
+		public boolean isInstrumentHttpClient() {
+			return this.instrumentHttpClient;
+		}
+
+		/**
+		 * @param instrumentHttpClient whether the gateway HTTP client is instrumented
+		 */
+		public void setInstrumentHttpClient(boolean instrumentHttpClient) {
+			this.instrumentHttpClient = instrumentHttpClient;
+		}
+
 	}
 
 }
