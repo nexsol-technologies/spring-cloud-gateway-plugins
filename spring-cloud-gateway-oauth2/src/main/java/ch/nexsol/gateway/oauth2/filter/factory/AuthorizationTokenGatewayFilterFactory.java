@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
@@ -34,6 +35,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Mono;
 
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
@@ -57,6 +59,10 @@ import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.G
  * it can check the token issuer, the client id and the granted accesses (roles resolved
  * through JSON path expressions), rejecting the request with {@code 403 FORBIDDEN} when a
  * check fails.
+ * <p>
+ * A request carrying no exploitable token is rejected with {@code 401 UNAUTHORIZED} as
+ * soon as a check is configured, unless the targeted route is flagged public, in which
+ * case it is served without authentication by design.
  */
 @Valid
 public class AuthorizationTokenGatewayFilterFactory
@@ -65,6 +71,15 @@ public class AuthorizationTokenGatewayFilterFactory
 	private static final Logger LOG = LoggerFactory.getLogger(AuthorizationTokenGatewayFilterFactory.class);
 
 	public static final String UNKNOWN_VALUE = "unknown";
+
+	private static final String BEARER_PREFIX = "Bearer ";
+
+	/**
+	 * Route metadata key flagging a route as publicly accessible. Mirrors
+	 * {@code PublicRouteMatcher.PUBLIC_METADATA_KEY} of the routes-security module, which
+	 * this module does not depend on.
+	 */
+	private static final String PUBLIC_METADATA_KEY = "public";
 
 	/**
 	 * Issuers key.
@@ -104,74 +119,92 @@ public class AuthorizationTokenGatewayFilterFactory
 	 */
 	@Override
 	public GatewayFilter apply(Config config) {
-		return (exchange, chain) -> {
-			return exchange.getPrincipal()
-				.filter((principal) -> (principal) instanceof JwtAuthenticationToken)
-				.cast(JwtAuthenticationToken.class)
-				.map(JwtAuthenticationToken::getToken)
-				.map((jwt) -> Optional.of(jwt))
-				// in case if there not Spring Security, find JWT manually
-				.defaultIfEmpty(extractBearer(exchange))
-				.filter((jwt) -> jwt.isPresent())
-				.map(Optional::get)
-				.map((jwt) -> {
-					String issuerId = jwt.getClaimAsString(IdTokenClaimNames.ISS);
-					String clientId = Optional.ofNullable(jwt.getClaimAsString(IdTokenClaimNames.AZP))
-						.orElse(jwt.getClaimAsString(IdTokenClaimNames.AUD));
-					Route route = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
-					String routeId = UNKNOWN_VALUE;
-					if (route != null) {
-						routeId = Optional.ofNullable(route.getId()).orElse(UNKNOWN_VALUE);
-					}
-					if (config.checkIssuer()) {
-						if (!config.getIssuers().contains(issuerId)) {
-							LOG.debug(
-									"Authorization Forbidden : route {} is not allowed for the client {} : issuer forbidden",
-									routeId, clientId);
-							throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-						}
-						else {
-							LOG.trace("issuer authorized {}", issuerId);
-						}
-					}
-					if (config.checkClientId()) {
-						if (!config.getClientIds().contains(clientId)) {
-							LOG.debug("Authorization Forbidden : route {} is not allowed for the client {}", routeId,
-									clientId);
-							throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-						}
-						else {
-							LOG.trace("clientId authorized {}", clientId);
-						}
-					}
-					if (config.checkGrantAccess()) {
-						if (!hasAuthority(jwt.getClaims(), config.getGrantAccesses())) {
-							LOG.debug(
-									"Authorization Forbidden : route {} is not allowed for the client {} : resource access forbidden",
-									routeId, clientId);
-							throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-						}
-						else {
-							LOG.trace("resource access authorized");
-						}
-					}
-					return exchange;
-				})
-				.defaultIfEmpty(exchange)
-				.flatMap(chain::filter);
-		};
+		return (exchange, chain) -> resolveJwt(exchange).switchIfEmpty(Mono.defer(() -> missingToken(config, exchange)))
+			.flatMap((jwt) -> authorize(config, jwt, exchange))
+			.then(Mono.defer(() -> chain.filter(exchange)));
+	}
+
+	/**
+	 * Resolves the JWT carried by the exchange: the one Spring Security already
+	 * authenticated when there is one, the bearer of the {@code Authorization} header
+	 * otherwise.
+	 * @param exchange the current exchange
+	 * @return the token, or an empty result when the request carries none
+	 */
+	private Mono<Jwt> resolveJwt(ServerWebExchange exchange) {
+		return exchange.getPrincipal()
+			.ofType(JwtAuthenticationToken.class)
+			.map(JwtAuthenticationToken::getToken)
+			// No Spring Security in the chain: read the bearer off the request itself.
+			// Deferred so the token is not parsed again when a principal was found.
+			.switchIfEmpty(Mono.defer(() -> Mono.justOrEmpty(extractBearer(exchange))));
+	}
+
+	/**
+	 * Decides what to do with a request carrying no exploitable token: it is denied as
+	 * soon as the route configures a check, so the filter never fails open.
+	 * @param config the filter configuration
+	 * @param exchange the current exchange
+	 * @return an empty result to let the request through, an error to deny it
+	 */
+	private Mono<Jwt> missingToken(Config config, ServerWebExchange exchange) {
+		Route route = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
+		// A public route is served without any authentication, so a missing token is
+		// expected there and must not be rejected.
+		if (!config.hasCheck() || isPublic(route)) {
+			return Mono.empty();
+		}
+		LOG.debug("Authorization Unauthorized : route {} requires a bearer token", routeId(route));
+		return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+	}
+
+	/**
+	 * Runs the configured checks against the token.
+	 * @param config the filter configuration
+	 * @param jwt the token carried by the request
+	 * @param exchange the current exchange
+	 * @return an empty result when every check passes, an error otherwise
+	 */
+	private Mono<Void> authorize(Config config, Jwt jwt, ServerWebExchange exchange) {
+		String clientId = Optional.ofNullable(jwt.getClaimAsString(IdTokenClaimNames.AZP))
+			.orElse(jwt.getClaimAsString(IdTokenClaimNames.AUD));
+		if (config.checkIssuer() && !config.getIssuers().contains(jwt.getClaimAsString(IdTokenClaimNames.ISS))) {
+			return forbidden(exchange, clientId, "issuer forbidden");
+		}
+		if (config.checkClientId() && !config.getClientIds().contains(clientId)) {
+			return forbidden(exchange, clientId, "client id forbidden");
+		}
+		if (config.checkGrantAccess() && !hasAuthority(jwt.getClaims(), config.getGrantAccesses())) {
+			return forbidden(exchange, clientId, "resource access forbidden");
+		}
+		LOG.trace("authorization granted to the client {}", clientId);
+		return Mono.empty();
+	}
+
+	private Mono<Void> forbidden(ServerWebExchange exchange, String clientId, String reason) {
+		LOG.debug("Authorization Forbidden : route {} is not allowed for the client {} : {}",
+				routeId(exchange.getAttribute(GATEWAY_ROUTE_ATTR)), clientId, reason);
+		return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN));
+	}
+
+	private static String routeId(Route route) {
+		return (route != null) ? Optional.ofNullable(route.getId()).orElse(UNKNOWN_VALUE) : UNKNOWN_VALUE;
+	}
+
+	private static boolean isPublic(Route route) {
+		Map<String, Object> metadata = (route != null) ? route.getMetadata() : null;
+		Object flag = (metadata != null) ? metadata.get(PUBLIC_METADATA_KEY) : null;
+		if (flag instanceof Boolean bool) {
+			return bool;
+		}
+		return (flag != null) && Boolean.parseBoolean(flag.toString());
 	}
 
 	private Optional<Jwt> extractBearer(ServerWebExchange exchange) {
-		return exchange.getRequest()
-			.getHeaders()
-			.headerSet()
-			.stream()
-			.filter((entry) -> HttpHeaders.AUTHORIZATION.equals(entry.getKey()) && !entry.getValue().isEmpty())
-			.findFirst()
-			.map((entry) -> entry.getValue().get(0))
-			.filter((header) -> header.startsWith("Bearer "))
-			.map((s) -> s.replaceFirst("Bearer ", ""))
+		// getFirst() matches the header name whatever its case, as HTTP/2 lowercases it.
+		return Optional.ofNullable(exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION))
+			.filter((header) -> header.startsWith(BEARER_PREFIX))
+			.map((header) -> header.substring(BEARER_PREFIX.length()))
 			.flatMap(this::createJwt);
 	}
 
@@ -186,12 +219,9 @@ public class AuthorizationTokenGatewayFilterFactory
 	}
 
 	boolean hasAuthority(Map<String, Object> claims, GrantAccess grantAccess) {
-
-		Collection<String> claimValues = null;
-		String path = grantAccess.getJsonPath();
 		Object claim;
 		try {
-			claim = JsonPath.read(claims, path);
+			claim = JsonPath.read(claims, grantAccess.getJsonPath());
 		}
 		catch (PathNotFoundException ex) {
 			claim = null;
@@ -199,32 +229,29 @@ public class AuthorizationTokenGatewayFilterFactory
 		if (claim == null) {
 			return false;
 		}
+		Collection<String> claimValues = claimValues(claim);
+		return grantAccess.getRoles().stream().allMatch(claimValues::contains);
+	}
+
+	/**
+	 * Flattens the value a JSON path resolved to into the roles it holds. A path with
+	 * wildcards resolves to a list of lists, and a single claim can hold a comma
+	 * separated list of roles.
+	 * @param claim the resolved claim value
+	 * @return the roles carried by the claim, empty when it holds none
+	 */
+	private static Collection<String> claimValues(Object claim) {
 		if (claim instanceof String claimStr) {
-			claimValues = Arrays.asList(claimStr.split(","));
+			return Arrays.asList(claimStr.split(","));
 		}
-		if (claim instanceof String[] claimArr) {
-			claimValues = Arrays.asList(claimArr);
+		if (claim instanceof Collection<?> collection) {
+			return collection.stream()
+				.flatMap((item) -> (item instanceof Collection<?> nested) ? nested.stream() : Stream.of(item))
+				.filter(String.class::isInstance)
+				.map(String.class::cast)
+				.toList();
 		}
-		if (Collection.class.isAssignableFrom(claim.getClass())) {
-			final var iterator = ((Collection) claim).iterator();
-			if (!iterator.hasNext()) {
-				claimValues = Collections.emptyList();
-			}
-			else {
-				final var firstItem = iterator.next();
-				if (firstItem instanceof String) {
-					claimValues = (Collection<String>) claim;
-				}
-				if (Collection.class.isAssignableFrom(firstItem.getClass())) {
-					claimValues = ((Collection) claim).stream()
-						.flatMap((colItem) -> ((Collection) colItem).stream())
-						.map(String.class::cast)
-						.toList();
-				}
-			}
-		}
-		final Collection<String> claimValuesFinal = (claimValues != null) ? claimValues : Collections.emptyList();
-		return grantAccess.getRoles().stream().allMatch((value) -> claimValuesFinal.contains(value));
+		return Collections.emptyList();
 	}
 
 	private Optional<Jwt> createJwt(String bearer) {
@@ -327,6 +354,15 @@ public class AuthorizationTokenGatewayFilterFactory
 		 */
 		public boolean checkGrantAccess() {
 			return this.grantAccesses != null && !this.grantAccesses.isEmpty();
+		}
+
+		/**
+		 * Whether at least one check is configured, hence whether the route requires a
+		 * token at all.
+		 * @return {@code true} if the filter has something to check
+		 */
+		public boolean hasCheck() {
+			return checkIssuer() || checkClientId() || checkGrantAccess();
 		}
 
 	}

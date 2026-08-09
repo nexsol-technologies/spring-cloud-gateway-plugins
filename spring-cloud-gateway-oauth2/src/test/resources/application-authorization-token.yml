@@ -36,6 +36,19 @@ spring.cloud.gateway.server.webflux:
         - jsonPath: '$.resource_access.*.roles'
           roles: "__bad_role"
 
+  - id: authorization-token-public
+    uri: ${test.uri}
+    predicates:
+    - Path=/authorization-token-public
+    metadata:
+      public: true
+    filters:
+    - name: AuthorizationToken
+      args:
+        grant-accesses:
+        - jsonPath: '$.resource_access.*.roles'
+          roles: "role1"
+
   - id: authorization-token-with-bad-issuer
     uri: ${test.uri}
     predicates:

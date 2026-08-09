@@ -21,6 +21,12 @@ The `AuthorizationToken` filter validates an access token (JWT). It reads the `P
 Spring Security, or the `Authorization` header. A token that does not meet the validation rules
 declared on the route is answered with `403 Forbidden`.
 
+A request carrying no exploitable token is answered with `401 Unauthorized` as soon as the route
+declares at least one rule: the filter never lets an unauthenticated request through. Two cases
+are left untouched, as no rule applies to them: a filter declared without any argument, and a
+route flagged public through its `public` metadata (see `spring-cloud-gateway-routes-security`),
+which is served without authentication by design.
+
 ```yaml
 spring.cloud.gateway.server.webflux:
   routes:
