@@ -66,7 +66,7 @@ is genuine Redis pub/sub:
 $ redis-cli SUBSCRIBE gateway-audit
 1) "message"
 2) "gateway-audit"
-3) "{\"request.method\":\"GET\",\"request.path\":\"/patient/99098875/alert-summaries\",\"response.status\":\"OK\"}"
+3) "{\"request.method\":\"GET\",\"request.path\":\"/book/99098875/reviews\",\"response.status\":\"OK\"}"
 ```
 
 ### Subscribe from a Spring application
@@ -89,5 +89,5 @@ lifetime of the application (for example by subscribing in an `ApplicationRunner
 The published message is the JSON object of the event attributes, for example:
 
 ```json
-{"request.method":"GET","request.path":"/patient/99098875/alert-summaries","response.status":"OK","jwt.user.id":"toto"}
+{"request.method":"GET","request.path":"/book/99098875/reviews","response.status":"OK","jwt.user.id":"toto"}
 ```

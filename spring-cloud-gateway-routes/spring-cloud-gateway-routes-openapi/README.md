@@ -84,28 +84,28 @@ applies per source.
 
 ### Telling two contracts apart: `path-prefix`
 
-Two services routinely declare the same paths &mdash; a patient service and a billing
-service both exposing `/patients` would collide on the gateway. `path-prefix` moves a
+Two services routinely declare the same paths &mdash; a book service and a billing
+service both exposing `/books` would collide on the gateway. `path-prefix` moves a
 contract aside, on the gateway side only:
 
 ```yaml
-    - id: patients
-      uri: https://patient-service.example.org
-      spec-url: https://patient-service.example.org/v3/api-docs
-      path-prefix: /patient-service
+    - id: books
+      uri: https://book-service.example.org
+      spec-url: https://book-service.example.org/v3/api-docs
+      path-prefix: /book-service
 ```
 
-The operation `/patients` is then exposed as `/patient-service/patients`. The prefix exists
+The operation `/books` is then exposed as `/book-service/books`. The prefix exists
 for callers only: it is removed again before the request is forwarded, so the backend still
 receives the path its contract declares.
 
 ```
 client            gateway route                       backend
-GET /patient-service/patients
-                  Path=/patient-service/patients
-                  RewritePath=/patient-service(?<remaining>/?.*), ${remaining}   -> /patients
-                  PrefixPath=/api/v3                                            -> /api/v3/patients
-                                                       GET /api/v3/patients
+GET /book-service/books
+                  Path=/book-service/books
+                  RewritePath=/book-service(?<remaining>/?.*), ${remaining}     -> /books
+                  PrefixPath=/api/v3                                            -> /api/v3/books
+                                                       GET /api/v3/books
 ```
 
 `RewritePath` rather than `StripPrefix`, so the route shown in the UI names the prefix it
@@ -120,7 +120,7 @@ Do not confuse the two path settings:
 
 When [spring-cloud-gateway-hub-openapi](../../spring-cloud-gateway-hub-openapi/README.md) is
 also present, the contract it serves advertises the gateway **with** the prefix, so
-"Try it out" calls `/patient-service/patients` and reaches the generated route.
+"Try it out" calls `/book-service/books` and reaches the generated route.
 
 ### Backend base path
 

@@ -47,11 +47,10 @@ class AuditEventFactoryTests {
 
 	@Test
 	void collectsRequestAndResponseAttributes() {
-		MockServerWebExchange exchange = exchangeWithResponse(
-				MockServerHttpRequest.get("/patient/99098875/alert-summaries")
-					.header(HttpHeaders.ACCEPT, "application/json,text/plain,*/*")
-					.remoteAddress(new InetSocketAddress("129.195.179.159", 40000))
-					.build());
+		MockServerWebExchange exchange = exchangeWithResponse(MockServerHttpRequest.get("/book/99098875/reviews")
+			.header(HttpHeaders.ACCEPT, "application/json,text/plain,*/*")
+			.remoteAddress(new InetSocketAddress("129.195.179.159", 40000))
+			.build());
 
 		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
 
@@ -61,7 +60,7 @@ class AuditEventFactoryTests {
 			.containsEntry(AuditAttributes.REQUEST_IP, "129.195.179.159")
 			.containsEntry(AuditAttributes.REQUEST_METHOD, "GET")
 			.containsEntry(AuditAttributes.REQUEST_PARAMETERS, AuditAttributes.NONE_VALUE)
-			.containsEntry(AuditAttributes.REQUEST_PATH, "/patient/99098875/alert-summaries")
+			.containsEntry(AuditAttributes.REQUEST_PATH, "/book/99098875/reviews")
 			.containsEntry(AuditAttributes.RESPONSE_HEADER_CONTENT_LENGTH, "387")
 			.containsEntry(AuditAttributes.RESPONSE_HEADER_CONTENT_TYPE, "application/hal+json;version=1")
 			.containsEntry(AuditAttributes.RESPONSE_STATUS, "OK");
@@ -70,7 +69,7 @@ class AuditEventFactoryTests {
 	@Test
 	void rendersMissingJwtAndTraceAsNone() {
 		MockServerWebExchange exchange = MockServerWebExchange
-			.from(MockServerHttpRequest.get("/patient/99098875/alert-summaries").build());
+			.from(MockServerHttpRequest.get("/book/99098875/reviews").build());
 
 		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
 
@@ -89,17 +88,17 @@ class AuditEventFactoryTests {
 			.header("alg", "none")
 			.claim("preferred_username", "toto")
 			.claim("azp", "dxxx")
-			.issuer("https://keycloak/realms/collaborator")
+			.issuer("https://keycloak/realms/example")
 			.build();
 		ServerWebExchange exchange = withPrincipal(
-				MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build()),
+				MockServerWebExchange.from(MockServerHttpRequest.get("/book").build()),
 				new JwtAuthenticationToken(jwt));
 
 		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
 
 		assertThat(attributes).containsEntry(AuditAttributes.JWT_USER_ID, "toto")
 			.containsEntry(AuditAttributes.JWT_CLIENT_ID, "dxxx")
-			.containsEntry(AuditAttributes.JWT_ISSUER_ID, "https://keycloak/realms/collaborator")
+			.containsEntry(AuditAttributes.JWT_ISSUER_ID, "https://keycloak/realms/example")
 			.containsEntry(AuditAttributes.JWT_IMPERSONATOR_USER_ID, AuditAttributes.NONE_VALUE);
 	}
 
@@ -107,7 +106,7 @@ class AuditEventFactoryTests {
 	void usesBasicAuthUserAsUserId() {
 		String basic = "Basic " + Base64.getEncoder().encodeToString("toto:secret".getBytes(StandardCharsets.UTF_8));
 		MockServerWebExchange exchange = MockServerWebExchange
-			.from(MockServerHttpRequest.get("/patient").header(HttpHeaders.AUTHORIZATION, basic).build());
+			.from(MockServerHttpRequest.get("/book").header(HttpHeaders.AUTHORIZATION, basic).build());
 
 		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
 
@@ -120,7 +119,7 @@ class AuditEventFactoryTests {
 		properties.getGroups().setResponse(false);
 		properties.getGroups().setJwt(false);
 		AuditEventFactory disabled = new AuditEventFactory(properties);
-		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build());
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/book").build());
 
 		Map<String, String> attributes = disabled.create(exchange).block().attributes();
 
@@ -135,10 +134,10 @@ class AuditEventFactoryTests {
 			.header("alg", "none")
 			.claim("preferred_username", "toto")
 			.claim("act", Map.of("sub", "admin", "preferred_username", "adminUser"))
-			.issuer("https://keycloak/realms/collaborator")
+			.issuer("https://keycloak/realms/example")
 			.build();
 		ServerWebExchange exchange = withPrincipal(
-				MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build()),
+				MockServerWebExchange.from(MockServerHttpRequest.get("/book").build()),
 				new JwtAuthenticationToken(jwt));
 
 		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
@@ -156,7 +155,7 @@ class AuditEventFactoryTests {
 			.issuer("https://issuer")
 			.build();
 		ServerWebExchange exchange = withPrincipal(
-				MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build()),
+				MockServerWebExchange.from(MockServerHttpRequest.get("/book").build()),
 				new JwtAuthenticationToken(jwt));
 
 		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
@@ -167,7 +166,7 @@ class AuditEventFactoryTests {
 
 	@Test
 	void prefersXForwardedForForIp() {
-		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/patient")
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/book")
 			.header("X-Forwarded-For", "203.0.113.7, 70.41.3.18")
 			.remoteAddress(new InetSocketAddress("10.0.0.1", 1234))
 			.build());
@@ -179,7 +178,7 @@ class AuditEventFactoryTests {
 
 	@Test
 	void rendersNonStandardStatusAsNumericCode() {
-		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build());
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/book").build());
 		exchange.getResponse().setStatusCode(HttpStatusCode.valueOf(299));
 
 		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
@@ -260,7 +259,7 @@ class AuditEventFactoryTests {
 	@Test
 	void usesPrincipalNameWhenNeitherJwtNorBasic() {
 		ServerWebExchange exchange = withPrincipal(
-				MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build()),
+				MockServerWebExchange.from(MockServerHttpRequest.get("/book").build()),
 				new UsernamePasswordAuthenticationToken("svc", "n/a"));
 
 		Map<String, String> attributes = this.factory.create(exchange).block().attributes();

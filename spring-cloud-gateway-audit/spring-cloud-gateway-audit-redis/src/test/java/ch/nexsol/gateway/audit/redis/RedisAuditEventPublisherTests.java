@@ -44,11 +44,11 @@ class RedisAuditEventPublisherTests {
 		RedisAuditEventPublisher publisher = new RedisAuditEventPublisher(template, "gateway-audit",
 				new AuditEventSerializer(new ObjectMapper()));
 
-		publisher.publish(new AuditEvent(Instant.now(), Map.of("request.path", "/patient")));
+		publisher.publish(new AuditEvent(Instant.now(), Map.of("request.path", "/book")));
 
 		ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
 		verify(template).convertAndSend(eq("gateway-audit"), payload.capture());
-		assertThat(payload.getValue()).contains("/patient");
+		assertThat(payload.getValue()).contains("/book");
 	}
 
 }

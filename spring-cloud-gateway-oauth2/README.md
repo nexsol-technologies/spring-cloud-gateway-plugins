@@ -58,8 +58,8 @@ Two independent match modes decide how the rules are combined, both defaulting t
 The default `ALL`/`ALL` is the most restrictive combination, so a configuration that does not
 declare a match mode keeps requiring every claim and every role.
 
-The example below reads as *(`collaborator` or `service`) and `patient_read`*: a realm role among
-two, plus one client role of `patient-service`. The bracket notation is what addresses a client id
+The example below reads as *(`admin` or `service`) and `book_read`*: a realm role among
+two, plus one client role of `book-service`. The bracket notation is what addresses a client id
 holding a hyphen.
 
 ```yaml
@@ -70,11 +70,11 @@ holding a hyphen.
         - jsonPath: "$.realm_access.roles"
           match: ANY
           roles:
-          - collaborator
+          - admin
           - service
-        - jsonPath: "$.resource_access['patient-service'].roles"
+        - jsonPath: "$.resource_access['book-service'].roles"
           roles:
-          - patient_read
+          - book_read
 ```
 
 A wildcard such as `$.resource_access.*.roles` flattens the roles of every client into a single

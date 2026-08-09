@@ -116,11 +116,11 @@ public class RoutesOpenapiProperties {
 
 		/**
 		 * Prefix added, on the gateway side, to every path the contract declares: with
-		 * {@code /patient-service}, the operation {@code /patients} is exposed as
-		 * {@code /patient-service/patients}. The prefix is stripped again before the
-		 * request is forwarded, so the backend still receives the path its contract
-		 * declares. This is what keeps two contracts declaring the same paths apart;
-		 * leave it unset to expose the contract paths as they are.
+		 * {@code /book-service}, the operation {@code /books} is exposed as
+		 * {@code /book-service/books}. The prefix is stripped again before the request is
+		 * forwarded, so the backend still receives the path its contract declares. This
+		 * is what keeps two contracts declaring the same paths apart; leave it unset to
+		 * expose the contract paths as they are.
 		 */
 		private String pathPrefix;
 
