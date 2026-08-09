@@ -58,3 +58,35 @@ spring.cloud.gateway.server.webflux:
       args:
         issuers:
         - http://bad.issuer.com
+
+  # The token holds role1 but not __bad_role: only ANY lets it through, so a request that
+  # is forwarded proves the match mode was bound.
+  - id: authorization-token-any-role
+    uri: ${test.uri}
+    predicates:
+    - Path=/authorization-token-any-role
+    filters:
+    - name: AuthorizationToken
+      args:
+        grant-accesses:
+        - jsonPath: '$.resource_access.*.roles'
+          match: ANY
+          roles:
+          - role1
+          - __bad_role
+
+  # The first granted access is never satisfied, the second always is: only ANY lets the
+  # request through.
+  - id: authorization-token-any-grant-access
+    uri: ${test.uri}
+    predicates:
+    - Path=/authorization-token-any-grant-access
+    filters:
+    - name: AuthorizationToken
+      args:
+        grant-accesses-match: ANY
+        grant-accesses:
+        - jsonPath: '$.realm_access.roles'
+          roles: "__bad_role"
+        - jsonPath: '$.resource_access.*.roles'
+          roles: "role1"

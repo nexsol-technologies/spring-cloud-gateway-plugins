@@ -93,6 +93,27 @@ class AuthorizationTokenGatewayFilterFactoryIntegrationTests extends BaseWebClie
 	}
 
 	@Test
+	void validateAuthorizationTokenWorksWithASingleMatchingRole() {
+		// The token holds role1 but not __bad_role, so only ANY lets it through. The
+		// 503 of the unresolvable `lb://testservice` uri proves the request was
+		// forwarded: with the default ALL the filter would answer 403 instead.
+		this.testClient.get().uri("/authorization-token-any-role").headers((headers) -> {
+			headers.set("Host", "www.validateauthorizationtoken.ch");
+			headers.setBearerAuth(token);
+		}).exchange().expectStatus().isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+	}
+
+	@Test
+	void validateAuthorizationTokenWorksWithASingleMatchingGrantAccess() {
+		// Same reasoning for `grant-accesses-match: ANY`: the first granted access is
+		// never satisfied, so only ANY forwards the request.
+		this.testClient.get().uri("/authorization-token-any-grant-access").headers((headers) -> {
+			headers.set("Host", "www.validateauthorizationtoken.ch");
+			headers.setBearerAuth(token);
+		}).exchange().expectStatus().isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+	}
+
+	@Test
 	void validateAuthorizationTokenWorksWithBadGrantAccess() {
 		this.testClient.get().uri("/authorization-token-with-bad-grant-access").headers((headers) -> {
 			headers.set("Host", "www.validateauthorizationtoken.ch");

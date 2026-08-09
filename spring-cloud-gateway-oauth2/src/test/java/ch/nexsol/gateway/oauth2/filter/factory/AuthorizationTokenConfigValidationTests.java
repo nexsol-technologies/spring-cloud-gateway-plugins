@@ -120,6 +120,30 @@ class AuthorizationTokenConfigValidationTests {
 	}
 
 	@Test
+	void reportsAMissingMatchMode() {
+		Config config = new Config();
+		config.setGrantAccessesMatch(null);
+
+		Set<ConstraintViolation<Config>> violations = validator.validate(config);
+
+		assertThat(violations).singleElement()
+			.satisfies((violation) -> assertThat(violation.getPropertyPath()).hasToString("grantAccessesMatch"));
+	}
+
+	@Test
+	void reportsAMissingMatchModeInsideAGrantedAccess() {
+		GrantAccess grantAccess = grantAccess("$.realm_access.roles", List.of("admin"));
+		grantAccess.setMatch(null);
+		Config config = new Config();
+		config.setGrantAccesses(List.of(grantAccess));
+
+		Set<ConstraintViolation<Config>> violations = validator.validate(config);
+
+		assertThat(violations).singleElement()
+			.satisfies((violation) -> assertThat(violation.getPropertyPath()).hasToString("grantAccesses[0].match"));
+	}
+
+	@Test
 	void acceptsAnEmptyConfiguration() {
 		assertThat(validator.validate(new Config())).isEmpty();
 	}
