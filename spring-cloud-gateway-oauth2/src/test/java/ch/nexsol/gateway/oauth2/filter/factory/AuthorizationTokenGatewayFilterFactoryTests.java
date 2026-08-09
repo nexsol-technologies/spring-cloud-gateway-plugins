@@ -18,13 +18,26 @@ package ch.nexsol.gateway.oauth2.filter.factory;
 
 import java.text.ParseException;
 import java.util.List;
+import java.util.Map;
 
+import ch.nexsol.gateway.oauth2.filter.factory.AuthorizationTokenGatewayFilterFactory.Config;
 import ch.nexsol.gateway.oauth2.filter.factory.AuthorizationTokenGatewayFilterFactory.GrantAccess;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTParser;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
+
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.cloud.gateway.route.Route;
+import org.springframework.http.HttpStatus;
+import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.mock.web.server.MockServerWebExchange;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.server.ServerWebExchange;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
 
 class AuthorizationTokenGatewayFilterFactoryTests {
 
@@ -76,6 +89,96 @@ class AuthorizationTokenGatewayFilterFactoryTests {
 
 		boolean hasAuthority = factory.hasAuthority(jwt.getJWTClaimsSet().getClaims(), grantAccess);
 		assertThat(hasAuthority).isFalse();
+	}
+
+	@Test
+	void shouldRejectRequestWithoutTokenWhenACheckIsConfigured() {
+		Config config = new Config();
+		config.setIssuers(List.of("https://nexsol.tech"));
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/anything"));
+		RecordingChain chain = new RecordingChain();
+
+		StepVerifier.create(new AuthorizationTokenGatewayFilterFactory().apply(config).filter(exchange, chain))
+			.expectErrorSatisfies((ex) -> assertThat(((ResponseStatusException) ex).getStatusCode())
+				.isEqualTo(HttpStatus.UNAUTHORIZED))
+			.verify();
+		assertThat(chain.called).isFalse();
+	}
+
+	@Test
+	void shouldForwardRequestWithoutTokenWhenNoCheckIsConfigured() {
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/anything"));
+		RecordingChain chain = new RecordingChain();
+
+		StepVerifier.create(new AuthorizationTokenGatewayFilterFactory().apply(new Config()).filter(exchange, chain))
+			.verifyComplete();
+		assertThat(chain.called).isTrue();
+	}
+
+	@Test
+	void shouldForwardRequestWithoutTokenOnPublicRoute() {
+		Config config = new Config();
+		config.setIssuers(List.of("https://nexsol.tech"));
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/anything"));
+		exchange.getAttributes().put(GATEWAY_ROUTE_ATTR, publicRoute());
+		RecordingChain chain = new RecordingChain();
+
+		StepVerifier.create(new AuthorizationTokenGatewayFilterFactory().apply(config).filter(exchange, chain))
+			.verifyComplete();
+		assertThat(chain.called).isTrue();
+	}
+
+	@Test
+	void shouldReadTheAuthorizationHeaderWhateverItsCase() {
+		Config config = new Config();
+		config.setIssuers(List.of("https://nexsol.tech"));
+		// HTTP/2 sends header names lower cased
+		MockServerWebExchange exchange = MockServerWebExchange
+			.from(MockServerHttpRequest.get("/anything").header("authorization", "Bearer " + token));
+		RecordingChain chain = new RecordingChain();
+
+		StepVerifier.create(new AuthorizationTokenGatewayFilterFactory().apply(config).filter(exchange, chain))
+			.verifyComplete();
+		assertThat(chain.called).isTrue();
+	}
+
+	@Test
+	void shouldRejectABearerWithAForbiddenIssuer() {
+		Config config = new Config();
+		config.setIssuers(List.of("https://bad.issuer.ch"));
+		MockServerWebExchange exchange = MockServerWebExchange
+			.from(MockServerHttpRequest.get("/anything").header("Authorization", "Bearer " + token));
+		RecordingChain chain = new RecordingChain();
+
+		StepVerifier.create(new AuthorizationTokenGatewayFilterFactory().apply(config).filter(exchange, chain))
+			.expectErrorSatisfies(
+					(ex) -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN))
+			.verify();
+		assertThat(chain.called).isFalse();
+	}
+
+	private static Route publicRoute() {
+		return Route.async()
+			.id("public-route")
+			.uri("http://localhost")
+			.predicate((exchange) -> true)
+			.metadata(Map.of("public", true))
+			.build();
+	}
+
+	/**
+	 * Filter chain recording whether the request was forwarded downstream.
+	 */
+	private static final class RecordingChain implements GatewayFilterChain {
+
+		private boolean called;
+
+		@Override
+		public Mono<Void> filter(ServerWebExchange exchange) {
+			this.called = true;
+			return Mono.empty();
+		}
+
 	}
 
 }

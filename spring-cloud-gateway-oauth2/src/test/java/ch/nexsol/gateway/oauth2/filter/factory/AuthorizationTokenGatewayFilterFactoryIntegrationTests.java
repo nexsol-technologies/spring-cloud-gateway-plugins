@@ -70,6 +70,29 @@ class AuthorizationTokenGatewayFilterFactoryIntegrationTests extends BaseWebClie
 	}
 
 	@Test
+	void validateAuthorizationTokenWorksWithoutToken() {
+		this.testClient.get()
+			.uri("/authorization-token-with-bad-issuer")
+			.headers((headers) -> headers.set("Host", "www.validateauthorizationtoken.ch"))
+			.exchange()
+			.expectStatus()
+			.isUnauthorized();
+	}
+
+	@Test
+	void validateAuthorizationTokenWorksWithoutTokenOnPublicRoute() {
+		// The route is flagged public, so the missing token is not rejected: the request
+		// reaches the routing filters and is answered by the unresolvable
+		// `lb://testservice` uri. The 503 is what proves it was forwarded, not denied.
+		this.testClient.get()
+			.uri("/authorization-token-public")
+			.headers((headers) -> headers.set("Host", "www.validateauthorizationtoken.ch"))
+			.exchange()
+			.expectStatus()
+			.isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+	}
+
+	@Test
 	void validateAuthorizationTokenWorksWithBadGrantAccess() {
 		this.testClient.get().uri("/authorization-token-with-bad-grant-access").headers((headers) -> {
 			headers.set("Host", "www.validateauthorizationtoken.ch");
