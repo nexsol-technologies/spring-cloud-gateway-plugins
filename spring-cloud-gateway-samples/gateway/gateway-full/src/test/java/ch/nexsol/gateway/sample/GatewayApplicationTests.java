@@ -19,10 +19,12 @@ package ch.nexsol.gateway.sample;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import ch.nexsol.gateway.ui.security.GatewayUiSecurityProperties;
 import org.junit.jupiter.api.Test;
 import reactor.test.StepVerifier;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OAuth2ResourceServerProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.cloud.gateway.route.RouteDefinition;
@@ -55,6 +57,12 @@ class GatewayApplicationTests {
 	@Autowired
 	WebTestClient webTestClient;
 
+	@Autowired
+	GatewayUiSecurityProperties consoleSecurity;
+
+	@Autowired
+	OAuth2ResourceServerProperties routedTrafficSecurity;
+
 	@Test
 	void shouldAggregateThePropertiesAndTheFileSources() {
 		StepVerifier.create(this.routeDefinitionLocator.getRouteDefinitions().map(RouteDefinition::getId).collectList())
@@ -77,6 +85,24 @@ class GatewayApplicationTests {
 			.isFound()
 			.expectHeader()
 			.location("/ui/login");
+	}
+
+	@Test
+	void shouldKeepTheIssuerOfTheConsoleApartFromTheOneOfTheRoutedTraffic() {
+		/*
+		 * The two resource servers of a gateway are easy to confuse:
+		 * spring.security.oauth2.resourceserver holds a single issuer for the whole
+		 * application and belongs to the traffic being routed, while the console names
+		 * its own. Both are wired here, and this context starting at all says the console
+		 * does not wait on its provider: the keys are fetched on the first token that
+		 * arrives.
+		 *
+		 * What a token then buys is exercised against the running authorization server,
+		 * as the README of this sample shows — not here, where nothing is listening on
+		 * 9090.
+		 */
+		assertThat(this.consoleSecurity.getOauth2().getResourceserver().getJwt().getIssuerUri()).isNotBlank();
+		assertThat(this.routedTrafficSecurity.getJwt().getIssuerUri()).isNotBlank();
 	}
 
 	@Test

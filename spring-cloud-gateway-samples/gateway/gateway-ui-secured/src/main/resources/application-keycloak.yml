@@ -22,13 +22,20 @@ spring.security.oauth2:
         issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8380/realms/gateway}
         user-name-attribute: preferred_username
 
+spring.cloud.gateway.server.webflux.ui.security:
   # The endpoints of the console then answer a Bearer token as well as a session, for a
   # script or an external dashboard reading /ui/metrics/data and the like.
-  resourceserver:
-    jwt:
-      issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8380/realms/gateway}
+  #
+  # Declared here rather than under spring.security.oauth2.resourceserver on purpose: that
+  # one holds a single issuer for the whole application, and it belongs to the traffic the
+  # gateway routes. A gateway validating the tokens of its microservices against one
+  # authorization server can this way have its console answer to another — and copying the
+  # Spring property into a real gateway would replace the issuer its routes depend on.
+  oauth2:
+    resourceserver:
+      jwt:
+        issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8380/realms/gateway}
 
-spring.cloud.gateway.server.webflux.ui.security:
   # Where the realm puts the roles it grants: Keycloak writes them under realm_access, and
   # the realm imported by the compose file adds them to the identity token as well as to
   # the access token, so a session and a Bearer token are matched on the same rule.

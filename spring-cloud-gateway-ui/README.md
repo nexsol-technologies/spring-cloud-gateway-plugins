@@ -571,13 +571,34 @@ What that gives you:
   provider, and the local user stays as the way in when the provider is unreachable. With a
   provider alone and no local user, the credentials form is left out rather than shown
   unable to succeed.
-* **A Bearer token** &mdash; configure a resource server and the endpoints of the console
-  answer a token as well as a session, for a script or an external dashboard reading
-  `/ui/metrics/data` and the like:
+* **A Bearer token** &mdash; name an issuer and the endpoints of the console answer a token
+  as well as a session, for a script or an external dashboard reading `/ui/metrics/data` and
+  the like:
 
   ```yaml
-  spring.security.oauth2.resourceserver.jwt.issuer-uri: https://your-idp.example.com/realms/master
+  spring.cloud.gateway.server.webflux.ui.security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://your-idp.example.com/realms/master
   ```
+
+  This is deliberately *not* `spring.security.oauth2.resourceserver`. That property holds a
+  single issuer for the whole application, and on a gateway it belongs to the traffic being
+  routed: a gateway validating the tokens of its microservices against one authorization
+  server can this way have its console answer to another. Setting the Spring property
+  instead would replace the issuer the routes depend on.
+
+  Left unset, the console falls back on whatever `ReactiveJwtDecoder` the application
+  already declared &mdash; convenient when both answer to the same issuer. Two consequences
+  worth knowing when leaning on that fallback: an application configuring **only** the
+  multi-tenant issuers of the [oauth2 plugin](../spring-cloud-gateway-oauth2/README.md)
+  declares no decoder at all, so the console quietly serves sessions alone; and the fallback
+  is a decoder, not a tenant resolver, so it answers to one issuer even where the routed
+  traffic answers to several.
+
+  The issuer is asked for its keys on the first token that arrives, never at start-up: a
+  gateway comes up whether or not the provider is answering.
 
 * **Roles** &mdash; `required-roles` narrows the console to the principals holding them, and
   `roles-claim` says where the token carries its roles, as a dotted path into the claim set

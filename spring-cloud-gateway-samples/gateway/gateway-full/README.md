@@ -64,6 +64,34 @@ plugin, and it creates and deletes routes &mdash; so
 asks for a principal on it and sends visitors to the same login page. Signing in once opens
 both.
 
+This sample is also where the two resource servers of a gateway sit side by side, which is
+worth a look because they are easy to confuse:
+
+| | Property | Here |
+| --- | --- | --- |
+| The traffic being routed | `spring.security.oauth2.resourceserver` | the multi-tenant issuers, further down `application.yml` |
+| The endpoints of the console | `spring.cloud.gateway.server.webflux.ui.security.oauth2.resourceserver` | its own issuer |
+
+They happen to name the same authorization server here, and writing it twice is the point:
+the console can be pointed at another provider in one line without touching what the routes
+depend on. The Spring property holds a single issuer for the whole application, so putting
+the console's issuer there would replace the one the routes validate against.
+
+```console
+$ TOKEN=$(curl -s -u messaging-client:secret \
+    -d grant_type=client_credentials \
+    http://localhost:9090/oauth2/token | jq -r .access_token)
+
+$ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
+    http://localhost:8181/ui/routes/list
+200
+```
+
+Without the token that call answers `302` to the login page; with a token the console cannot
+decode it answers `401` and `WWW-Authenticate: Bearer`, never an HTML page. The keys are
+fetched from the issuer on the first token that arrives, so the gateway starts whether or
+not `auth-server` is up.
+
 The [gateway-ui-secured](../gateway-ui-secured/README.md) sample is the other half of this:
 the same login page, with Keycloak and roles behind it.
 

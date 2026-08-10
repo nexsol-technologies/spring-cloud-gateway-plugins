@@ -68,6 +68,8 @@ import org.springframework.security.oauth2.client.userinfo.ReactiveOAuth2UserSer
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoders;
+import org.springframework.security.oauth2.jwt.SupplierReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverter;
 import org.springframework.security.web.server.SecurityWebFilterChain;
@@ -488,16 +490,40 @@ public class GatewayUiSecurityAutoConfiguration {
 		UiSecurityCustomizer gatewayUiResourceServerCustomizer(ObjectProvider<ReactiveJwtDecoder> decoder,
 				GatewayUiSecurityProperties properties) {
 			return (http) -> {
-				if (decoder.getIfAvailable() == null) {
+				ReactiveJwtDecoder consoleDecoder = decoder(properties, decoder);
+				if (consoleDecoder == null) {
 					return;
 				}
 				http.oauth2ResourceServer((oauth2) -> oauth2.jwt((jwt) -> {
+					jwt.jwtDecoder(consoleDecoder);
 					String claim = properties.getRolesClaim();
 					if (StringUtils.hasText(claim)) {
 						jwt.jwtAuthenticationConverter(rolesConverter(claim));
 					}
 				}));
 			};
+		}
+
+		/**
+		 * The decoder the console validates its Bearer tokens with: its own when an
+		 * issuer was named for it, and the one the application declared otherwise.
+		 * <p>
+		 * The two are worth separating. Without an issuer of its own the console inherits
+		 * the decoder built for the traffic the gateway routes, which is right when both
+		 * answer to the same authorization server and wrong when they do not &mdash; and
+		 * {@code spring.security.oauth2.resourceserver} holds one issuer for the whole
+		 * application, so there is no way to say both there.
+		 * <p>
+		 * The issuer is asked for its keys on the first token that arrives rather than at
+		 * start-up, so a gateway comes up whether or not the provider is answering.
+		 */
+		private static ReactiveJwtDecoder decoder(GatewayUiSecurityProperties properties,
+				ObjectProvider<ReactiveJwtDecoder> applicationDecoder) {
+			String issuer = properties.getOauth2().getResourceserver().getJwt().getIssuerUri();
+			if (StringUtils.hasText(issuer)) {
+				return new SupplierReactiveJwtDecoder(() -> ReactiveJwtDecoders.fromIssuerLocation(issuer));
+			}
+			return applicationDecoder.getIfAvailable();
 		}
 
 		/**

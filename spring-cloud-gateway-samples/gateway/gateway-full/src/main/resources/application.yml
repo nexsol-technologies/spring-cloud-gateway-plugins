@@ -141,6 +141,18 @@ spring.cloud.gateway.server.webflux.ui:
       password: ${ADMIN_PASSWORD:superadmin}
       roles:
       - ADMIN
+    # The console names the issuer it accepts Bearer tokens from, apart from the one the
+    # gateway validates the traffic it routes against further down this file. Both happen
+    # to be the sample authorization server here, and that is the point of writing it
+    # twice: the two are independent, and pointing the console at another provider is a
+    # one-line change that leaves the routes alone.
+    #
+    # The keys are fetched on the first token that arrives, so this gateway starts with
+    # nothing listening on 9090.
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${CONSOLE_ISSUER_URI:http://localhost:9090}
 
 # CASE_INSENSITIVE_IDENTIFIERS is what makes H2 accept the quoted lower-case identifiers
 # Spring Data R2DBC generates against the schema the plugin ships, whose DDL is unquoted.
@@ -159,6 +171,7 @@ spring:
           issuer-uri: http://localhost:9090
         - id: local2
           issuer-uri: http://localhost:9090
+#OU activer uniquement
         jwt:
           issuer-uri: http://localhost:9090
 

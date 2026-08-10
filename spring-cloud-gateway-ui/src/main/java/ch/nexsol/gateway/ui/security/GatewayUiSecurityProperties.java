@@ -78,6 +78,12 @@ public class GatewayUiSecurityProperties {
 	private List<String> requiredRoles = new ArrayList<>();
 
 	/**
+	 * The issuer the console validates Bearer tokens against, when it is not the one the
+	 * gateway validates the traffic it routes against.
+	 */
+	private final OAuth2 oauth2 = new OAuth2();
+
+	/**
 	 * Returns how the console treats its own paths.
 	 * @return the mode
 	 */
@@ -126,11 +132,99 @@ public class GatewayUiSecurityProperties {
 	}
 
 	/**
+	 * Returns the resource server of the console.
+	 * @return the resource server configuration
+	 */
+	public OAuth2 getOauth2() {
+		return this.oauth2;
+	}
+
+	/**
 	 * Sets the roles a principal must hold to reach the console.
 	 * @param requiredRoles the required roles
 	 */
 	public void setRequiredRoles(List<String> requiredRoles) {
 		this.requiredRoles = requiredRoles;
+	}
+
+	/**
+	 * The resource server of the console, named after the Spring Security properties it
+	 * mirrors so that it reads the same way.
+	 * <p>
+	 * Unset, the console validates Bearer tokens with whatever {@code ReactiveJwtDecoder}
+	 * the application already declared &mdash; which is the decoder built for the traffic
+	 * the gateway routes. That is convenient when both answer to the same issuer, and
+	 * wrong when they do not: a gateway validating the tokens of its microservices
+	 * against one authorization server may well want its console signed into through
+	 * another. Setting an issuer here gives the console a decoder of its own and leaves
+	 * {@code spring.security.oauth2.resourceserver} to the routed traffic.
+	 */
+	public static class OAuth2 {
+
+		/**
+		 * The resource server settings of the console.
+		 */
+		private final ResourceServer resourceserver = new ResourceServer();
+
+		/**
+		 * Returns the resource server settings of the console.
+		 * @return the resource server settings
+		 */
+		public ResourceServer getResourceserver() {
+			return this.resourceserver;
+		}
+
+		/**
+		 * The resource server settings of the console.
+		 */
+		public static class ResourceServer {
+
+			/**
+			 * How the tokens the console accepts are validated.
+			 */
+			private final Jwt jwt = new Jwt();
+
+			/**
+			 * Returns how the tokens the console accepts are validated.
+			 * @return the JWT settings
+			 */
+			public Jwt getJwt() {
+				return this.jwt;
+			}
+
+			/**
+			 * How the tokens the console accepts are validated.
+			 */
+			public static class Jwt {
+
+				/**
+				 * The issuer the console validates its Bearer tokens against. The keys
+				 * are fetched from it on the first token that arrives, never at start-up:
+				 * a gateway has to come up whether or not the provider is answering.
+				 */
+				private String issuerUri;
+
+				/**
+				 * Returns the issuer the console validates its Bearer tokens against.
+				 * @return the issuer, or {@code null} to use the decoder of the
+				 * application
+				 */
+				public String getIssuerUri() {
+					return this.issuerUri;
+				}
+
+				/**
+				 * Sets the issuer the console validates its Bearer tokens against.
+				 * @param issuerUri the issuer
+				 */
+				public void setIssuerUri(String issuerUri) {
+					this.issuerUri = issuerUri;
+				}
+
+			}
+
+		}
+
 	}
 
 	/**
