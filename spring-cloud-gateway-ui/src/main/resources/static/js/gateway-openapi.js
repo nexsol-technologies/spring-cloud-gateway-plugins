@@ -93,7 +93,7 @@
 			// Everything this page loads is served by the gateway itself: no font from an
 			// external CDN, so the view still works on an isolated network.
 			withDefaultFonts: false,
-			darkMode: false,
+			darkMode: window.gatewayUi.theme() === 'dark',
 			hideDarkModeToggle: true,
 			// Scalar enables its AI agent by itself when the page is served from localhost.
 			// Its control is a form next to the search box, and it captures the clicks of

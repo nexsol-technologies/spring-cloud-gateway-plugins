@@ -53,6 +53,11 @@ class GatewayUiSecurityAutoConfigurationTests {
 			assertThat(matches(chain, "/ui")).isTrue();
 			assertThat(matches(chain, "/css/gateway-ui.css")).isTrue();
 			assertThat(matches(chain, "/js/htmx.min.js")).isTrue();
+			// The brand images: the favicon and sidebar icon every page loads, and the
+			// lockup of the home page.
+			assertThat(matches(chain, "/img/icon.png")).isTrue();
+			assertThat(matches(chain, "/img/logo.png")).isTrue();
+			assertThat(matches(chain, "/img/logo-dark.png")).isTrue();
 		});
 	}
 

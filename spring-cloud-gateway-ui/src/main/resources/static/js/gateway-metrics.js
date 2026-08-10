@@ -74,7 +74,7 @@
 	};
 
 	var dataUrl = chartEl.getAttribute('data-url') || '/ui/metrics/data';
-	var chart = echarts.init(chartEl);
+	var chart = echarts.init(chartEl, window.gatewayUi.theme() === 'dark' ? 'dark' : null);
 	var rows = [];
 	var sortKey = 'count';
 	var sortDir = -1;
@@ -159,7 +159,13 @@
 			return { min: min - 1, max: max + 1 };
 		}
 		var pad = (max - min) * 0.1;
-		return { min: min - pad, max: max + pad };
+		// Rounded: an explicit bound is printed as the axis label as given, and the float
+		// noise of the padding would render it as 3.0000000004 rather than 3.4.
+		return { min: round(min - pad), max: round(max + pad) };
+	}
+
+	function round(value) {
+		return Math.round(value * 1000) / 1000;
 	}
 
 	function sizer(key) {
@@ -263,6 +269,10 @@
 
 		if (is3d) {
 			chart.setOption({
+				// The bundled dark theme paints a canvas of its own, dropped so the chart
+				// keeps sitting on the card that hosts it. Both calls replace the option
+				// rather than merging into it, so each one carries it.
+				backgroundColor: 'transparent',
 				tooltip: { formatter: tooltip },
 				xAxis3D: { name: LABELS[xk], type: 'value' },
 				yAxis3D: { name: LABELS[yk], type: 'value' },
@@ -289,6 +299,7 @@
 		var guide = guides(xs, ys, xb, yb, config.quadrants);
 
 		chart.setOption({
+			backgroundColor: 'transparent',
 			tooltip: { formatter: tooltip },
 			grid: { left: 70, right: 30, top: 24, bottom: 56 },
 			xAxis: {

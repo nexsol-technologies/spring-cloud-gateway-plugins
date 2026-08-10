@@ -68,7 +68,16 @@ window.gatewayUi = (function () {
 		}
 	}
 
-	return { remember: remember };
+	/**
+	 * The theme the page is drawn in, for the widgets that pick their own colours.
+	 *
+	 * @returns {string} 'dark' or 'light'
+	 */
+	function theme() {
+		return document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
+	}
+
+	return { remember: remember, theme: theme };
 })();
 
 (function () {
@@ -91,5 +100,34 @@ window.gatewayUi = (function () {
 		var collapsed = !shell.classList.contains('gw-collapsed');
 		apply(collapsed);
 		localStorage.setItem(STORAGE_KEY, String(collapsed));
+	});
+})();
+
+/*
+ * Light / dark switch. The theme itself is applied by the head of the shell, before the
+ * page paints; this only writes the choice down and puts it in place straight away.
+ */
+(function () {
+	var STORAGE_KEY = 'gw-theme';
+	var button = document.getElementById('gw-theme');
+	if (!button) {
+		return;
+	}
+
+	button.addEventListener('click', function () {
+		var next = window.gatewayUi.theme() === 'dark' ? 'light' : 'dark';
+		document.documentElement.setAttribute('data-bs-theme', next);
+		try {
+			localStorage.setItem(STORAGE_KEY, next);
+		}
+		catch (ignored) {
+			// A storage that is full or disabled must not break the switch: the theme
+			// still changes, it is simply not remembered.
+		}
+		// A widget that picks its colours when it is created cannot be restyled in place.
+		// The page hosting one comes back in the new theme rather than staying half-lit.
+		if (document.querySelector('[data-gw-theme-reload]')) {
+			location.reload();
+		}
 	});
 })();

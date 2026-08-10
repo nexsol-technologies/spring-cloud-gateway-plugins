@@ -32,6 +32,14 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 @ControllerAdvice
 public class GatewayUiModelAttributes {
 
+	/**
+	 * The version of the plugins, as stamped in the manifest of the jar this class ships
+	 * in. It is {@code null} when the classes are not read from a jar, which is what
+	 * running from an IDE or from the test classes does: the menu then shows no version
+	 * rather than a made-up one.
+	 */
+	private static final String VERSION = GatewayUiModelAttributes.class.getPackage().getImplementationVersion();
+
 	private final GatewayUiMenu menu;
 
 	/**
@@ -49,6 +57,16 @@ public class GatewayUiModelAttributes {
 	@ModelAttribute("navItems")
 	public List<NavItem> navItems() {
 		return this.menu.items();
+	}
+
+	/**
+	 * Adds the version of the plugins to the model of every view, for the side menu to
+	 * show it.
+	 * @return the version, or {@code null} when it cannot be read
+	 */
+	@ModelAttribute("uiVersion")
+	public String uiVersion() {
+		return VERSION;
 	}
 
 }

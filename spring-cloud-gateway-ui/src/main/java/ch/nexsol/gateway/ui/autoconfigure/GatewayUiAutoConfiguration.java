@@ -120,7 +120,7 @@ public class GatewayUiAutoConfiguration {
 		// requests answer as the 404 they are, and stay out of the audit trail.
 		return new UiSecuredPaths("/ui", "/css/bootstrap.min.css", "/css/bootstrap.min.css.map", "/css/gateway-ui.css",
 				"/js/htmx.min.js", "/js/bootstrap.bundle.min.js", "/js/bootstrap.bundle.min.js.map",
-				"/js/gateway-ui.js");
+				"/js/gateway-ui.js", "/img/logo.png", "/img/logo-dark.png", "/img/icon.png");
 	}
 
 	/**

@@ -3,12 +3,18 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Home', ~{:: #gw-page}, ~{})}">
 <body>
 	<div id="gw-page">
-		<header class="mb-4 d-flex flex-wrap gap-3 align-items-baseline">
+		<header class="mb-4 d-flex flex-wrap gap-4 align-items-center">
+			<!-- Two lockups: the tagline of the shipped one is near-black and would be lost
+			     on a dark page, so the dark theme gets a lightened one. -->
+			<img class="gw-home-logo gw-logo-light" th:src="@{/img/logo.png}" src="/img/logo.png"
+					alt="neXsol Spring Cloud Gateway Plugins">
+			<img class="gw-home-logo gw-logo-dark" th:src="@{/img/logo-dark.png}" src="/img/logo-dark.png"
+					alt="" aria-hidden="true">
 			<div>
 				<h1 class="h3 fw-bold mb-1">Spring Cloud Gateway</h1>
 				<p class="text-secondary mb-0">Where the gateway stands right now.</p>
 			</div>
-			<div class="ms-auto text-secondary small">
+			<div class="ms-auto text-secondary small align-self-end">
 				up for <span class="fw-semibold" th:text="${uptime}">—</span>
 			</div>
 		</header>
