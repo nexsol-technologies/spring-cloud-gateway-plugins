@@ -21,7 +21,12 @@ The plugin auto-configures itself; no extra setup is required. Start the gateway
 
 Every screenshot in this page comes from the
 [gateway-full sample](../spring-cloud-gateway-samples/gateway/gateway-full), which runs
-every plugin at once, so each view is shown with real routes and real traffic.
+every plugin at once, so each view is shown with real routes and real traffic. Its console
+signs an operator in, which is why the side menu carries a name and a way out &mdash; see
+[Signing in](#signing-in). The two of the login page itself come from
+[gateway-ui-secured](../spring-cloud-gateway-samples/gateway/gateway-ui-secured), the sample
+that registers an identity provider. They are re-captured with
+[tools/console-screenshots.mjs](../tools/README.md).
 
 ## The shell
 
@@ -462,6 +467,10 @@ When Spring Security is on the classpath, the plugin contributes its own
 `SecurityWebFilterChain` so the shell keeps working behind the authentication of the
 application. Nothing has to be declared.
 
+What that chain does with the paths of the console is the **mode**. It permits them by
+default, which is the behaviour the plugin has always had. Set to `authenticated`, it puts
+a login page in front of them instead &mdash; see [Signing in](#signing-in) below.
+
 The chain permits **exactly** the paths the active views serve &mdash; never a `/ui/**`
 pattern. A gateway route declared under `/ui` (say `/ui/find_pwd`) must not inherit the UI
 permissions, and a view that is not active leaves its path closed. Each view declares its
@@ -499,3 +508,150 @@ spring.cloud.gateway.server.webflux:
 > As with any `SecurityWebFilterChain` bean, its presence makes Spring Boot back off from
 > its default "everything authenticated" chain. An application that was relying on that
 > default must declare its own chains.
+
+The chain is built from a `ServerHttpSecurity`, which only exists once WebFlux security is
+enabled. In practice that means `spring-boot-starter-security`: with the raw Spring Security
+jars alone and no Boot security auto-configuration, the plugin contributes nothing and the
+console stays under the rules of the application.
+
+## Signing in
+
+The console can carry its own login page rather than borrowing the authentication of the
+application. One property switches it on:
+
+```yaml
+spring.cloud.gateway.server.webflux:
+  ui:
+    security:
+      mode: authenticated
+      user:
+        name: superadmin
+        password: ${ADMIN_PASSWORD}
+```
+
+Every path the active views serve is then behind an authenticated principal; the login page
+and the static assets it paints with are the only ones left open.
+
+![The login page of the console](doc/login-light.png)
+
+> The two screenshots of this section come from the
+> [gateway-ui-secured sample](../spring-cloud-gateway-samples/gateway/gateway-ui-secured/README.md),
+> which is this whole section running: a local user, a Keycloak the sample starts and
+> imports a realm into, and a Bearer token on the endpoints. The provider button is there
+> because that sample registers one; with a local user alone the form stands on its own.
+
+It follows the console into the dark theme, remembering the choice made in the side menu so
+signing back in never flashes the other one:
+
+![The login page in the dark theme](doc/login-dark.png)
+
+What that gives you:
+
+* **A local user** &mdash; declared by the properties above and held by this chain alone.
+  It is *not* registered as a `ReactiveUserDetailsService`, so it neither competes with nor
+  replaces the authentication the rest of the application is built on. The password is taken
+  as-is when it carries the id of the encoder that produced it (`{bcrypt}$2a$…`) and
+  encoded at start-up otherwise. Leave it unset and the console authenticates against
+  whatever directory the application declared.
+* **An OpenID Connect provider** &mdash; nothing to configure beyond the standard Spring
+  Security client registration. A button per registered provider appears on the login page
+  on its own:
+
+  ```yaml
+  spring.security.oauth2.client:
+    registration.oidc:
+      client-id: gateway-console
+      client-secret: ${OIDC_CLIENT_SECRET}
+      scope: openid,profile,email
+    provider.oidc:
+      issuer-uri: https://your-idp.example.com/realms/master
+  ```
+
+  Both ways in can be offered at once, which is the point: operators sign in through the
+  provider, and the local user stays as the way in when the provider is unreachable. With a
+  provider alone and no local user, the credentials form is left out rather than shown
+  unable to succeed.
+* **A Bearer token** &mdash; configure a resource server and the endpoints of the console
+  answer a token as well as a session, for a script or an external dashboard reading
+  `/ui/metrics/data` and the like:
+
+  ```yaml
+  spring.security.oauth2.resourceserver.jwt.issuer-uri: https://your-idp.example.com/realms/master
+  ```
+
+* **Roles** &mdash; `required-roles` narrows the console to the principals holding them, and
+  `roles-claim` says where the token carries its roles, as a dotted path into the claim set
+  (`roles`, `realm_access.roles`, `resource_access.console.roles`&hellip;). The roles read
+  there are added to the authorities of a Bearer token and of an OIDC session alike, so the
+  same rule applies to both:
+
+  ```yaml
+  spring.cloud.gateway.server.webflux.ui.security:
+    roles-claim: realm_access.roles
+    required-roles: [ADMIN]
+  ```
+
+  Left empty, any authenticated principal is let through. A principal signed in but holding
+  none of them is not answered with a bare `403`: signing in again would hand back the same
+  roles, so the console shows them a page saying so, carrying the button that ends the
+  session.
+
+  ![The page shown to a signed-in visitor holding none of the required roles](doc/forbidden-light.png)
+
+  `/ui/forbidden` and `/ui/logout` are therefore behind *authentication* and never behind
+  `required-roles`: gating them on the roles would trap someone who holds none, unable even
+  to sign out.
+
+  What names the principal is `user-name-attribute` on the provider. Keycloak issues an
+  opaque `sub` by default, so point it at something a person recognises, or the side menu
+  reads a UUID:
+
+  ```yaml
+  spring.security.oauth2.client.provider.keycloak.user-name-attribute: preferred_username
+  ```
+
+| Property | Default | What it does |
+| --- | --- | --- |
+| `...ui.security.mode` | `permit-all` | `authenticated` puts the login page in front of the console |
+| `...ui.security.user.name` | `admin` | Name of the local user |
+| `...ui.security.user.password` | &mdash; | Password of the local user; unset, no local user is declared |
+| `...ui.security.user.roles` | `[ADMIN]` | Roles the local user holds |
+| `...ui.security.roles-claim` | &mdash; | Dotted path the roles of a token are read from |
+| `...ui.security.required-roles` | `[]` | Roles a principal must hold; empty lets any authenticated principal through |
+
+Signing in resumes the navigation it interrupted: the page the visitor was heading for is
+saved and served once the session opens, falling back on `/ui`. The side menu then shows who
+is signed in, with the button that ends the session next to the theme switch.
+
+Signing out ends the session the **provider** holds as well, through its
+`end_session_endpoint`. Without that, the console would close its own session and the
+provider would hand the same account straight back on the next sign-in: nobody could come
+back as somebody else without clearing their cookies. Two things follow from it:
+
+* The provider must accept the console as a post-logout destination. In Keycloak that is
+  the client's *Valid post logout redirect URIs*, and it has to cover
+  `<gateway>/ui/login?logout`.
+* This is a single sign-on session, so an operator signing out of the console signs out of
+  whatever else shares it.
+
+A local user, or a provider publishing no `end_session_endpoint`, is signed out the ordinary
+way &mdash; the console falls back on its own login page.
+
+Answers are given in the terms of the request that was made, which is what keeps the shell
+usable rather than merely secured:
+
+| Request | Unauthenticated answer |
+| --- | --- |
+| A page navigation | `302` to `/ui/login` |
+| An HTMX fragment | `401` carrying `HX-Redirect: /ui/login`, so HTMX reloads the page instead of swapping the login form into a corner of the shell |
+| An event stream (`/ui/audit/events`) | `401`, which an `EventSource` can act on &mdash; served the login page, it would keep reconnecting to it |
+| A request carrying `Authorization` | `401` with `WWW-Authenticate: Bearer` rather than an HTML page |
+
+CSRF protection is on in this mode, since the console is then behind a session cookie. The
+forms carry the token as a hidden field, and `gateway-ui.js` puts it on every HTMX request
+from the `<meta name="_csrf">` tags the shell renders. A plugin hosting its own page inside
+the shell gets this for free as long as it goes through the shell layout.
+
+The [gateway-ui-secured sample](../spring-cloud-gateway-samples/gateway/gateway-ui-secured/README.md)
+runs all of it &mdash; local user, Keycloak with an imported realm, roles, Bearer tokens
+&mdash; and declares no security bean of its own.

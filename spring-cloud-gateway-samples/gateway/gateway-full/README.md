@@ -50,6 +50,23 @@ http://localhost:8181/ui. Every view lights up here, since every plugin is prese
 page, the routes with their sources, the route tester, the traffic chart, the instances
 view, the audit tail and the **Database routes** management page.
 
+The console carries its own login page: sign in with `superadmin` / `superadmin`, or set
+`ADMIN_PASSWORD`. That is the whole configuration &mdash;
+[application.yml](src/main/resources/application.yml) sets
+`spring.cloud.gateway.server.webflux.ui.security.mode` to `authenticated` and names a local
+user; the plugin contributes the chain.
+
+Two things are worth noticing while you are in there. The side menu gains the operator and
+the button that ends the session, next to the theme switch. And **Database routes** is the
+one page of the console the plugin leaves to the application &mdash; it belongs to another
+plugin, and it creates and deletes routes &mdash; so
+[ApiGatewayApplication](src/main/java/ch/nexsol/gateway/sample/ApiGatewayApplication.java)
+asks for a principal on it and sends visitors to the same login page. Signing in once opens
+both.
+
+The [gateway-ui-secured](../gateway-ui-secured/README.md) sample is the other half of this:
+the same login page, with Keycloak and roles behind it.
+
 ### OpenAPI hub
 
 > Run the gateway and `service-a` with the `eureka` profile, and the `eureka` sample.

@@ -134,6 +134,13 @@ spring.cloud.gateway.server.webflux.ui:
     extensions:
       x-roles: Required roles
       x-from-application-version: Since
+  security:
+    mode: authenticated
+    user:
+      name: superadmin
+      password: ${ADMIN_PASSWORD:superadmin}
+      roles:
+      - ADMIN
 
 # CASE_INSENSITIVE_IDENTIFIERS is what makes H2 accept the quoted lower-case identifiers
 # Spring Data R2DBC generates against the schema the plugin ships, whose DDL is unquoted.

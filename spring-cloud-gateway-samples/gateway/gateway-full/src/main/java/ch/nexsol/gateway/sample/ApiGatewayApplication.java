@@ -34,6 +34,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.authentication.RedirectServerAuthenticationEntryPoint;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.CorsWebFilter;
@@ -65,7 +66,8 @@ public class ApiGatewayApplication {
 	}
 
 	// The UI, OpenAPI hub and Basic-auth exchange chains are contributed by the ui,
-	// hub-openapi and oauth2 plugins themselves.
+	// hub-openapi and oauth2 plugins themselves. The console carries its own login page
+	// here, from spring.cloud.gateway.server.webflux.ui.security in application.yml.
 
 	@Bean
 	@Order(2)
@@ -88,13 +90,30 @@ public class ApiGatewayApplication {
 		http.csrf(ServerHttpSecurity.CsrfSpec::disable);
 		http.authorizeExchange((spec) -> {
 			spec.pathMatchers("/actuator/**").permitAll();
-			spec.pathMatchers("/ui/**").permitAll();
+			// The console is behind its own login page, and the chain the ui plugin
+			// contributes covers the paths its views serve. What is left here is the
+			// database routes page: it belongs to another plugin, it creates and deletes
+			// routes, and the console deliberately leaves it to the application. This
+			// application decides the same thing, and reads the session opened at
+			// /ui/login.
+			spec.pathMatchers("/ui/**").authenticated();
 			spec.pathMatchers("/api/gateway/**").permitAll();
 			spec.pathMatchers("/v3/api-docs", "/v3/api-docs/**", "/configuration/ui", "/swagger-resources/**",
 					"/configuration/security", "/swagger-ui.html", "/webjars/**", "/v3/api-docs/swagger-config")
 				.permitAll();
 			spec.anyExchange().permitAll();
 		});
+		/*
+		 * Without this, ServerHttpSecurity brings its own login form and sends the
+		 * visitor to a generated page at /login: a second login page for the same
+		 * session. The one path this chain protects is a page of the console, so it sends
+		 * them there instead. Every other path here is permitted, so no API call reaches
+		 * this entry point.
+		 */
+		http.formLogin(ServerHttpSecurity.FormLoginSpec::disable);
+		http.httpBasic(ServerHttpSecurity.HttpBasicSpec::disable);
+		http.exceptionHandling((handling) -> handling
+			.authenticationEntryPoint(new RedirectServerAuthenticationEntryPoint("/ui/login")));
 		http.oauth2ResourceServer((oauth2) -> oauth2.jwt(Customizer.withDefaults()));
 		return http.build();
 	}

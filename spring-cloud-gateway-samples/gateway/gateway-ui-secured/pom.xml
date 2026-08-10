@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>ch.nexsol-tech.gateway</groupId>
+		<artifactId>sample-gateways</artifactId>
+		<version>${revision}</version>
+		<relativePath>../pom.xml </relativePath>
+	</parent>
+	<artifactId>sample-gateway-ui-secured</artifactId>
+	<name>sample-gateway-ui-secured</name>
+	<description>Gateway sample putting a login page in front of the console, with a local user and Keycloak</description>
+
+	<dependencies>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-ui</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<!--
+			The console builds its chain from a ServerHttpSecurity, which only exists once
+			this starter enables WebFlux security.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<!-- Signing in through the identity provider. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-client</artifactId>
+		</dependency>
+		<!-- Calling the endpoints of the console with a Bearer token rather than a session. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+		</dependency>
+	</dependencies>
+
+</project>

@@ -1,0 +1,36 @@
+# The identity provider the console signs into under the 'keycloak' profile:
+#
+#   docker compose up -d
+#   mvn spring-boot:run -Dspring-boot.run.profiles=keycloak
+#
+# The default profile needs none of this: the console then has its local user alone.
+#
+# The realm is imported at start-up from keycloak/gateway-realm.json and lives in the
+# container only, so `docker compose down` puts everything back the way it was.
+services:
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    container_name: gateway-ui-keycloak
+    # 8380, so it collides neither with the service the sample routes to on 8080 nor with
+    # the authorization server of the gateway-secured sample on 9090.
+    ports:
+      - "8380:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    command:
+      - start-dev
+      - --import-realm
+    healthcheck:
+      # The management port carries the health endpoints; /realms/gateway answering is what
+      # actually tells you the import went through.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo -e 'GET /realms/gateway HTTP/1.1\\nHost: localhost\\nConnection: close\\n\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s

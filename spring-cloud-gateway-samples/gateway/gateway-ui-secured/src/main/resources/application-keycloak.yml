@@ -1,0 +1,37 @@
+# Single sign-on through the Keycloak the docker-compose file of this sample starts.
+#
+# Kept in a profile rather than in application.yml on purpose: `issuer-uri` makes the
+# gateway fetch the OpenID configuration of the realm at start-up, so the default profile
+# starts — and the tests run — without anything listening on 8380.
+spring.security.oauth2:
+  client:
+    registration:
+      keycloak:
+        # Read on the button of the login page.
+        client-name: Keycloak
+        client-id: gateway-console
+        client-secret: ${OIDC_CLIENT_SECRET:gateway-console-secret}
+        authorization-grant-type: authorization_code
+        redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+        scope:
+        - openid
+        - profile
+        - email
+    provider:
+      keycloak:
+        issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8380/realms/gateway}
+        user-name-attribute: preferred_username
+
+  # The endpoints of the console then answer a Bearer token as well as a session, for a
+  # script or an external dashboard reading /ui/metrics/data and the like.
+  resourceserver:
+    jwt:
+      issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8380/realms/gateway}
+
+spring.cloud.gateway.server.webflux.ui.security:
+  # Where the realm puts the roles it grants: Keycloak writes them under realm_access, and
+  # the realm imported by the compose file adds them to the identity token as well as to
+  # the access token, so a session and a Bearer token are matched on the same rule.
+  roles-claim: realm_access.roles
+  required-roles:
+  - ADMIN

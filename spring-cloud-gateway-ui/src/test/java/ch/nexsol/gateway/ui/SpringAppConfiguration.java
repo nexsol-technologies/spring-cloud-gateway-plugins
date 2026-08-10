@@ -29,9 +29,15 @@ import org.springframework.context.annotation.FilterType;
  * The {@link TypeExcludeFilter} exclusion is what {@code @SpringBootApplication} adds for
  * you: without it the scan picks up the {@code @TestConfiguration} classes of every test
  * in these packages, so each test would see the beans contributed by all the others.
+ * <p>
+ * The security package is excluded because a gateway application never scans it: what it
+ * holds is contributed by the auto-configuration, and only under the mode that asks for
+ * it. Scanning it here would give every test a login page the console was not configured
+ * to serve.
  */
 @SpringBootConfiguration
-@ComponentScan(excludeFilters = @ComponentScan.Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class))
+@ComponentScan(excludeFilters = { @ComponentScan.Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
+		@ComponentScan.Filter(type = FilterType.REGEX, pattern = "ch\\.nexsol\\.gateway\\.ui\\.security\\..*") })
 @EnableAutoConfiguration
 public class SpringAppConfiguration {
 

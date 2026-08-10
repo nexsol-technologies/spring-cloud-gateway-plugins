@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Spring Cloud Gateway &mdash; Not allowed</title>
+	<link rel="icon" type="image/png" th:href="@{/img/icon.png}" href="/img/icon.png">
+	<link rel="apple-touch-icon" th:href="@{/img/icon.png}" href="/img/icon.png">
+	<!-- Same early theme switch as the shell, so the page never flashes the other one. -->
+	<script>
+		(function () {
+			var chosen = null;
+			try {
+				chosen = localStorage.getItem('gw-theme');
+			}
+			catch (ignored) {
+				// Storage refused by the browser: the system preference decides.
+			}
+			document.documentElement.setAttribute('data-bs-theme',
+					chosen || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+		})();
+	</script>
+	<link rel="stylesheet" th:href="@{/css/bootstrap.min.css}" href="/css/bootstrap.min.css">
+	<link rel="stylesheet" th:href="@{/css/gateway-ui.css}" href="/css/gateway-ui.css">
+</head>
+<body class="bg-body-tertiary">
+	<main class="gw-login">
+		<div class="card border-0 shadow-sm gw-login-card">
+			<div class="card-body p-4 p-sm-5 text-center">
+				<!-- A closed padlock: the console was reached, and it is shut. -->
+				<svg class="gw-forbidden-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+						stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<rect x="4.5" y="10.5" width="15" height="10" rx="2"/>
+					<path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>
+					<circle cx="12" cy="15.5" r="1.4" fill="currentColor" stroke="none"/>
+				</svg>
+				<h1 class="h4 fw-bold mt-3 mb-2">This console is not open to you</h1>
+				<p class="text-secondary mb-1">
+					You are signed in, but your account does not hold the roles the gateway console
+					requires.
+				</p>
+				<p class="text-secondary" th:if="${currentUser != null}">
+					Signed in as <span class="fw-semibold" th:text="${currentUser}">operator</span>.
+				</p>
+				<p class="text-secondary small mb-4">
+					Ask an administrator for the missing role, or sign out and come back as somebody
+					else.
+				</p>
+				<form th:action="@{/ui/logout}" action="/ui/logout" method="post">
+					<input type="hidden" th:if="${_csrf != null}"
+							th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+					<button class="btn btn-primary w-100" type="submit">Sign out</button>
+				</form>
+			</div>
+		</div>
+	</main>
+</body>
+</html>
