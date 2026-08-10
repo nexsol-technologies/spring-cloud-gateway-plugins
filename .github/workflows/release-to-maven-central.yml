@@ -65,7 +65,12 @@ jobs:
     permissions:
      contents: write
     steps:
+      # Full history + tags: the changelog generator diffs against the previous
+      # tag, and a shallow clone makes its 'git fetch --tags' fail with
+      # "shallow file has changed since we read it".
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: free disk space
         continue-on-error: true
