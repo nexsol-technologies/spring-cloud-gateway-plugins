@@ -22,6 +22,7 @@ import java.util.Map;
 
 import ch.nexsol.gateway.oauth2.filter.factory.AuthorizationTokenGatewayFilterFactory.Config;
 import ch.nexsol.gateway.oauth2.filter.factory.AuthorizationTokenGatewayFilterFactory.GrantAccess;
+import ch.nexsol.gateway.oauth2.filter.factory.AuthorizationTokenGatewayFilterFactory.MatchMode;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTParser;
 import org.junit.jupiter.api.Test;
@@ -92,6 +93,79 @@ class AuthorizationTokenGatewayFilterFactoryTests {
 	}
 
 	@Test
+	void shouldHaveOneOfTheRolesWhenTheMatchIsAny() throws ParseException {
+		AuthorizationTokenGatewayFilterFactory factory = new AuthorizationTokenGatewayFilterFactory();
+		GrantAccess grantAccess = grantAccess("$.resource_access.*.roles", MatchMode.ANY, "role1", "roleXXX");
+
+		boolean hasAuthority = factory.hasAuthority(claims(), grantAccess);
+		assertThat(hasAuthority).isTrue();
+	}
+
+	@Test
+	void shouldCombineTheRolesAndTheGrantedAccessesWithAllByDefault() {
+		assertThat(new GrantAccess().getMatch()).isEqualTo(MatchMode.ALL);
+		assertThat(new Config().getGrantAccessesMatch()).isEqualTo(MatchMode.ALL);
+	}
+
+	@Test
+	void shouldDenyWhenEveryGrantedAccessAndEveryRoleAreRequired() throws ParseException {
+		assertThat(hasAuthority(MatchMode.ALL, partiallySatisfied(MatchMode.ALL), neverSatisfied())).isFalse();
+	}
+
+	@Test
+	void shouldDenyWhenEveryGrantedAccessIsRequiredEvenIfASingleRoleIsEnough() throws ParseException {
+		assertThat(hasAuthority(MatchMode.ALL, partiallySatisfied(MatchMode.ANY), neverSatisfied())).isFalse();
+	}
+
+	@Test
+	void shouldDenyWhenASingleGrantedAccessIsEnoughButNoneIsSatisfied() throws ParseException {
+		assertThat(hasAuthority(MatchMode.ANY, partiallySatisfied(MatchMode.ALL), neverSatisfied())).isFalse();
+	}
+
+	@Test
+	void shouldGrantWhenASingleGrantedAccessIsEnoughAndOneRoleSatisfiesIt() throws ParseException {
+		assertThat(hasAuthority(MatchMode.ANY, partiallySatisfied(MatchMode.ANY), neverSatisfied())).isTrue();
+	}
+
+	@Test
+	void shouldRequireEveryGrantedAccessThroughTheTwoArgumentOverload() throws ParseException {
+		AuthorizationTokenGatewayFilterFactory factory = new AuthorizationTokenGatewayFilterFactory();
+		List<GrantAccess> grantAccesses = List.of(partiallySatisfied(MatchMode.ANY), neverSatisfied());
+
+		// The overload kept for the callers of the previous signature must behave as ALL.
+		assertThat(factory.hasAuthority(claims(), grantAccesses)).isFalse();
+	}
+
+	@Test
+	void shouldForwardARequestWhenASingleGrantedAccessIsSatisfied() {
+		Config config = new Config();
+		config.setGrantAccessesMatch(MatchMode.ANY);
+		config.setGrantAccesses(List.of(neverSatisfied(), partiallySatisfied(MatchMode.ANY)));
+		MockServerWebExchange exchange = MockServerWebExchange
+			.from(MockServerHttpRequest.get("/anything").header("Authorization", "Bearer " + token));
+		RecordingChain chain = new RecordingChain();
+
+		StepVerifier.create(new AuthorizationTokenGatewayFilterFactory().apply(config).filter(exchange, chain))
+			.verifyComplete();
+		assertThat(chain.called).isTrue();
+	}
+
+	@Test
+	void shouldNotCheckTheGrantedAccessesWhenTheListIsEmptyWhateverTheMatchMode() {
+		// anyMatch on an empty list is false: the hasCheck() guard is what keeps an empty
+		// configuration from denying every request once the match mode is ANY.
+		Config config = new Config();
+		config.setGrantAccessesMatch(MatchMode.ANY);
+		MockServerWebExchange exchange = MockServerWebExchange
+			.from(MockServerHttpRequest.get("/anything").header("Authorization", "Bearer " + token));
+		RecordingChain chain = new RecordingChain();
+
+		StepVerifier.create(new AuthorizationTokenGatewayFilterFactory().apply(config).filter(exchange, chain))
+			.verifyComplete();
+		assertThat(chain.called).isTrue();
+	}
+
+	@Test
 	void shouldRejectRequestWithoutTokenWhenACheckIsConfigured() {
 		Config config = new Config();
 		config.setIssuers(List.of("https://nexsol.tech"));
@@ -155,6 +229,43 @@ class AuthorizationTokenGatewayFilterFactoryTests {
 					(ex) -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN))
 			.verify();
 		assertThat(chain.called).isFalse();
+	}
+
+	private static Map<String, Object> claims() throws ParseException {
+		return JWTParser.parse(token).getJWTClaimsSet().getClaims();
+	}
+
+	private static boolean hasAuthority(MatchMode grantAccessesMatch, GrantAccess... grantAccesses)
+			throws ParseException {
+		return new AuthorizationTokenGatewayFilterFactory().hasAuthority(claims(), List.of(grantAccesses),
+				grantAccessesMatch);
+	}
+
+	private static GrantAccess grantAccess(String jsonPath, MatchMode match, String... roles) {
+		GrantAccess grantAccess = new GrantAccess();
+		grantAccess.setJsonPath(jsonPath);
+		grantAccess.setMatch(match);
+		grantAccess.setRoles(List.of(roles));
+		return grantAccess;
+	}
+
+	/**
+	 * A requirement the token satisfies partially: the realm holds {@code admin} but not
+	 * {@code roleXXX}, so it is satisfied under {@link MatchMode#ANY} only.
+	 * @param match how the roles are combined
+	 * @return the granted access
+	 */
+	private static GrantAccess partiallySatisfied(MatchMode match) {
+		return grantAccess("$.realm_access.roles", match, "admin", "roleXXX");
+	}
+
+	/**
+	 * A requirement the token never satisfies, whatever the match mode. The bracket
+	 * notation is what addresses a client id holding a hyphen.
+	 * @return the granted access
+	 */
+	private static GrantAccess neverSatisfied() {
+		return grantAccess("$.resource_access['spring-client-1'].roles", MatchMode.ALL, "roleYYY");
 	}
 
 	private static Route publicRoute() {

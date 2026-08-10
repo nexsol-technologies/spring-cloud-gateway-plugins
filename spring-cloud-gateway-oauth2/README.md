@@ -39,10 +39,47 @@ spring.cloud.gateway.server.webflux:
       args:
         issuers: # (optional) List of issuers (iss) to validate
         client-ids:  # (optional) List of client id (azp) to validate
-        grant-accesses: # (optional) List of roles to validate. If many grant_access is provided, it is an AND validation: The token MUST have all the rules
+        grant-accesses-match: ALL # (optional) How the granted accesses are combined, ALL (default) or ANY
+        grant-accesses: # (optional) List of roles to validate
         - jsonPath: '$.resource_access.*.roles'
+          match: ALL # (optional) How the roles are combined, ALL (default) or ANY
           roles: "role-1,role-2"
 ```
+
+#### Combining the granted accesses
+
+Two independent match modes decide how the rules are combined, both defaulting to `ALL`:
+
+* `grant-accesses-match` — between the granted accesses, so between the claims their JSON paths
+  point at: `ALL` requires every one of them, `ANY` a single one.
+* `match` — between the roles of a single granted access: `ALL` requires the claim to hold every
+  role, `ANY` a single one.
+
+The default `ALL`/`ALL` is the most restrictive combination, so a configuration that does not
+declare a match mode keeps requiring every claim and every role.
+
+The example below reads as *(`admin` or `service`) and `book_read`*: a realm role among
+two, plus one client role of `book-service`. The bracket notation is what addresses a client id
+holding a hyphen.
+
+```yaml
+    - name: AuthorizationToken
+      args:
+        grant-accesses-match: ALL
+        grant-accesses:
+        - jsonPath: "$.realm_access.roles"
+          match: ANY
+          roles:
+          - admin
+          - service
+        - jsonPath: "$.resource_access['book-service'].roles"
+          roles:
+          - book_read
+```
+
+A wildcard such as `$.resource_access.*.roles` flattens the roles of every client into a single
+list, so a role granted by any client satisfies the rule. Name the client explicitly when the rule
+is meant to be about one of them.
 
 ## WebFilter
 

@@ -42,10 +42,10 @@ with the event to the audit backend:
 
 ```yaml
 routes:
-  - id: patient
+  - id: book
     uri: https://backend
     predicates:
-      - Path=/patient/**
+      - Path=/book/**
     filters:
       - Audit
     metadata:
@@ -53,7 +53,7 @@ routes:
       criticality: high
 ```
 
-audits `route.id=patient`, `route.metadata.tenant=acme` and
+audits `route.id=book`, `route.metadata.tenant=acme` and
 `route.metadata.criticality=high`. An exchange no route handled &mdash; a request that
 matched nothing, or a page the gateway served itself when the global web filter is on
 &mdash; is audited as `route.id=_none_`, with no metadata attribute.
@@ -106,10 +106,10 @@ spring:
               exclude-paths:         # paths the global filter never audits (default none)
                 - /actuator/**
           routes:
-            - id: patient
+            - id: book
               uri: https://backend
               predicates:
-                - Path=/patient/**
+                - Path=/book/**
               filters:
                 - Audit
 ```

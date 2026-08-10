@@ -96,16 +96,16 @@ class StaticOpenapiDocsRouteLocatorTests {
 		// exactly what the prefix moved away.
 		RoutesOpenapiProperties properties = new RoutesOpenapiProperties();
 		Source source = new Source();
-		source.setId("patients");
-		source.setUri(URI.create("https://patient-service.example.org"));
-		source.setSpecUrl("https://patient-service.example.org/v3/api-docs");
-		source.setPathPrefix("/patient-service");
+		source.setId("books");
+		source.setUri(URI.create("https://book-service.example.org"));
+		source.setSpecUrl("https://book-service.example.org/v3/api-docs");
+		source.setPathPrefix("/book-service");
 		properties.setSources(List.of(source));
 
 		StepVerifier.create(locatorFor(properties).getRouteDefinitions()).assertNext((route) -> {
 			FilterDefinition rewriteServers = route.getFilters().get(1);
 			assertThat(rewriteServers.getName()).isEqualTo("OpenapiModifyResponseBody");
-			assertThat(rewriteServers.getArgs().values()).contains("/patient-service");
+			assertThat(rewriteServers.getArgs().values()).contains("/book-service");
 		}).verifyComplete();
 	}
 

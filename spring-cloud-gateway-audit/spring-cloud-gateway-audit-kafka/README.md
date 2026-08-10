@@ -121,5 +121,5 @@ provide the matching `sasl.jaas.config`.
 The message value is the JSON object of the event attributes, for example:
 
 ```json
-{"request.method":"GET","request.path":"/patient/99098875/alert-summaries","response.status":"OK","jwt.user.id":"toto"}
+{"request.method":"GET","request.path":"/book/99098875/reviews","response.status":"OK","jwt.user.id":"toto"}
 ```

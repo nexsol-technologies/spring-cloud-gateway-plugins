@@ -33,6 +33,7 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
@@ -174,7 +175,8 @@ public class AuthorizationTokenGatewayFilterFactory
 		if (config.checkClientId() && !config.getClientIds().contains(clientId)) {
 			return forbidden(exchange, clientId, "client id forbidden");
 		}
-		if (config.checkGrantAccess() && !hasAuthority(jwt.getClaims(), config.getGrantAccesses())) {
+		if (config.checkGrantAccess()
+				&& !hasAuthority(jwt.getClaims(), config.getGrantAccesses(), config.getGrantAccessesMatch())) {
 			return forbidden(exchange, clientId, "resource access forbidden");
 		}
 		LOG.trace("authorization granted to the client {}", clientId);
@@ -215,7 +217,21 @@ public class AuthorizationTokenGatewayFilterFactory
 	 * @return {@code true} if every granted access is satisfied
 	 */
 	public boolean hasAuthority(Map<String, Object> claims, List<GrantAccess> grantAccesses) {
-		return grantAccesses.stream().allMatch((grantAccess) -> hasAuthority(claims, grantAccess));
+		return hasAuthority(claims, grantAccesses, MatchMode.ALL);
+	}
+
+	/**
+	 * Check whether the given JWT claims satisfy the configured granted accesses,
+	 * combined according to the given mode.
+	 * @param claims the JWT claims to inspect
+	 * @param grantAccesses the required granted accesses
+	 * @param match how the granted accesses are combined
+	 * @return {@code true} if the granted accesses are satisfied
+	 */
+	public boolean hasAuthority(Map<String, Object> claims, List<GrantAccess> grantAccesses, MatchMode match) {
+		return (match == MatchMode.ANY)
+				? grantAccesses.stream().anyMatch((grantAccess) -> hasAuthority(claims, grantAccess))
+				: grantAccesses.stream().allMatch((grantAccess) -> hasAuthority(claims, grantAccess));
 	}
 
 	boolean hasAuthority(Map<String, Object> claims, GrantAccess grantAccess) {
@@ -230,7 +246,9 @@ public class AuthorizationTokenGatewayFilterFactory
 			return false;
 		}
 		Collection<String> claimValues = claimValues(claim);
-		return grantAccess.getRoles().stream().allMatch(claimValues::contains);
+		return (grantAccess.getMatch() == MatchMode.ANY)
+				? grantAccess.getRoles().stream().anyMatch(claimValues::contains)
+				: grantAccess.getRoles().stream().allMatch(claimValues::contains);
 	}
 
 	/**
@@ -284,6 +302,9 @@ public class AuthorizationTokenGatewayFilterFactory
 
 		private List<@Valid GrantAccess> grantAccesses = new ArrayList<>(0);
 
+		@NotNull
+		private MatchMode grantAccessesMatch = MatchMode.ALL;
+
 		/**
 		 * Return the allowed issuers.
 		 * @return the issuers
@@ -333,6 +354,23 @@ public class AuthorizationTokenGatewayFilterFactory
 		}
 
 		/**
+		 * Return how the granted accesses are combined.
+		 * @return the match mode
+		 */
+		public MatchMode getGrantAccessesMatch() {
+			return this.grantAccessesMatch;
+		}
+
+		/**
+		 * Set how the granted accesses are combined: {@link MatchMode#ALL} requires every
+		 * granted access, {@link MatchMode#ANY} a single one.
+		 * @param grantAccessesMatch the match mode to set
+		 */
+		public void setGrantAccessesMatch(MatchMode grantAccessesMatch) {
+			this.grantAccessesMatch = grantAccessesMatch;
+		}
+
+		/**
 		 * Whether the issuer check is enabled (at least one issuer configured).
 		 * @return {@code true} if the issuer must be checked
 		 */
@@ -369,7 +407,7 @@ public class AuthorizationTokenGatewayFilterFactory
 
 	/**
 	 * A single granted access requirement, made of a JSON path pointing to a claim and
-	 * the roles that claim must contain.
+	 * the roles that claim must contain, combined according to its match mode.
 	 */
 	@Validated
 	public static class GrantAccess {
@@ -379,6 +417,9 @@ public class AuthorizationTokenGatewayFilterFactory
 
 		@NotEmpty
 		private List<@NotEmpty String> roles;
+
+		@NotNull
+		private MatchMode match = MatchMode.ALL;
 
 		/**
 		 * Return the JSON path locating the claim holding the roles.
@@ -411,6 +452,40 @@ public class AuthorizationTokenGatewayFilterFactory
 		public void setRoles(List<String> roles) {
 			this.roles = roles;
 		}
+
+		/**
+		 * Return how the required roles are combined.
+		 * @return the match mode
+		 */
+		public MatchMode getMatch() {
+			return this.match;
+		}
+
+		/**
+		 * Set how the required roles are combined: {@link MatchMode#ALL} requires the
+		 * claim to hold every role, {@link MatchMode#ANY} a single one.
+		 * @param match the match mode to set
+		 */
+		public void setMatch(MatchMode match) {
+			this.match = match;
+		}
+
+	}
+
+	/**
+	 * How a list of requirements is combined.
+	 */
+	public enum MatchMode {
+
+		/**
+		 * Every requirement must be satisfied.
+		 */
+		ALL,
+
+		/**
+		 * A single satisfied requirement is enough.
+		 */
+		ANY
 
 	}
 

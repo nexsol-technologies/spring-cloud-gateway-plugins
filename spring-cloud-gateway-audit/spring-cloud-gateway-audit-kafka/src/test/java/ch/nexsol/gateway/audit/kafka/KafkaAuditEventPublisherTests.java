@@ -46,11 +46,11 @@ class KafkaAuditEventPublisherTests {
 		KafkaAuditEventPublisher publisher = new KafkaAuditEventPublisher(template, "gateway-audit",
 				new AuditEventSerializer(new ObjectMapper()));
 
-		publisher.publish(new AuditEvent(Instant.now(), Map.of("request.path", "/patient")));
+		publisher.publish(new AuditEvent(Instant.now(), Map.of("request.path", "/book")));
 
 		ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
 		verify(template).send(eq("gateway-audit"), payload.capture());
-		assertThat(payload.getValue()).asString().contains("/patient");
+		assertThat(payload.getValue()).asString().contains("/book");
 	}
 
 }

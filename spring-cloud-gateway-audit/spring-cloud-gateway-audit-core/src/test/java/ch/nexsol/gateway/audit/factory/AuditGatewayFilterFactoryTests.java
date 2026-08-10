@@ -50,7 +50,7 @@ class AuditGatewayFilterFactoryTests {
 		AuditEventPublisher publisher = mock(AuditEventPublisher.class);
 		GatewayFilter filter = new AuditGatewayFilterFactory(this.eventFactory, publisher)
 			.apply(new AuditGatewayFilterFactory.Config());
-		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build());
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/book").build());
 		GatewayFilterChain chain = (ex) -> {
 			ex.getResponse().setStatusCode(HttpStatus.NOT_FOUND);
 			return Mono.empty();
@@ -68,7 +68,7 @@ class AuditGatewayFilterFactoryTests {
 		AuditEventPublisher publisher = mock(AuditEventPublisher.class);
 		GatewayFilter filter = new AuditGatewayFilterFactory(this.eventFactory, publisher)
 			.apply(new AuditGatewayFilterFactory.Config());
-		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build());
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/book").build());
 		ConnectException failure = new ConnectException("connection refused");
 
 		StepVerifier.create(filter.filter(exchange, (ex) -> Mono.error(failure)))
@@ -76,7 +76,7 @@ class AuditGatewayFilterFactoryTests {
 
 		ArgumentCaptor<AuditEvent> captor = ArgumentCaptor.forClass(AuditEvent.class);
 		verify(publisher, times(1)).publish(captor.capture());
-		assertThat(captor.getValue().attributes()).containsEntry(AuditAttributes.REQUEST_PATH, "/patient");
+		assertThat(captor.getValue().attributes()).containsEntry(AuditAttributes.REQUEST_PATH, "/book");
 	}
 
 	@Test
@@ -85,7 +85,7 @@ class AuditGatewayFilterFactoryTests {
 		doThrow(new RuntimeException("boom")).when(publisher).publish(any());
 		GatewayFilter filter = new AuditGatewayFilterFactory(this.eventFactory, publisher)
 			.apply(new AuditGatewayFilterFactory.Config());
-		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/patient").build());
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/book").build());
 
 		StepVerifier.create(filter.filter(exchange, (ex) -> Mono.empty())).verifyComplete();
 
