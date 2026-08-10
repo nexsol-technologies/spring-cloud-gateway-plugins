@@ -79,6 +79,17 @@ public class AuditEventFactory {
 
 	private static final String BASIC_PREFIX = "basic ";
 
+	/**
+	 * Exchange attribute the OpenAPI validation plugin publishes its outcome under, as a
+	 * map of attribute name to value.
+	 * <p>
+	 * Declared as a literal on purpose: it is the only thing the two plugins agree on,
+	 * and keeping it a literal is what lets either of them be absent from the classpath.
+	 * Its value must stay in step with
+	 * {@code ch.nexsol.gateway.validation.ValidationAttributes.VALIDATION_ATTRIBUTES_ATTR}.
+	 */
+	private static final String VALIDATION_ATTRIBUTES_ATTR = "gatewayOpenapiValidationAttributes";
+
 	private final AuditProperties.Groups groups;
 
 	private final Map<String, String> metadata;
@@ -112,6 +123,9 @@ public class AuditEventFactory {
 		}
 		if (this.groups.isRoute()) {
 			collectRoute(exchange, attributes);
+		}
+		if (this.groups.isValidation()) {
+			collectValidation(exchange, attributes);
 		}
 		collectMetadata(attributes);
 		if (!this.groups.isJwt()) {
@@ -170,6 +184,19 @@ public class AuditEventFactory {
 		}
 		attributes.put(ROUTE_ID, StringUtils.hasText(route.getId()) ? route.getId() : NONE_VALUE);
 		route.getMetadata().forEach((key, value) -> attributes.put(ROUTE_METADATA_PREFIX + key, stringValue(value)));
+	}
+
+	/**
+	 * Copies the outcome the OpenAPI validation plugin stamped on the exchange, when that
+	 * plugin is in use and validated this exchange. Nothing is added otherwise, so an
+	 * event never carries an attribute that would suggest a validation took place.
+	 */
+	private void collectValidation(ServerWebExchange exchange, Map<String, String> attributes) {
+		Object published = exchange.getAttribute(VALIDATION_ATTRIBUTES_ATTR);
+		if (!(published instanceof Map<?, ?> validation)) {
+			return;
+		}
+		validation.forEach((key, value) -> attributes.put(String.valueOf(key), stringValue(value)));
 	}
 
 	private void collectMetadata(Map<String, String> attributes) {

@@ -267,6 +267,45 @@ class AuditEventFactoryTests {
 		assertThat(attributes).containsEntry(AuditAttributes.JWT_USER_ID, "svc");
 	}
 
+	@Test
+	void collectsTheOutcomeTheOpenapiValidationPluginPublished() {
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/books/7").build());
+		// Published by the validation filter under the name the two plugins agree on,
+		// without either of them depending on the other.
+		exchange.getAttributes()
+			.put("gatewayOpenapiValidationAttributes",
+					Map.of("openapi.validation.operation", "GET /books/{id}", "openapi.validation.request.valid",
+							"false", "openapi.validation.request.errors", "query parameter 'page' is not an integer"));
+
+		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
+
+		assertThat(attributes).containsEntry("openapi.validation.operation", "GET /books/{id}")
+			.containsEntry("openapi.validation.request.valid", "false")
+			.containsEntry("openapi.validation.request.errors", "query parameter 'page' is not an integer");
+	}
+
+	@Test
+	void collectsNoValidationAttributeWhenNoValidationTookPlace() {
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/books/7").build());
+
+		Map<String, String> attributes = this.factory.create(exchange).block().attributes();
+
+		assertThat(attributes).doesNotContainKey("openapi.validation.request.valid");
+	}
+
+	@Test
+	void skipsTheValidationGroupWhenItIsTurnedOff() {
+		AuditProperties properties = new AuditProperties();
+		properties.getGroups().setValidation(false);
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/books/7").build());
+		exchange.getAttributes()
+			.put("gatewayOpenapiValidationAttributes", Map.of("openapi.validation.request.valid", "false"));
+
+		Map<String, String> attributes = new AuditEventFactory(properties).create(exchange).block().attributes();
+
+		assertThat(attributes).doesNotContainKey("openapi.validation.request.valid");
+	}
+
 	private static Route route(String id, Map<String, Object> metadata) {
 		return Route.async().id(id).uri("http://orders").predicate((exchange) -> true).metadata(metadata).build();
 	}

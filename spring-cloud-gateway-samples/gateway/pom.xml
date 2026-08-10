@@ -17,6 +17,7 @@
 	<modules>
 		<!-- One plugin each -->
 		<module>gateway-filters</module>
+		<module>gateway-openapi-validation</module>
 		<module>gateway-oauth2</module>
 		<module>gateway-hub-openapi</module>
 		<module>gateway-ui</module>

@@ -1,0 +1,16 @@
+{
+  "properties": [
+    {
+      "name": "spring.cloud.gateway.server.webflux.openapi-validation.request.mode",
+      "type": "ch.nexsol.gateway.validation.ValidationMode",
+      "description": "What to do with a request that does not honour the contract: ENFORCE denies it with 400 Bad Request, REPORT forwards it and records the violations, OFF does not validate the request at all. Enforced by default, since rejecting a malformed request is what shields the downstream service.",
+      "defaultValue": "enforce"
+    },
+    {
+      "name": "spring.cloud.gateway.server.webflux.openapi-validation.response.mode",
+      "type": "ch.nexsol.gateway.validation.ValidationMode",
+      "description": "What to do with a response that does not honour the contract: ENFORCE replaces it with 502 Bad Gateway, REPORT forwards it and records the violations, OFF does not validate the response at all. Only reported on by default: a downstream service answering outside its own contract is a defect to be measured, and turning it into a gateway error would break the clients that cope with it today. Move to ENFORCE once the reports are quiet.",
+      "defaultValue": "report"
+    }
+  ]
+}

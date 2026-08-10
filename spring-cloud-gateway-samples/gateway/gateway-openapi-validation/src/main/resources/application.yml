@@ -1,0 +1,79 @@
+server.port: 8212
+spring.application.name: gateway-openapi-validation
+
+spring.cloud.gateway.server.webflux:
+
+  # Each direction is configured on its own. These are the defaults, spelled out here to
+  # show where the knobs are: a malformed request is denied before it reaches the backend,
+  # while a backend answering outside its own contract is measured rather than turned into a
+  # gateway error. Move the response to ENFORCE once the reports are quiet.
+  openapi-validation:
+    request:
+      mode: ENFORCE           # ENFORCE | REPORT | OFF
+      validate-body: true
+      max-body-size: 1MB
+    response:
+      mode: REPORT
+      validate-body: true
+      max-body-size: 1MB
+
+  audit:
+    groups:
+      # Every validation outcome lands on the audit event, alongside the route, the
+      # principal and the trace id.
+      validation: true
+
+  routes:
+
+  # The contract declares /books and /books/{id}; the gateway exposes them under
+  # /book-service, so the prefix is stripped before a path is matched against the contract,
+  # and stripped again before the request is forwarded.
+  - id: bookstore
+    uri: http://localhost:8080
+    predicates:
+    - Path=/book-service/**
+    filters:
+    - name: OpenapiValidation
+      args:
+        specUrl: classpath:openapi/bookstore.yaml
+        pathPrefix: /book-service
+    - StripPrefix=1
+
+  # Try these against the running gateway. The first four never reach the backend, so they
+  # answer without one:
+  #
+  #   # 400: 'page' is declared as an integer
+  #   curl -i 'localhost:8212/book-service/books?page=first'
+  #
+  #   # 400: 'status' is outside the declared enumeration
+  #   curl -i 'localhost:8212/book-service/books?status=lost'
+  #
+  #   # 400: the contract declares no such operation
+  #   curl -i 'localhost:8212/book-service/authors'
+  #
+  #   # 400: 'author' is required by the Book schema
+  #   curl -i -XPOST localhost:8212/book-service/books \
+  #        -H 'content-type: application/json' -d '{"title":"Dune"}'
+  #
+  #   # forwarded: honours the contract (needs a backend on :8080 to answer)
+  #   curl -i 'localhost:8212/book-service/books?page=1&status=available'
+  #
+  # The counters are then visible at
+  #   curl -s localhost:8212/actuator/metrics/gateway.openapi.validations
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+        - metrics
+  endpoint:
+    gateway:
+      access: read-only
+
+logging:
+  level:
+    '[ch.nexsol]': debug

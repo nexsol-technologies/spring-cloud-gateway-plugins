@@ -24,9 +24,17 @@ Attributes are grouped so each group can be enabled or disabled independently.
 | `response` | `response.header.content-length`, `response.header.content-type`, `response.status` |
 | `trace`    | `trace.id`, `span.id` |
 | `route`    | `route.id`, `route.metadata.<key>` for every metadata declared on that route |
+| `validation` | `openapi.validation.operation`, `openapi.validation.request.valid`, `openapi.validation.request.errors`, `openapi.validation.response.valid`, `openapi.validation.response.errors` |
 
 Absent values are rendered as `_none_`; an expected-but-unresolved content type is
 rendered as `unknown`.
+
+The `validation` group carries the outcome published by
+[spring-cloud-gateway-openapi-validation](../../spring-cloud-gateway-openapi-validation/README.md).
+The two plugins do not depend on each other: the filter stamps its outcome on the exchange
+and this group reads it if it is there, so either plugin can be absent. Nothing is added for
+an exchange no contract was applied to, and an `errors` attribute only appears when there
+were violations &mdash; so an audited exchange never looks validated when it was not.
 
 The `trace` group is read from the current Micrometer Tracing observation, so it needs a
 tracer that is actually wired. Since Spring Boot 4 that takes two dependencies &mdash; the
@@ -101,6 +109,7 @@ spring:
               response: true         # default true
               trace: true            # default true
               route: true            # default true
+              validation: true       # default true; OpenAPI validation outcome, when that plugin is in use
             web-filter:
               enabled: false         # global auditing, opt-in (default false)
               exclude-paths:         # paths the global filter never audits (default none)
@@ -146,7 +155,7 @@ All keys are under `spring.cloud.gateway.server.webflux.audit`.
 | `enabled` | `true` | Master switch; when `false` no audit filter is registered |
 | `provider` | _(unset)_ | Provider selector, read by the provider modules |
 | `metadata.<key>` | _(empty)_ | Metadata added to every event as `metadata.<key>` |
-| `groups.jwt` / `groups.request` / `groups.response` / `groups.trace` / `groups.route` | `true` | Toggle each attribute group |
+| `groups.jwt` / `groups.request` / `groups.response` / `groups.trace` / `groups.route` / `groups.validation` | `true` | Toggle each attribute group |
 | `web-filter.enabled` | `false` | Register the global auditing web filter |
 | `web-filter.exclude-paths` | _(empty)_ | Path patterns the global filter never audits; a matching exchange produces no event at all |
 
