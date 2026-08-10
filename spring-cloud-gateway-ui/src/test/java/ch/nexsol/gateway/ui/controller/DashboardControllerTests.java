@@ -53,6 +53,33 @@ class DashboardControllerTests {
 	}
 
 	@Test
+	void shouldRenderTheBrandingAndTheThemeSwitch() {
+		this.webTestClient.get()
+			.uri("/ui")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("rel=\"icon\"")
+				.contains("/img/icon.png")
+				.contains("/img/logo.png")
+				.contains("id=\"gw-theme\""));
+	}
+
+	@Test
+	void shouldServeTheBrandImagesTheShellPointsAt() {
+		for (String image : new String[] { "/img/icon.png", "/img/logo.png", "/img/logo-dark.png" }) {
+			this.webTestClient.get()
+				.uri(image)
+				.exchange()
+				.expectStatus()
+				.isOk()
+				.expectHeader()
+				.contentType(MediaType.IMAGE_PNG);
+		}
+	}
+
+	@Test
 	void shouldRenderTheOverviewFiguresAndTheUptime() {
 		this.webTestClient.get()
 			.uri("/ui")

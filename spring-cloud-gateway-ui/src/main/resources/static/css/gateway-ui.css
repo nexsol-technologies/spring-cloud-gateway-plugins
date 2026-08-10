@@ -14,6 +14,12 @@
 	--gw-sidebar-hover-bg: #334155;
 }
 
+/* Dark theme: the sidebar steps back from the content, which Bootstrap darkens on its own. */
+[data-bs-theme="dark"] {
+	--gw-sidebar-bg: #111827;
+	--gw-sidebar-hover-bg: #1f2937;
+}
+
 .gw-shell {
 	display: flex;
 	min-height: 100vh;
@@ -59,8 +65,11 @@
 	overflow: hidden;
 }
 
-.gw-brand .gw-icon {
-	color: #60a5fa;
+.gw-brand-logo {
+	flex: 0 0 30px;
+	width: 30px;
+	height: 30px;
+	object-fit: contain;
 }
 
 .gw-toggle {
@@ -84,7 +93,8 @@
 	color: #fff;
 }
 
-.gw-collapsed .gw-brand-label {
+/* Collapsed, the header only has room for the toggle: the brand would be cut in half. */
+.gw-collapsed .gw-brand {
 	display: none;
 }
 
@@ -171,16 +181,62 @@
 	padding: .6rem 0;
 }
 
-/* Pinned below the scrolling navigation: the link to the project repository. */
+/*
+ * Pinned below the scrolling navigation: the link to the project repository, the version
+ * of the plugins and the theme switch. Collapsed, the version goes with the other labels
+ * and the two buttons wrap into a column.
+ */
 .gw-sidebar-footer {
 	flex: 0 0 auto;
-	padding: .5rem;
+	display: flex;
+	align-items: center;
+	gap: .4rem;
+	padding: .5rem .7rem;
 	border-top: 1px solid rgba(255, 255, 255, .08);
 }
 
-.gw-sidebar-footer .gw-nav-link {
-	margin-bottom: 0;
+.gw-collapsed .gw-sidebar-footer {
+	flex-wrap: wrap;
+	justify-content: center;
+	padding: .5rem .25rem;
+}
+
+.gw-footer-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: .3rem;
+	border: 0;
+	border-radius: .5rem;
+	background: transparent;
 	color: var(--gw-sidebar-fg-muted);
+	cursor: pointer;
+	transition: background .15s ease, color .15s ease;
+}
+
+.gw-footer-btn:hover {
+	background: var(--gw-sidebar-hover-bg);
+	color: #fff;
+}
+
+/* Pushes the theme switch to the far edge, and takes the free space when it is hidden. */
+.gw-version {
+	margin-right: auto;
+	font-size: .78rem;
+	color: var(--gw-sidebar-fg-muted);
+}
+
+/* The switch shows the theme it leads to, not the one in use. */
+.gw-theme-sun {
+	display: none;
+}
+
+[data-bs-theme="dark"] .gw-theme-sun {
+	display: block;
+}
+
+[data-bs-theme="dark"] .gw-theme-moon {
+	display: none;
 }
 
 /* Content ----------------------------------------------------------------- */
@@ -189,6 +245,31 @@
 	flex: 1 1 auto;
 	min-width: 0;
 	padding: 1.75rem 2rem;
+}
+
+/* Home header: the product lockup, sized so its wordmark stays readable. */
+.gw-home-logo {
+	height: 180px;
+	width: auto;
+}
+
+/* Only the lockup drawn for the theme in use is shown. */
+.gw-logo-dark {
+	display: none;
+}
+
+[data-bs-theme="dark"] .gw-logo-light {
+	display: none;
+}
+
+[data-bs-theme="dark"] .gw-logo-dark {
+	display: block;
+}
+
+@media (max-width: 575.98px) {
+	.gw-home-logo {
+		height: 120px;
+	}
 }
 
 /* Traffic table ----------------------------------------------------------- */
@@ -225,6 +306,12 @@
 	font-size: .78rem;
 	white-space: normal;
 	overflow-wrap: anywhere;
+}
+
+/* The chip is drawn from the page it sits on, which is dark here. */
+[data-bs-theme="dark"] .gw-chip {
+	border-color: rgba(255, 255, 255, .15);
+	background: rgba(255, 255, 255, .06);
 }
 
 /* Routes table ------------------------------------------------------------ */

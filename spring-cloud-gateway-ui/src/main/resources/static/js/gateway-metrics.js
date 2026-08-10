@@ -74,7 +74,10 @@
 	};
 
 	var dataUrl = chartEl.getAttribute('data-url') || '/ui/metrics/data';
-	var chart = echarts.init(chartEl);
+	// The bundled dark theme paints a canvas of its own, dropped so the chart keeps sitting
+	// on the card that hosts it.
+	var chart = echarts.init(chartEl, window.gatewayUi.theme() === 'dark' ? 'dark' : null);
+	chart.setOption({ backgroundColor: 'transparent' });
 	var rows = [];
 	var sortKey = 'count';
 	var sortDir = -1;

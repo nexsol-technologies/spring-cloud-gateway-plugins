@@ -24,6 +24,18 @@ The plugin auto-configures itself; no extra setup is required. Start the gateway
   choice is remembered across page loads.
 * **Thin scrollbar** &mdash; the menu scrolls independently with a slim scrollbar.
 * **Home page** &mdash; the overview of the gateway, rendered inside the shell.
+* **Branding** &mdash; the mark sits at the top of the side menu and doubles as the favicon
+  of every page, while the home page opens on the full lockup. Both are served from
+  `static/img` (`icon.png`, `logo.png`, and `logo-dark.png` whose tagline is drawn for a
+  dark page).
+* **Light and dark theme** &mdash; the switch at the bottom of the menu flips the console
+  between the two, starting from what the operating system reports and remembering the
+  choice afterwards. It is applied before the page paints, so no page ever flashes light
+  first. The traffic chart and the API reference pick their colours when they are created:
+  their page reloads on a theme change rather than staying half-lit.
+* **Version** &mdash; the version of the plugins, read from the manifest of the jar the UI
+  ships in, sits next to the repository link. It is absent when the classes are not read
+  from a jar, which is what running from an IDE does.
 * **Remembered controls** &mdash; the switches and drop-downs of a view are restored as they
   were last left. Search boxes are not: a query kept across page loads would hide rows
   without the reader knowing why.
