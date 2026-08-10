@@ -17,6 +17,12 @@ automatically when it is present on the classpath.
 The plugin auto-configures itself; no extra setup is required. Start the gateway and open
 `http://<host>:<port>/ui`.
 
+![The home page of the console](doc/home-light.png)
+
+Every screenshot in this page comes from the
+[gateway-full sample](../spring-cloud-gateway-samples/gateway/gateway-full), which runs
+every plugin at once, so each view is shown with real routes and real traffic.
+
 ## The shell
 
 * **Collapsible side menu** &mdash; the toggle button in the top-left corner switches the
@@ -40,6 +46,11 @@ The plugin auto-configures itself; no extra setup is required. Start the gateway
   were last left. Search boxes are not: a query kept across page loads would hide rows
   without the reader knowing why.
 
+Collapsed, the menu keeps the icons and drops everything that carries text &mdash; the
+brand, the entry labels and the version:
+
+![The console with the side menu collapsed](doc/collapsed-light.png)
+
 Built with Thymeleaf, Bootstrap, HTMX and plain CSS/JS, served as static resources (no
 CDN, offline friendly).
 
@@ -56,6 +67,29 @@ what the application actually runs:
 | Instances | `/ui/metrics/instances` | Micrometer is present and `spring.cloud.gateway.server.webflux.metrics.instance.enabled` is not `false` |
 | OpenAPI | `/ui/openapi` | `spring-cloud-gateway-hub-openapi` is present and `spring.cloud.gateway.server.webflux.hub-openapi.enabled` is `true` |
 | Audit | `/ui/audit` | `spring-cloud-gateway-audit-core` is present and `spring.cloud.gateway.server.webflux.audit.enabled` is not `false` |
+
+## Light and dark theme
+
+The switch at the bottom of the side menu turns the whole console over, from the shell down
+to the traffic chart and the API reference. The screenshots below are the light theme; here
+is the same home page in both.
+
+| Light | Dark |
+| --- | --- |
+| ![The home page in the light theme](doc/home-light.png) | ![The home page in the dark theme](doc/home-dark.png) |
+
+<details>
+<summary>Every other view in the dark theme</summary>
+
+![The routes view in the dark theme](doc/routes-dark.png)
+![The database routes view in the dark theme](doc/routes-db-dark.png)
+![The route tester in the dark theme](doc/route-tester-dark.png)
+![The traffic view in the dark theme](doc/traffic-dark.png)
+![The instances view in the dark theme](doc/instances-dark.png)
+![The OpenAPI view in the dark theme](doc/openapi-dark.png)
+![The audit view in the dark theme](doc/audit-dark.png)
+
+</details>
 
 ## Home page
 
@@ -87,6 +121,8 @@ Every route definition the gateway resolves, **attributed to the source it was r
 &mdash; properties, database, YAML/JSON files, OpenAPI contracts, Config Server or any
 third-party locator. This is what answers "which configuration actually won" when several
 sources declare routes at once.
+
+![The routes view](doc/routes-light.png)
 
 Each source is queried individually instead of through the gateway's aggregate, and the
 source name is derived from the locator class name, so a locator contributed by any plugin
@@ -146,6 +182,8 @@ Describe a request &mdash; method, path with an optional query string, headers, 
 `Name: value` pair per line &mdash; and see which route would handle it. **Nothing is sent
 downstream**: the request is never dispatched, only matched.
 
+![The route tester](doc/route-tester-light.png)
+
 The verdict comes from the route table itself: the routes are read from the `RouteLocator`
 and each one is evaluated with the very predicates the gateway would apply, in the very
 order it applies them. The first match wins, as it does at runtime.
@@ -172,6 +210,8 @@ predicate rather than failing the whole test.
 The tail of the exchanges the audit plugin captured, newest first: time, method, path,
 status (colour-coded by class), user, ip and trace id. A row expands into **every** attribute
 the audit plugin collected for that exchange &mdash; JWT claims, headers, trace and span ids.
+
+![The audit view](doc/audit-light.png)
 
 Filter by status class (2xx to 5xx) and search across method, path, user, ip and trace id.
 The **Live** switch polls every 3 seconds.
@@ -205,6 +245,8 @@ When Micrometer is on the classpath, a **Traffic** entry appears (`/ui/metrics`)
 from the gateway request metrics (`spring.cloud.gateway.requests`): calls, average and max
 latency, errors and error rate per route. The page reads top to bottom &mdash; summary,
 then map, then the exact numbers.
+
+![The traffic view](doc/traffic-light.png)
 
 **Summary** &mdash; routes called, total calls, weighted average latency, total 4xx, total 5xx.
 
@@ -280,6 +322,8 @@ figures on the home page all read the same filtered set.
 The other half of the metrics plugin: not which route carries the load, but **which
 instance is in trouble**. One card per running gateway, read from the same provider as the
 traffic view and headed by the same coverage line.
+
+![The instances view](doc/instances-light.png)
 
 Each card carries the JVM figures &mdash; heap against its ceiling, process CPU, live and
 peak threads, garbage collection overhead, non-heap, open file descriptors &mdash; and then
@@ -370,6 +414,8 @@ is wired exactly this way and shows up under `/ui/routes/db`.
 When [spring-cloud-gateway-hub-openapi](../spring-cloud-gateway-hub-openapi/README.md) is on
 the classpath **and** enabled, the shell lights up an `OpenAPI` entry serving the contracts
 the hub aggregates, rendered with [Scalar](https://github.com/scalar/scalar) at `/ui/openapi`.
+
+![The OpenAPI view](doc/openapi-light.png)
 
 The page reads the list of contracts from the SpringDoc `swagger-config` endpoint, which the
 hub keeps in sync with the discovered services, and feeds them to Scalar as its document

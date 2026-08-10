@@ -20,6 +20,8 @@ The plugin bundles a server-rendered management page, hosted inside the gateway 
 the page activates and appears as the **Database routes** entry in the shared side menu;
 without it the plugin exposes its REST API only.
 
+![The database routes view, inside the gateway UI shell](../../spring-cloud-gateway-ui/doc/routes-db-light.png)
+
 The page is rendered with Thymeleaf and driven by HTMX, against the same REST endpoints
 described below. From `/ui/routes/db` you can:
 
