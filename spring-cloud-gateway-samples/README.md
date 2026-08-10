@@ -20,6 +20,7 @@ run it with `mvn spring-boot:run` from its directory.
 | [gateway-audit](gateway/gateway-audit/README.md) | 8205 | [audit](../spring-cloud-gateway-audit/README.md) — and its Redis, Kafka and R2DBC providers | `docker compose` |
 | [gateway-metrics](gateway/gateway-metrics/README.md) | 8206 | [metrics](../spring-cloud-gateway-metrics/README.md) — and its Prometheus, Redis and discovery sources | `docker compose`, `eureka` |
 | [gateway-routes-files](gateway/gateway-routes-files/README.md) | 8207 | [routes-files](../spring-cloud-gateway-routes/spring-cloud-gateway-routes-files/README.md) — routes as files | — |
+| [gateway-openapi-validation](gateway/gateway-openapi-validation/README.md) | 8212 | [openapi-validation](../spring-cloud-gateway-openapi-validation/README.md) — `OpenapiValidation`, requests enforced against a contract | — |
 
 ### Combinations
 

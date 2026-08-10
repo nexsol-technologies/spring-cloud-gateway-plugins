@@ -34,6 +34,7 @@ import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.core.io.ClassPathResource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 /**
  * Tests for {@link OpenApiRouteDefinitionMapper} covering both generation modes and the
@@ -120,6 +121,60 @@ class OpenApiRouteDefinitionMapperTests {
 		assertThat(getPet.getFilters().get(0).getArgs().values()).contains("/pet-service(?<remaining>/?.*)",
 				"${remaining}");
 		assertThat(getPet.getFilters().get(1).getArgs().values()).contains("/api/v3");
+	}
+
+	@Test
+	void generatingTheRoutesDoesNotValidateTheTrafficUnlessAsked() {
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source(RouteGenerationMode.AGGREGATED),
+				this.openApi);
+
+		assertThat(routes.get(0).getFilters()).extracting(FilterDefinition::getName)
+			.doesNotContain("OpenapiValidation");
+	}
+
+	@Test
+	void validateAttachesTheValidationFilterReusingTheContractOfTheSource() {
+		Source source = source(RouteGenerationMode.AGGREGATED);
+		source.setSpecUrl("classpath:openapi/petstore.yaml");
+		source.setValidate(true);
+
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source, this.openApi);
+
+		FilterDefinition validation = routes.get(0).getFilters().get(0);
+		assertThat(validation.getName()).isEqualTo("OpenapiValidation");
+		assertThat(validation.getArgs()).containsExactly(entry("specUrl", "classpath:openapi/petstore.yaml"));
+	}
+
+	@Test
+	void validateAttachesTheValidationFilterAheadOfEveryOtherOne() {
+		// A request breaking the contract must be denied before a retry or a rate limiter
+		// budget is spent on it.
+		Source source = source(RouteGenerationMode.PER_OPERATION);
+		source.setSpecUrl("classpath:openapi/petstore.yaml");
+		source.setPathPrefix("/pet-service");
+		source.setValidate(true);
+
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source, this.openApi);
+
+		RouteDefinition getPet = routes.stream().filter((r) -> r.getId().equals("petstore_getPet")).findFirst().get();
+		assertThat(getPet.getFilters()).extracting(FilterDefinition::getName)
+			.containsExactly("OpenapiValidation", "RewritePath", "PrefixPath", "Retry");
+	}
+
+	@Test
+	void validatePassesTheGatewaySidePrefixRatherThanTheBackendBasePath() {
+		Source source = source(RouteGenerationMode.AGGREGATED);
+		source.setSpecUrl("classpath:openapi/petstore.yaml");
+		// A prefix written without its leading slash is normalized, like everywhere else.
+		source.setPathPrefix("pet-service");
+		source.setValidate(true);
+
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source, this.openApi);
+
+		FilterDefinition validation = routes.get(0).getFilters().get(0);
+		assertThat(validation.getArgs()).containsEntry("specUrl", "classpath:openapi/petstore.yaml")
+			// '/pet-service', not the '/api/v3' base path the contract servers declare.
+			.containsEntry("pathPrefix", "/pet-service");
 	}
 
 	@Test

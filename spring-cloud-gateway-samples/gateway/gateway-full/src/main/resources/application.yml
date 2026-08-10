@@ -76,6 +76,31 @@ spring.cloud.gateway.server.webflux.routes-openapi:
        team: pets
      filters:
        - Retry=3
+     # Generating the routes from a contract does not validate the traffic against it.
+     # This does: it attaches the OpenapiValidation filter, reusing the 'spec-url' and
+     # 'path-prefix' above so they cannot drift apart, and puts it ahead of every other
+     # filter — a request breaking the contract is denied before the Retry budget is spent
+     # on it. Note that no metadata turns validation on; 'metadata' above is only carried
+     # onto the route, nothing reads it.
+     #
+     # To hold the traffic against a *different* document than the routes came from — a
+     # stricter contract, say — leave this off and write the filter by hand instead:
+     #   - OpenapiValidation=classpath:openapi/petstore-strict.yaml
+     validate: true
+
+# Holds the traffic of the routes carrying the OpenapiValidation filter against their
+# contract (spring-cloud-gateway-openapi-validation). These are the defaults, spelled out:
+# a malformed request is denied, while a backend answering outside its own contract is
+# measured rather than turned into a gateway error.
+spring.cloud.gateway.server.webflux.openapi-validation:
+  request:
+    mode: ENFORCE           # ENFORCE | REPORT | OFF
+    validate-body: true
+    max-body-size: 1MB
+  response:
+    mode: REPORT
+    validate-body: true
+    max-body-size: 1MB
 
 # Traffic and instance figures (spring-cloud-gateway-metrics). No provider: the figures
 # are those of this instance. See the gateway-metrics sample for the consolidating

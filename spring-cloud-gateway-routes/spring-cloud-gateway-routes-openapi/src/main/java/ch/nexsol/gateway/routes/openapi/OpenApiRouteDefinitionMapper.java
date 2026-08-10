@@ -49,6 +49,13 @@ import org.springframework.util.StringUtils;
 public class OpenApiRouteDefinitionMapper {
 
 	/**
+	 * Name of the filter a source asking to be validated is given, provided by the
+	 * {@code spring-cloud-gateway-openapi-validation} plugin. Referred to by name so this
+	 * module keeps no dependency towards it.
+	 */
+	private static final String VALIDATION_FILTER_NAME = "OpenapiValidation";
+
+	/**
 	 * Maps the document to route definitions.
 	 * @param source the source configuration
 	 * @param openApi the parsed OpenAPI document
@@ -108,6 +115,14 @@ public class OpenApiRouteDefinitionMapper {
 		route.setId(id);
 		route.setUri(source.getUri());
 		List<FilterDefinition> filters = new ArrayList<>();
+		if (source.isValidate()) {
+			// First in the chain, so a request that breaks the contract is denied before
+			// any
+			// other filter has done work for it — a retry or a rate limiter budget spent
+			// on
+			// a request that was never going to be forwarded.
+			filters.add(validationFilter(source, pathPrefix));
+		}
 		// Filters apply in declaration order: drop the gateway-side prefix, then prepend
 		// the base path the backend expects. RewritePath rather than StripPrefix, so the
 		// route names the prefix it removes instead of removing whatever sits first.
@@ -125,6 +140,30 @@ public class OpenApiRouteDefinitionMapper {
 		route.setFilters(filters);
 		route.setMetadata(new LinkedHashMap<>(source.getMetadata()));
 		return route;
+	}
+
+	/**
+	 * Builds the validation filter for a source that asked for it, reusing the contract
+	 * and the prefix the source already declares so the two cannot drift apart.
+	 * <p>
+	 * Named by string and given explicit arguments rather than built from the
+	 * {@code Name=arg0,arg1} shorthand the rest of this class uses. The string keeps this
+	 * module free of any dependency towards the validation plugin, which only has to be
+	 * on the classpath at runtime; the explicit arguments avoid the shorthand splitting a
+	 * contract location that happens to contain a comma.
+	 */
+	private static FilterDefinition validationFilter(Source source, String pathPrefix) {
+		FilterDefinition filter = new FilterDefinition();
+		filter.setName(VALIDATION_FILTER_NAME);
+		Map<String, String> args = new LinkedHashMap<>();
+		args.put("specUrl", source.getSpecUrl());
+		if (!pathPrefix.isEmpty()) {
+			// The filter matches the gateway-side path, so it needs the prefix the routes
+			// are exposed under, not the backend base path.
+			args.put("pathPrefix", pathPrefix);
+		}
+		filter.setArgs(args);
+		return filter;
 	}
 
 	/**

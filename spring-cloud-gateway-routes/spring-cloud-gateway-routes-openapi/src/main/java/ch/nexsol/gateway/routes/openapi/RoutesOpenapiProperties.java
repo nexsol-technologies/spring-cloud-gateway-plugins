@@ -143,6 +143,20 @@ public class RoutesOpenapiProperties {
 		 */
 		private List<String> filters = new ArrayList<>();
 
+		/**
+		 * Whether the traffic of the generated routes is also validated against this
+		 * contract, by attaching the {@code OpenapiValidation} filter of the
+		 * {@code spring-cloud-gateway-openapi-validation} plugin. Generating routes from
+		 * a contract does not validate anything by itself; this is what ties the two
+		 * together, reusing the {@code spec-url} and {@code path-prefix} declared here so
+		 * they cannot drift apart.
+		 * <p>
+		 * Requires that plugin on the classpath. Leave it off and declare the filter in
+		 * {@code filters} by hand to validate against a different document than the one
+		 * the routes were generated from.
+		 */
+		private boolean validate;
+
 		public String getId() {
 			return this.id;
 		}
@@ -205,6 +219,14 @@ public class RoutesOpenapiProperties {
 
 		public void setFilters(List<String> filters) {
 			this.filters = filters;
+		}
+
+		public boolean isValidate() {
+			return this.validate;
+		}
+
+		public void setValidate(boolean validate) {
+			this.validate = validate;
 		}
 
 	}

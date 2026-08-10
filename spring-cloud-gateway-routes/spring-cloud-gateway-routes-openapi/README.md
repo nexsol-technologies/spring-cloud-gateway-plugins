@@ -28,7 +28,45 @@ spring.cloud.gateway.server.webflux.routes-openapi:
         team: pets
       filters:
         - Retry=3
+      # validate: true                # also hold the traffic against this contract
 ```
+
+### Validating the traffic against the same contract
+
+Generating routes from a contract does not validate anything: the routes match the paths the
+contract declares, and whatever the clients then send is forwarded as is. Setting
+`validate: true` on a source closes that gap by attaching the `OpenapiValidation` filter of
+[spring-cloud-gateway-openapi-validation](../../spring-cloud-gateway-openapi-validation/README.md),
+which needs to be on the classpath:
+
+```yaml
+    - id: bookstore
+      uri: http://localhost:8080
+      spec-url: classpath:openapi/bookstore.yaml
+      path-prefix: /book-service
+      validate: true
+      filters:
+        - Retry=3
+```
+
+The filter is given the `spec-url` and the `path-prefix` of the source, so the two can never
+drift apart, and it is placed **ahead of every other filter** — a request that breaks the
+contract is denied before a retry or a rate limiter budget has been spent on it.
+
+There is no metadata that turns validation on. `metadata` is only carried onto the generated
+route; nothing reads it.
+
+To hold the traffic against a *different* document than the routes were generated from — a
+stricter contract, say — leave `validate` off and declare the filter yourself, since it takes
+the contract location as its own argument:
+
+```yaml
+      filters:
+        - OpenapiValidation=classpath:openapi/bookstore-strict.yaml,/book-service
+```
+
+What happens to a message that breaks its contract — denied, or forwarded and recorded — is
+configured per direction in the validation plugin, not here.
 
 ### Sources declared in documents
 
@@ -142,7 +180,8 @@ ignored by the gateway), while the base path comes from the contract.
 - **AGGREGATED** — a single route per source, with a `Path` predicate listing every path and
   a `Method` predicate listing every HTTP method.
 
-The configured `metadata` and `filters` are applied to every generated route.
+The configured `metadata` and `filters` are applied to every generated route, as is the
+`OpenapiValidation` filter when the source sets `validate: true`.
 
 ## Reloading
 

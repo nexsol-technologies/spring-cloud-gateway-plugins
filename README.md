@@ -28,6 +28,9 @@ OAuth2 support for Spring Cloud Gateway: multi-tenant authentication, JWT valida
 [spring-cloud-gateway-hub-openapi](spring-cloud-gateway-hub-openapi/README.md)<br>
 Aggregates the OpenAPI documentation of downstream services into a hub. To generate routes from an OpenAPI contract instead, see [spring-cloud-gateway-routes-openapi](spring-cloud-gateway-routes/spring-cloud-gateway-routes-openapi/README.md).
 
+[spring-cloud-gateway-openapi-validation](spring-cloud-gateway-openapi-validation/README.md)<br>
+Validates the requests and the responses of a route against an OpenAPI contract (the `OpenapiValidation` filter), so the contract becomes something the gateway enforces rather than documentation. Each direction is configured on its own — a request denied with `400` while the responses of the same route are only reported on — and every outcome is counted in Micrometer and stamped on the audit trail. A body is only ever buffered when it is JSON, uncompressed and within a configured maximum, so a file upload streams straight through.
+
 [spring-cloud-gateway-ui](spring-cloud-gateway-ui/README.md)<br>
 A Spring Boot Admin-like web UI served under `/ui`, where each gateway plugin lights up its own view automatically when present on the classpath: an overview home page, the resolved routes with the source each one came from, a route tester answering which route would handle a described request (and why, predicate by predicate), a traffic chart, the technical health of every running instance and a live tail of the audit events.
 

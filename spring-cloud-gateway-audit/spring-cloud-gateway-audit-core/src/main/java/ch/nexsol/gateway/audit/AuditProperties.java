@@ -154,6 +154,14 @@ public class AuditProperties {
 		private boolean route = true;
 
 		/**
+		 * Collect the {@code openapi.validation.*} attributes published by the OpenAPI
+		 * validation plugin: which contract operation the exchange was held against, and
+		 * whether its request and its response honoured it. Nothing is collected on a
+		 * gateway that does not use that plugin, or on an exchange it did not validate.
+		 */
+		private boolean validation = true;
+
+		/**
 		 * @return whether the JWT group is collected
 		 */
 		public boolean isJwt() {
@@ -221,6 +229,20 @@ public class AuditProperties {
 		 */
 		public void setRoute(boolean route) {
 			this.route = route;
+		}
+
+		/**
+		 * @return whether the OpenAPI validation group is collected
+		 */
+		public boolean isValidation() {
+			return this.validation;
+		}
+
+		/**
+		 * @param validation whether the OpenAPI validation group is collected
+		 */
+		public void setValidation(boolean validation) {
+			this.validation = validation;
 		}
 
 	}
