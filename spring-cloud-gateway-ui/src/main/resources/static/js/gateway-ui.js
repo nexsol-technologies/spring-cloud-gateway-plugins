@@ -104,6 +104,23 @@ window.gatewayUi = (function () {
 })();
 
 /*
+ * CSRF token on every HTMX request. A console that authenticates keeps its writes behind a
+ * session cookie, which a form can carry a hidden field for but an HTMX request cannot:
+ * the token is put on the request as a header instead, from the meta tags the shell renders
+ * it in. Nothing is added when the console is open, since there is then no token to add.
+ */
+(function () {
+	var token = document.querySelector('meta[name="_csrf"]');
+	var header = document.querySelector('meta[name="_csrf_header"]');
+	if (!token || !header) {
+		return;
+	}
+	document.body.addEventListener('htmx:configRequest', function (event) {
+		event.detail.headers[header.content] = token.content;
+	});
+})();
+
+/*
  * Light / dark switch. The theme itself is applied by the head of the shell, before the
  * page paints; this only writes the choice down and puts it in place straight away.
  */

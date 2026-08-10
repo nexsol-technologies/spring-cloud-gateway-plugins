@@ -28,6 +28,7 @@ run it with `mvn spring-boot:run` from its directory.
 | --- | --- | --- |
 | [gateway-routes-all](gateway/gateway-routes-all/README.md) | 8210 | every [route source](../spring-cloud-gateway-routes/README.md) at once — properties, files, database, Config Server, OpenAPI — plus `routes-security` |
 | [gateway-secured](gateway/gateway-secured/README.md) | 8211 | `oauth2` + `filters` + `routes-security`: the three moments a secured gateway decides at |
+| [gateway-ui-secured](gateway/gateway-ui-secured/README.md) | 8213 | `ui` behind its own login page: a local user, Keycloak, and a Bearer token on its endpoints |
 | [gateway-full](gateway/gateway-full/README.md) | 8181 | every plugin, the integrated demo |
 
 The ports never collide, so several gateways can run side by side.
@@ -56,6 +57,7 @@ The samples needing a backend ship their own `docker-compose.yml`, next to the m
 | [gateway-audit](gateway/gateway-audit/docker-compose.yml) | Redis, Kafka, PostgreSQL | 6379, 9092, 15433 |
 | [gateway-metrics](gateway/gateway-metrics/docker-compose.yml) | Redis, Prometheus | 6379, 9091 |
 | [gateway-routes-all](gateway/gateway-routes-all/docker-compose.yml) | PostgreSQL | 15432 |
+| [gateway-ui-secured](gateway/gateway-ui-secured/docker-compose.yml) | Keycloak, realm imported at start-up | 8380 |
 
 Start only the service the profile you are running needs — `docker compose up -d redis`
 rather than `docker compose up -d`. Every sample has a default profile needing none of them.

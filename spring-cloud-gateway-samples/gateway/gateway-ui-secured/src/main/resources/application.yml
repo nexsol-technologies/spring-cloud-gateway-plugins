@@ -1,0 +1,56 @@
+server.port: 8213
+spring.application.name: gateway-ui-secured
+
+# The console carries its own login page. Nothing else is configured here: no security
+# bean, no filter chain — the ui plugin contributes the chain, this only says what it
+# should do with the paths of the console.
+spring.cloud.gateway.server.webflux:
+  ui:
+    security:
+      mode: authenticated
+      # The local user, held by the chain of the console alone. It is the way in when the
+      # identity provider is unreachable, and the only one under the default profile.
+      user:
+        name: superadmin
+        password: ${ADMIN_PASSWORD:superadmin}
+        roles:
+        - ADMIN
+
+  # Routes declared in the properties, so the views behind the login have something to
+  # show once you are through it.
+  routes:
+  - id: httpbin_get
+    uri: https://httpbin.org
+    predicates:
+    - Path=/httpbin/**
+    filters:
+    - StripPrefix=1
+    metadata:
+      team: platform
+      tier: gold
+
+  - id: service_a
+    uri: http://localhost:8080
+    predicates:
+    - Path=/service-a/**
+    - Method=GET,POST
+    filters:
+    - StripPrefix=1
+    metadata:
+      team: back-office
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+  endpoint:
+    gateway:
+      access: read-only
+
+logging:
+  level:
+    '[ch.nexsol]': debug

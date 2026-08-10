@@ -50,6 +50,51 @@ http://localhost:8181/ui. Every view lights up here, since every plugin is prese
 page, the routes with their sources, the route tester, the traffic chart, the instances
 view, the audit tail and the **Database routes** management page.
 
+The console carries its own login page: sign in with `superadmin` / `superadmin`, or set
+`ADMIN_PASSWORD`. That is the whole configuration &mdash;
+[application.yml](src/main/resources/application.yml) sets
+`spring.cloud.gateway.server.webflux.ui.security.mode` to `authenticated` and names a local
+user; the plugin contributes the chain.
+
+Two things are worth noticing while you are in there. The side menu gains the operator and
+the button that ends the session, next to the theme switch. And **Database routes** is the
+one page of the console the plugin leaves to the application &mdash; it belongs to another
+plugin, and it creates and deletes routes &mdash; so
+[ApiGatewayApplication](src/main/java/ch/nexsol/gateway/sample/ApiGatewayApplication.java)
+asks for a principal on it and sends visitors to the same login page. Signing in once opens
+both.
+
+This sample is also where the two resource servers of a gateway sit side by side, which is
+worth a look because they are easy to confuse:
+
+| | Property | Here |
+| --- | --- | --- |
+| The traffic being routed | `spring.security.oauth2.resourceserver` | the multi-tenant issuers, further down `application.yml` |
+| The endpoints of the console | `spring.cloud.gateway.server.webflux.ui.security.oauth2.resourceserver` | its own issuer |
+
+They happen to name the same authorization server here, and writing it twice is the point:
+the console can be pointed at another provider in one line without touching what the routes
+depend on. The Spring property holds a single issuer for the whole application, so putting
+the console's issuer there would replace the one the routes validate against.
+
+```console
+$ TOKEN=$(curl -s -u messaging-client:secret \
+    -d grant_type=client_credentials \
+    http://localhost:9090/oauth2/token | jq -r .access_token)
+
+$ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
+    http://localhost:8181/ui/routes/list
+200
+```
+
+Without the token that call answers `302` to the login page; with a token the console cannot
+decode it answers `401` and `WWW-Authenticate: Bearer`, never an HTML page. The keys are
+fetched from the issuer on the first token that arrives, so the gateway starts whether or
+not `auth-server` is up.
+
+The [gateway-ui-secured](../gateway-ui-secured/README.md) sample is the other half of this:
+the same login page, with Keycloak and roles behind it.
+
 ### OpenAPI hub
 
 > Run the gateway and `service-a` with the `eureka` profile, and the `eureka` sample.

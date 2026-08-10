@@ -21,6 +21,7 @@
 		<module>gateway-oauth2</module>
 		<module>gateway-hub-openapi</module>
 		<module>gateway-ui</module>
+		<module>gateway-ui-secured</module>
 		<module>gateway-audit</module>
 		<module>gateway-metrics</module>
 		<module>gateway-routes-files</module>

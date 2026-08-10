@@ -17,6 +17,8 @@
 package ch.nexsol.gateway.ui.autoconfigure;
 
 import ch.nexsol.gateway.audit.AuditEventPublisher;
+import ch.nexsol.gateway.ui.security.LoginController;
+import ch.nexsol.gateway.ui.security.UiSecurityModelAttributes;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -95,6 +97,34 @@ class GatewayUiSecurityAutoConfigurationTests {
 			assertThat(matches(chain, "/ui/audit")).isFalse();
 			assertThat(matches(chain, "/ui")).isTrue();
 		});
+	}
+
+	@Test
+	void openConsoleServesNoLoginExchange() {
+		this.runner.run((context) -> {
+			assertThat(context).doesNotHaveBean(LoginController.class);
+			assertThat(context).doesNotHaveBean(UiSecurityModelAttributes.class);
+			SecurityWebFilterChain chain = (SecurityWebFilterChain) context.getBean("gatewayUiSecurityWebFilterChain");
+			assertThat(matches(chain, "/ui/login")).isFalse();
+		});
+	}
+
+	@Test
+	void authenticatedConsoleServesItsLoginExchange() {
+		this.runner.withPropertyValues("spring.cloud.gateway.server.webflux.ui.security.mode=authenticated")
+			.run((context) -> {
+				assertThat(context).hasNotFailed();
+				assertThat(context).hasSingleBean(LoginController.class);
+				assertThat(context).hasSingleBean(UiSecurityModelAttributes.class);
+				SecurityWebFilterChain chain = (SecurityWebFilterChain) context
+					.getBean("gatewayUiSecurityWebFilterChain");
+				assertThat(matches(chain, "/ui/login")).isTrue();
+				assertThat(matches(chain, "/ui/logout")).isTrue();
+				// The paths of the views are still matched exactly, and a gateway route
+				// under /ui still is not.
+				assertThat(matches(chain, "/ui")).isTrue();
+				assertThat(matches(chain, "/ui/find_pwd")).isFalse();
+			});
 	}
 
 	@Test
