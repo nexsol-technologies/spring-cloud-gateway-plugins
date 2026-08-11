@@ -97,6 +97,10 @@ contract is worth aggregating serves it to the gateway. `401` is therefore repor
 than worked around &mdash; and note that it says nothing about the **service**, which is
 routed as usual: only its contract is missing from the hub.
 
+A service missing from the dropdown without a word at all is a service the hub never
+considered, which is a different matter &mdash; see
+[below](#a-service-routed-without-the-discovery-client).
+
 The documents themselves are never buffered by the discovery: only the path each document
 was found at is kept, and the response body is released. The documents are fetched, and
 their `servers` section rewritten, when the Swagger UI actually asks for them.
@@ -132,6 +136,31 @@ spring.cloud.gateway.server.webflux.routes-openapi:
 
 The source then appears in the Swagger UI dropdown as `petstore`, served through the
 gateway at `/v3/api-docs/petstore`.
+
+### A service routed without the discovery client
+
+The hub builds its documentation routes from the routes the **discovery locator** produced,
+and from those alone. A service routed any other way — declared by hand in
+`spring.cloud.gateway.server.webflux.routes`, or coming from `routes-files`,
+`routes-configserver`, `routes-database` — is never probed and never appears in the dropdown.
+Nothing is logged, because nothing was attempted.
+
+Declaring it as an OpenAPI source is what puts it back, and `mode: NO_ROUTE` keeps the
+generator from adding a second set of routes in front of a backend that already has some:
+
+```yaml
+spring.cloud.gateway.server.webflux.routes-openapi:
+  enabled: true
+  sources:
+    - id: alert-service
+      spec-url: https://alert-service.internal/v3/api-docs
+      mode: NO_ROUTE                  # the contract only; the routes are declared elsewhere
+      path-prefix: /ALERT-SERVICE     # the prefix those routes answer under
+```
+
+The contract is proxied and its `servers` rewritten exactly like any other source, so "Try it
+out" targets `path-prefix` on the gateway — which has to be the prefix the existing routes
+answer under, or the console calls paths nothing serves.
 
 ## Which issuer the documents advertise
 

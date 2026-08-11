@@ -61,6 +61,14 @@ public class OpenApiRouteDefinitionLoader {
 		List<RouteDefinition> definitions = new ArrayList<>();
 		List<Source> sources = this.sourcesLoader.load();
 		for (Source source : sources) {
+			// A source may be declared for its contract alone, so it joins the OpenAPI
+			// hub while its routes are declared elsewhere. Its document is not even read
+			// here: reading it is the hub's business, and a contract that cannot be
+			// parsed into routes nobody asked for is not a failure of this loader.
+			if (source.getMode() == RouteGenerationMode.NO_ROUTE) {
+				LOG.debug("OpenAPI source '{}' is declared for its contract alone", source.getId());
+				continue;
+			}
 			// Isolate failures per source: a broken one must not drop the others' routes.
 			try {
 				OpenAPI openApi = this.specLoader.load(source.getSpecUrl());
@@ -70,7 +78,8 @@ public class OpenApiRouteDefinitionLoader {
 				LOG.warn("Skipping OpenAPI source '{}' ({}): {}", source.getId(), source.getSpecUrl(), ex.getMessage());
 			}
 		}
-		LOG.info("Generated {} route definition(s) from {} OpenAPI source(s)", definitions.size(), sources.size());
+		LOG.info("Generated {} route definition(s) from {} OpenAPI source(s)", definitions.size(),
+				sources.stream().filter((source) -> source.getMode() != RouteGenerationMode.NO_ROUTE).count());
 		return definitions;
 	}
 
