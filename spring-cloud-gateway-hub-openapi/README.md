@@ -66,15 +66,36 @@ spring.cloud.gateway.server.webflux.hub-openapi:
 | `max-connections` | The probes use a connection pool of their own, so they never compete for the connections the gateway proxies its traffic on. |
 | `cache-ttl` | The path a document was found at &mdash; or the confirmed absence of a document &mdash; is remembered per service instance, so the next heartbeat does not probe the whole registry again. Set to `0` to probe on every refresh. |
 
-Only a service that answered has its result cached. A service that could not be reached is
-probed again on the next refresh, so a service that was down when the gateway started
+Only a service that answered **"not there"** has its result cached. A service that could not
+be reached, or that refused to hand its document over, has said nothing about having one:
+it is probed again on the next refresh, so a service that was down when the gateway started
 appears in the hub as soon as it comes back, without waiting for `cache-ttl`.
 
-Probing an instance stops at the first path it could not be reached on, instead of trying
-the remaining ones: they lead to the same instance and fail the same way. An unreachable
-service therefore costs one `timeout`, not one per candidate path &mdash; which is what
-keeps the few services that are always down or draining in a large registry from dominating
-the refresh.
+Probing an instance stops at the first path that settles the question, instead of trying the
+remaining ones: an unreachable instance and a refused document answer the same way whatever
+the path. An unreachable service therefore costs one `timeout`, not one per candidate path
+&mdash; which is what keeps the few services that are always down or draining in a large
+registry from dominating the refresh.
+
+### A service that does not appear in the hub
+
+A discovered service missing from the dropdown is either a service without a document, which
+is normal and silent, or a service the hub could not read one from, which is a configuration
+to fix and says so:
+
+```
+WARN  Route ALERT-SERVICE is left out of the OpenAPI hub: http://10.1.2.3:8080/v3/api-docs.json
+      answered 401 UNAUTHORIZED. Its document is protected, and the hub reads it anonymously.
+```
+
+The same reason is logged once per `cache-ttl` rather than on every heartbeat, and again as
+soon as it changes. Turn `ch.nexsol.gateway.openapi.hub` to `debug` for the outcome of every
+single probe, path by path.
+
+The probes are anonymous, and there is no way to give them a credential: a service whose
+contract is worth aggregating serves it to the gateway. `401` is therefore reported rather
+than worked around &mdash; and note that it says nothing about the **service**, which is
+routed as usual: only its contract is missing from the hub.
 
 The documents themselves are never buffered by the discovery: only the path each document
 was found at is kept, and the response body is released. The documents are fetched, and

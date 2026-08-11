@@ -37,6 +37,7 @@ import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -68,6 +69,14 @@ public class OpenapiService implements DisposableBean {
 	private final Duration cacheTtl;
 
 	private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
+
+	/**
+	 * The last outcome reported for an instance that yields no document for a reason
+	 * worth a warning. A route refresh happens on every discovery heartbeat, and a
+	 * service that refuses its document refuses it on every one of them: without this the
+	 * log would carry the same line every few seconds.
+	 */
+	private final Map<String, Reported> reported = new ConcurrentHashMap<>();
 
 	/**
 	 * Creates a new service backed by the given discovery client, probing with the
@@ -149,46 +158,90 @@ public class OpenapiService implements DisposableBean {
 		List<String> paths = StringUtils.hasText(declaredPath) ? List.of(declaredPath) : DEFAULT_PATHS;
 
 		// concatMap preserves the .json -> .yaml -> plain preference order and takeUntil
-		// stops at the first match, instead of firing all the probes in parallel.
-		// A probe that could not reach the instance stops the sequence too: the remaining
-		// paths fail the same way, each costing another full timeout, so an unreachable
-		// service costs one timeout rather than one per candidate path.
+		// stops at the first path that settles the question, instead of firing all the
+		// probes in parallel. Only a plain "not there" is worth trying the next path for:
+		// an unreachable instance and a refused document answer the same way whatever the
+		// path, each costing another full timeout.
 		return Flux.fromIterable(paths)
 			.concatMap((path) -> probe(uri, path, routeDefinition))
-			.takeUntil((probe) -> probe.found() || !probe.answered())
+			.takeUntil(Probe::settles)
 			.collectList()
-			.flatMap((probes) -> toDiscover(uri, probes, routeDefinition));
+			.flatMap((probes) -> toDiscover(uri, probes, routeId(routeDefinition)));
 	}
 
-	private Mono<OpenapiDiscover> toDiscover(URI uri, List<Probe> probes, RouteDefinition routeDefinition) {
+	private Mono<OpenapiDiscover> toDiscover(URI uri, List<Probe> probes, String routeId) {
 		Probe last = probes.get(probes.size() - 1);
 		if (last.found()) {
 			cache(uri, last.path());
-			return Mono.just(new OpenapiDiscover(last.path(), routeDefinition));
+			this.reported.remove(uri.toString());
+			return Mono.just(new OpenapiDiscover(last.path(), last.routeDefinition()));
 		}
-		// Only a service that answered tells us it has no document. A probe that could
-		// not reach it says nothing, and caching that would keep the service out of the
-		// hub until the entry expires, long after it came back.
-		if (probes.stream().allMatch(Probe::answered)) {
+		// Only a service that answered "not there" tells us it has no document. A refused
+		// or unreachable one says nothing, and caching that would keep it out of the hub
+		// until the entry expires, long after it came back.
+		if (last.outcome() == Probe.Outcome.ABSENT) {
 			cache(uri, null);
+			this.reported.remove(uri.toString());
+			LOG.debug("No OpenAPI document under {} for route {}; it is left out of the hub", uri, routeId);
+			return Mono.empty();
 		}
+		report(uri, last, routeId);
 		return Mono.empty();
+	}
+
+	/**
+	 * Says once, rather than on every heartbeat, that a discovered service is not in the
+	 * hub and why. A service without a document is a normal thing and stays silent; a
+	 * service that has one and will not hand it over is a configuration to fix.
+	 */
+	private void report(URI uri, Probe probe, String routeId) {
+		Instant now = Instant.now();
+		this.reported.values().removeIf((entry) -> entry.expiresAt().isBefore(now));
+		Reported previous = this.reported.put(uri.toString(),
+				new Reported(probe.outcome(), now.plus(reportInterval())));
+		if (previous != null && previous.outcome() == probe.outcome()) {
+			LOG.debug("Route {} is still left out of the OpenAPI hub: {} {}", routeId, uri + probe.path(),
+					probe.reason());
+			return;
+		}
+		if (probe.outcome() == Probe.Outcome.DENIED) {
+			LOG.warn("Route {} is left out of the OpenAPI hub: {} answered {}. Its document is protected, and the hub "
+					+ "reads it anonymously.", routeId, uri + probe.path(), probe.reason());
+		}
+		else {
+			LOG.warn("Route {} is left out of the OpenAPI hub: {} could not be reached ({})", routeId,
+					uri + probe.path(), probe.reason());
+		}
+	}
+
+	/**
+	 * How long the same reason stays out of the log. The probes themselves are throttled
+	 * by the cache, so this follows it, and falls back on a value of its own when the
+	 * cache is disabled and every refresh probes again.
+	 */
+	private Duration reportInterval() {
+		return this.cacheTtl.isPositive() ? this.cacheTtl : Duration.ofMinutes(5);
 	}
 
 	private Mono<Probe> probe(URI uri, String path, RouteDefinition routeDefinition) {
 		return this.webClient.get().uri(uri + path).exchangeToMono((response) -> {
-			boolean found = response.statusCode().equals(HttpStatus.OK);
-			LOG.debug("url {} {} for route {} : {}", uri + path, found ? "found" : "not found", routeDefinition,
-					response.statusCode());
+			HttpStatusCode status = response.statusCode();
+			LOG.debug("url {} {} for route {} : {}", uri + path, status.equals(HttpStatus.OK) ? "found" : "not found",
+					routeDefinition, status);
 			// The body is released, never buffered: only the path the document was found
 			// at is used downstream, and holding every document of every service in
 			// memory
 			// on every route refresh is what brings a large registry down.
-			return response.releaseBody().thenReturn(found ? Probe.found(path) : Probe.absent(path));
+			return response.releaseBody().thenReturn(Probe.answered(path, status, routeDefinition));
 		}).onErrorResume((ex) -> {
 			LOG.debug("url {} unreachable for route {} : {}", uri + path, routeDefinition, ex.getMessage());
-			return Mono.just(Probe.failed(path));
+			return Mono.just(Probe.failed(path, ex, routeDefinition));
 		});
+	}
+
+	private static String routeId(RouteDefinition routeDefinition) {
+		return (routeDefinition != null && StringUtils.hasText(routeDefinition.getId())) ? routeDefinition.getId()
+				: "unknown";
 	}
 
 	private CacheEntry lookUpCache(URI uri) {
@@ -228,41 +281,68 @@ public class OpenapiService implements DisposableBean {
 	}
 
 	/**
-	 * Outcome of a single probe. A service that answered "not there" and a service that
-	 * could not be reached both yield no document, but only the former is worth
-	 * remembering.
+	 * Outcome of a single probe. Three ways of yielding no document, which the hub must
+	 * not confuse: a service that answered "not there" has no document and is remembered
+	 * as such, while one that refused to hand it over and one that could not be reached
+	 * have said nothing about it and are reported instead.
 	 *
 	 * @param path the probed path
 	 * @param outcome what the probe found
+	 * @param reason what the service answered, or why it could not be reached
+	 * @param routeDefinition the route definition the probe was run for
 	 */
-	private record Probe(String path, Outcome outcome) {
+	private record Probe(String path, Outcome outcome, String reason, RouteDefinition routeDefinition) {
 
 		private enum Outcome {
 
-			FOUND, ABSENT, FAILED
+			FOUND, ABSENT, DENIED, FAILED
 
 		}
 
-		static Probe found(String path) {
-			return new Probe(path, Outcome.FOUND);
+		static Probe answered(String path, HttpStatusCode status, RouteDefinition routeDefinition) {
+			Outcome outcome;
+			if (status.equals(HttpStatus.OK)) {
+				outcome = Outcome.FOUND;
+			}
+			else if (status.value() == HttpStatus.UNAUTHORIZED.value()
+					|| status.value() == HttpStatus.FORBIDDEN.value()) {
+				outcome = Outcome.DENIED;
+			}
+			else {
+				outcome = Outcome.ABSENT;
+			}
+			return new Probe(path, outcome, status.toString(), routeDefinition);
 		}
 
-		static Probe absent(String path) {
-			return new Probe(path, Outcome.ABSENT);
-		}
-
-		static Probe failed(String path) {
-			return new Probe(path, Outcome.FAILED);
+		static Probe failed(String path, Throwable error, RouteDefinition routeDefinition) {
+			return new Probe(path, Outcome.FAILED, String.valueOf(error.getMessage()), routeDefinition);
 		}
 
 		boolean found() {
 			return this.outcome == Outcome.FOUND;
 		}
 
-		boolean answered() {
-			return this.outcome != Outcome.FAILED;
+		/**
+		 * Whether this probe settles the question, leaving the remaining candidate paths
+		 * nothing to add. Only a plain "not there" does not: the same instance refuses or
+		 * fails to answer the same way whatever the path, each attempt costing another
+		 * full timeout.
+		 * @return {@code true} unless the service answered that this path has no document
+		 */
+		boolean settles() {
+			return this.outcome != Outcome.ABSENT;
 		}
 
+	}
+
+	/**
+	 * The last reason a service instance was reported as left out of the hub, and how
+	 * long that reason stays out of the log.
+	 *
+	 * @param outcome the reason it was left out
+	 * @param expiresAt the instant the same reason is worth logging again
+	 */
+	private record Reported(Probe.Outcome outcome, Instant expiresAt) {
 	}
 
 	/**
