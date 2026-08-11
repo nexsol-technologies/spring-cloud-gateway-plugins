@@ -17,17 +17,21 @@
 package ch.nexsol.gateway.openapi.autoconfigure;
 
 import java.net.URI;
+import java.util.Map;
 import java.util.Set;
 
 import ch.nexsol.gateway.audit.AuditProperties;
 import ch.nexsol.gateway.openapi.HubOpenapiProperties;
 import ch.nexsol.gateway.openapi.hub.AuditExclusionBeanPostProcessor;
+import ch.nexsol.gateway.openapi.hub.GatewayIssuers;
 import ch.nexsol.gateway.openapi.hub.OpenapiService;
 import ch.nexsol.gateway.openapi.hub.SpringDocOpenapiRoutes;
 import ch.nexsol.gateway.openapi.hub.StaticOpenapiDocsRouteLocator;
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
 import ch.nexsol.gateway.openapi.hub.filter.OpenapiModifyResponseBodyGatewayFilterFactory;
 import ch.nexsol.gateway.routes.openapi.OpenapiSourcesLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springdoc.core.properties.SpringDocConfigProperties;
 import org.springdoc.core.properties.SwaggerUiConfigProperties;
 
@@ -48,6 +52,7 @@ import org.springframework.cloud.gateway.filter.factory.rewrite.MessageBodyEncod
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.http.codec.ServerCodecConfigurer;
 
 /**
@@ -61,6 +66,8 @@ import org.springframework.http.codec.ServerCodecConfigurer;
 		matchIfMissing = false)
 @EnableConfigurationProperties(HubOpenapiProperties.class)
 public class HubApiAutoConfiguration {
+
+	private static final Logger LOG = LoggerFactory.getLogger(HubApiAutoConfiguration.class);
 
 	/**
 	 * Registers the component that publishes the discovered OpenAPI routes as Swagger UI
@@ -112,6 +119,9 @@ public class HubApiAutoConfiguration {
 	 * @param bodyDecoders the available message body decoders
 	 * @param bodyEncoders the available message body encoders
 	 * @param apiGatewayUri the public gateway URI to advertise in the OpenAPI servers
+	 * @param hubProperties the hub configuration, naming where the advertised OpenID
+	 * Connect issuer comes from
+	 * @param environment the environment the gateway issuers are read from
 	 * @return the {@link OpenapiModifyResponseBodyGatewayFilterFactory} bean
 	 */
 	@Bean
@@ -119,9 +129,35 @@ public class HubApiAutoConfiguration {
 	OpenapiModifyResponseBodyGatewayFilterFactory customModifyResponseBodyGatewayFilterFactory(
 			ServerCodecConfigurer codecConfigurer, Set<MessageBodyDecoder> bodyDecoders,
 			Set<MessageBodyEncoder> bodyEncoders,
-			@Value("${spring.cloud.gateway.server.webflux.hub-openapi.gateway-uri}") URI apiGatewayUri) {
+			@Value("${spring.cloud.gateway.server.webflux.hub-openapi.gateway-uri}") URI apiGatewayUri,
+			HubOpenapiProperties hubProperties, Environment environment) {
 		return new OpenapiModifyResponseBodyGatewayFilterFactory(codecConfigurer.getReaders(), bodyDecoders,
-				bodyEncoders, apiGatewayUri);
+				bodyEncoders, apiGatewayUri, advertisedIssuers(hubProperties, environment));
+	}
+
+	/**
+	 * The issuers the aggregated documents advertise: those of the gateway when it was
+	 * asked for them, and none &mdash; leaving every document as its service wrote it
+	 * &mdash; otherwise.
+	 * <p>
+	 * Asking for the issuers of a gateway that has none configured is a contradiction
+	 * worth a word: the request cannot be honoured, and the documents keep pointing at
+	 * whatever internal address their services declared.
+	 */
+	private static Map<String, String> advertisedIssuers(HubOpenapiProperties properties, Environment environment) {
+		if (properties.getSecurity().getIssuer() != HubOpenapiProperties.Security.Issuer.GATEWAY) {
+			return Map.of();
+		}
+		Map<String, String> issuers = GatewayIssuers.from(environment);
+		if (issuers.isEmpty()) {
+			LOG.warn("hub-openapi.security.issuer is GATEWAY, but this gateway is configured with no issuer: "
+					+ "the aggregated documents keep the one their services declared. Configure "
+					+ "spring.security.oauth2.resourceserver.multitenant or .jwt.issuer-uri.");
+		}
+		else {
+			LOG.debug("Aggregated OpenAPI documents will advertise the gateway issuers {}", issuers.keySet());
+		}
+		return issuers;
 	}
 
 	/**

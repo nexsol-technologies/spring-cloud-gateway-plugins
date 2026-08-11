@@ -102,6 +102,15 @@ the same login page, with Keycloak and roles behind it.
 http://localhost:8181/swagger-ui.html serves the contracts of the discovered services,
 `SERVICE-A` among them, next to the statically configured petstore source.
 
+The profile also sets `hub-openapi.security.issuer: gateway`, which is worth a look on this
+sample because it is where the two tenants are declared. A service names, in its contract,
+the issuer it validates its own traffic against — an address internal to the cluster, which
+resolves to nothing in the browser reading the contract. This advertises the issuers of the
+gateway instead, read straight from `spring.security.oauth2.resourceserver.multitenant`:
+`local` and `local2` become two schemes and two alternatives, so the page offers them as the
+choice they are. Set it back to `document` and each contract keeps the issuer its service
+wrote.
+
 <p align="center">
   <img src="../../doc/spring-cloud-gateway-openapi.png" alt="spring-cloud-gateway-openapi" width="50%"/>
 </p>

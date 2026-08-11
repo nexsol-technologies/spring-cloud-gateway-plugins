@@ -112,6 +112,52 @@ spring.cloud.gateway.server.webflux.routes-openapi:
 The source then appears in the Swagger UI dropdown as `petstore`, served through the
 gateway at `/v3/api-docs/petstore`.
 
+## Which issuer the documents advertise
+
+A service names, in its `openIdConnect` security scheme, the issuer **it** validates its own
+traffic against &mdash; routinely an address internal to the cluster. The document is read in
+a browser, where that address resolves to nothing: the console shows a discovery URL nobody
+can reach, and no token can be obtained to try an operation with.
+
+The gateway knows better. It is configured with the issuers it accepts on the traffic it
+routes, and a token good enough for the traffic is exactly the token an operation needs:
+
+```yaml
+spring.cloud.gateway.server.webflux.hub-openapi:
+  security:
+    issuer: gateway            # DOCUMENT (default) | GATEWAY
+```
+
+| Value | What the documents say |
+|---|---|
+| `DOCUMENT` | Whatever their service wrote, untouched. The default, and the behaviour the plugin has always had. |
+| `GATEWAY` | The issuers of this gateway, read from `spring.security.oauth2.resourceserver` &mdash; nothing to declare twice. |
+
+Both shapes are read, and neither has to be the one the console itself signs in through:
+
+```yaml
+spring.security.oauth2.resourceserver:
+  multitenant:                 # each tenant contributes an issuer, under its id
+    - id: local
+      issuer-uri: http://localhost:9090
+    - id: partner
+      issuer-uri: https://partner.example.ch/realms/care
+  # or, for a single issuer:
+  jwt:
+    issuer-uri: http://localhost:9090
+```
+
+With **one** issuer, every `openIdConnect` scheme keeps its name and only its discovery URL
+changes. With **several**, each scheme becomes one scheme per tenant &mdash; `bearer-oidc`
+becomes `bearer-oidc-local` and `bearer-oidc-partner` &mdash; and every requirement naming it,
+at the root of the document and on each operation carrying its own, becomes one alternative
+per tenant. An OpenAPI `security` list is a disjunction, so the console offers the tenants as
+the choice they are rather than one of them as a fact.
+
+Only the discovery URL moves. The schemes, the scopes and the operations are the service's
+own, and a scheme that is not `openIdConnect` is left alone. Asking for `GATEWAY` on a gateway
+configured with no issuer changes nothing and says so at start-up.
+
 ## Spring Security
 
 When Spring Security is on the classpath and the hub is enabled, the plugin contributes its
