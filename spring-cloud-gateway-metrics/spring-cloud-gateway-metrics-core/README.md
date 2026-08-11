@@ -103,6 +103,24 @@ box (`jvm.memory.*`, `jvm.gc.*`, `jvm.threads.*`, `process.*`, `system.*`) and t
 Netty ones the gateway does not: `reactor.netty.connection.provider.*` for the pools and
 `reactor.netty.eventloop.pending.tasks` for the event loops.
 
+Micrometer 1.16 ships two naming conventions for the JVM binders, and the memory and
+processor figures are read under both:
+
+| Figure | Micrometer convention | OpenTelemetry convention |
+| --- | --- | --- |
+| Heap / non-heap used | `jvm.memory.used` + `area=heap`\|`nonheap` | `jvm.memory.used` + `jvm.memory.type=heap`\|`non_heap` |
+| Heap ceiling | `jvm.memory.max` + `area=heap` | `jvm.memory.limit` + `jvm.memory.type=heap` |
+| Process CPU | `process.cpu.usage` | `jvm.cpu.recent_utilization` |
+| Processors | `system.cpu.count` | `jvm.cpu.count` |
+
+Everything else read here is named identically under both. Spring Boot always builds the
+binders with the historical convention and exposes no property to switch, so an application
+only lands on the OpenTelemetry names by declaring its own `JvmMemoryMetrics` or
+`ProcessorMetrics` bean — which cannot be detected from the outside, the conventions being
+held in a private field. The registry itself is therefore asked: the historical name first,
+the OpenTelemetry one only when that search comes back empty. Under the historical
+convention nothing changes and nothing extra is looked up.
+
 The pool gauges are folded per connection provider and downstream address. Reactor Netty
 also tags them with an `id` identifying a pool instance, whose cardinality follows the
 internals of the transport; what an operator reads is "the pool towards service-a is full",

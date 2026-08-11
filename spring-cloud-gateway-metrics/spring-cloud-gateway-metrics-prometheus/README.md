@@ -111,6 +111,14 @@ selected by name in a single expression and grouped per instance on this side:
 last_over_time({__name__=~"jvm_memory_used_bytes|process_cpu_usage|…",job="gateway"}[120s])
 ```
 
+The names selected are the historical Micrometer ones. An instance whose JVM binders were
+declared with the OpenTelemetry conventions publishes its memory and processor series under
+other names (`jvm.memory.limit`, `jvm.cpu.recent_utilization`, and the `jvm.memory.type`
+label instead of `area`) and those two figures come back empty here — unlike the local
+source, which reads both. The exported spelling of those names depends on the Prometheus
+registry rather than on the convention alone, so it is left out until measured on a
+gateway that actually publishes them.
+
 Twenty round trips to read twenty counters would make this by far the most expensive
 provider instead of the cheapest.
 

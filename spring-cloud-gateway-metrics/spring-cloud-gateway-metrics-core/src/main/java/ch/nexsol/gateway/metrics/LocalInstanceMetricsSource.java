@@ -44,11 +44,23 @@ import org.springframework.cloud.gateway.config.HttpClientProperties;
  * Reactor Netty figures are not &mdash; the gateway leaves that instrumentation off
  * &mdash; so what is missing is reported as such through {@link InstanceInstrumentation}
  * instead of being shown as an empty table.
+ * <p>
+ * Memory and processor are read under both meter conventions Micrometer ships: the
+ * historical one ({@code area=heap}, {@code jvm.memory.max}, {@code process.cpu.usage})
+ * and the OpenTelemetry one ({@code jvm.memory.type=heap}, {@code jvm.memory.limit},
+ * {@code jvm.cpu.recent_utilization}). Neither Spring Boot nor the binders expose which
+ * one is in use &mdash; the conventions are held in a private field &mdash; so the
+ * registry itself is asked, and the second lookup only happens when the first finds
+ * nothing. The other figures this class reads are named identically under both
+ * conventions.
  */
 public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 
 	/** Micrometer tag separating the heap pools from the rest of the memory. */
 	public static final String AREA_TAG = "area";
+
+	/** OpenTelemetry tag separating the heap pools from the rest of the memory. */
+	public static final String MEMORY_TYPE_TAG = "jvm.memory.type";
 
 	/** Reactor Netty tag naming the connection provider a pool counter belongs to. */
 	public static final String POOL_NAME_TAG = "name";
@@ -62,9 +74,17 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 	/** Counter of the tasks queued on a Reactor Netty event loop. */
 	public static final String EVENT_LOOP_PENDING_TASKS = "reactor.netty.eventloop.pending.tasks";
 
+	private static final String MEMORY_USED = "jvm.memory.used";
+
+	private static final String MEMORY_MAX = "jvm.memory.max";
+
+	private static final String MEMORY_LIMIT = "jvm.memory.limit";
+
 	private static final String HEAP = "heap";
 
 	private static final String NON_HEAP = "nonheap";
+
+	private static final String OTEL_NON_HEAP = "non_heap";
 
 	private static final long MISSING = -1L;
 
@@ -134,19 +154,36 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 			pauseTotalMs += timer.totalTime(TimeUnit.MILLISECONDS);
 			pauseCount += timer.count();
 		}
-		return new JvmStats(bytes(sumGauges(registry, "jvm.memory.used", AREA_TAG, HEAP)),
-				bytes(sumGauges(registry, "jvm.memory.max", AREA_TAG, HEAP)),
-				bytes(sumGauges(registry, "jvm.memory.used", AREA_TAG, NON_HEAP)),
-				orZero(gauge(registry, "jvm.gc.overhead")), pauseTotalMs, pauseCount,
-				(int) orZero(gauge(registry, "jvm.threads.live")), (int) orZero(gauge(registry, "jvm.threads.peak")),
-				(int) orZero(gauge(registry, "jvm.threads.daemon")));
+		return new JvmStats(bytes(memoryUsed(registry, HEAP, HEAP)), bytes(heapMax(registry)),
+				bytes(memoryUsed(registry, NON_HEAP, OTEL_NON_HEAP)), orZero(gauge(registry, "jvm.gc.overhead")),
+				pauseTotalMs, pauseCount, (int) orZero(gauge(registry, "jvm.threads.live")),
+				(int) orZero(gauge(registry, "jvm.threads.peak")), (int) orZero(gauge(registry, "jvm.threads.daemon")));
 	}
 
 	private static SystemStats system(MeterRegistry registry) {
-		return new SystemStats(orZero(gauge(registry, "process.cpu.usage")),
+		return new SystemStats(orZero(gauge(registry, "process.cpu.usage", "jvm.cpu.recent_utilization")),
 				orZero(gauge(registry, "system.cpu.usage")), orMissing(gauge(registry, "system.load.average.1m")),
-				(int) orZero(gauge(registry, "system.cpu.count")), bytes(gauge(registry, "process.files.open")),
-				bytes(gauge(registry, "process.files.max")));
+				(int) orZero(gauge(registry, "system.cpu.count", "jvm.cpu.count")),
+				bytes(gauge(registry, "process.files.open")), bytes(gauge(registry, "process.files.max")));
+	}
+
+	/**
+	 * Sums the used memory of one area, under whichever convention the JVM binder was
+	 * built with.
+	 * @param registry the registry to read
+	 * @param area the value of the Micrometer {@code area} tag
+	 * @param memoryType the value of the OpenTelemetry {@code jvm.memory.type} tag
+	 * @return the used bytes, or {@code NaN} when neither convention published them
+	 */
+	private static double memoryUsed(MeterRegistry registry, String area, String memoryType) {
+		double used = sumGauges(registry, MEMORY_USED, AREA_TAG, area);
+		return Double.isNaN(used) ? sumGauges(registry, MEMORY_USED, MEMORY_TYPE_TAG, memoryType) : used;
+	}
+
+	/** Reads the heap ceiling, which the two conventions do not even name alike. */
+	private static double heapMax(MeterRegistry registry) {
+		double max = sumGauges(registry, MEMORY_MAX, AREA_TAG, HEAP);
+		return Double.isNaN(max) ? sumGauges(registry, MEMORY_LIMIT, MEMORY_TYPE_TAG, HEAP) : max;
 	}
 
 	private static NettyStats netty(MeterRegistry registry) {
@@ -211,6 +248,12 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 	private static double gauge(MeterRegistry registry, String name) {
 		Gauge gauge = registry.find(name).gauge();
 		return (gauge != null) ? gauge.value() : Double.NaN;
+	}
+
+	/** Reads a gauge the two conventions name differently, the historical name first. */
+	private static double gauge(MeterRegistry registry, String name, String openTelemetryName) {
+		double value = gauge(registry, name);
+		return Double.isNaN(value) ? gauge(registry, openTelemetryName) : value;
 	}
 
 	/**
