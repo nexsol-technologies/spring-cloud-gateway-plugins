@@ -89,6 +89,20 @@ class InstanceMetricsControllerTests {
 	}
 
 	@Test
+	void shouldCarryTheRoutesBehindTheDownstreamAddresses() {
+		// The map travels even when it is empty: the view reads it on every render, and
+		// an absent field would leave every pool unnamed rather than un-nameable.
+		this.webTestClient.get()
+			.uri("/ui/metrics/instances/data")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody()
+			.jsonPath("$.routesByAddress")
+			.exists();
+	}
+
+	@Test
 	void shouldReportWhichInstrumentationIsOff() {
 		// Neither switch is on in this context, and the payload has to carry that: an
 		// empty pool list alone would read as "no downstream called yet".

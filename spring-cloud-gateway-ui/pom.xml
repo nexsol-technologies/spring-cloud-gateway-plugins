@@ -35,6 +35,13 @@
 			<artifactId>spring-cloud-gateway-server-webflux</artifactId>
 			<optional>true</optional>
 		</dependency>
+		<!-- Optional: the instances view names the routes a connection pool serves, which
+		     for a load-balanced route is only known to the service registry. -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-commons</artifactId>
+			<optional>true</optional>
+		</dependency>
 		<!-- Optional: the audit view tails the events produced by the audit plugin. -->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>

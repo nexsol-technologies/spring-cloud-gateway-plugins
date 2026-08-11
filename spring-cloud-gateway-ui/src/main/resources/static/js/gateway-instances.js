@@ -22,6 +22,10 @@
 	var url = container.getAttribute('data-url');
 	var timer = null;
 
+	// The routes behind each downstream address, resolved once per snapshot rather than
+	// per row: the same address means the same routes on every instance.
+	var routesByAddress = {};
+
 	// The property that publishes the connection pool counters. Named in full in the
 	// view, because a reader looking at an empty pool section needs the fix, not the
 	// observation that something is missing.
@@ -132,11 +136,33 @@
 			+ '</div>';
 	}
 
+	// How many route ids a cell spells out before counting the rest. A contract turned
+	// into one route per operation puts twenty of them on a single address, and the
+	// column has to stay a column.
+	var ROUTES_SHOWN = 2;
+
+	/**
+	 * The routes behind a downstream address. An address in no route table and no
+	 * registry keeps a dash: the downstream was called, but nothing here can say on whose
+	 * behalf, and naming it after a route it may not serve would be worse than silence.
+	 */
+	function routeCell(address) {
+		var routes = routesByAddress[address] || [];
+		if (!routes.length) {
+			return '&mdash;';
+		}
+		var shown = routes.slice(0, ROUTES_SHOWN).map(escape).join(', ');
+		return (routes.length > ROUTES_SHOWN)
+			? shown + ' <span class="text-secondary fw-normal">+' + (routes.length - ROUTES_SHOWN) + '</span>'
+			: shown;
+	}
+
 	function poolRow(pool) {
 		var saturation = ratio(pool.active, pool.max);
 		var queue = (pool.maxPending > 0) ? count(pool.pending) + ' / ' + count(pool.maxPending)
 			: count(pool.pending);
 		return '<tr>'
+			+ '<td class="fw-semibold">' + routeCell(pool.remoteAddress) + '</td>'
 			+ '<td class="text-nowrap">' + escape(pool.name) + ' <span class="text-secondary">&rarr;</span> '
 			+ escape(pool.remoteAddress) + '</td>'
 			+ '<td style="min-width: 8rem">' + bar(saturation) + '</td>'
@@ -163,7 +189,7 @@
 		});
 		return '<div class="table-responsive"><table class="table table-sm align-middle mb-0">'
 			+ '<thead><tr class="text-secondary small">'
-			+ '<th>Pool</th><th>Saturation</th><th class="text-end">Active / max</th>'
+			+ '<th>Route</th><th>Pool</th><th>Saturation</th><th class="text-end">Active / max</th>'
 			+ '<th class="text-end">Idle</th><th class="text-end">Pending</th><th class="text-end">Avg wait</th>'
 			+ '</tr></thead><tbody>'
 			+ pools.map(poolRow).join('')
@@ -196,6 +222,7 @@
 
 	function render(snapshot) {
 		coverageEl.textContent = snapshot.coverage || '';
+		routesByAddress = snapshot.routesByAddress || {};
 		var instances = snapshot.instances || [];
 		emptyEl.style.display = instances.length ? 'none' : '';
 		container.innerHTML = instances.map(card).join('');

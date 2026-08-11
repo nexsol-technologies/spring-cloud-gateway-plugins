@@ -120,6 +120,35 @@ class LocalInstanceMetricsSourceTests {
 	}
 
 	@Test
+	void readsTheMemoryAndProcessorFiguresUnderTheOpenTelemetryConventions() {
+		SimpleMeterRegistry registry = new SimpleMeterRegistry();
+		gauge(registry, "jvm.memory.used", 300, "jvm.memory.type", "heap", "jvm.memory.pool.name", "G1 Eden Space");
+		gauge(registry, "jvm.memory.used", 700, "jvm.memory.type", "heap", "jvm.memory.pool.name", "G1 Old Gen");
+		gauge(registry, "jvm.memory.used", 50, "jvm.memory.type", "non_heap", "jvm.memory.pool.name", "Metaspace");
+		gauge(registry, "jvm.memory.limit", 2000, "jvm.memory.type", "heap", "jvm.memory.pool.name", "G1 Old Gen");
+		gauge(registry, "jvm.cpu.recent_utilization", 0.34);
+		gauge(registry, "jvm.cpu.count", 8);
+
+		InstanceMetric metric = sourceFor(registry).read();
+
+		assertThat(metric.jvm().heapUsedBytes()).isEqualTo(1000);
+		assertThat(metric.jvm().heapMaxBytes()).isEqualTo(2000);
+		assertThat(metric.jvm().nonHeapUsedBytes()).isEqualTo(50);
+		assertThat(metric.system().processCpuUsage()).isEqualTo(0.34, offset(0.0001));
+		assertThat(metric.system().cpuCount()).isEqualTo(8);
+	}
+
+	@Test
+	void countsTheMemoryOnceWhenBothConventionsArePublished() {
+		SimpleMeterRegistry registry = new SimpleMeterRegistry();
+		gauge(registry, "jvm.memory.used", 1000, "area", "heap", "id", "old");
+		gauge(registry, "jvm.memory.used", 1000, "jvm.memory.type", "heap", "jvm.memory.pool.name", "G1 Old Gen");
+
+		// The same pool published twice must not read as twice the memory.
+		assertThat(sourceFor(registry).read().jvm().heapUsedBytes()).isEqualTo(1000);
+	}
+
+	@Test
 	void readsTheUptimeAndTheSystemFigures() {
 		SimpleMeterRegistry registry = new SimpleMeterRegistry();
 		TimeGauge.builder("process.uptime", new AtomicLong(90_000), TimeUnit.MILLISECONDS, AtomicLong::get)
