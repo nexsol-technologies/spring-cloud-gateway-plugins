@@ -339,8 +339,9 @@ gateway-7f9c4   http://10.0.3.21:8080                          up 4d 02h
 Heap ▓▓▓▓▓▓▓░░░ 71%  1.4 / 2.0 GB   CPU 34%   Threads 87 (peak 112)   GC 0.4%
 
 Pools
-  proxy → service-a:8080   ▓▓▓▓▓▓▓▓▓░   47 / 50 active   3 idle   12 / 100 pending   340 ms
-  proxy → service-b:8443   ▓░░░░░░░░░    2 / 50 active  14 idle    0 / 100 pending     0 ms
+  Route                             Pool
+  service-a-route                   proxy → 323d64b065a5:8080   ▓▓▓▓▓▓▓▓▓░   47 / 50   340 ms
+  petstore_updatePet, …addPet +17   proxy → c2b76b2d36a1:8443   ▓░░░░░░░░░    2 / 50     0 ms
 Event loop — 0 pending task(s) across 8 loop(s).
 ```
 
@@ -350,6 +351,22 @@ still looks perfectly healthy: nothing in the traffic view separates that from t
 being slow, and nothing in a generic JVM dashboard shows it at all. The rows are sorted
 fullest first, and folded per connection provider and downstream address rather than per
 internal pool instance.
+
+**The route column** turns that address into something a reader knows. Behind Docker
+Swarm or Kubernetes a pool is keyed on a container identity (`323d64b065a5:8080`), which
+names nothing on its own, so `PoolRouteResolver` maps it back two ways: a route with a
+literal URI carries its own authority and is matched straight from the route table &mdash;
+the default port of the scheme filled in, since a route often leaves it out and a pool
+never does &mdash; while a load-balanced route (`lb://SERVICE-X`) only resolves through
+the service registry, which is read for the addresses the route table could not name, and
+only for those. An address neither knows &mdash; an instance deregistered while its
+connections still live &mdash; keeps a dash rather than being attributed to a route it may
+not serve. Without a registry in the context, literal routes are still named.
+
+A downstream is often the target of several routes &mdash; a pool serves the service, not
+the route, and an OpenAPI contract turned into one route per operation alone puts twenty of
+them on one address. All of them travel in the payload; the cell spells out two and counts
+the rest, so the column stays a column.
 
 The event loop line is the WebFlux-specific counterpart: pending tasks are what says
 something is blocking the loop, which slows every route down for a reason no route-level

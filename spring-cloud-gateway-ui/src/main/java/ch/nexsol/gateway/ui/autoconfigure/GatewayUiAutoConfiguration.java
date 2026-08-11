@@ -30,6 +30,7 @@ import ch.nexsol.gateway.ui.controller.GatewayUiModelAttributes;
 import ch.nexsol.gateway.ui.metrics.InstanceMetricsController;
 import ch.nexsol.gateway.ui.metrics.InstancesOverviewContribution;
 import ch.nexsol.gateway.ui.metrics.MetricsOverviewContribution;
+import ch.nexsol.gateway.ui.metrics.PoolRouteResolver;
 import ch.nexsol.gateway.ui.metrics.RouteMetricsController;
 import ch.nexsol.gateway.ui.nav.GatewayUiMenu;
 import ch.nexsol.gateway.ui.nav.NavItem;
@@ -51,6 +52,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.ApplicationContext;
@@ -304,6 +306,24 @@ public class GatewayUiAutoConfiguration {
 				matchIfMissing = true)
 		@Import(InstanceMetricsController.class)
 		static class InstanceMetricsConfiguration {
+
+			/**
+			 * Names the routes a connection pool serves, from the route table and, for a
+			 * load-balanced route, from the service registry.
+			 * <p>
+			 * Declared on the route table being exposed at all: without it a pool can
+			 * only be shown as the container address it connects to, which is what the
+			 * view falls back to.
+			 * @param inventoryService the inventory the route table is read from
+			 * @param discoveryClient the provider over the service registry
+			 * @return the pool route resolver
+			 */
+			@Bean
+			@ConditionalOnClass({ RouteDefinitionLocator.class, ReactiveDiscoveryClient.class })
+			PoolRouteResolver poolRouteResolver(RouteInventoryService inventoryService,
+					ObjectProvider<ReactiveDiscoveryClient> discoveryClient) {
+				return new PoolRouteResolver(inventoryService, discoveryClient);
+			}
 
 			/**
 			 * Contributes the instance count to the home page.
