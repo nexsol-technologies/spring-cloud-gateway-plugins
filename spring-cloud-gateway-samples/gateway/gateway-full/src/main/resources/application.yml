@@ -102,10 +102,15 @@ spring.cloud.gateway.server.webflux.openapi-validation:
     validate-body: true
     max-body-size: 1MB
 
-# Traffic and instance figures (spring-cloud-gateway-metrics). No provider: the figures
-# are those of this instance. See the gateway-metrics sample for the consolidating
-# sources.
+# Traffic and instance figures (spring-cloud-gateway-metrics). No provider by default: the
+# figures are those of this instance. The 'metrics-redis', 'metrics-prometheus' and
+# 'metrics-discovery' profiles at the end of this file each put a consolidating source
+# behind it.
 spring.cloud.gateway.server.webflux.metrics:
+  # Defaults to the host name, the pod name on Kubernetes. Set here so the coverage line
+  # under the chart reads the same whatever machine the sample runs on, and so the
+  # 'instance2' profile has one value to override.
+  instance-id: gateway-full-1
   excluded-routes:
     - openapi-docs-.*
   instance:
@@ -223,3 +228,130 @@ spring.cloud.gateway.server.webflux:
 spring.cloud.gateway.server.webflux.hub-openapi:
   enabled: true
   gateway-uri: http://localhost:${server.port}
+---
+# Each instance publishes what it counted into Redis; the view sums whatever is there.
+#   docker compose up -d redis
+#   mvn spring-boot:run -Dspring-boot.run.profiles=metrics-redis
+# Start a second instance to see the figures consolidate — the 'instance2' profile is that
+# instance, on its own port and under its own identity:
+#   mvn spring-boot:run -Dspring-boot.run.profiles=metrics-redis,instance2
+spring:
+  config:
+    activate:
+      on-profile:
+      - metrics-redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+spring.cloud.gateway.server.webflux.metrics:
+  provider: redis
+  redis:
+    key-prefix: "gateway:metrics:"
+    # A namespace of its own rather than a suffix under key-prefix: the route source scans
+    # that prefix with a wildcard and would pick these entries up only to discard them,
+    # one warning each, on every refresh.
+    instance-key-prefix: "gateway:instances:"
+    publish-interval: 10s
+    # Comfortably longer than the publish interval, or an instance disappears from the
+    # figures between two of its own writes.
+    time-to-live: 45s
+---
+# Reads the consolidated figures from Prometheus. The only source that survives a restart:
+# the series outlive the JVM that produced them.
+#   docker compose up -d prometheus
+#   mvn spring-boot:run -Dspring-boot.run.profiles=metrics-prometheus
+spring:
+  config:
+    activate:
+      on-profile:
+      - metrics-prometheus
+spring.cloud.gateway.server.webflux.metrics:
+  provider: prometheus
+  prometheus:
+    # 9091, so it does not collide with the auth-server sample on 9090.
+    url: http://localhost:9091
+    # Set it unless this gateway is the only publisher of the meter: a shared Prometheus
+    # otherwise mixes the traffic of every gateway into one figure.
+    selector: job="gateway-full"
+    meter: spring_cloud_gateway_requests_seconds
+    timeout: 5s
+    # The scrape target Prometheus stamps every series with, a host and port rather than
+    # the instance-id above: the instances view names its rows differently here than under
+    # the other providers.
+    instance-label: instance
+    # Prometheus keeps the series of instances that no longer run. Anything that stopped
+    # reporting for longer than this drops out of the instances view.
+    stale-after: 2m
+---
+# Polls every instance registered under this gateway's own service id and sums the answers.
+# Needs the 'eureka' sample on :8761, and a second instance to consolidate.
+#   mvn spring-boot:run -Dspring-boot.run.profiles=metrics-discovery
+#   mvn spring-boot:run -Dspring-boot.run.profiles=metrics-discovery,instance2
+# It composes with the 'eureka' profile above, which adds the discovery route locator and
+# the OpenAPI hub: -Dspring-boot.run.profiles=eureka,metrics-discovery
+spring:
+  config:
+    activate:
+      on-profile:
+      - metrics-discovery
+eureka:
+  client:
+    enabled: true
+    fetch-registry: true
+    register-with-eureka: true
+spring.cloud.gateway.server.webflux.metrics:
+  provider: discovery
+  discovery:
+    # Left to spring.application.name, which is what the instances register under.
+    service-id:
+    path: /ui/metrics/local
+    instance-path: /ui/metrics/local/instance
+    timeout: 3s
+---
+# Every plugin off, from configuration alone: the same jar and the same classpath, and a
+# gateway that routes traffic and does nothing else.
+#   mvn spring-boot:run -Dspring-boot.run.profiles=plugins-off
+# What still answers is what the gateway itself provides: the routes below, /actuator, and
+# the filter factories the routes name — a filter factory is only applied by a route asking
+# for it, so it has nothing to turn off.
+spring:
+  config:
+    activate:
+      on-profile:
+      - plugins-off
+  autoconfigure:
+    # The two plugins carrying no switch of their own: they are wired on the strength of
+    # being on the classpath. Boot's own exclude list is the property that turns them off.
+    # It works differently from the switches below — it silences the auto-configuration
+    # altogether, so /ui and /ui/routes/db answer 404 rather than answering that they are
+    # disabled.
+    exclude:
+    - ch.nexsol.gateway.ui.autoconfigure.GatewayUiAutoConfiguration
+    - ch.nexsol.gateway.ui.autoconfigure.GatewayUiSecurityAutoConfiguration
+    - ch.nexsol.gateway.database.autoconfigure.GatewayDatabaseAutoConfiguration
+spring.cloud.gateway.server.webflux:
+  webfilter:
+    # filters: the correlation-id web filter, the only thing that plugin puts on every
+    # request. Its filter factories stay registered and unused.
+    correlation-id.enabled: false
+    # oauth2: the Basic-auth to Bearer exchange, likewise the only global piece.
+    basicauth-exchange-oauth2.enabled: false
+  routes-files.enabled: false
+  routes-openapi.enabled: false
+  routes-configserver.enabled: false
+  routes-security.public-routes.enabled: false
+  hub-openapi.enabled: false
+  audit:
+    enabled: false
+    web-filter.enabled: false
+  metrics:
+    enabled: false
+    instance.enabled: false
+  # openapi-validation has no enabled flag either, for a different reason: it is attached
+  # route by route, and both directions on OFF is what neutralises it wherever a route
+  # attached it. Quoted, or YAML reads OFF as the boolean false.
+  openapi-validation:
+    request.mode: "OFF"
+    response.mode: "OFF"

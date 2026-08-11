@@ -125,6 +125,11 @@
             <artifactId>spring-cloud-gateway-metrics-discovery</artifactId>
             <version>${revision}</version>
         </dependency>
+        <!-- Publishes /actuator/prometheus, which the prometheus source reads back. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
     </dependencies>
 
 </project>

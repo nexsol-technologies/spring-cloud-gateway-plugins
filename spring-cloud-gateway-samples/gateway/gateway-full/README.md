@@ -27,7 +27,7 @@ each name what they additionally need.
 | `routes-database` | `/ui/routes/db` |
 | `routes-security` | on the classpath; this gateway permits everything, so nothing here needs exempting — see [gateway-secured](../gateway-secured/README.md) |
 | `hub-openapi` | `/swagger-ui.html`, under the `eureka` profile |
-| `metrics` | `/ui/metrics` and `/ui/metrics/instances`, both instrumentation switches on |
+| `metrics` | `/ui/metrics` and `/ui/metrics/instances`, both instrumentation switches on, the consolidating sources behind the `metrics-*` profiles |
 | `audit` | `/ui/audit`, with the global web filter on |
 | `ui` | `/ui` |
 
@@ -128,11 +128,12 @@ starting one on that port.
 
 ## Auditing and metrics here
 
-Both run with **no provider**: the audit events are logged and republished as Spring
-application events, and the figures are those of this instance. The
-[gateway-audit](../gateway-audit/README.md) and
-[gateway-metrics](../gateway-metrics/README.md) samples are where the Redis, Kafka, R2DBC,
-Prometheus and discovery backends are exercised.
+Auditing runs with **no provider**: the events are logged and republished as Spring
+application events. The [gateway-audit](../gateway-audit/README.md) sample is where the
+Redis, Kafka and R2DBC backends are exercised.
+
+Metrics start the same way — the figures are those of this instance — and the three
+consolidating sources sit behind a profile each, [below](#consolidating-the-metrics).
 
 The metrics plugin serves two views here. http://localhost:8181/ui/metrics answers *which
 route carries the load*; http://localhost:8181/ui/metrics/instances answers *which instance
@@ -150,6 +151,146 @@ spring.cloud.gateway.server.webflux.metrics.instance.instrument-http-client: tru
 Neither is on by default — they add a metrics recorder to the pipeline of every connection,
 so they cost something on the data path. The pool rows appear once a downstream has actually
 been called, so send some traffic through first.
+
+### Consolidating the metrics
+
+With no profile the views report what **this JVM** counted, and say so under the chart:
+`this instance only`. Behind a load balancer that is a share of the traffic, not the
+traffic — which is what the three profiles below fix, each in its own way.
+
+| | Default | `metrics-prometheus` | `metrics-redis` | `metrics-discovery` |
+|---|---|---|---|---|
+| Extra infrastructure | none | a Prometheus | a Redis | a service registry |
+| Covers every instance | no | yes | yes | yes |
+| Survives a restart | no | **yes** | no | no |
+| Freshness | live | scrape interval | publish interval | live |
+
+[`docker-compose.yml`](docker-compose.yml) starts the first two. It binds the same host
+ports as the `gateway-metrics` sample, so run one sample or the other.
+
+#### Redis
+
+```console
+docker compose up -d redis
+mvn spring-boot:run -Dspring-boot.run.profiles=metrics-redis
+```
+
+Each instance writes its own key and never touches the others', which is what lets them all
+publish without any locking. Start a second one — that is the `instance2` profile, see
+[below](#a-second-instance) — to watch the figures add up:
+
+```console
+mvn spring-boot:run -Dspring-boot.run.profiles=metrics-redis,instance2
+```
+
+The coverage then reads `2 instances, via Redis`. Stop one and it fades out on its own when
+its key expires — `time-to-live` is 45s against a 10s publish interval.
+
+#### Prometheus
+
+```console
+docker compose up -d prometheus
+mvn spring-boot:run -Dspring-boot.run.profiles=metrics-prometheus
+```
+
+Prometheus is on http://localhost:9091 (not `:9090`, which the `auth-server` sample uses) and
+scrapes `/actuator/prometheus` on the host every 5 seconds — see
+[`prometheus.yml`](prometheus.yml). Give it one scrape interval before the figures appear.
+The endpoint itself comes from `micrometer-registry-prometheus`, which this sample carries
+for that reason alone.
+
+The `selector: job="gateway-full"` matters: a shared Prometheus otherwise mixes the traffic
+of every gateway publishing the same meter into one figure, wrong in a way nothing on the
+page would reveal.
+
+#### Discovery
+
+```console
+# from spring-cloud-gateway-samples/eureka
+mvn spring-boot:run
+# here, twice
+mvn spring-boot:run -Dspring-boot.run.profiles=metrics-discovery
+mvn spring-boot:run -Dspring-boot.run.profiles=metrics-discovery,instance2
+```
+
+No infrastructure beyond the registry: each instance is polled directly on
+`/ui/metrics/local`, which answers with **its own** figures and never the consolidated ones —
+the base case that keeps the instances from polling each other forever. An instance that does
+not answer is left out, and the coverage says so.
+
+That endpoint belongs to the metrics plugin, not to the console, so the chain the `ui` plugin
+contributes does not cover it and the `/ui/**` rule of this application would close it. It is
+permitted in
+[ApiGatewayApplication](src/main/java/ch/nexsol/gateway/sample/ApiGatewayApplication.java);
+without that, every instance answers its siblings a redirect to the login page and reports
+only its own traffic. It exists only while the discovery provider is selected.
+
+The profile turns the Eureka client on by itself, so it needs nothing else. Combine it with
+the `eureka` profile to get the discovery route locator and the OpenAPI hub as well:
+`-Dspring-boot.run.profiles=eureka,metrics-discovery`.
+
+#### A second instance
+
+[`application-instance2.yml`](src/main/resources/application-instance2.yml) is the second
+instance: port `8191`, `instance-id` `gateway-full-2`, nothing else. Add it to whichever
+source is being tried, last, so it keeps the port and the identity whatever the other
+profile sets:
+
+```console
+mvn spring-boot:run -Dspring-boot.run.profiles=metrics-redis,instance2
+mvn spring-boot:run -Dspring-boot.run.profiles=metrics-prometheus,instance2
+mvn spring-boot:run -Dspring-boot.run.profiles=metrics-discovery,instance2
+```
+
+Redis and discovery need nothing more from it. Prometheus does: uncomment the `8191` target
+in [`prometheus.yml`](prometheus.yml) and restart the container, or it is never scraped and
+the second instance stays invisible — a scraper is told what to visit, where the other two
+sources are told by the instance itself.
+
+The two share what lives outside the JVM — the Redis keys, the Eureka registration — and
+nothing else: the database routes run on a private in-memory H2, so each has its own. Run
+both under `pgsql` to share those too.
+
+## Turning the plugins off
+
+Every plugin here is configuration, not code, and the `plugins-off` profile is the proof:
+
+```console
+mvn spring-boot:run -Dspring-boot.run.profiles=plugins-off
+```
+
+Same jar, same classpath, and a gateway that routes traffic and does nothing else — no
+console, no audit trail, no metrics, no route source beyond `application.yml`. Useful to
+weigh what a plugin costs, and to check that none of them is load-bearing.
+
+Most of them carry their own switch:
+
+| Plugin | Property |
+| --- | --- |
+| `filters` | `webfilter.correlation-id.enabled` |
+| `oauth2` | `webfilter.basicauth-exchange-oauth2.enabled` |
+| `routes-files` | `routes-files.enabled` |
+| `routes-openapi` | `routes-openapi.enabled` |
+| `routes-configserver` | `routes-configserver.enabled` |
+| `routes-security` | `routes-security.public-routes.enabled` |
+| `hub-openapi` | `hub-openapi.enabled` |
+| `audit` | `audit.enabled`, `audit.web-filter.enabled` |
+| `metrics` | `metrics.enabled`, `metrics.instance.enabled` |
+
+all under `spring.cloud.gateway.server.webflux`. Two cases differ:
+
+- **`openapi-validation`** has no `enabled` flag because it is attached route by route.
+  Setting `openapi-validation.request.mode` and `response.mode` to `OFF` neutralises it
+  wherever a route attached it. Note the quotes in the YAML — unquoted, `OFF` is read as
+  the boolean `false`.
+- **`ui` and `routes-database`** have no switch at all: they are wired on the strength of
+  being on the classpath. Boot's own `spring.autoconfigure.exclude` is what turns them off,
+  and it is a different thing — it silences the auto-configuration, so `/ui` answers `404`
+  rather than answering that it is disabled.
+
+The filter factories the plugins contribute (`Authorization`, `AuthorizationToken`,
+`OpenapiValidation`, …) stay registered under this profile and have nothing to turn off: a
+filter factory is only ever applied by a route naming it.
 
 ## Tracing
 

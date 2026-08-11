@@ -1,0 +1,34 @@
+# Backends the consolidating metrics sources read through. Start only the one the profile
+# you run needs:
+#   docker compose up -d redis        # --spring.profiles.active=metrics-redis
+#   docker compose up -d prometheus   # --spring.profiles.active=metrics-prometheus
+# No profile and 'metrics-discovery' need neither: the first reads this JVM, the second the
+# service registry the 'eureka' sample provides.
+#
+# These bind the same host ports as the gateway-metrics sample does, so run one or the
+# other. The pgsql profile of this sample is served by the docker-compose.yml of the
+# gateway-routes-all sample.
+services:
+
+  redis:
+    image: redis:8-alpine
+    container_name: gateway-full-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: gateway-full-prometheus
+    # 9091, so it does not collide with the 'auth-server' sample on 9090.
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    # The gateway runs on the host, not in this network.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
