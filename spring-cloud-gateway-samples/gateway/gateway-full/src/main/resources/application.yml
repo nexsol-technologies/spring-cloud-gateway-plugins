@@ -228,6 +228,13 @@ spring.cloud.gateway.server.webflux:
 spring.cloud.gateway.server.webflux.hub-openapi:
   enabled: true
   gateway-uri: http://localhost:${server.port}
+  security:
+    # The contracts the hub aggregates name the issuer each service validates its own
+    # traffic against, which in a cluster is an address a browser cannot resolve. This
+    # advertises the issuers of this gateway instead — the multitenant list further up this
+    # file, so 'local' and 'local2' are offered as the two tenants they are, and a token
+    # good enough for the routed traffic is what the console obtains.
+    issuer: gateway
 ---
 # Each instance publishes what it counted into Redis; the view sums whatever is there.
 #   docker compose up -d redis

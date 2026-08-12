@@ -31,6 +31,23 @@ public enum RouteGenerationMode {
 	 * A single route definition per source, matching all the paths and HTTP methods of
 	 * the document.
 	 */
-	AGGREGATED
+	AGGREGATED,
+
+	/**
+	 * No route at all: the source is declared for its contract alone.
+	 * <p>
+	 * This is for a service whose routes are declared elsewhere &mdash; by hand, by the
+	 * discovery locator, in a route file, in the database &mdash; and which is listed
+	 * here only so its contract joins the aggregated Swagger UI of
+	 * {@code spring-cloud-gateway-hub-openapi}: that plugin builds documentation routes
+	 * for the services it discovers on its own, and a service routed any other way is
+	 * otherwise absent from it.
+	 * <p>
+	 * The document is not even read, since nothing is generated from it: fetching it is
+	 * the hub's business, when the console asks for it. Only {@code id}, {@code spec-url}
+	 * and {@code path-prefix} are read &mdash; the rest of the source configures routes
+	 * that do not exist.
+	 */
+	NO_ROUTE
 
 }

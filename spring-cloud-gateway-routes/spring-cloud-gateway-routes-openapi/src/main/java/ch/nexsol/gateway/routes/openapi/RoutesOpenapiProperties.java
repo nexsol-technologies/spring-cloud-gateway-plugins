@@ -110,7 +110,9 @@ public class RoutesOpenapiProperties {
 		private String specUrl;
 
 		/**
-		 * How to turn the document into routes.
+		 * How to turn the document into routes, {@link RouteGenerationMode#NO_ROUTE}
+		 * included: a source may be declared for its contract alone, so it joins the
+		 * aggregated Swagger UI while its routes stay declared elsewhere.
 		 */
 		private RouteGenerationMode mode = RouteGenerationMode.AGGREGATED;
 

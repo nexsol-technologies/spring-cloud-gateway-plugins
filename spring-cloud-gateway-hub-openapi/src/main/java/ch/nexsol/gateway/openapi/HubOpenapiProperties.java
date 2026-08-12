@@ -28,8 +28,14 @@ public class HubOpenapiProperties {
 
 	private final Discovery discovery = new Discovery();
 
+	private final Security security = new Security();
+
 	public Discovery getDiscovery() {
 		return this.discovery;
+	}
+
+	public Security getSecurity() {
+		return this.security;
 	}
 
 	/**
@@ -98,6 +104,61 @@ public class HubOpenapiProperties {
 
 		public void setCacheTtl(Duration cacheTtl) {
 			this.cacheTtl = cacheTtl;
+		}
+
+	}
+
+	/**
+	 * Which OpenID Connect issuer the aggregated documents advertise.
+	 * <p>
+	 * A service names the issuer it validates its own traffic against, which is routinely
+	 * an address internal to the cluster: the document travels to a browser, where that
+	 * address resolves to nothing and the console cannot obtain a token to try the API
+	 * with. The gateway, on the other hand, is configured with the issuers it accepts on
+	 * the traffic it routes &mdash; and a token good enough for the traffic is exactly
+	 * the token an operation needs.
+	 */
+	public static class Security {
+
+		/**
+		 * Where the OpenID Connect issuer advertised by the aggregated documents comes
+		 * from.
+		 */
+		private Issuer issuer = Issuer.DOCUMENT;
+
+		public Issuer getIssuer() {
+			return this.issuer;
+		}
+
+		public void setIssuer(Issuer issuer) {
+			this.issuer = issuer;
+		}
+
+		/**
+		 * The two things an aggregated document can say about the issuer to authenticate
+		 * against.
+		 */
+		public enum Issuer {
+
+			/**
+			 * Leave the document as its service wrote it. The issuer is then whatever the
+			 * service validates its own traffic against, internal address included.
+			 */
+			DOCUMENT,
+
+			/**
+			 * Advertise the issuers of the gateway, read from
+			 * {@code spring.security.oauth2.resourceserver}: the multi-tenant list, each
+			 * tenant under its {@code id}, or the single {@code jwt.issuer-uri}. Every
+			 * {@code openIdConnect} security scheme of the document is rewritten to point
+			 * at them; with several tenants the document offers one scheme per tenant, so
+			 * the console can be authenticated as any of them.
+			 * <p>
+			 * Falls back to {@link #DOCUMENT} when the gateway is configured with no
+			 * issuer at all.
+			 */
+			GATEWAY
+
 		}
 
 	}

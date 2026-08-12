@@ -179,9 +179,40 @@ ignored by the gateway), while the base path comes from the contract.
   `<source-id>_<method>_<path>` when no `operationId` is present).
 - **AGGREGATED** — a single route per source, with a `Path` predicate listing every path and
   a `Method` predicate listing every HTTP method.
+- **NO_ROUTE** — none. The source is declared for its contract alone, see below.
 
 The configured `metadata` and `filters` are applied to every generated route, as is the
 `OpenapiValidation` filter when the source sets `validate: true`.
+
+### A contract without its routes
+
+`mode: NO_ROUTE` declares a source for its **contract alone**. Nothing is generated from it;
+it exists so the contract joins the aggregated Swagger UI of
+[spring-cloud-gateway-hub-openapi](../../spring-cloud-gateway-hub-openapi/README.md), next to
+the services that plugin discovers on its own.
+
+That is the answer for a service whose routes are already declared elsewhere — by hand, by the
+discovery locator, in a route file, in the database. The hub only builds documentation routes
+for the services it discovers through the discovery client, so a service routed any other way
+is simply absent from the dropdown, without a word: nothing failed, nothing was attempted.
+Declaring it here is what puts it back, and `NO_ROUTE` is what keeps this plugin from adding a
+second set of routes in front of a backend that already has some.
+
+```yaml
+spring.cloud.gateway.server.webflux.routes-openapi:
+  enabled: true
+  sources:
+    - id: alert-service
+      spec-url: https://alert-service.internal/v3/api-docs
+      mode: NO_ROUTE
+      # The prefix the routes you already declared answer under, so "Try it out" calls them
+      # rather than the bare contract paths.
+      path-prefix: /ALERT-SERVICE
+```
+
+Only `id`, `spec-url` and `path-prefix` are read. `uri`, `base-path`, `metadata`, `filters`
+and `validate` configure routes that are not generated, and the document is not even
+read by this plugin — fetching it is the hub's business, when the console asks for it.
 
 ## Reloading
 

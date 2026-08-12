@@ -71,6 +71,10 @@ public class OpenApiRouteDefinitionMapper {
 		return switch (source.getMode()) {
 			case PER_OPERATION -> perOperation(source, paths, basePath, pathPrefix);
 			case AGGREGATED -> aggregated(source, paths, basePath, pathPrefix);
+			// The loader skips such a source before reading its document, so this is only
+			// reached by an application mapping a document itself. Answering nothing is
+			// what the mode says.
+			case NO_ROUTE -> List.of();
 		};
 	}
 

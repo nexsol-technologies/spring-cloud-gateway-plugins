@@ -237,6 +237,35 @@ class OpenapiServiceTests {
 		}
 	}
 
+	/**
+	 * A service protecting its document said nothing about having one. Remembering that
+	 * as an absence is what kept it out of the hub for the whole cache interval after the
+	 * authorization was fixed, without a word anywhere.
+	 */
+	@Test
+	void aRefusedDocumentIsNeitherAnAbsenceNorCached() {
+		givenInstance(Map.of());
+		this.exchange = (url) -> Mono.just(ClientResponse.create(HttpStatus.UNAUTHORIZED).build());
+
+		StepVerifier.create(discover()).verifyComplete();
+		StepVerifier.create(discover()).verifyComplete();
+
+		// Probed again rather than remembered, and stopped at the first path: the same
+		// instance refuses the others the same way.
+		assertThat(this.probedUrls).containsExactly(JSON_URL, JSON_URL);
+	}
+
+	@Test
+	void aForbiddenDocumentIsTreatedAsARefusalToo() {
+		givenInstance(Map.of());
+		this.exchange = (url) -> Mono.just(ClientResponse.create(HttpStatus.FORBIDDEN).build());
+
+		StepVerifier.create(discover()).verifyComplete();
+		StepVerifier.create(discover()).verifyComplete();
+
+		assertThat(this.probedUrls).containsExactly(JSON_URL, JSON_URL);
+	}
+
 	private void givenInstance(Map<String, String> metadata) {
 		when(this.discoveryClient.getInstances("service-a")).thenReturn(Flux
 			.just(new DefaultServiceInstance("service-a-1", "service-a", "service-a.example", 8080, false, metadata)));

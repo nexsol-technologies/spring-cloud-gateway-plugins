@@ -86,6 +86,49 @@ class OpenApiRouteDefinitionLoaderTests {
 		assertThat(routes).extracting(RouteDefinition::getId).containsExactly("petstore");
 	}
 
+	/**
+	 * A source may be declared for its contract alone, so it joins the OpenAPI hub next
+	 * to the services it aggregates while its routes stay declared elsewhere &mdash; by
+	 * hand, by the discovery locator, in a route file. Generating routes for it too would
+	 * put a second set of overlapping predicates in front of the same backend.
+	 */
+	@Test
+	void loaderGeneratesNoRouteForASourceDeclaredForItsContractAlone() {
+		Source documentationOnly = aggregatedSource();
+		documentationOnly.setMode(RouteGenerationMode.NO_ROUTE);
+		OpenApiRouteDefinitionLoader loader = new OpenApiRouteDefinitionLoader(this.stubLoader,
+				new OpenApiRouteDefinitionMapper(), sourcesOf(documentationOnly));
+
+		assertThat(loader.load()).isEmpty();
+	}
+
+	@Test
+	void loaderKeepsGeneratingForTheOtherSources() {
+		Source documentationOnly = aggregatedSource();
+		documentationOnly.setId("alert-service");
+		documentationOnly.setMode(RouteGenerationMode.NO_ROUTE);
+		OpenApiRouteDefinitionLoader loader = new OpenApiRouteDefinitionLoader(this.stubLoader,
+				new OpenApiRouteDefinitionMapper(), sourcesOf(documentationOnly, aggregatedSource()));
+
+		assertThat(loader.load()).extracting(RouteDefinition::getId).containsExactly("petstore");
+	}
+
+	/**
+	 * The document of such a source is not even read here: reading it is the hub's
+	 * business, and a contract that cannot be parsed into routes nobody asked for is not
+	 * a failure of this loader.
+	 */
+	@Test
+	void loaderDoesNotReadTheDocumentOfASourceItGeneratesNothingFor() {
+		Source documentationOnly = aggregatedSource();
+		documentationOnly.setMode(RouteGenerationMode.NO_ROUTE);
+		OpenApiRouteDefinitionLoader loader = new OpenApiRouteDefinitionLoader((url) -> {
+			throw new IllegalStateException("the document must not be read");
+		}, new OpenApiRouteDefinitionMapper(), sourcesOf(documentationOnly));
+
+		assertThat(loader.load()).isEmpty();
+	}
+
 	@Test
 	void loaderIsolatesFailingSources() {
 		Source failing = new Source();

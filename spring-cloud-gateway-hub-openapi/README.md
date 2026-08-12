@@ -66,15 +66,40 @@ spring.cloud.gateway.server.webflux.hub-openapi:
 | `max-connections` | The probes use a connection pool of their own, so they never compete for the connections the gateway proxies its traffic on. |
 | `cache-ttl` | The path a document was found at &mdash; or the confirmed absence of a document &mdash; is remembered per service instance, so the next heartbeat does not probe the whole registry again. Set to `0` to probe on every refresh. |
 
-Only a service that answered has its result cached. A service that could not be reached is
-probed again on the next refresh, so a service that was down when the gateway started
+Only a service that answered **"not there"** has its result cached. A service that could not
+be reached, or that refused to hand its document over, has said nothing about having one:
+it is probed again on the next refresh, so a service that was down when the gateway started
 appears in the hub as soon as it comes back, without waiting for `cache-ttl`.
 
-Probing an instance stops at the first path it could not be reached on, instead of trying
-the remaining ones: they lead to the same instance and fail the same way. An unreachable
-service therefore costs one `timeout`, not one per candidate path &mdash; which is what
-keeps the few services that are always down or draining in a large registry from dominating
-the refresh.
+Probing an instance stops at the first path that settles the question, instead of trying the
+remaining ones: an unreachable instance and a refused document answer the same way whatever
+the path. An unreachable service therefore costs one `timeout`, not one per candidate path
+&mdash; which is what keeps the few services that are always down or draining in a large
+registry from dominating the refresh.
+
+### A service that does not appear in the hub
+
+A discovered service missing from the dropdown is either a service without a document, which
+is normal and silent, or a service the hub could not read one from, which is a configuration
+to fix and says so:
+
+```
+WARN  Route ALERT-SERVICE is left out of the OpenAPI hub: http://10.1.2.3:8080/v3/api-docs.json
+      answered 401 UNAUTHORIZED. Its document is protected, and the hub reads it anonymously.
+```
+
+The same reason is logged once per `cache-ttl` rather than on every heartbeat, and again as
+soon as it changes. Turn `ch.nexsol.gateway.openapi.hub` to `debug` for the outcome of every
+single probe, path by path.
+
+The probes are anonymous, and there is no way to give them a credential: a service whose
+contract is worth aggregating serves it to the gateway. `401` is therefore reported rather
+than worked around &mdash; and note that it says nothing about the **service**, which is
+routed as usual: only its contract is missing from the hub.
+
+A service missing from the dropdown without a word at all is a service the hub never
+considered, which is a different matter &mdash; see
+[below](#a-service-routed-without-the-discovery-client).
 
 The documents themselves are never buffered by the discovery: only the path each document
 was found at is kept, and the response body is released. The documents are fetched, and
@@ -111,6 +136,77 @@ spring.cloud.gateway.server.webflux.routes-openapi:
 
 The source then appears in the Swagger UI dropdown as `petstore`, served through the
 gateway at `/v3/api-docs/petstore`.
+
+### A service routed without the discovery client
+
+The hub builds its documentation routes from the routes the **discovery locator** produced,
+and from those alone. A service routed any other way — declared by hand in
+`spring.cloud.gateway.server.webflux.routes`, or coming from `routes-files`,
+`routes-configserver`, `routes-database` — is never probed and never appears in the dropdown.
+Nothing is logged, because nothing was attempted.
+
+Declaring it as an OpenAPI source is what puts it back, and `mode: NO_ROUTE` keeps the
+generator from adding a second set of routes in front of a backend that already has some:
+
+```yaml
+spring.cloud.gateway.server.webflux.routes-openapi:
+  enabled: true
+  sources:
+    - id: alert-service
+      spec-url: https://alert-service.internal/v3/api-docs
+      mode: NO_ROUTE                  # the contract only; the routes are declared elsewhere
+      path-prefix: /ALERT-SERVICE     # the prefix those routes answer under
+```
+
+The contract is proxied and its `servers` rewritten exactly like any other source, so "Try it
+out" targets `path-prefix` on the gateway — which has to be the prefix the existing routes
+answer under, or the console calls paths nothing serves.
+
+## Which issuer the documents advertise
+
+A service names, in its `openIdConnect` security scheme, the issuer **it** validates its own
+traffic against &mdash; routinely an address internal to the cluster. The document is read in
+a browser, where that address resolves to nothing: the console shows a discovery URL nobody
+can reach, and no token can be obtained to try an operation with.
+
+The gateway knows better. It is configured with the issuers it accepts on the traffic it
+routes, and a token good enough for the traffic is exactly the token an operation needs:
+
+```yaml
+spring.cloud.gateway.server.webflux.hub-openapi:
+  security:
+    issuer: gateway            # DOCUMENT (default) | GATEWAY
+```
+
+| Value | What the documents say |
+|---|---|
+| `DOCUMENT` | Whatever their service wrote, untouched. The default, and the behaviour the plugin has always had. |
+| `GATEWAY` | The issuers of this gateway, read from `spring.security.oauth2.resourceserver` &mdash; nothing to declare twice. |
+
+Both shapes are read, and neither has to be the one the console itself signs in through:
+
+```yaml
+spring.security.oauth2.resourceserver:
+  multitenant:                 # each tenant contributes an issuer, under its id
+    - id: local
+      issuer-uri: http://localhost:9090
+    - id: partner
+      issuer-uri: https://partner.example.ch/realms/care
+  # or, for a single issuer:
+  jwt:
+    issuer-uri: http://localhost:9090
+```
+
+With **one** issuer, every `openIdConnect` scheme keeps its name and only its discovery URL
+changes. With **several**, each scheme becomes one scheme per tenant &mdash; `bearer-oidc`
+becomes `bearer-oidc-local` and `bearer-oidc-partner` &mdash; and every requirement naming it,
+at the root of the document and on each operation carrying its own, becomes one alternative
+per tenant. An OpenAPI `security` list is a disjunction, so the console offers the tenants as
+the choice they are rather than one of them as a fact.
+
+Only the discovery URL moves. The schemes, the scopes and the operations are the service's
+own, and a scheme that is not `openIdConnect` is left alone. Asking for `GATEWAY` on a gateway
+configured with no issuer changes nothing and says so at start-up.
 
 ## Spring Security
 

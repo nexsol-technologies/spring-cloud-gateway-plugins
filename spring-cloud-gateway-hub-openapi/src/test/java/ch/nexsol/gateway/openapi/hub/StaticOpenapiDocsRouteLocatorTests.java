@@ -20,6 +20,7 @@ import java.net.URI;
 import java.util.List;
 
 import ch.nexsol.gateway.routes.openapi.OpenapiSourcesLoader;
+import ch.nexsol.gateway.routes.openapi.RouteGenerationMode;
 import ch.nexsol.gateway.routes.openapi.RoutesOpenapiProperties;
 import ch.nexsol.gateway.routes.openapi.RoutesOpenapiProperties.Source;
 import org.junit.jupiter.api.Test;
@@ -73,6 +74,30 @@ class StaticOpenapiDocsRouteLocatorTests {
 			// RewritePath maps the hub docs path to the upstream spec path.
 			assertThat(route.getFilters().get(0).getArgs().values()).contains("/v3/api-docs/petstore",
 					"/api/v3/openapi.json");
+		}).verifyComplete();
+	}
+
+	/**
+	 * A source declared for its contract alone generates no route, and that is exactly
+	 * what it is here for: its routes exist elsewhere, and only the contract is missing
+	 * from the hub. The documentation route is what makes it appear, so it must be
+	 * emitted just the same.
+	 */
+	@Test
+	void emitsTheDocumentationRouteOfASourceThatGeneratesNoRoute() {
+		RoutesOpenapiProperties properties = new RoutesOpenapiProperties();
+		Source source = new Source();
+		source.setId("alert-service");
+		source.setSpecUrl("https://alert-service.example.ch/v3/api-docs");
+		source.setMode(RouteGenerationMode.NO_ROUTE);
+		properties.setSources(List.of(source));
+
+		StepVerifier.create(locatorFor(properties).getRouteDefinitions()).assertNext((route) -> {
+			assertThat(route.getId()).isEqualTo("openapi-docs-discovery-alert-service");
+			assertThat(route.getMetadata()).containsEntry("name", "alert-service");
+			// The document is proxied from where it lives, not from the 'uri' of the
+			// routes: there are none, and nothing here required one to be declared.
+			assertThat(route.getUri()).hasToString("https://alert-service.example.ch");
 		}).verifyComplete();
 	}
 
