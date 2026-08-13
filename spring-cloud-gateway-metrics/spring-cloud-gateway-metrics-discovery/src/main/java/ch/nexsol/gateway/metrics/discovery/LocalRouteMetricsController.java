@@ -50,7 +50,11 @@ public class LocalRouteMetricsController {
 	 * Returns the figures held by this instance.
 	 * @return one figure per route, for this instance only
 	 */
-	@GetMapping(DiscoveryMetricsProperties.DEFAULT_PATH)
+	// Bound to the configured path rather than to the constant: the fan-out polls
+	// `discovery.path`, so moving it would otherwise leave every sibling polling a path
+	// no instance serves, and reporting them all as unreachable.
+	@GetMapping("${spring.cloud.gateway.server.webflux.metrics.discovery.path:"
+			+ DiscoveryMetricsProperties.DEFAULT_PATH + "}")
 	public List<RouteMetric> local() {
 		return RouteMetricsAggregator.merge(this.localSource.read());
 	}

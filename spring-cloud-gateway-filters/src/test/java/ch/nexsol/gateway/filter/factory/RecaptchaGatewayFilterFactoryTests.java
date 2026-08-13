@@ -17,6 +17,7 @@
 package ch.nexsol.gateway.filter.factory;
 
 import java.net.URI;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import ch.nexsol.gateway.filter.factory.RecaptchaGatewayFilterFactory.Config;
@@ -223,6 +224,78 @@ class RecaptchaGatewayFilterFactoryTests {
 	void shouldMapTheShortcutArgumentsInOrder() {
 		assertThat(new RecaptchaGatewayFilterFactory(WebClient.create()).shortcutFieldOrder())
 			.containsExactly("verifyUrl", "version", "secretKey", "recaptchaHttpHeader", "score");
+	}
+
+	@Test
+	void shouldRejectAV3TokenSolvedForAnotherAction() {
+		// A token obtained on a harmless action of the site is otherwise replayable
+		// against the action this route protects.
+		Config config = config(Version.V3, (short) 50);
+		config.setAction("checkout");
+		GatewayFilter filter = filterAnswering("""
+				{"success": true, "score": 0.9, "action": "page_view", "hostname": "example.org"}""", config);
+
+		expectForbidden(filter);
+	}
+
+	@Test
+	void shouldAcceptAV3TokenSolvedForTheExpectedAction() {
+		Config config = config(Version.V3, (short) 50);
+		config.setAction("checkout");
+		GatewayFilter filter = filterAnswering("""
+				{"success": true, "score": 0.9, "action": "checkout", "hostname": "example.org"}""", config);
+
+		StepVerifier.create(filter.filter(request("token"), this.chain)).verifyComplete();
+		assertThat(this.forwarded).isTrue();
+	}
+
+	@Test
+	void shouldAcceptAnyActionWhenNoneIsConfigured() {
+		GatewayFilter filter = filterAnswering("""
+				{"success": true, "score": 0.9, "action": "whatever", "hostname": "example.org"}""",
+				config(Version.V3, (short) 50));
+
+		StepVerifier.create(filter.filter(request("token"), this.chain)).verifyComplete();
+		assertThat(this.forwarded).isTrue();
+	}
+
+	@Test
+	void shouldRejectAChallengeSolvedOnAnotherHostname() {
+		// Google verifies the token, not its origin: a token solved on any other site
+		// registered under the same secret would otherwise be accepted here.
+		Config config = config(Version.V3, (short) 50);
+		config.setHostnames(List.of("example.org"));
+		GatewayFilter filter = filterAnswering("""
+				{"success": true, "score": 0.9, "hostname": "attacker.example.com"}""", config);
+
+		expectForbidden(filter);
+	}
+
+	@Test
+	void shouldRejectAV2ChallengeSolvedOnAnotherHostname() {
+		Config config = config(Version.V2, (short) 50);
+		config.setHostnames(List.of("example.org"));
+		GatewayFilter filter = filterAnswering("""
+				{"success": true, "hostname": "attacker.example.com"}""", config);
+
+		expectForbidden(filter);
+	}
+
+	@Test
+	void shouldAcceptAChallengeSolvedOnAnExpectedHostname() {
+		Config config = config(Version.V3, (short) 50);
+		config.setHostnames(List.of("other.example.org", "example.org"));
+		GatewayFilter filter = filterAnswering("""
+				{"success": true, "score": 0.9, "hostname": "example.org"}""", config);
+
+		StepVerifier.create(filter.filter(request("token"), this.chain)).verifyComplete();
+		assertThat(this.forwarded).isTrue();
+	}
+
+	@Test
+	void shouldNotCheckTheOriginWhenNothingIsConfigured() {
+		assertThat(new Config().getAction()).isNull();
+		assertThat(new Config().getHostnames()).isEmpty();
 	}
 
 	private void expectForbidden(GatewayFilter filter) {

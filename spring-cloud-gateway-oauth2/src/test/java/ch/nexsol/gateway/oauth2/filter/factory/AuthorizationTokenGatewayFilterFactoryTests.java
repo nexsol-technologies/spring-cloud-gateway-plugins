@@ -17,6 +17,8 @@
 package ch.nexsol.gateway.oauth2.filter.factory;
 
 import java.text.ParseException;
+import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +36,8 @@ import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 
@@ -141,8 +145,7 @@ class AuthorizationTokenGatewayFilterFactoryTests {
 		Config config = new Config();
 		config.setGrantAccessesMatch(MatchMode.ANY);
 		config.setGrantAccesses(List.of(neverSatisfied(), partiallySatisfied(MatchMode.ANY)));
-		MockServerWebExchange exchange = MockServerWebExchange
-			.from(MockServerHttpRequest.get("/anything").header("Authorization", "Bearer " + token));
+		MockServerWebExchange exchange = authenticated();
 		RecordingChain chain = new RecordingChain();
 
 		StepVerifier.create(new AuthorizationTokenGatewayFilterFactory().apply(config).filter(exchange, chain))
@@ -156,13 +159,29 @@ class AuthorizationTokenGatewayFilterFactoryTests {
 		// configuration from denying every request once the match mode is ANY.
 		Config config = new Config();
 		config.setGrantAccessesMatch(MatchMode.ANY);
-		MockServerWebExchange exchange = MockServerWebExchange
-			.from(MockServerHttpRequest.get("/anything").header("Authorization", "Bearer " + token));
+		MockServerWebExchange exchange = authenticated();
 		RecordingChain chain = new RecordingChain();
 
 		StepVerifier.create(new AuthorizationTokenGatewayFilterFactory().apply(config).filter(exchange, chain))
 			.verifyComplete();
 		assertThat(chain.called).isTrue();
+	}
+
+	@Test
+	void shouldDenyABearerHeaderThatSpringSecurityDidNotAuthenticate() {
+		// The filter authorizes, it does not authenticate: a token nobody verified is a
+		// token anybody can forge, so a raw bearer header counts as no token at all.
+		Config config = new Config();
+		config.setIssuers(List.of("https://nexsol.tech"));
+		MockServerWebExchange exchange = MockServerWebExchange
+			.from(MockServerHttpRequest.get("/anything").header("Authorization", "Bearer " + token));
+		RecordingChain chain = new RecordingChain();
+
+		StepVerifier.create(new AuthorizationTokenGatewayFilterFactory().apply(config).filter(exchange, chain))
+			.expectErrorSatisfies((ex) -> assertThat(((ResponseStatusException) ex).getStatusCode())
+				.isEqualTo(HttpStatus.UNAUTHORIZED))
+			.verify();
+		assertThat(chain.called).isFalse();
 	}
 
 	@Test
@@ -203,12 +222,10 @@ class AuthorizationTokenGatewayFilterFactoryTests {
 	}
 
 	@Test
-	void shouldReadTheAuthorizationHeaderWhateverItsCase() {
+	void shouldAuthorizeTheTokenSpringSecurityAuthenticated() {
 		Config config = new Config();
 		config.setIssuers(List.of("https://nexsol.tech"));
-		// HTTP/2 sends header names lower cased
-		MockServerWebExchange exchange = MockServerWebExchange
-			.from(MockServerHttpRequest.get("/anything").header("authorization", "Bearer " + token));
+		MockServerWebExchange exchange = authenticated();
 		RecordingChain chain = new RecordingChain();
 
 		StepVerifier.create(new AuthorizationTokenGatewayFilterFactory().apply(config).filter(exchange, chain))
@@ -220,8 +237,7 @@ class AuthorizationTokenGatewayFilterFactoryTests {
 	void shouldRejectABearerWithAForbiddenIssuer() {
 		Config config = new Config();
 		config.setIssuers(List.of("https://bad.issuer.ch"));
-		MockServerWebExchange exchange = MockServerWebExchange
-			.from(MockServerHttpRequest.get("/anything").header("Authorization", "Bearer " + token));
+		MockServerWebExchange exchange = authenticated();
 		RecordingChain chain = new RecordingChain();
 
 		StepVerifier.create(new AuthorizationTokenGatewayFilterFactory().apply(config).filter(exchange, chain))
@@ -233,6 +249,38 @@ class AuthorizationTokenGatewayFilterFactoryTests {
 
 	private static Map<String, Object> claims() throws ParseException {
 		return JWTParser.parse(token).getJWTClaimsSet().getClaims();
+	}
+
+	/**
+	 * An exchange whose principal is the {@link JwtAuthenticationToken} a resource server
+	 * filter chain would have produced, which is the only shape the filter ever reads.
+	 * @return the authenticated exchange
+	 */
+	private static MockServerWebExchange authenticated() {
+		return MockServerWebExchange.builder(MockServerHttpRequest.get("/anything"))
+			.principal(new JwtAuthenticationToken(verifiedJwt()))
+			.build();
+	}
+
+	/**
+	 * Builds the {@link Jwt} a resource server would have handed over once it verified
+	 * the token: same claims, minus the verification this test has no key to perform.
+	 * @return the verified token
+	 */
+	private static Jwt verifiedJwt() {
+		try {
+			JWT parsed = JWTParser.parse(token);
+			Map<String, Object> claims = new LinkedHashMap<>(parsed.getJWTClaimsSet().getClaims());
+			// Jwt keeps its timestamps as Instant where Nimbus hands them over as Date.
+			claims.replaceAll((name, value) -> (value instanceof Date date) ? date.toInstant() : value);
+			return Jwt.withTokenValue(token)
+				.headers((headers) -> headers.putAll(parsed.getHeader().toJSONObject()))
+				.claims((all) -> all.putAll(claims))
+				.build();
+		}
+		catch (ParseException ex) {
+			throw new IllegalStateException(ex);
+		}
 	}
 
 	private static boolean hasAuthority(MatchMode grantAccessesMatch, GrantAccess... grantAccesses)

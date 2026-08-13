@@ -42,7 +42,11 @@ public class LocalInstanceMetricsController {
 	 * Returns the figures of this instance.
 	 * @return the figures of this instance, never the consolidated ones
 	 */
-	@GetMapping(DiscoveryMetricsProperties.DEFAULT_INSTANCE_PATH)
+	// Bound to the configured path rather than to the constant: the fan-out polls
+	// `discovery.instance-path`, so moving it would otherwise leave every sibling polling
+	// a path no instance serves, and reporting them all as unreachable.
+	@GetMapping("${spring.cloud.gateway.server.webflux.metrics.discovery.instance-path:"
+			+ DiscoveryMetricsProperties.DEFAULT_INSTANCE_PATH + "}")
 	public InstanceMetric local() {
 		return this.localSource.read();
 	}

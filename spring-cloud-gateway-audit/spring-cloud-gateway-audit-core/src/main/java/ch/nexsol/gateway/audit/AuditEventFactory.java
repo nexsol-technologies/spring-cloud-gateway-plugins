@@ -17,14 +17,18 @@
 package ch.nexsol.gateway.audit;
 
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.handler.TracingObservationHandler.TracingContext;
@@ -90,9 +94,16 @@ public class AuditEventFactory {
 	 */
 	private static final String VALIDATION_ATTRIBUTES_ATTR = "gatewayOpenapiValidationAttributes";
 
+	/**
+	 * What the value of a masked query parameter is audited as.
+	 */
+	private static final String MASKED_VALUE = "***";
+
 	private final AuditProperties.Groups groups;
 
 	private final Map<String, String> metadata;
+
+	private final Set<String> maskedParameters;
 
 	/**
 	 * Create a new factory.
@@ -102,6 +113,12 @@ public class AuditEventFactory {
 	public AuditEventFactory(AuditProperties properties) {
 		this.groups = properties.getGroups();
 		this.metadata = new LinkedHashMap<>(properties.getMetadata());
+		// Lower cased once: parameter names are compared without regard to case, and the
+		// comparison runs on every audited request.
+		this.maskedParameters = properties.getMaskedParameters()
+			.stream()
+			.map((name) -> name.toLowerCase(Locale.ROOT))
+			.collect(Collectors.toUnmodifiableSet());
 	}
 
 	/**
@@ -258,7 +275,7 @@ public class AuditEventFactory {
 
 	private String basicAuthUser(ServerHttpRequest request) {
 		String header = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-		if (header == null || !header.toLowerCase().startsWith(BASIC_PREFIX)) {
+		if (header == null || !header.toLowerCase(Locale.ROOT).startsWith(BASIC_PREFIX)) {
 			return null;
 		}
 		try {
@@ -298,9 +315,60 @@ public class AuditEventFactory {
 		return NONE_VALUE;
 	}
 
+	/**
+	 * Returns the query string, with the value of every masked parameter replaced.
+	 * <p>
+	 * The raw query is walked rather than {@code getQueryParams()}, so what is audited
+	 * stays the string the client actually sent: same order, same encoding, same repeated
+	 * parameters. Only the values of the configured names are replaced.
+	 */
 	private String parametersOrNone(ServerHttpRequest request) {
 		String query = request.getURI().getRawQuery();
-		return StringUtils.hasText(query) ? query : NONE_VALUE;
+		if (!StringUtils.hasText(query)) {
+			return NONE_VALUE;
+		}
+		if (this.maskedParameters.isEmpty()) {
+			return query;
+		}
+		StringBuilder masked = new StringBuilder(query.length());
+		for (String parameter : query.split("&", -1)) {
+			if (!masked.isEmpty()) {
+				masked.append('&');
+			}
+			int equals = parameter.indexOf('=');
+			if (equals < 0 || !isMasked(parameter.substring(0, equals))) {
+				masked.append(parameter);
+				continue;
+			}
+			masked.append(parameter, 0, equals + 1).append(MASKED_VALUE);
+		}
+		return masked.toString();
+	}
+
+	/**
+	 * Whether the value of a parameter must be masked.
+	 * <p>
+	 * The name is matched as it was sent and, when it carries a percent escape, decoded
+	 * first: {@code access%5Ftoken} is the same parameter as {@code access_token} to
+	 * every server that reads it, so it has to be the same parameter here too. Decoding
+	 * only when a {@code %} is present keeps the usual case free of it.
+	 */
+	private boolean isMasked(String name) {
+		if (this.maskedParameters.contains(name.toLowerCase(Locale.ROOT))) {
+			return true;
+		}
+		if (name.indexOf('%') < 0) {
+			return false;
+		}
+		try {
+			return this.maskedParameters
+				.contains(URLDecoder.decode(name, StandardCharsets.UTF_8).toLowerCase(Locale.ROOT));
+		}
+		catch (IllegalArgumentException ex) {
+			// A malformed escape decodes to nothing meaningful; the raw comparison above
+			// already had its say.
+			return false;
+		}
 	}
 
 	private String statusValue(HttpStatusCode status) {

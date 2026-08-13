@@ -16,6 +16,9 @@
 
 package ch.nexsol.gateway.database.controller.error;
 
+import ch.nexsol.gateway.database.controller.FilterController;
+import ch.nexsol.gateway.database.controller.PredicateController;
+import ch.nexsol.gateway.database.controller.RouteController;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,11 +32,15 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.ServerWebInputException;
 
 /**
- * Default controller advice translating request validation and binding failures into HTTP
- * 400 responses.
+ * Controller advice translating the request validation and binding failures of the route
+ * management controllers into HTTP 400 responses.
+ * <p>
+ * Scoped to the controllers of this plugin: an unrestricted {@code @ControllerAdvice}
+ * applies to every controller of the host application, so it would quietly take over the
+ * error handling of endpoints that have nothing to do with the gateway routes, and answer
+ * them with the bodiless 400 this one produces.
  */
-@ControllerAdvice
-// @ConditionalOnMissingBean(annotation = ControllerAdvice.class)
+@ControllerAdvice(assignableTypes = { RouteController.class, FilterController.class, PredicateController.class })
 public class ControllerExceptionHandler {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ControllerExceptionHandler.class);

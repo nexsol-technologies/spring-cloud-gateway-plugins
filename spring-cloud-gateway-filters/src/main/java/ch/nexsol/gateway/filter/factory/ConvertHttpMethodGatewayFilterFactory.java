@@ -91,10 +91,22 @@ public class ConvertHttpMethodGatewayFilterFactory
 
 		/**
 		 * Sets the replacement HTTP method from its textual name.
+		 * <p>
+		 * The name is checked against the methods HTTP defines rather than handed
+		 * straight to {@link HttpMethod#valueOf(String)}: since Spring Framework 6 that
+		 * method accepts anything and mints an {@code HttpMethod} for it, so a typo would
+		 * build a route forwarding a method no server knows &mdash; and {@code @NotNull}
+		 * would never fire, since it never returns {@code null}.
 		 * @param method the HTTP method name to resolve
+		 * @throws IllegalArgumentException when the name is not a standard HTTP method
 		 */
 		public void setReplacement(String method) {
-			this.replacement = HttpMethod.valueOf(method);
+			HttpMethod resolved = HttpMethod.valueOf(method);
+			if (!Arrays.asList(HttpMethod.values()).contains(resolved)) {
+				throw new IllegalArgumentException("'" + method + "' is not an HTTP method; expected one of "
+						+ Arrays.toString(HttpMethod.values()));
+			}
+			this.replacement = resolved;
 		}
 
 	}

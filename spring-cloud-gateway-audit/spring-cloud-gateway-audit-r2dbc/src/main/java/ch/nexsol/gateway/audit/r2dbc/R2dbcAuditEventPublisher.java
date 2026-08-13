@@ -18,6 +18,7 @@ package ch.nexsol.gateway.audit.r2dbc;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.regex.Pattern;
 
 import ch.nexsol.gateway.audit.AuditEvent;
 import ch.nexsol.gateway.audit.AuditEventPublisher;
@@ -37,6 +38,15 @@ public class R2dbcAuditEventPublisher implements AuditEventPublisher {
 
 	private static final Logger LOG = LoggerFactory.getLogger(R2dbcAuditEventPublisher.class);
 
+	/**
+	 * A SQL identifier, quoted or not, optionally qualified by a schema. Quoted names are
+	 * accepted because a database that folds case needs them to address a table named
+	 * with capitals, and rejecting them would break a gateway that was configured with
+	 * one.
+	 */
+	private static final Pattern TABLE_NAME = Pattern
+		.compile("(\"[^\"]+\"|[A-Za-z_][A-Za-z0-9_$]*)(\\.(\"[^\"]+\"|[A-Za-z_][A-Za-z0-9_$]*))?");
+
 	private final DatabaseClient databaseClient;
 
 	private final String insertSql;
@@ -52,6 +62,16 @@ public class R2dbcAuditEventPublisher implements AuditEventPublisher {
 	 */
 	public R2dbcAuditEventPublisher(DatabaseClient databaseClient, String table, AuditEventSerializer serializer) {
 		this.databaseClient = databaseClient;
+		// The table name is concatenated into the statement, since a bind marker cannot
+		// carry an identifier. It comes from the configuration rather than from a
+		// request,
+		// so this is not reachable from the traffic — but the check costs nothing and
+		// keeps
+		// the one place that builds SQL by hand from being able to build anything else.
+		if (!TABLE_NAME.matcher(table).matches()) {
+			throw new IllegalArgumentException(
+					"'" + table + "' is not a valid table name; expected " + TABLE_NAME.pattern());
+		}
 		this.insertSql = "INSERT INTO " + table
 				+ " (event_timestamp, attributes) VALUES (:eventTimestamp, :attributes)";
 		this.serializer = serializer;

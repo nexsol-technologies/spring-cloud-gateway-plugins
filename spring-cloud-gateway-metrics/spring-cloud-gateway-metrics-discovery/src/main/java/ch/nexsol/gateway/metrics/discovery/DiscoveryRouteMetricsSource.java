@@ -89,19 +89,23 @@ public class DiscoveryRouteMetricsSource implements RouteMetricsSource {
 			// exists to avoid.
 			return Mono.just(RouteMetricsSnapshot.empty("service discovery is not enabled"));
 		}
-		AtomicInteger reached = new AtomicInteger();
-		AtomicInteger discovered = new AtomicInteger();
-		return registry.getInstances(this.serviceId)
-			.doOnNext((instance) -> discovered.incrementAndGet())
-			.flatMap((instance) -> poll(instance).doOnNext((metrics) -> reached.incrementAndGet()))
-			.flatMapIterable((metrics) -> metrics)
-			.collectList()
-			.map((partials) -> new RouteMetricsSnapshot(coverage(reached.get(), discovered.get()),
-					RouteMetricsAggregator.merge(partials)))
-			.onErrorResume((ex) -> {
-				LOG.warn("Could not list the instances of '{}': {}", this.serviceId, ex.getMessage());
-				return Mono.just(RouteMetricsSnapshot.empty("service discovery unavailable"));
-			});
+		// Deferred so the counters belong to one subscription: created at assembly time
+		// they would be shared by every subscriber of the returned mono, and a second
+		// reading would report twice the instances.
+		return Mono.defer(() -> {
+			AtomicInteger reached = new AtomicInteger();
+			AtomicInteger discovered = new AtomicInteger();
+			return registry.getInstances(this.serviceId)
+				.doOnNext((instance) -> discovered.incrementAndGet())
+				.flatMap((instance) -> poll(instance).doOnNext((metrics) -> reached.incrementAndGet()))
+				.flatMapIterable((metrics) -> metrics)
+				.collectList()
+				.map((partials) -> new RouteMetricsSnapshot(coverage(reached.get(), discovered.get()),
+						RouteMetricsAggregator.merge(partials)));
+		}).onErrorResume((ex) -> {
+			LOG.warn("Could not list the instances of '{}': {}", this.serviceId, ex.getMessage());
+			return Mono.just(RouteMetricsSnapshot.empty("service discovery unavailable"));
+		});
 	}
 
 	private String coverage(int reached, int discovered) {

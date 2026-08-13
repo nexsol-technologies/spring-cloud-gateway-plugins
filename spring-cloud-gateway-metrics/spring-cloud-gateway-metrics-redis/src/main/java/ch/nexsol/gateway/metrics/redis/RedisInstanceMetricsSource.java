@@ -62,21 +62,25 @@ public class RedisInstanceMetricsSource implements InstanceMetricsSource {
 
 	@Override
 	public Mono<InstanceMetricsSnapshot> collect() {
-		AtomicInteger instances = new AtomicInteger();
-		ScanOptions options = ScanOptions.scanOptions()
-			.match(this.properties.getInstanceKeyPrefix() + "*")
-			.count(100)
-			.build();
-		return this.redisTemplate.scan(options)
-			.flatMap((key) -> this.redisTemplate.opsForValue().get(key))
-			.flatMap((payload) -> read(payload).doOnNext((metric) -> instances.incrementAndGet()))
-			.sort(Comparator.comparing(InstanceMetric::instanceId))
-			.collectList()
-			.map((rows) -> new InstanceMetricsSnapshot(coverage(instances.get()), rows))
-			.onErrorResume((ex) -> {
-				LOG.warn("Could not read the instance metrics from Redis: {}", ex.getMessage());
-				return Mono.just(InstanceMetricsSnapshot.empty("Redis unavailable"));
-			});
+		// Deferred so the counter belongs to one subscription. Created at assembly time
+		// it would be shared by every subscriber, and a second reading of the same mono
+		// would report twice the instances.
+		return Mono.defer(() -> {
+			AtomicInteger instances = new AtomicInteger();
+			ScanOptions options = ScanOptions.scanOptions()
+				.match(this.properties.getInstanceKeyPrefix() + "*")
+				.count(100)
+				.build();
+			return this.redisTemplate.scan(options)
+				.flatMap((key) -> this.redisTemplate.opsForValue().get(key))
+				.flatMap((payload) -> read(payload).doOnNext((metric) -> instances.incrementAndGet()))
+				.sort(Comparator.comparing(InstanceMetric::instanceId))
+				.collectList()
+				.map((rows) -> new InstanceMetricsSnapshot(coverage(instances.get()), rows));
+		}).onErrorResume((ex) -> {
+			LOG.warn("Could not read the instance metrics from Redis: {}", ex.getMessage());
+			return Mono.just(InstanceMetricsSnapshot.empty("Redis unavailable"));
+		});
 	}
 
 	private String coverage(int instances) {

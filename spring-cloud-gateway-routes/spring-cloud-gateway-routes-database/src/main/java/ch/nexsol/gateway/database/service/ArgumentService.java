@@ -22,8 +22,15 @@ import org.apache.commons.text.StringEscapeUtils;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Converts route element arguments between their in-memory map form and the escaped JSON
- * string stored in the database.
+ * Converts route element arguments between their in-memory map form and the JSON string
+ * stored in the database.
+ * <p>
+ * Written as plain JSON. It used to be escaped a second time on the way in and unescaped
+ * on the way out, which bought nothing &mdash; the value is already a JSON document, and
+ * a column holds it fine &mdash; while turning every backslash of an argument into a
+ * round-trip through two escaping rules. Reading still unescapes, so the rows written by
+ * the previous versions are read back unchanged: unescaping plain JSON leaves it as it
+ * is.
  */
 public class ArgumentService {
 
@@ -49,12 +56,12 @@ public class ArgumentService {
 	}
 
 	/**
-	 * Serializes an argument map into an escaped JSON string.
+	 * Serializes an argument map into a JSON string.
 	 * @param args the arguments as a map
-	 * @return the escaped JSON representation of the arguments
+	 * @return the JSON representation of the arguments
 	 */
 	public String mapArgumentsToJsonString(Map<String, String> args) {
-		return StringEscapeUtils.escapeJson(this.objectMapper.writeValueAsString(args));
+		return this.objectMapper.writeValueAsString(args);
 	}
 
 }

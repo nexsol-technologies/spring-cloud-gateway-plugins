@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,9 +27,6 @@ import java.util.stream.Stream;
 
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
-import com.nimbusds.jwt.JWT;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.JWTParser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -41,12 +37,9 @@ import reactor.core.publisher.Mono;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.cloud.gateway.route.Route;
-import org.springframework.core.convert.converter.Converter;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.MappedJwtClaimSetConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.server.ResponseStatusException;
@@ -64,6 +57,17 @@ import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.G
  * A request carrying no exploitable token is rejected with {@code 401 UNAUTHORIZED} as
  * soon as a check is configured, unless the targeted route is flagged public, in which
  * case it is served without authentication by design.
+ * <p>
+ * This is an <strong>authorization</strong> filter, not an authentication one: the only
+ * token it ever inspects is the one carried by the {@link JwtAuthenticationToken} Spring
+ * Security authenticated upstream, whose signature, expiry and issuer have therefore
+ * already been verified &mdash; by the resource server of the application, single-issuer
+ * or multi-tenant. It never reads the {@code Authorization} header itself, since the
+ * claims of a token nobody verified are attacker-controlled and authorizing on them would
+ * let anyone forge the issuer, the client id and the roles checked here.
+ * <p>
+ * A route that declares a check must therefore sit behind a resource server filter chain.
+ * Without one no request carries a principal, and every request is denied.
  */
 @Valid
 public class AuthorizationTokenGatewayFilterFactory
@@ -72,8 +76,6 @@ public class AuthorizationTokenGatewayFilterFactory
 	private static final Logger LOG = LoggerFactory.getLogger(AuthorizationTokenGatewayFilterFactory.class);
 
 	public static final String UNKNOWN_VALUE = "unknown";
-
-	private static final String BEARER_PREFIX = "Bearer ";
 
 	/**
 	 * Route metadata key flagging a route as publicly accessible. Mirrors
@@ -97,14 +99,11 @@ public class AuthorizationTokenGatewayFilterFactory
 	 */
 	public static final String GRANT_ACCESSES_KEY = "grantAccesses";
 
-	private final Converter<Map<String, Object>, Map<String, Object>> claimSetConverter;
-
 	/**
 	 * Create a new factory bound to its {@link Config} type.
 	 */
 	public AuthorizationTokenGatewayFilterFactory() {
 		super(AuthorizationTokenGatewayFilterFactory.Config.class);
-		this.claimSetConverter = MappedJwtClaimSetConverter.withDefaults(Collections.emptyMap());
 	}
 
 	/**
@@ -126,19 +125,13 @@ public class AuthorizationTokenGatewayFilterFactory
 	}
 
 	/**
-	 * Resolves the JWT carried by the exchange: the one Spring Security already
-	 * authenticated when there is one, the bearer of the {@code Authorization} header
-	 * otherwise.
+	 * Resolves the JWT Spring Security authenticated for this exchange.
 	 * @param exchange the current exchange
-	 * @return the token, or an empty result when the request carries none
+	 * @return the verified token, or an empty result when the request carries no
+	 * authenticated JWT
 	 */
 	private Mono<Jwt> resolveJwt(ServerWebExchange exchange) {
-		return exchange.getPrincipal()
-			.ofType(JwtAuthenticationToken.class)
-			.map(JwtAuthenticationToken::getToken)
-			// No Spring Security in the chain: read the bearer off the request itself.
-			// Deferred so the token is not parsed again when a principal was found.
-			.switchIfEmpty(Mono.defer(() -> Mono.justOrEmpty(extractBearer(exchange))));
+		return exchange.getPrincipal().ofType(JwtAuthenticationToken.class).map(JwtAuthenticationToken::getToken);
 	}
 
 	/**
@@ -202,14 +195,6 @@ public class AuthorizationTokenGatewayFilterFactory
 		return (flag != null) && Boolean.parseBoolean(flag.toString());
 	}
 
-	private Optional<Jwt> extractBearer(ServerWebExchange exchange) {
-		// getFirst() matches the header name whatever its case, as HTTP/2 lowercases it.
-		return Optional.ofNullable(exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION))
-			.filter((header) -> header.startsWith(BEARER_PREFIX))
-			.map((header) -> header.substring(BEARER_PREFIX.length()))
-			.flatMap(this::createJwt);
-	}
-
 	/**
 	 * Check whether the given JWT claims satisfy all of the configured granted accesses.
 	 * @param claims the JWT claims to inspect
@@ -270,23 +255,6 @@ public class AuthorizationTokenGatewayFilterFactory
 				.toList();
 		}
 		return Collections.emptyList();
-	}
-
-	private Optional<Jwt> createJwt(String bearer) {
-		try {
-			JWT parsedJwt = JWTParser.parse(bearer);
-			JWTClaimsSet jwtClaimsSet = parsedJwt.getJWTClaimsSet();
-			Map<String, Object> headers = new LinkedHashMap<>(parsedJwt.getHeader().toJSONObject());
-			Map<String, Object> claims = this.claimSetConverter.convert(jwtClaimsSet.getClaims());
-			return Optional.of(Jwt.withTokenValue(parsedJwt.getParsedString())
-				.headers((h) -> h.putAll(headers))
-				.claims((c) -> c.putAll(claims))
-				.build());
-		}
-		catch (Exception ex) {
-			LOG.error("Error when parsing bearer", ex);
-			return Optional.empty();
-		}
 	}
 
 	/**

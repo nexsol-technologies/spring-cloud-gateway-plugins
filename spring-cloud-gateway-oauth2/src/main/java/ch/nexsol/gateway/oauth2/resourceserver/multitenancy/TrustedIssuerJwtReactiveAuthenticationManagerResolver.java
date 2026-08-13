@@ -75,7 +75,14 @@ public class TrustedIssuerJwtReactiveAuthenticationManagerResolver
 						manager.setJwtAuthenticationConverter(this.converter);
 					}
 					return manager;
-				}).subscribeOn(Schedulers.boundedElastic()).cache());
+				})
+					.subscribeOn(Schedulers.boundedElastic())
+					.cache()
+					// cache() remembers the failure too, so an issuer whose discovery
+					// endpoint was briefly unreachable would stay unusable for the life
+					// of
+					// the gateway. Forgetting it lets the next request build it again.
+					.doOnError((ex) -> this.authenticationManagers.remove(k)));
 	}
 
 }

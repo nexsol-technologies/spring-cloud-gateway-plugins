@@ -17,15 +17,26 @@ Basic credentials for a Bearer token, JWT authority mapping and multi-tenant iss
 
 ### AuthorizationToken
 
-The `AuthorizationToken` filter validates an access token (JWT). It reads the `Principal` from
-Spring Security, or the `Authorization` header. A token that does not meet the validation rules
-declared on the route is answered with `403 Forbidden`.
+The `AuthorizationToken` filter **authorizes** a request against the access token (JWT) it
+carries: the issuer, the client id and the granted accesses declared on the route are checked,
+and a token that does not meet them is answered with `403 Forbidden`.
 
-A request carrying no exploitable token is answered with `401 Unauthorized` as soon as the route
-declares at least one rule: the filter never lets an unauthenticated request through. Two cases
-are left untouched, as no rule applies to them: a filter declared without any argument, and a
-route flagged public through its `public` metadata (see `spring-cloud-gateway-routes-security`),
-which is served without authentication by design.
+It does **not** authenticate. The only token it reads is the one Spring Security already
+authenticated — the `JwtAuthenticationToken` of the `Principal` — whose signature, expiry and
+issuer have therefore been verified by the resource server of the application, single-issuer or
+multi-tenant. The raw `Authorization` header is never parsed: the claims of a token nobody
+verified are attacker-controlled, and authorizing on them would let anyone forge the very
+issuer, client id and roles this filter checks.
+
+**A route declaring a rule must therefore sit behind a resource server filter chain.** Without
+one no request carries a principal, and every request is answered `401 Unauthorized`. See the
+resource server section above to configure the issuers.
+
+A request carrying no authenticated token is answered with `401 Unauthorized` as soon as the
+route declares at least one rule: the filter never lets an unauthenticated request through. Two
+cases are left untouched, as no rule applies to them: a filter declared without any argument,
+and a route flagged public through its `public` metadata (see
+`spring-cloud-gateway-routes-security`), which is served without authentication by design.
 
 ```yaml
 spring.cloud.gateway.server.webflux:

@@ -155,9 +155,29 @@ All keys are under `spring.cloud.gateway.server.webflux.audit`.
 | `enabled` | `true` | Master switch; when `false` no audit filter is registered |
 | `provider` | _(unset)_ | Provider selector, read by the provider modules |
 | `metadata.<key>` | _(empty)_ | Metadata added to every event as `metadata.<key>` |
+| `masked-parameters` | `access_token`, `id_token`, `refresh_token`, `token`, `code`, `client_secret`, `password`, `secret`, `api_key`, `apikey` | Query parameters whose value is replaced by `***` in `request.parameters`, matched without regard to case |
 | `groups.jwt` / `groups.request` / `groups.response` / `groups.trace` / `groups.route` / `groups.validation` | `true` | Toggle each attribute group |
 | `web-filter.enabled` | `false` | Register the global auditing web filter |
 | `web-filter.exclude-paths` | _(empty)_ | Path patterns the global filter never audits; a matching exchange produces no event at all |
+
+### Secrets in the query string
+
+`request.parameters` audits the query string as it came in, and a gateway sees the query
+strings of everyone behind it. Anything passed there — a token, an authorization code, a
+password in a badly designed form — would otherwise land in Kafka, in Redis or in a table, and
+outlive the request by as long as the trail is kept. The values of `masked-parameters` are
+replaced by `***`; the names, the order and the encoding are left as they were.
+
+The defaults cover the usual names. Add the ones the services behind this gateway use:
+
+```yaml
+spring.cloud.gateway.server.webflux.audit:
+  masked-parameters:
+  - access_token
+  - signature   # whatever the APIs behind this gateway carry in their query strings
+```
+
+Set it to an empty list to audit the query string exactly as received.
 
 ## Default publisher
 

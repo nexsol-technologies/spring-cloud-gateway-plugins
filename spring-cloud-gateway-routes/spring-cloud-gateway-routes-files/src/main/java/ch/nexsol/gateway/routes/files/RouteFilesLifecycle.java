@@ -23,7 +23,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.time.Duration;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +41,12 @@ import org.springframework.context.SmartLifecycle;
 public class RouteFilesLifecycle implements SmartLifecycle {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RouteFilesLifecycle.class);
+
+	/**
+	 * How long the watcher waits for a change to settle before reloading. Long enough to
+	 * fold the burst of events one save produces, short enough to stay unnoticed.
+	 */
+	private static final Duration QUIET_PERIOD = Duration.ofMillis(300);
 
 	private final FileRouteDefinitionLocator locator;
 
@@ -108,10 +116,39 @@ public class RouteFilesLifecycle implements SmartLifecycle {
 			}
 			boolean changed = !key.pollEvents().isEmpty();
 			key.reset();
-			if (changed) {
-				LOG.debug("Route file change detected, refreshing route definitions");
-				this.locator.refresh().subscribe();
+			if (!changed) {
+				continue;
 			}
+			if (!drainPendingEvents()) {
+				return;
+			}
+			LOG.debug("Route file change detected, refreshing route definitions");
+			this.locator.refresh().subscribe();
+		}
+	}
+
+	/**
+	 * Waits for the burst of events a single change produces to settle.
+	 * <p>
+	 * Saving one file emits several events &mdash; an editor writing through a temporary
+	 * file emits a create, a modify and a delete &mdash; and each of them would otherwise
+	 * reload and re-parse every configured file. Consuming what is already pending folds
+	 * them into one reload.
+	 * @return {@code false} when the wait was interrupted and the loop must stop
+	 */
+	private boolean drainPendingEvents() {
+		try {
+			WatchKey pending = this.watchService.poll(QUIET_PERIOD.toMillis(), TimeUnit.MILLISECONDS);
+			while (pending != null) {
+				pending.pollEvents();
+				pending.reset();
+				pending = this.watchService.poll(QUIET_PERIOD.toMillis(), TimeUnit.MILLISECONDS);
+			}
+			return true;
+		}
+		catch (ClosedWatchServiceException | InterruptedException ex) {
+			Thread.currentThread().interrupt();
+			return false;
 		}
 	}
 

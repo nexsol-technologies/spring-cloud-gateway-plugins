@@ -31,7 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
 import org.springframework.cloud.gateway.filter.FilterDefinition;
@@ -39,6 +38,7 @@ import org.springframework.cloud.gateway.handler.predicate.PredicateDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.reactive.TransactionalOperator;
 
 /**
  * Core service managing route entities and assembling the Spring Cloud Gateway route
@@ -64,19 +64,23 @@ public class RouteService {
 
 	private final ApplicationEventPublisher publisher;
 
+	private final TransactionalOperator transactionalOperator;
+
 	/**
 	 * Creates the route service with its collaborating beans.
 	 * @param routeRepository the repository persisting and querying routes
 	 * @param predicateService the service handling route predicates
 	 * @param filterService the service handling route filters
 	 * @param publisher the publisher used to trigger route refresh events
+	 * @param transactionalOperator the operator making a route and its elements one write
 	 */
 	public RouteService(RouteRepository routeRepository, PredicateService predicateService, FilterService filterService,
-			ApplicationEventPublisher publisher) {
+			ApplicationEventPublisher publisher, TransactionalOperator transactionalOperator) {
 		this.routeRepository = routeRepository;
 		this.predicateService = predicateService;
 		this.filterService = filterService;
 		this.publisher = publisher;
+		this.transactionalOperator = transactionalOperator;
 	}
 
 	/**
@@ -121,23 +125,46 @@ public class RouteService {
 								route.getRouteId(), route.getId());
 					}
 					return hasPredicate;
-				}).map((route) -> {
-					RouteDefinition routeDefinition = new RouteDefinition();
-					routeDefinition.setId(route.getRouteId());
-					routeDefinition.setUri(URI.create(route.getUri()));
-					if (route.getOrder() != null) {
-						routeDefinition.setOrder(route.getOrder());
-					}
-					routeDefinition.setPredicates(predicateMap.getOrDefault(route.getId(), List.of()));
-					routeDefinition.setFilters(filterMap.getOrDefault(route.getId(), List.of()));
-					if (route.isPublicRoute()) {
-						routeDefinition.setMetadata(Map.of(PUBLIC_METADATA_KEY, Boolean.TRUE));
-					}
-
-					return routeDefinition;
-				});
+				})
+					// Same reasoning for a row whose uri is not a URI: it is dropped
+					// rather
+					// than propagated, since an error here would fail the whole flux and
+					// leave the gateway with no route at all.
+					.flatMap((route) -> Mono.justOrEmpty(toDefinition(route, predicateMap, filterMap)));
 			});
 		});
+	}
+
+	/**
+	 * Builds the gateway definition of one persisted route.
+	 * @param route the persisted route
+	 * @param predicateMap the predicate definitions, by route reference id
+	 * @param filterMap the filter definitions, by route reference id
+	 * @return the definition, or {@code null} when the row cannot yield one
+	 */
+	private RouteDefinition toDefinition(RouteEntity route, Map<Long, List<PredicateDefinition>> predicateMap,
+			Map<Long, List<FilterDefinition>> filterMap) {
+		URI uri;
+		try {
+			uri = URI.create(route.getUri());
+		}
+		catch (IllegalArgumentException ex) {
+			LOG.warn("Skipping route '{}' (id={}): '{}' is not a valid uri", route.getRouteId(), route.getId(),
+					route.getUri());
+			return null;
+		}
+		RouteDefinition routeDefinition = new RouteDefinition();
+		routeDefinition.setId(route.getRouteId());
+		routeDefinition.setUri(uri);
+		if (route.getOrder() != null) {
+			routeDefinition.setOrder(route.getOrder());
+		}
+		routeDefinition.setPredicates(predicateMap.getOrDefault(route.getId(), List.of()));
+		routeDefinition.setFilters(filterMap.getOrDefault(route.getId(), List.of()));
+		if (route.isPublicRoute()) {
+			routeDefinition.setMetadata(Map.of(PUBLIC_METADATA_KEY, Boolean.TRUE));
+		}
+		return routeDefinition;
 	}
 
 	/**
@@ -165,7 +192,7 @@ public class RouteService {
 	 * @return the created route
 	 */
 	public Mono<RouteEntity> createRoute(@Valid RouteCreateModel routeModel) {
-		return this.routeRepository.existsByRouteId(routeModel.routeId()).flatMap((exists) -> {
+		Mono<RouteEntity> created = this.routeRepository.existsByRouteId(routeModel.routeId()).flatMap((exists) -> {
 			if (exists) {
 				return Mono.error(new RouteAlreadyExistException());
 			}
@@ -186,9 +213,13 @@ public class RouteService {
 							.flatMap(createFilters(routeModel));
 					});
 			}
-		})
-			.doOnNext((routeEntity) -> this.publisher.publishEvent(new RefreshRoutesEvent(this)))
-			.subscribeOn(Schedulers.boundedElastic());
+		});
+		// The route, its predicates and its filters are several writes: without a
+		// transaction a failure halfway leaves a route with no predicate, which the
+		// loader
+		// then skips — a route that exists in the table and routes nothing.
+		return this.transactionalOperator.transactional(created)
+			.doOnNext((routeEntity) -> this.publisher.publishEvent(new RefreshRoutesEvent(this)));
 	}
 
 	/**
@@ -199,7 +230,7 @@ public class RouteService {
 	 * @return the updated route
 	 */
 	public Mono<RouteEntity> updateRoute(Long routeId, @Valid RouteCreateModel routeModel) {
-		return Mono
+		Mono<RouteEntity> updated = Mono
 			.zip(this.findById(routeId).switchIfEmpty(Mono.error(new RouteNotFoundException())),
 					this.predicateService.validatePredicatesArgs(routeModel.predicates()),
 					this.filterService.validateFiltersArgs(routeModel.filters()))
@@ -213,10 +244,13 @@ public class RouteService {
 					.flatMap(deletePredicates())
 					.flatMap(deleteFilters())
 					.flatMap(createPredicates(routeModel))
-					.flatMap(createFilters(routeModel))
-					.doOnNext((r) -> this.publisher.publishEvent(new RefreshRoutesEvent(this)));
-			})
-			.subscribeOn(Schedulers.boundedElastic());
+					.flatMap(createFilters(routeModel));
+			});
+		// An update deletes the predicates and the filters before recreating them, so a
+		// failure in between would leave the route with none at all. The transaction is
+		// what makes the replacement all-or-nothing.
+		return this.transactionalOperator.transactional(updated)
+			.doOnNext((r) -> this.publisher.publishEvent(new RefreshRoutesEvent(this)));
 	}
 
 	/**
@@ -225,9 +259,13 @@ public class RouteService {
 	 * @return a completion signal, or an error when the route does not exist
 	 */
 	public Mono<Void> deleteRoute(Long routeId) {
+		// One statement, and the schema cascades the predicates and the filters with it,
+		// so there is nothing here to make atomic. What was missing is the refresh: the
+		// gateway kept routing a deleted route until something else triggered one.
 		return this.findById(routeId)
 			.switchIfEmpty(Mono.error(new RouteNotFoundException()))
-			.flatMap((routeEntity) -> this.routeRepository.deleteById(routeId));
+			.flatMap((routeEntity) -> this.routeRepository.deleteById(routeId))
+			.doOnSuccess((unused) -> this.publisher.publishEvent(new RefreshRoutesEvent(this)));
 	}
 
 	private Function<RouteEntity, Mono<RouteEntity>> deletePredicates() {

@@ -48,6 +48,20 @@ public class AuditProperties {
 	 */
 	private Map<String, String> metadata = new LinkedHashMap<>();
 
+	/**
+	 * Names of the query parameters whose value is replaced by {@code ***} in the audited
+	 * {@code request.parameters}, matched without regard to case.
+	 * <p>
+	 * A query string is audited raw, and a gateway sees the query strings of everyone
+	 * behind it: a token passed as a parameter, a password in a badly designed form, an
+	 * API key. Those land in Kafka, in Redis or in a table, where they outlive the
+	 * request by as long as the trail is kept. The defaults cover the usual names; add
+	 * the ones of the services behind this gateway, or set an empty list to audit the
+	 * query string exactly as it came in.
+	 */
+	private List<String> maskedParameters = new ArrayList<>(List.of("access_token", "id_token", "refresh_token",
+			"token", "code", "client_secret", "password", "secret", "api_key", "apikey"));
+
 	private Groups groups = new Groups();
 
 	private WebFilter webFilter = new WebFilter();
@@ -92,6 +106,20 @@ public class AuditProperties {
 	 */
 	public void setMetadata(Map<String, String> metadata) {
 		this.metadata = metadata;
+	}
+
+	/**
+	 * @return the names of the query parameters whose value is masked
+	 */
+	public List<String> getMaskedParameters() {
+		return this.maskedParameters;
+	}
+
+	/**
+	 * @param maskedParameters the names of the query parameters whose value is masked
+	 */
+	public void setMaskedParameters(List<String> maskedParameters) {
+		this.maskedParameters = maskedParameters;
 	}
 
 	/**

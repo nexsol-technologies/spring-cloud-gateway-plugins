@@ -16,10 +16,10 @@
 
 package ch.nexsol.gateway.filter;
 
-import java.util.concurrent.atomic.AtomicReference;
-
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.handler.TracingObservationHandler.TracingContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import org.springframework.core.Ordered;
@@ -37,6 +37,8 @@ import org.springframework.web.server.WebFilterChain;
  * @author guerricmerle
  */
 public class CorrelationIdFilter implements WebFilter, Ordered {
+
+	private static final Logger LOG = LoggerFactory.getLogger(CorrelationIdFilter.class);
 
 	private static final String X_CORRELATION_ID = "x-correlation-id";
 
@@ -63,30 +65,36 @@ public class CorrelationIdFilter implements WebFilter, Ordered {
 
 	private Mono<Void> addCustomTraceHeader(ServerWebExchange exchange) {
 		ServerHttpResponse response = exchange.getResponse();
+		final String traceId = traceId(exchange);
+		if (!StringUtils.hasText(traceId)) {
+			return Mono.empty();
+		}
+		if (response.isCommitted()) {
+			// The headers are already on the wire: adding one now changes nothing but the
+			// local copy, so say so rather than pretend the client got it.
+			LOG.debug("Response already committed, not adding the {} header", X_CORRELATION_ID);
+			return Mono.empty();
+		}
+		response.beforeCommit(() -> {
+			response.getHeaders().add(X_CORRELATION_ID, traceId);
+			return Mono.empty();
+		});
+		return Mono.empty();
+	}
+
+	private static String traceId(ServerWebExchange exchange) {
 		final Object context = exchange
 			.getAttribute("org.springframework.http.server.reactive.observation.ServerRequestObservationContext");
-		final AtomicReference<String> traceId = new AtomicReference<>();
 		if (context instanceof ServerRequestObservationContext realcontext) {
 			TracingContext tracingContext = realcontext.get(TracingContext.class);
 			if (tracingContext != null) {
 				Span realSpan = tracingContext.getSpan();
 				if (realSpan != null && realSpan.context() != null) {
-					traceId.set(realSpan.context().traceId());
+					return realSpan.context().traceId();
 				}
 			}
 		}
-		if (StringUtils.hasText(traceId.get())) {
-			if (response.isCommitted()) {
-				response.getHeaders().add(X_CORRELATION_ID, traceId.get());
-			}
-			else {
-				response.beforeCommit(() -> {
-					response.getHeaders().add(X_CORRELATION_ID, traceId.get());
-					return Mono.empty();
-				});
-			}
-		}
-		return Mono.empty();
+		return null;
 	}
 
 }

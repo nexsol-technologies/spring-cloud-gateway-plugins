@@ -135,6 +135,8 @@ public class RedisMetricsAutoConfiguration {
 		 * @return the local instance metrics source
 		 */
 		@Bean
+		@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.instance.enabled",
+				matchIfMissing = true)
 		LocalInstanceMetricsSource localInstanceMetricsSource(ObjectProvider<MeterRegistry> meterRegistry,
 				ObjectProvider<HttpClientProperties> httpClientProperties, MetricsProperties properties,
 				InstanceIdentity identity) {
@@ -152,6 +154,8 @@ public class RedisMetricsAutoConfiguration {
 		 */
 		@Bean
 		@ConditionalOnSingleCandidate(ReactiveStringRedisTemplate.class)
+		@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.instance.enabled",
+				matchIfMissing = true)
 		RedisInstanceMetricsPublisher redisInstanceMetricsPublisher(ReactiveStringRedisTemplate redisTemplate,
 				LocalInstanceMetricsSource localSource, RedisMetricsProperties properties, ObjectMapper objectMapper,
 				InstanceIdentity identity) {
