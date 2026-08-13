@@ -23,6 +23,8 @@ import java.util.Map;
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
 import ch.nexsol.gateway.routes.openapi.OpenapiSourcesLoader;
 import ch.nexsol.gateway.routes.openapi.RoutesOpenapiProperties.Source;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -45,6 +47,8 @@ import org.springframework.util.StringUtils;
  * the gateway.
  */
 public class StaticOpenapiDocsRouteLocator implements RouteDefinitionLocator {
+
+	private static final Logger LOG = LoggerFactory.getLogger(StaticOpenapiDocsRouteLocator.class);
 
 	private final ObjectProvider<OpenapiSourcesLoader> sourcesLoader;
 
@@ -70,7 +74,34 @@ public class StaticOpenapiDocsRouteLocator implements RouteDefinitionLocator {
 			.subscribeOn(Schedulers.boundedElastic())
 			.flatMapMany(Flux::fromIterable)
 			.filter((source) -> StringUtils.hasText(source.getId()) && StringUtils.hasText(source.getSpecUrl()))
+			// The hub proxies contracts through a gateway route, so it can only publish
+			// what it can reach over HTTP. A 'classpath:' or 'file:' contract carries no
+			// authority to route towards, and would yield a route with a nonsensical uri.
+			.filter(StaticOpenapiDocsRouteLocator::isProxyable)
 			.map(this::toDocumentationRoute);
+	}
+
+	private static boolean isProxyable(Source source) {
+		URI specUri;
+		try {
+			specUri = URI.create(source.getSpecUrl());
+		}
+		catch (IllegalArgumentException ex) {
+			LOG.warn("Leaving the OpenAPI source '{}' out of the hub: '{}' is not a valid URI", source.getId(),
+					source.getSpecUrl());
+			return false;
+		}
+		if (!"http".equalsIgnoreCase(specUri.getScheme()) && !"https".equalsIgnoreCase(specUri.getScheme())) {
+			LOG.warn("Leaving the OpenAPI source '{}' out of the hub: the hub proxies its contracts, so '{}' has to be "
+					+ "an http(s) URL", source.getId(), source.getSpecUrl());
+			return false;
+		}
+		if (!StringUtils.hasText(specUri.getRawAuthority()) || !StringUtils.hasText(specUri.getRawPath())) {
+			LOG.warn("Leaving the OpenAPI source '{}' out of the hub: '{}' carries no host or no path", source.getId(),
+					source.getSpecUrl());
+			return false;
+		}
+		return true;
 	}
 
 	private RouteDefinition toDocumentationRoute(Source source) {

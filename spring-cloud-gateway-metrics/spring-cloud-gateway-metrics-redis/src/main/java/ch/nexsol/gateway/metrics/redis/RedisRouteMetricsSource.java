@@ -71,19 +71,26 @@ public class RedisRouteMetricsSource implements RouteMetricsSource {
 
 	@Override
 	public Mono<RouteMetricsSnapshot> collect() {
-		AtomicInteger instances = new AtomicInteger();
-		ScanOptions options = ScanOptions.scanOptions().match(this.properties.getKeyPrefix() + "*").count(100).build();
-		return this.redisTemplate.scan(options)
-			.flatMap((key) -> this.redisTemplate.opsForValue().get(key))
-			.flatMap((payload) -> read(payload).doOnNext((metrics) -> instances.incrementAndGet()))
-			.flatMapIterable((metrics) -> metrics)
-			.collectList()
-			.map((partials) -> new RouteMetricsSnapshot(coverage(instances.get()),
-					RouteMetricsAggregator.merge(partials)))
-			.onErrorResume((ex) -> {
-				LOG.warn("Could not read the route metrics from Redis: {}", ex.getMessage());
-				return Mono.just(RouteMetricsSnapshot.empty("Redis unavailable"));
-			});
+		// Deferred so the counter belongs to one subscription. Created at assembly time
+		// it would be shared by every subscriber, and a second reading of the same mono
+		// would report twice the instances.
+		return Mono.defer(() -> {
+			AtomicInteger instances = new AtomicInteger();
+			ScanOptions options = ScanOptions.scanOptions()
+				.match(this.properties.getKeyPrefix() + "*")
+				.count(100)
+				.build();
+			return this.redisTemplate.scan(options)
+				.flatMap((key) -> this.redisTemplate.opsForValue().get(key))
+				.flatMap((payload) -> read(payload).doOnNext((metrics) -> instances.incrementAndGet()))
+				.flatMapIterable((metrics) -> metrics)
+				.collectList()
+				.map((partials) -> new RouteMetricsSnapshot(coverage(instances.get()),
+						RouteMetricsAggregator.merge(partials)));
+		}).onErrorResume((ex) -> {
+			LOG.warn("Could not read the route metrics from Redis: {}", ex.getMessage());
+			return Mono.just(RouteMetricsSnapshot.empty("Redis unavailable"));
+		});
 	}
 
 	private String coverage(int instances) {

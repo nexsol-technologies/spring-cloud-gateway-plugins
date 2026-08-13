@@ -23,6 +23,7 @@ import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -135,6 +136,14 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 				.parentObservation(contextView.getOrDefault(ObservationThreadLocalAccessor.KEY, null))
 				.start();
 
+			// An exchange that fails is denied, never forwarded: letting the request
+			// through would send the raw Basic credentials to a downstream service that
+			// expects a bearer token, and would turn a refused credential or an
+			// unreachable
+			// authorization server into a request served as if it had been authorized.
+			// Requests this filter has nothing to do with — no Basic header, or a client
+			// id
+			// it is not configured for — complete empty and are forwarded untouched.
 			return Mono.just(request)
 				.map((r) -> r.getHeaders())
 				.filter((headers) -> this.containsAuthorizationBasic(headers))
@@ -148,7 +157,6 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 									error));
 					}))
 				.map((token) -> withBearerAuth(exchange, token))
-				.onErrorResume((error) -> Mono.just(exchange))
 				.defaultIfEmpty(exchange)
 				.doOnSuccess((result) -> observation.stop())
 				.doOnCancel(observation::stop)
@@ -161,19 +169,11 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 
 	}
 
-	private BasicValue getUserPasswordFromBasic(String basic) {
-		String pair = new String(Base64.getDecoder().decode(basic));
-		String[] s = pair.split(":");
-		return new BasicValue(s[0], s[1]);
-	}
-
 	private boolean containsAuthorizationBasic(HttpHeaders headers) {
 		if (headers.containsHeader(HttpHeaders.AUTHORIZATION) && headers.get(HttpHeaders.AUTHORIZATION) != null
 				&& !headers.get(HttpHeaders.AUTHORIZATION).isEmpty()) {
 			LOG.trace("contains AUTHORIZATION header");
-			return headers.get(HttpHeaders.AUTHORIZATION)
-				.stream()
-				.anyMatch((h) -> h.toLowerCase().startsWith(HEADER_AUTHORIZATION_BASIC));
+			return headers.get(HttpHeaders.AUTHORIZATION).stream().anyMatch(BasicValue::isBasic);
 		}
 		LOG.trace("NOT contains AUTHORIZATION header");
 		return false;
@@ -185,15 +185,13 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 
 			return headers.get(HttpHeaders.AUTHORIZATION)
 				.stream()
-				.map((h) -> h.substring(HEADER_AUTHORIZATION_BASIC.length()))
+				.filter(BasicValue::isBasic)
 				.findFirst()
-				.map(this::getUserPasswordFromBasic)
+				.flatMap(BasicValue::parse)
 				.map((value) -> {
-					LOG.trace("BasicValue is " + value.getKey());
+					LOG.trace("BasicValue is {}", value.getKey());
 					return value;
-				})
-				.map(Optional::of)
-				.orElse(Optional.empty());
+				});
 		}
 		return Optional.empty();
 	}
@@ -315,6 +313,47 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 			super();
 			this.clientId = clientId;
 			this.clientSecret = clientSecret;
+		}
+
+		/**
+		 * Whether the given {@code Authorization} header value announces Basic
+		 * credentials. The scheme is case-insensitive per RFC 7235, and the comparison is
+		 * made in {@link Locale#ROOT} so it does not depend on the locale of the JVM.
+		 * @param header the raw header value
+		 * @return {@code true} when the header carries Basic credentials
+		 */
+		public static boolean isBasic(String header) {
+			return header != null && header.toLowerCase(Locale.ROOT).startsWith(HEADER_AUTHORIZATION_BASIC);
+		}
+
+		/**
+		 * Decodes a Basic {@code Authorization} header into its client id / client secret
+		 * pair.
+		 * <p>
+		 * Everything about the header is attacker-controlled, so nothing here may throw:
+		 * a value that is not valid Base64, or that carries no {@code :} separator,
+		 * yields an empty result and the request is simply left alone. The pair is split
+		 * on the <em>first</em> separator only, since RFC 7617 forbids a colon in the
+		 * user id but allows one in the password.
+		 * @param header the raw header value
+		 * @return the decoded pair, or empty when the header is not a usable one
+		 */
+		public static Optional<BasicValue> parse(String header) {
+			byte[] decoded;
+			try {
+				decoded = Base64.getDecoder().decode(header.substring(HEADER_AUTHORIZATION_BASIC.length()));
+			}
+			catch (IllegalArgumentException ex) {
+				LOG.debug("Ignoring an Authorization header whose Basic credentials are not valid Base64");
+				return Optional.empty();
+			}
+			String pair = new String(decoded, StandardCharsets.UTF_8);
+			int separator = pair.indexOf(':');
+			if (separator < 0) {
+				LOG.debug("Ignoring an Authorization header whose Basic credentials carry no ':' separator");
+				return Optional.empty();
+			}
+			return Optional.of(new BasicValue(pair.substring(0, separator), pair.substring(separator + 1)));
 		}
 
 		/**

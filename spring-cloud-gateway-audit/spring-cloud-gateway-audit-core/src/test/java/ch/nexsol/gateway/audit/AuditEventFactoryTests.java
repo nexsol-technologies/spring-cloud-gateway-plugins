@@ -17,9 +17,11 @@
 package ch.nexsol.gateway.audit;
 
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,7 @@ import reactor.core.publisher.Mono;
 
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -304,6 +307,71 @@ class AuditEventFactoryTests {
 		Map<String, String> attributes = new AuditEventFactory(properties).create(exchange).block().attributes();
 
 		assertThat(attributes).doesNotContainKey("openapi.validation.request.valid");
+	}
+
+	@Test
+	void masksTheValueOfASensitiveQueryParameter() {
+		Map<String, String> attributes = auditQuery("page=2&access_token=s3cr3t&size=10");
+
+		assertThat(attributes).containsEntry(AuditAttributes.REQUEST_PARAMETERS, "page=2&access_token=***&size=10");
+	}
+
+	@Test
+	void masksWhateverTheCaseOfTheParameterName() {
+		Map<String, String> attributes = auditQuery("Access_Token=s3cr3t");
+
+		assertThat(attributes).containsEntry(AuditAttributes.REQUEST_PARAMETERS, "Access_Token=***");
+	}
+
+	@Test
+	void masksAParameterWhoseNameIsPercentEncoded() {
+		// '%5F' is '_': the same parameter to the server that reads it, so it must be the
+		// same parameter here — otherwise encoding the name is enough to leak the value.
+		Map<String, String> attributes = auditQuery("access%5Ftoken=s3cr3t");
+
+		assertThat(attributes).containsEntry(AuditAttributes.REQUEST_PARAMETERS, "access%5Ftoken=***");
+	}
+
+	@Test
+	void masksEveryOccurrenceOfARepeatedParameter() {
+		Map<String, String> attributes = auditQuery("token=one&token=two");
+
+		assertThat(attributes).containsEntry(AuditAttributes.REQUEST_PARAMETERS, "token=***&token=***");
+	}
+
+	@Test
+	void leavesTheQueryStringUntouchedWhenNothingIsMasked() {
+		AuditProperties properties = new AuditProperties();
+		properties.setMaskedParameters(List.of());
+
+		MockServerWebExchange exchange = MockServerWebExchange
+			.from(MockServerHttpRequest.get("/orders?access_token=s3cr3t").build());
+		Map<String, String> attributes = new AuditEventFactory(properties).create(exchange).block().attributes();
+
+		assertThat(attributes).containsEntry(AuditAttributes.REQUEST_PARAMETERS, "access_token=s3cr3t");
+	}
+
+	@Test
+	void keepsAValuelessParameterAsItIs() {
+		Map<String, String> attributes = auditQuery("verbose&page=2");
+
+		assertThat(attributes).containsEntry(AuditAttributes.REQUEST_PARAMETERS, "verbose&page=2");
+	}
+
+	/**
+	 * Audits a request carrying the given query string, verbatim.
+	 * <p>
+	 * The URI is built directly rather than through
+	 * {@code MockServerHttpRequest.get(String)}, which encodes what it is given and would
+	 * turn a {@code %5F} escape into {@code %255F} — the opposite of the raw query these
+	 * tests are about.
+	 * @param rawQuery the query string as a client would send it
+	 * @return the audited attributes
+	 */
+	private Map<String, String> auditQuery(String rawQuery) {
+		MockServerWebExchange exchange = MockServerWebExchange
+			.from(MockServerHttpRequest.method(HttpMethod.GET, URI.create("/orders?" + rawQuery)).build());
+		return this.factory.create(exchange).block().attributes();
 	}
 
 	private static Route route(String id, Map<String, Object> metadata) {

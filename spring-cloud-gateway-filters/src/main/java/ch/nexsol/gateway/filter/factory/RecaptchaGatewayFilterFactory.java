@@ -17,6 +17,7 @@
 package ch.nexsol.gateway.filter.factory;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -148,11 +149,11 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 		Mono<RecaptchaResponseIdentifier> verdict = switch (config.getVersion()) {
 			case V3 -> callRecaptchaValidateToken(config.getVerifyUrl(), config.getSecretKey(), recaptchaToken,
 					RecaptchaResponseV3.class)
-				.flatMap((response) -> validateV3(response, config.getScore()))
+				.flatMap((response) -> validateV3(response, config))
 				.cast(RecaptchaResponseIdentifier.class);
 			case V2 -> callRecaptchaValidateToken(config.getVerifyUrl(), config.getSecretKey(), recaptchaToken,
 					RecaptchaResponseV2.class)
-				.flatMap(this::validateV2)
+				.flatMap((response) -> validateV2(response, config))
 				.cast(RecaptchaResponseIdentifier.class);
 		};
 		return verdict.onErrorResume((error) -> !isRejection(error), (error) -> {
@@ -209,19 +210,20 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 				.formatted(verifyUrl, response.statusCode(), body)));
 	}
 
-	private Mono<RecaptchaResponseV2> validateV2(RecaptchaResponseV2 recaptchaResponse) {
+	private Mono<RecaptchaResponseV2> validateV2(RecaptchaResponseV2 recaptchaResponse, Config config) {
 		if (!recaptchaResponse.isSuccess()) {
 			LOG.debug("Invalid reCAPTCHA token {}", recaptchaResponse);
 			return Mono.error(rejected());
 		}
-		return Mono.just(recaptchaResponse);
+		return validateHostname(recaptchaResponse, config).thenReturn(recaptchaResponse);
 	}
 
-	private Mono<RecaptchaResponseV3> validateV3(RecaptchaResponseV3 recaptchaResponse, short threshold) {
+	private Mono<RecaptchaResponseV3> validateV3(RecaptchaResponseV3 recaptchaResponse, Config config) {
 		if (!recaptchaResponse.isSuccess()) {
 			LOG.debug("Invalid reCAPTCHA token {}", recaptchaResponse);
 			return Mono.error(rejected());
 		}
+		short threshold = config.getScore();
 		// Compared on the 0.0-1.0 scale the provider answers on, rather than by scaling
 		// the score up: 0.29 * 100 is 28.999999999999996, which would reject a score
 		// exactly meeting a threshold of 29.
@@ -230,7 +232,33 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 					recaptchaResponse);
 			return Mono.error(rejected());
 		}
-		return Mono.just(recaptchaResponse);
+		// A v3 token is bound to the action it was solved for. Without this check a token
+		// obtained on a harmless action — a page view, a search — is replayable against
+		// the
+		// action this route protects, which is the whole point of scoring it.
+		if (StringUtils.hasText(config.getAction()) && !config.getAction().equals(recaptchaResponse.getAction())) {
+			LOG.debug("reCAPTCHA action '{}' does not match the expected '{}'", recaptchaResponse.getAction(),
+					config.getAction());
+			return Mono.error(rejected());
+		}
+		return validateHostname(recaptchaResponse, config).thenReturn(recaptchaResponse);
+	}
+
+	/**
+	 * Checks that the challenge was solved on one of the expected sites. Google verifies
+	 * the token, not where it came from: without this, a token solved on any other site
+	 * registered under the same secret is accepted here.
+	 * @param recaptchaResponse the answer of the verification endpoint
+	 * @param config the reCAPTCHA verification configuration
+	 * @return an empty result when the hostname is accepted, an error otherwise
+	 */
+	private Mono<Void> validateHostname(RecaptchaResponseIdentifier recaptchaResponse, Config config) {
+		List<String> expected = config.getHostnames();
+		if (expected.isEmpty() || expected.contains(recaptchaResponse.getHostname())) {
+			return Mono.empty();
+		}
+		LOG.debug("reCAPTCHA hostname '{}' is not one of the expected {}", recaptchaResponse.getHostname(), expected);
+		return Mono.error(rejected());
 	}
 
 	/**
@@ -270,6 +298,21 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 		@Min(0)
 		@Max(100)
 		private short score = 50;
+
+		/**
+		 * Action the v3 token must have been solved for, as passed to
+		 * {@code grecaptcha.execute}. Leave it unset to accept a token whatever the
+		 * action it was solved for, which makes a token obtained on any other action of
+		 * the site replayable against this route.
+		 */
+		private String action;
+
+		/**
+		 * Host names the challenge may have been solved on. Leave the list empty to
+		 * accept any, which makes a token solved on any other site registered under the
+		 * same secret acceptable here.
+		 */
+		private List<String> hostnames = new ArrayList<>();
 
 		/**
 		 * Returns the reCAPTCHA verification endpoint URL.
@@ -333,6 +376,38 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 		 */
 		public void setScore(short score) {
 			this.score = score;
+		}
+
+		/**
+		 * Returns the action the v3 token must have been solved for.
+		 * @return the expected action, {@code null} when any is accepted
+		 */
+		public String getAction() {
+			return this.action;
+		}
+
+		/**
+		 * Sets the action the v3 token must have been solved for.
+		 * @param action the expected action
+		 */
+		public void setAction(String action) {
+			this.action = action;
+		}
+
+		/**
+		 * Returns the host names the challenge may have been solved on.
+		 * @return the accepted host names, empty when any is accepted
+		 */
+		public List<String> getHostnames() {
+			return this.hostnames;
+		}
+
+		/**
+		 * Sets the host names the challenge may have been solved on.
+		 * @param hostnames the accepted host names
+		 */
+		public void setHostnames(List<String> hostnames) {
+			this.hostnames = hostnames;
 		}
 
 		/**

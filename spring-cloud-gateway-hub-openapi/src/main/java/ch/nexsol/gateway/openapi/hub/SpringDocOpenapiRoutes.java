@@ -16,9 +16,13 @@
 
 package ch.nexsol.gateway.openapi.hub;
 
+import java.util.Comparator;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springdoc.core.properties.AbstractSwaggerUiConfigProperties.SwaggerUrl;
 import org.springdoc.core.properties.SwaggerUiConfigProperties;
 
@@ -34,9 +38,11 @@ import static ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator.R
  */
 public class SpringDocOpenapiRoutes {
 
+	private static final Logger LOG = LoggerFactory.getLogger(SpringDocOpenapiRoutes.class);
+
 	private final RouteLocator routeLocator;
 
-	private SwaggerUiConfigProperties swaggerUiConfigProperties;
+	private final SwaggerUiConfigProperties swaggerUiConfigProperties;
 
 	/**
 	 * Creates a new instance.
@@ -63,7 +69,13 @@ public class SpringDocOpenapiRoutes {
 		this.routeLocator.getRoutes().filter((route) -> route.getId().startsWith(ROUTE_ID_PREFIX)).map((route) -> {
 			String name = (String) route.getMetadata().get("name");
 			return new SwaggerUrl(name, HubDiscoveryRouteLocator.API_DOCS_URL + "/" + name, null);
-		}).collect(Collectors.toSet()).doOnNext(this.swaggerUiConfigProperties::setUrls).subscribe();
+		})
+			// A sorted set, because the console renders these as a dropdown: collecting
+			// into a plain HashSet leaves the order to the hash of the names, so the list
+			// an operator reads would be shuffled on every refresh.
+			.collect(Collectors.toCollection(() -> new TreeSet<>(Comparator.comparing(SwaggerUrl::getName))))
+			.doOnNext(this.swaggerUiConfigProperties::setUrls)
+			.subscribe(null, (ex) -> LOG.warn("Could not refresh the Swagger UI entries of the OpenAPI hub", ex));
 	}
 
 }

@@ -85,8 +85,16 @@ public abstract class AbstractRefreshableRouteDefinitionLocator implements Route
 	}
 
 	private void updateCacheAndPublish(List<RouteDefinition> definitions) {
-		this.cache.set(List.copyOf(definitions));
-		LOG.debug("Loaded {} route definition(s)", definitions.size());
+		List<RouteDefinition> loaded = List.copyOf(definitions);
+		List<RouteDefinition> previous = this.cache.getAndSet(loaded);
+		LOG.debug("Loaded {} route definition(s)", loaded.size());
+		// A poll that read the same definitions changes nothing, and publishing anyway
+		// makes the gateway rebuild its whole route table — every predicate and every
+		// filter of every route — on every single tick.
+		if (loaded.equals(previous)) {
+			LOG.debug("Route definitions unchanged, not publishing a refresh event");
+			return;
+		}
 		this.publisher.publishEvent(new RefreshRoutesEvent(this));
 	}
 

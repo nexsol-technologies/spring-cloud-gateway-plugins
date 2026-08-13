@@ -57,11 +57,7 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 
 	private final YAMLMapper yamlMapper;
 
-	private final Set<MessageBodyDecoder> messageBodyDecoders;
-
-	private final Set<MessageBodyEncoder> messageBodyEncoders;
-
-	private final List<HttpMessageReader<?>> messageReaders;
+	private final ModifyResponseBodyGatewayFilterFactory delegate;
 
 	private final URI apiGatewayUri;
 
@@ -120,9 +116,10 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 		this.jsonMapper = JsonMapper.builder().build();
 		this.yamlMapper = YAMLMapper.builder().build();
 
-		this.messageReaders = messageReaders;
-		this.messageBodyDecoders = messageBodyDecoders;
-		this.messageBodyEncoders = messageBodyEncoders;
+		// Built once rather than on every apply(): apply() runs for every route carrying
+		// this filter, on every route refresh, and the delegate holds nothing per route.
+		this.delegate = new ModifyResponseBodyGatewayFilterFactory(messageReaders, messageBodyDecoders,
+				messageBodyEncoders);
 
 		this.apiGatewayUri = apiGatewayUri;
 		this.gatewayIssuers = gatewayIssuers;
@@ -136,14 +133,9 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 	 */
 	@Override
 	public GatewayFilter apply(Config config) {
-		org.springframework.cloud.gateway.filter.factory.rewrite.ModifyResponseBodyGatewayFilterFactory.Config c = new org.springframework.cloud.gateway.filter.factory.rewrite.ModifyResponseBodyGatewayFilterFactory.Config();
+		ModifyResponseBodyGatewayFilterFactory.Config c = new ModifyResponseBodyGatewayFilterFactory.Config();
 		c.setRewriteFunction(byte[].class, byte[].class, rewriteServersWithGatewayUrl(config.getPath()));
-		ModifyResponseBodyGatewayFilterFactory factory = new ModifyResponseBodyGatewayFilterFactory(this.messageReaders,
-				this.messageBodyDecoders, this.messageBodyEncoders);
-
-		ModifyResponseBodyGatewayFilterFactory.ModifyResponseGatewayFilter gatewayFilter = factory.new ModifyResponseGatewayFilter(
-				c);
-		return gatewayFilter;
+		return this.delegate.new ModifyResponseGatewayFilter(c);
 	}
 
 	private RewriteFunction<byte[], byte[]> rewriteServersWithGatewayUrl(String path) {

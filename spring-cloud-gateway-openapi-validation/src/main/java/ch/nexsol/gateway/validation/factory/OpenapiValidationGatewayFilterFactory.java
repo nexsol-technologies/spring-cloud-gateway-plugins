@@ -51,6 +51,7 @@ import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFac
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferLimitException;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -224,7 +225,20 @@ public class OpenapiValidationGatewayFilterFactory
 			return afterRequest(parameters, exchange, chain, contract, operationKey, found);
 		}
 		return ServerWebExchangeUtils.cacheRequestBodyAndRequest(exchange,
-				(cachedRequest) -> DataBufferUtils.join(cachedRequest.getBody())
+				// Bounded by the same maximum the skip decision used: that decision
+				// trusts
+				// the announced Content-Length, and a sender that under-announces it
+				// would
+				// otherwise be buffered without any limit.
+				(cachedRequest) -> DataBufferUtils.join(cachedRequest.getBody(), maxBufferedBytes(direction))
+					// The body announced a length within the maximum and then exceeded
+					// it.
+					// Its buffers are gone, so it cannot be forwarded either: say what
+					// happened rather than answer the 500 an unmapped exception produces.
+					.onErrorMap(DataBufferLimitException.class::isInstance,
+							(ex) -> new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE,
+									"the request body exceeds the " + direction.getMaxBodySize()
+											+ " the gateway validates against"))
 					.map(OpenapiValidationGatewayFilterFactory::readAndRelease)
 					.defaultIfEmpty(NO_BODY)
 					.flatMap((body) -> {
@@ -272,10 +286,13 @@ public class OpenapiValidationGatewayFilterFactory
 			default -> ValidationReport.of("the contract declares no operation matching '" + contractPath + "'");
 		};
 		Direction direction = this.properties.getRequest();
-		record(exchange, ValidationAttributes.REQUEST_VALID, ValidationAttributes.REQUEST_ERRORS, report);
 		if (!direction.isActive()) {
+			// Nothing is validated, so nothing is recorded: stamping a verdict here would
+			// have the audit trail report requests as invalid on a gateway that was asked
+			// not to validate them.
 			return chain.filter(exchange);
 		}
+		record(exchange, ValidationAttributes.REQUEST_VALID, ValidationAttributes.REQUEST_ERRORS, report);
 		this.metrics.validated(REQUEST, routeId(exchange), "unresolved", direction.getMode(), false);
 		if (direction.isEnforced()) {
 			return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, report.describe()));
@@ -310,7 +327,10 @@ public class OpenapiValidationGatewayFilterFactory
 						.validate(contract, operationKey, found, status, headers, null);
 					return handle(report, body);
 				}
-				return DataBufferUtils.join(Flux.from(body))
+				// Bounded for the same reason the request body is: the skip decision
+				// above
+				// trusts the Content-Length the upstream announced.
+				return DataBufferUtils.join(Flux.from(body), maxBufferedBytes(direction))
 					.map(OpenapiValidationGatewayFilterFactory::readAndRelease)
 					.defaultIfEmpty(NO_BODY)
 					.flatMap((bytes) -> {
@@ -399,6 +419,20 @@ public class OpenapiValidationGatewayFilterFactory
 			return SkipReason.UNKNOWN_LENGTH;
 		}
 		return (length > direction.getMaxBodySize().toBytes()) ? SkipReason.TOO_LARGE : null;
+	}
+
+	/**
+	 * The largest body that is buffered, as the number of bytes {@code DataBufferUtils}
+	 * takes.
+	 * <p>
+	 * Clamped rather than cast: a maximum above 2 GiB overflows an {@code int} into a
+	 * negative one, which the limit check reads as "already exceeded" and turns into a
+	 * gateway that rejects every single body it was asked to validate.
+	 * @param direction the direction being validated
+	 * @return the limit, capped at {@link Integer#MAX_VALUE}
+	 */
+	private static int maxBufferedBytes(Direction direction) {
+		return (int) Math.min(direction.getMaxBodySize().toBytes(), Integer.MAX_VALUE);
 	}
 
 	private static void logSkip(String direction, SkipReason reason, HttpHeaders headers) {

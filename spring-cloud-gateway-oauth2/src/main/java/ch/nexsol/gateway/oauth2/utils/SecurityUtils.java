@@ -16,9 +16,9 @@
 
 package ch.nexsol.gateway.oauth2.utils;
 
-import java.util.Base64;
 import java.util.Optional;
 
+import ch.nexsol.gateway.oauth2.filter.webfilter.BasicAuthExchangeToAccessTokenGatewayWebFilter.BasicValue;
 import ch.nexsol.gateway.oauth2.properties.BasicAuthExchangeToAccessTokenProperties;
 
 import org.springframework.http.HttpHeaders;
@@ -50,18 +50,14 @@ public final class SecurityUtils {
 			BasicAuthExchangeToAccessTokenProperties properties) {
 		return (exchange) -> {
 			ServerHttpRequest request = exchange.getRequest();
+			// Decoded through the same defensive parser the exchange filter uses: this
+			// runs
+			// inside the security chain, where a header that is not valid Base64 would
+			// otherwise turn an unauthenticated request into a 500.
 			boolean result = Optional.ofNullable(request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION))
-				.filter((header) -> header.toLowerCase().startsWith(HEADER_AUTHORIZATION_BASIC))
-				.map((basic) -> {
-					String pair = basic;
-					if (!basic.contains(":")) {
-						pair = new String(
-								Base64.getDecoder().decode(basic.substring(HEADER_AUTHORIZATION_BASIC.length())));
-					}
-					String userName = pair.split(":")[0];
-					return userName;
-				})
-				.map((user) -> properties.isUserConfigured(user))
+				.filter(BasicValue::isBasic)
+				.flatMap(BasicValue::parse)
+				.map((basic) -> properties.isUserConfigured(basic.getClientId()))
 				.orElse(false);
 			return result ? MatchResult.match() : MatchResult.notMatch();
 

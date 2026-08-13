@@ -17,12 +17,17 @@
 package ch.nexsol.gateway.oauth2.filter;
 
 import java.io.IOException;
+import java.text.ParseException;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.nimbusds.jwt.JWT;
+import com.nimbusds.jwt.JWTParser;
 import okhttp3.mockwebserver.MockWebServer;
+import reactor.core.publisher.Mono;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.SpringBootConfiguration;
@@ -31,8 +36,11 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,6 +48,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
 
 @SpringBootConfiguration
 @ComponentScan
@@ -70,6 +79,46 @@ public class SpringAppConfiguration {
 	@Bean
 	CacheManager cacheManager() {
 		return new ConcurrentMapCacheManager("basicauth-token-exchange.cache");
+	}
+
+	/**
+	 * Stands in for the resource server the {@code AuthorizationToken} filter authorizes
+	 * behind.
+	 * <p>
+	 * That filter only ever reads the {@link JwtAuthenticationToken} Spring Security
+	 * authenticated, never the raw header, so an integration test needs a principal to
+	 * exercise anything but the "no token" path. This filter provides one the way a
+	 * resource server would &mdash; minus the verification, which is precisely what these
+	 * tests have no issuer to perform.
+	 * @return the web filter authenticating the bearer of the test requests
+	 */
+	@Bean
+	WebFilter testResourceServer() {
+		return (exchange, chain) -> {
+			String header = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+			if (header == null || !header.startsWith("Bearer ")) {
+				return chain.filter(exchange);
+			}
+			return chain.filter(exchange.mutate()
+				.principal(Mono.just(new JwtAuthenticationToken(decode(header.substring("Bearer ".length())))))
+				.build());
+		};
+	}
+
+	private static Jwt decode(String value) {
+		try {
+			JWT parsed = JWTParser.parse(value);
+			Map<String, Object> claims = new LinkedHashMap<>(parsed.getJWTClaimsSet().getClaims());
+			// Jwt keeps its timestamps as Instant where Nimbus hands them over as Date.
+			claims.replaceAll((name, claim) -> (claim instanceof Date date) ? date.toInstant() : claim);
+			return Jwt.withTokenValue(value)
+				.headers((headers) -> headers.putAll(parsed.getHeader().toJSONObject()))
+				.claims((all) -> all.putAll(claims))
+				.build();
+		}
+		catch (ParseException ex) {
+			throw new IllegalStateException(ex);
+		}
 	}
 
 	@Bean(destroyMethod = "shutdown")

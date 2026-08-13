@@ -139,12 +139,22 @@ spring.cloud.gateway.server.webflux:
         secret-key:            # the secret key issued by Google reCAPTCHA
         recaptcha-http-header: # (optional) header carrying the captcha; default 'recaptcha'
         score:                 # (optional) minimal score to accept, 0 to 100; default 50
+        action:                # (optional) v3 action the token must have been solved for
+        hostnames:             # (optional) host names the challenge may have been solved on
 ```
 
 The `score` threshold applies to v3 only, where the provider answers a score between 0.0 and
 1.0. The default of `50` is Google's recommended starting point: legitimate traffic commonly
 scores between 0.7 and 0.9, so a stricter threshold turns real users away. In v2 the answer
 carries no score and the threshold is ignored.
+
+`action` and `hostnames` are what bind a token to where it came from, and both are worth
+setting. Google verifies the token, not its origin: without `action`, a v3 token solved on a
+harmless action of the site — a page view, a search — is replayable against the route this
+filter protects; without `hostnames`, a token solved on any other site registered under the
+same secret is accepted here. Left unset, each check is simply not made. They take the `args`
+form above rather than the inline shorthand, whose arguments are positional and comma
+separated.
 
 #### Everything that is not a pass is a 403
 

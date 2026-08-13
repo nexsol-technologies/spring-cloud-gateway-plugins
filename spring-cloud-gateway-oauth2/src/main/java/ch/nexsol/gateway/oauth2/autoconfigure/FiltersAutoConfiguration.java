@@ -38,6 +38,12 @@ import org.springframework.context.annotation.Conditional;
 @AutoConfiguration
 public class FiltersAutoConfiguration {
 
+	/**
+	 * Registers the {@code AuthorizationToken} filter factory. It authorizes on the token
+	 * the resource server of the application already authenticated, and never verifies
+	 * one itself, so it needs nothing injected.
+	 * @return the authorization token filter factory bean
+	 */
 	@Bean
 	AuthorizationTokenGatewayFilterFactory authorizationTokenGatewayFilterFactory() {
 		return new AuthorizationTokenGatewayFilterFactory();

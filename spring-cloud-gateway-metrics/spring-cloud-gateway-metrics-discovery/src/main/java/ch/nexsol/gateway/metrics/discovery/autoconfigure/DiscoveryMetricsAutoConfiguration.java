@@ -62,8 +62,22 @@ public class DiscoveryMetricsAutoConfiguration {
 	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.provider", havingValue = "discovery")
-	@Import({ LocalRouteMetricsController.class, LocalInstanceMetricsController.class })
+	@Import(LocalRouteMetricsController.class)
 	static class DiscoverySourceConfiguration {
+
+		/**
+		 * Serves the technical figures of this instance to its siblings. Registered under
+		 * the same condition as the source it reads: without it there is nothing to
+		 * serve.
+		 * @param localSource the source reading this instance's meter registry
+		 * @return the local instance metrics endpoint
+		 */
+		@Bean
+		@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.instance.enabled",
+				matchIfMissing = true)
+		LocalInstanceMetricsController localInstanceMetricsController(LocalInstanceMetricsSource localSource) {
+			return new LocalInstanceMetricsController(localSource);
+		}
 
 		/**
 		 * Binds the discovery metrics properties.
@@ -124,6 +138,8 @@ public class DiscoveryMetricsAutoConfiguration {
 		 * @return the local instance metrics source
 		 */
 		@Bean
+		@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.instance.enabled",
+				matchIfMissing = true)
 		LocalInstanceMetricsSource localInstanceMetricsSource(ObjectProvider<MeterRegistry> meterRegistry,
 				ObjectProvider<HttpClientProperties> httpClientProperties, MetricsProperties properties,
 				InstanceIdentity identity) {
