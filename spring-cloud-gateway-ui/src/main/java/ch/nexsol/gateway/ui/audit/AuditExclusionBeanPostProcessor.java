@@ -17,9 +17,10 @@
 package ch.nexsol.gateway.ui.audit;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import ch.nexsol.gateway.audit.AuditProperties;
-import ch.nexsol.gateway.ui.security.UiSecuredPaths;
+import ch.nexsol.gateway.commons.security.SecuredPathsContribution;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -29,23 +30,29 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
  * browsing the shell does not fill the audit trail with the traffic of the shell itself:
  * its pages, its HTMX fragments and its static assets are not gateway traffic.
  * <p>
- * The exclusions are the exact paths every active view already declares through
- * {@link UiSecuredPaths}, which is the authoritative list of what the console serves: a
- * view that is not active excludes nothing, and a gateway route declared under
- * {@code /ui} keeps being audited.
+ * The exclusions are the exact paths every active view, and every plugin whose endpoints
+ * the console governs, already declares through {@link SecuredPathsContribution}: a view
+ * that is not active excludes nothing, and a gateway route declared under {@code /ui}
+ * keeps being audited.
+ * <p>
+ * What stays in the trail is what a client calls with a token rather than what a browser
+ * paints: the JSON APIs a plugin declared as such. They are the ones an audit trail
+ * exists for &mdash; who created a route, and when. The page over the same routes is
+ * console traffic like any other view, fragment by fragment, and would drown them.
  * <p>
  * The contributions are resolved lazily: a bean post-processor is created very early,
  * before the beans it reads exist.
  */
 public class AuditExclusionBeanPostProcessor implements BeanPostProcessor {
 
-	private final ObjectProvider<UiSecuredPaths> securedPaths;
+	private final ObjectProvider<SecuredPathsContribution> securedPaths;
 
 	/**
 	 * Creates the post-processor.
-	 * @param securedPaths the provider over the paths contributed by the active views
+	 * @param securedPaths the provider over the paths contributed by the active views and
+	 * by the plugins the console governs
 	 */
-	public AuditExclusionBeanPostProcessor(ObjectProvider<UiSecuredPaths> securedPaths) {
+	public AuditExclusionBeanPostProcessor(ObjectProvider<SecuredPathsContribution> securedPaths) {
 		this.securedPaths = securedPaths;
 	}
 
@@ -55,10 +62,13 @@ public class AuditExclusionBeanPostProcessor implements BeanPostProcessor {
 			return bean;
 		}
 		List<String> excluded = properties.getWebFilter().getExcludePaths();
-		this.securedPaths.orderedStream()
-			.flatMap((contribution) -> contribution.paths().stream())
-			.filter((path) -> !excluded.contains(path))
-			.forEach(excluded::add);
+		this.securedPaths.orderedStream().forEach((contribution) -> {
+			List<String> calledWithAToken = contribution.csrfExemptPaths();
+			Stream.of(contribution.paths(), contribution.openPaths(), contribution.writePaths())
+				.flatMap(List::stream)
+				.filter((path) -> !calledWithAToken.contains(path) && !excluded.contains(path))
+				.forEach(excluded::add);
+		});
 		return bean;
 	}
 

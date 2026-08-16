@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.metrics.discovery.autoconfigure;
 
+import ch.nexsol.gateway.commons.security.SecuredPaths;
 import ch.nexsol.gateway.metrics.InstanceIdentity;
 import ch.nexsol.gateway.metrics.InstanceMetricsSource;
 import ch.nexsol.gateway.metrics.LocalInstanceMetricsSource;
@@ -87,6 +88,25 @@ public class DiscoveryMetricsAutoConfiguration {
 		@ConfigurationProperties(prefix = "spring.cloud.gateway.server.webflux.metrics.discovery")
 		DiscoveryMetricsProperties discoveryMetricsProperties() {
 			return new DiscoveryMetricsProperties();
+		}
+
+		/**
+		 * Declares the endpoints this instance serves to its siblings, so that whoever
+		 * governs the paths of the gateway knows they exist rather than leaving them to
+		 * whatever catch-all rule the application happens to have.
+		 * <p>
+		 * They are declared open: the fan-out polls them with a client that carries no
+		 * credentials, so closing them would not protect the figures, it would leave
+		 * every instance reporting its own traffic alone. The paths are the configured
+		 * ones, not the constants: moving one moves what the siblings poll, and what is
+		 * declared has to move with it.
+		 * @param properties the discovery configuration
+		 * @return the paths this instance serves to its siblings
+		 */
+		@Bean
+		@ConditionalOnMissingBean(name = "discoveryMetricsSecuredPaths")
+		SecuredPaths discoveryMetricsSecuredPaths(DiscoveryMetricsProperties properties) {
+			return SecuredPaths.open(properties.getPath(), properties.getInstancePath());
 		}
 
 		/**

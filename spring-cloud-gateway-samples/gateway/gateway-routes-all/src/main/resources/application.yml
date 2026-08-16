@@ -44,6 +44,15 @@ spring.cloud.gateway.server.webflux.routes-openapi:
 spring.r2dbc:
   url: r2dbc:h2:mem:///routes_db?options=DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
 
+# This sample is about where routes come from, not about who may change them, and it is
+# meant to be browsed without signing in. The console is open by default, and this says
+# that the endpoints changing the routing table (/ui/routes/db, /api/gateway/routes) follow
+# it rather than asking for the Basic credentials the application declares. Any gateway
+# that is not a local demo should leave this alone: the default closes them as soon as
+# there is anything to authenticate against.
+spring.cloud.gateway.server.webflux.ui.security:
+  write-mode: permit-all
+
 management:
   endpoints:
     web:

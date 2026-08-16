@@ -52,9 +52,44 @@ public class GatewayUiSecurityProperties {
 	}
 
 	/**
+	 * How the chain treats the paths a plugin declared as changing the gateway.
+	 */
+	public enum WriteMode {
+
+		/**
+		 * They require an authenticated principal as soon as the chain has something to
+		 * authenticate against: the local user of the console, or the user directory the
+		 * application declared. With none of those the chain has no door to put in front
+		 * of them, so they are permitted and a warning names them at start-up.
+		 */
+		AUTO,
+
+		/**
+		 * They require an authenticated principal, whether or not the chain has anything
+		 * to authenticate against.
+		 */
+		AUTHENTICATED,
+
+		/**
+		 * They are treated as any other path of the console, and follow the {@link Mode
+		 * mode}. This is the behaviour the plugins had before the distinction existed.
+		 */
+		PERMIT_ALL
+
+	}
+
+	/**
 	 * How the console treats its own paths.
 	 */
 	private Mode mode = Mode.PERMIT_ALL;
+
+	/**
+	 * How the chain treats the paths that change the gateway, such as the route
+	 * management API. They do not follow the mode: publishing a console without a login
+	 * is a decision, publishing an API that reconfigures the routing table without one is
+	 * an accident.
+	 */
+	private WriteMode writeMode = WriteMode.AUTO;
 
 	/**
 	 * The local user the login form authenticates against. Left without a password, no
@@ -97,6 +132,22 @@ public class GatewayUiSecurityProperties {
 	 */
 	public void setMode(Mode mode) {
 		this.mode = mode;
+	}
+
+	/**
+	 * Returns how the chain treats the paths that change the gateway.
+	 * @return the write mode
+	 */
+	public WriteMode getWriteMode() {
+		return this.writeMode;
+	}
+
+	/**
+	 * Sets how the chain treats the paths that change the gateway.
+	 * @param writeMode the write mode
+	 */
+	public void setWriteMode(WriteMode writeMode) {
+		this.writeMode = writeMode;
 	}
 
 	/**

@@ -45,4 +45,17 @@ public interface UiSecurityCustomizer {
 		return List.of();
 	}
 
+	/**
+	 * Whether this contribution authenticates a caller of an <em>open</em> console, and
+	 * is therefore applied even when there is no login page in front of the views.
+	 * <p>
+	 * An open console still has endpoints that change the gateway, and closing them takes
+	 * a way in. A login page is not one: there is none to redirect to. A Bearer token is,
+	 * which is why the resource server says yes here and the login contributions say no.
+	 * @return whether the contribution applies to an open console, false by default
+	 */
+	default boolean appliesWhenOpen() {
+		return false;
+	}
+
 }

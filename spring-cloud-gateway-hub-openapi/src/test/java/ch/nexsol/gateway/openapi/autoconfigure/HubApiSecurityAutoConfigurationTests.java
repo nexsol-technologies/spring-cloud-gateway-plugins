@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.openapi.autoconfigure;
 
+import ch.nexsol.gateway.commons.security.SecuredPaths;
 import org.junit.jupiter.api.Test;
 import org.springdoc.core.properties.SpringDocConfigProperties;
 import org.springdoc.core.properties.SwaggerUiConfigProperties;
@@ -93,6 +94,30 @@ class HubApiSecurityAutoConfigurationTests {
 				assertThat(matches(chain, "/docs-ui.html")).isTrue();
 				// The aggregated contracts keep the path the hub publishes them under.
 				assertThat(matches(chain, "/v3/api-docs/service-a")).isTrue();
+			});
+	}
+
+	@Test
+	void declaresWhatABrowserReadsToTheConsoleAndLeavesTheProbedContractOpen() {
+		this.runner.run((context) -> {
+			SecuredPaths declared = context.getBean("hubOpenapiSecuredPaths", SecuredPaths.class);
+			// What a browser asks for follows the console: the visitor holds its session.
+			assertThat(declared.paths()).contains("/swagger-ui.html", "/v3/api-docs/*", "/v3/api-docs/swagger-config");
+			// The contract of the gateway itself is probed by the hub over HTTP, with no
+			// credentials to offer: closing it would empty the hub of the gateway rather
+			// than protect anything.
+			assertThat(declared.openPaths()).containsExactly("/v3/api-docs", "/v3/api-docs.json", "/v3/api-docs.yaml");
+			assertThat(declared.writePaths()).isEmpty();
+		});
+	}
+
+	@Test
+	void declaresTheSpringDocPathsAsTheyAreConfigured() {
+		this.runner.withPropertyValues("springdoc.api-docs.path=/docs", "springdoc.swagger-ui.path=/docs-ui.html")
+			.run((context) -> {
+				SecuredPaths declared = context.getBean("hubOpenapiSecuredPaths", SecuredPaths.class);
+				assertThat(declared.paths()).contains("/docs-ui.html", "/docs/swagger-config");
+				assertThat(declared.openPaths()).containsExactly("/docs", "/docs.json", "/docs.yaml");
 			});
 	}
 

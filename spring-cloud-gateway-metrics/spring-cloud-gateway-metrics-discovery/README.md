@@ -153,10 +153,17 @@ That distinction is the whole design. Were the fan-out to poll the consolidated 
 every instance would poll every other one, which would poll it back, forever. The local
 endpoint is the base case that terminates the recursion.
 
-**The paths must be reachable between instances.** This module does not depend on the UI, so
-it cannot declare them to the shell's security chain: an application that secures
-everything must permit them itself, or the siblings answer 401 and each instance ends up
-reporting only its own traffic.
+**The paths must be reachable between instances.** The module declares them, as they are
+configured, through a `SecuredPaths.open(...)` bean from `spring-cloud-gateway-commons`. A
+gateway carrying the [UI console](../../spring-cloud-gateway-ui/README.md) therefore has
+them permitted by the chain the console contributes, whether that console is open or behind
+a login &mdash; the fan-out polls with a client that holds no credentials, and a login page
+it cannot answer would leave each instance reporting only its own traffic.
+
+That is a deliberate exposure: route names, request counts and JVM figures, in read only.
+An application without the console still has to permit them itself, and one that would
+rather close them can declare its own `discoveryMetricsSecuredPaths` bean &mdash; and give
+up the consolidation until the poll is given a way to authenticate.
 
 ## What it costs
 
