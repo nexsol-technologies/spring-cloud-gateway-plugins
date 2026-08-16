@@ -16,6 +16,9 @@
 
 package ch.nexsol.gateway.openapi.autoconfigure;
 
+import java.util.List;
+
+import ch.nexsol.gateway.commons.security.SecuredPaths;
 import ch.nexsol.gateway.openapi.hub.HubOpenapiPaths;
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
 import org.springdoc.core.properties.SpringDocConfigProperties;
@@ -92,6 +95,30 @@ public class HubApiSecurityAutoConfiguration {
 				HubOpenapiPaths.documentationPaths(springDocProperties, swaggerUiProperties).toArray(String[]::new)));
 		http.authorizeExchange((spec) -> spec.anyExchange().permitAll());
 		return http.build();
+	}
+
+	/**
+	 * Declares the paths of the hub to whoever governs them, so that a gateway whose
+	 * console is behind a login does not leave its documentation in front of it.
+	 * <p>
+	 * The declaration is read by the console, whose chain is ordered ahead of this one
+	 * and therefore answers first for the paths it takes over. Without a console, nobody
+	 * reads it and the chain above keeps serving them as it always has.
+	 * <p>
+	 * The Swagger UI and the contracts it renders follow the console: a browser reaching
+	 * them holds the session it opened. The contract of the gateway itself is left open,
+	 * because the hub reads it over HTTP with no credentials to offer &mdash; closing it
+	 * would remove the gateway from its own hub rather than protect anything.
+	 * @param springDocProperties the SpringDoc configuration, when it is on
+	 * @param swaggerUiProperties the Swagger UI configuration, when it is on
+	 * @return the paths of the hub
+	 */
+	@Bean
+	@ConditionalOnMissingBean(name = "hubOpenapiSecuredPaths")
+	SecuredPaths hubOpenapiSecuredPaths(ObjectProvider<SpringDocConfigProperties> springDocProperties,
+			ObjectProvider<SwaggerUiConfigProperties> swaggerUiProperties) {
+		return new SecuredPaths(HubOpenapiPaths.browsedPaths(springDocProperties, swaggerUiProperties),
+				HubOpenapiPaths.probedPaths(springDocProperties), List.of(), List.of());
 	}
 
 }

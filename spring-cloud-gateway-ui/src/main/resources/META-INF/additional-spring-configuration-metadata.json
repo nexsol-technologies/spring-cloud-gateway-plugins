@@ -5,6 +5,20 @@
       "type": "java.lang.Boolean",
       "description": "Whether the shell contributes its own security filter chain. It permits the exact paths the active views declared, never a /ui/** pattern, so a gateway route under /ui does not inherit the UI permissions. Turn it off to secure those paths from the application instead.",
       "defaultValue": true
+    },
+    {
+      "name": "spring.cloud.gateway.server.webflux.ui.security.mode",
+      "type": "ch.nexsol.gateway.ui.security.GatewayUiSecurityProperties$Mode",
+      "sourceType": "ch.nexsol.gateway.ui.security.GatewayUiSecurityProperties",
+      "description": "How the chain treats the paths the console serves: PERMIT_ALL leaves them open behind whatever the application authenticates elsewhere, AUTHENTICATED puts the login page of the console in front of them.",
+      "defaultValue": "permit-all"
+    },
+    {
+      "name": "spring.cloud.gateway.server.webflux.ui.security.write-mode",
+      "type": "ch.nexsol.gateway.ui.security.GatewayUiSecurityProperties$WriteMode",
+      "sourceType": "ch.nexsol.gateway.ui.security.GatewayUiSecurityProperties",
+      "description": "How the chain treats the paths a plugin declared as changing the gateway, such as the route management API: AUTO asks for a principal as soon as there is something to authenticate against and leaves them open with a warning otherwise, AUTHENTICATED always asks for one, PERMIT_ALL treats them as any other path and follows the mode.",
+      "defaultValue": "auto"
     }
   ]
 }

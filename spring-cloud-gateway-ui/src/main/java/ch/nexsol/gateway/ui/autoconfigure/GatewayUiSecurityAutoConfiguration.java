@@ -23,9 +23,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
+import ch.nexsol.gateway.commons.security.SecuredPathsContribution;
 import ch.nexsol.gateway.ui.security.ClaimRoles;
 import ch.nexsol.gateway.ui.security.GatewayUiSecurityProperties;
 import ch.nexsol.gateway.ui.security.LoginController;
@@ -35,6 +36,8 @@ import ch.nexsol.gateway.ui.security.UiLoginProviders;
 import ch.nexsol.gateway.ui.security.UiSecuredPaths;
 import ch.nexsol.gateway.ui.security.UiSecurityCustomizer;
 import ch.nexsol.gateway.ui.security.UiSecurityModelAttributes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -78,7 +81,10 @@ import org.springframework.security.web.server.authentication.RedirectServerAuth
 import org.springframework.security.web.server.authentication.ServerAuthenticationSuccessHandler;
 import org.springframework.security.web.server.authentication.logout.RedirectServerLogoutSuccessHandler;
 import org.springframework.security.web.server.authentication.logout.ServerLogoutSuccessHandler;
+import org.springframework.security.web.server.csrf.CsrfWebFilter;
 import org.springframework.security.web.server.savedrequest.WebSessionServerRequestCache;
+import org.springframework.security.web.server.util.matcher.AndServerWebExchangeMatcher;
+import org.springframework.security.web.server.util.matcher.NegatedServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.util.StringUtils;
 
@@ -94,6 +100,11 @@ import static org.springframework.security.config.Customizer.withDefaults;
  * {@code /ui} (say {@code /ui/find_pwd}) must not inherit the UI permissions. A view that
  * is not active contributes nothing, so its path stays closed.
  * <p>
+ * The other plugins declare the endpoints they serve the same way, through
+ * {@link SecuredPathsContribution}, so that a gateway has one place deciding who reaches
+ * what rather than one rule per plugin. They are the ones who know their paths; this
+ * chain is the one that knows how to authenticate a visitor.
+ * <p>
  * What the chain then does with those paths is the
  * {@link GatewayUiSecurityProperties.Mode mode}. It permits them by default, which is the
  * behaviour the plugin has always had. Set to
@@ -101,6 +112,13 @@ import static org.springframework.security.config.Customizer.withDefaults;
  * console in front of them instead: a local user, an OpenID Connect provider, or both,
  * and a Bearer token for whoever calls the endpoints of the console rather than browsing
  * them.
+ * <p>
+ * Two kinds of path do not follow the mode, because following it would be wrong in one
+ * direction or the other. The ones declared open stay open &mdash; the assets the login
+ * page paints with could not be behind that same login. The ones declared as changing the
+ * gateway stay closed, under {@link GatewayUiSecurityProperties.WriteMode the write
+ * mode}: a console published without a login is a decision, an API that reconfigures the
+ * routing table without one is an accident.
  * <p>
  * The chain can be turned off with
  * {@code spring.cloud.gateway.server.webflux.ui.security-chain-enabled=false} or replaced
@@ -149,10 +167,14 @@ public class GatewayUiSecurityAutoConfiguration {
 
 	private static final String SECURITY_PREFIX = "spring.cloud.gateway.server.webflux.ui.security";
 
+	private static final Logger LOG = LoggerFactory.getLogger(GatewayUiSecurityAutoConfiguration.class);
+
 	/**
-	 * Registers the chain over the exact paths the active views serve.
+	 * Registers the chain over the exact paths the active views and the other plugins
+	 * declared.
 	 * @param http the reactive security builder
-	 * @param securedPaths the paths contributed by the active views
+	 * @param securedPaths the paths contributed by the active views and by the plugins
+	 * whose endpoints the console governs
 	 * @param properties the security configuration of the console
 	 * @param customizers the contributions of the OAuth2 modules that are on the
 	 * classpath
@@ -163,34 +185,79 @@ public class GatewayUiSecurityAutoConfiguration {
 	 */
 	@Bean
 	@Order(GATEWAY_UI_CHAIN_ORDER)
+	// The console's own declaration, not any contribution: a gateway that switched the
+	// views off must not end up with a chain built from another plugin's paths alone,
+	// which would take Boot's default "everything authenticated" chain away with it.
 	@ConditionalOnBean(UiSecuredPaths.class)
 	@ConditionalOnMissingBean(name = "gatewayUiSecurityWebFilterChain")
 	SecurityWebFilterChain gatewayUiSecurityWebFilterChain(ServerHttpSecurity http,
-			ObjectProvider<UiSecuredPaths> securedPaths, GatewayUiSecurityProperties properties,
+			ObjectProvider<SecuredPathsContribution> securedPaths, GatewayUiSecurityProperties properties,
 			ObjectProvider<UiSecurityCustomizer> customizers,
 			ObjectProvider<ReactiveUserDetailsService> userDetailsService,
 			ObjectProvider<ReactiveAuthenticationManager> authenticationManager) {
-		List<String> paths = securedPaths.orderedStream()
-			.flatMap((contribution) -> contribution.paths().stream())
-			.distinct()
-			.collect(Collectors.toCollection(ArrayList::new));
+		List<SecuredPathsContribution> declared = securedPaths.orderedStream().toList();
+		List<String> paths = collect(declared, SecuredPathsContribution::paths);
+		List<String> open = collect(declared, SecuredPathsContribution::openPaths);
+		List<String> write = collect(declared, SecuredPathsContribution::writePaths);
+		List<String> csrfExempt = collect(declared, SecuredPathsContribution::csrfExemptPaths);
+		add(paths, open);
+		add(paths, write);
+		List<UiSecurityCustomizer> contributions = customizers.orderedStream().toList();
 		http.cors(withDefaults());
 		if (properties.getMode() != GatewayUiSecurityProperties.Mode.AUTHENTICATED) {
 			http.csrf(ServerHttpSecurity.CsrfSpec::disable);
 			http.securityMatcher(ServerWebExchangeMatchers.pathMatchers(paths.toArray(String[]::new)));
-			http.authorizeExchange((spec) -> spec.anyExchange().permitAll());
+			// An open console serves no login page, so the only door the chain can put in
+			// front of the paths that change the gateway is the one a caller carries
+			// itself: credentials, or a Bearer token the resource server validates.
+			boolean credentials = credentialsForm(properties, userDetailsService, authenticationManager);
+			List<UiSecurityCustomizer> openContributions = contributions.stream()
+				.filter(UiSecurityCustomizer::appliesWhenOpen)
+				.toList();
+			if (write.isEmpty() || !restrictWrite(properties, credentials || !openContributions.isEmpty())) {
+				warnOpenWritePaths(properties, write);
+				http.authorizeExchange((spec) -> spec.anyExchange().permitAll());
+				return http.build();
+			}
+			http.authorizeExchange((spec) -> {
+				// The roles are asked for here too. They are what an operator holds, and
+				// an
+				// open console is the one place where the only principal that ever has to
+				// be checked is the one changing the gateway.
+				List<String> roles = properties.getRequiredRoles();
+				if (roles.isEmpty()) {
+					spec.pathMatchers(write.toArray(String[]::new)).authenticated();
+				}
+				else {
+					spec.pathMatchers(write.toArray(String[]::new)).hasAnyRole(roles.toArray(String[]::new));
+				}
+				spec.anyExchange().permitAll();
+			});
+			// Asking for Basic credentials with no authentication manager to check them
+			// against leaves Spring Security unable to build the filter, and the
+			// application does not start.
+			if (credentials) {
+				http.httpBasic(withDefaults());
+				localUser(properties.getUser()).ifPresent(http::authenticationManager);
+			}
+			openContributions.forEach((contribution) -> contribution.customize(http));
 			return http.build();
 		}
 		// The endpoints of an authentication exchange are reached before there is a
 		// principal, so they join the paths of the views rather than the other way round.
-		List<UiSecurityCustomizer> contributions = customizers.orderedStream().toList();
-		contributions.stream()
+		List<String> exchangePaths = contributions.stream()
 			.flatMap((contribution) -> contribution.paths().stream())
-			.filter((path) -> !paths.contains(path))
-			.forEach(paths::add);
+			.toList();
+		add(paths, exchangePaths);
+		add(open, exchangePaths);
+		// The login page is reached without a principal by definition. What else stays in
+		// front of it was declared open by whoever serves it: the assets the login page
+		// paints with, and the endpoints another plugin has polled without credentials.
+		add(open, List.of(LOGIN_PATH));
 		http.securityMatcher(ServerWebExchangeMatchers.pathMatchers(paths.toArray(String[]::new)));
+		exemptFromCsrf(http, csrfExempt);
 		http.authorizeExchange((spec) -> {
-			spec.pathMatchers(openPaths(paths)).permitAll();
+			spec.pathMatchers(open.toArray(String[]::new)).permitAll();
 			// Ending the session and being told why the console is closed are the two
 			// things
 			// a signed-in visitor must be able to do whatever their roles: gating them on
@@ -286,16 +353,71 @@ public class GatewayUiSecurityAutoConfiguration {
 	}
 
 	/**
-	 * The paths reachable without a principal: the static assets, which the login page
-	 * itself loads, and the login page. Everything the console serves under {@code /ui}
-	 * is behind the login.
+	 * Gathers one kind of path across the contributions, in the order they were
+	 * contributed and without a duplicate.
 	 */
-	private static String[] openPaths(List<String> paths) {
-		return Stream
-			.concat(paths.stream().filter((path) -> !path.equals("/ui") && !path.startsWith("/ui/")),
-					Stream.of(LOGIN_PATH))
+	private static List<String> collect(List<SecuredPathsContribution> contributions,
+			Function<SecuredPathsContribution, List<String>> kind) {
+		return contributions.stream()
+			.flatMap((contribution) -> kind.apply(contribution).stream())
 			.distinct()
-			.toArray(String[]::new);
+			.collect(Collectors.toCollection(ArrayList::new));
+	}
+
+	/**
+	 * Appends the paths that are not already there, so a path declared twice is matched
+	 * once.
+	 */
+	private static void add(List<String> paths, List<String> added) {
+		added.stream().filter((path) -> !paths.contains(path)).forEach(paths::add);
+	}
+
+	/**
+	 * Whether the paths that change the gateway are put behind an authenticated
+	 * principal.
+	 * <p>
+	 * Under {@link GatewayUiSecurityProperties.WriteMode#AUTO}, the answer is yes as soon
+	 * as the chain has something to authenticate against. Closing them with nothing
+	 * behind the door would leave no way through it at all, which is why the default
+	 * stops there and says so rather than locking an application out of its own route
+	 * management.
+	 */
+	private static boolean restrictWrite(GatewayUiSecurityProperties properties, boolean canAuthenticate) {
+		return switch (properties.getWriteMode()) {
+			case AUTHENTICATED -> true;
+			case PERMIT_ALL -> false;
+			case AUTO -> canAuthenticate;
+		};
+	}
+
+	/**
+	 * Says which paths are left open, and how to close them. An operator reading the logs
+	 * of a gateway has no other way of learning that its route management answers to
+	 * anyone.
+	 */
+	private static void warnOpenWritePaths(GatewayUiSecurityProperties properties, List<String> write) {
+		if (write.isEmpty() || properties.getWriteMode() == GatewayUiSecurityProperties.WriteMode.PERMIT_ALL) {
+			return;
+		}
+		LOG.warn(
+				"The gateway endpoints that change its configuration are reachable without authentication: {}. "
+						+ "The console is open and no user directory was found to authenticate against. Configure "
+						+ "{}.user.password, declare a ReactiveUserDetailsService, or set {}.mode=authenticated.",
+				write, SECURITY_PREFIX, SECURITY_PREFIX);
+	}
+
+	/**
+	 * Leaves the declared paths out of the CSRF protection, without touching the rest:
+	 * the default matcher still decides on the method, so the safe ones stay out of it
+	 * and every other path keeps the protection the console gives it.
+	 */
+	private static void exemptFromCsrf(ServerHttpSecurity http, List<String> csrfExempt) {
+		if (csrfExempt.isEmpty()) {
+			return;
+		}
+		http.csrf((csrf) -> csrf.requireCsrfProtectionMatcher(
+				new AndServerWebExchangeMatcher(CsrfWebFilter.DEFAULT_CSRF_MATCHER, new NegatedServerWebExchangeMatcher(
+						ServerWebExchangeMatchers.pathMatchers(csrfExempt.toArray(String[]::new))))));
 	}
 
 	/**
@@ -473,10 +595,14 @@ public class GatewayUiSecurityAutoConfiguration {
 	 * Contributes the resource server to the chain, so the endpoints of the console
 	 * answer a Bearer token as well as a session. It backs off when the application
 	 * configured no issuer, since there would be no decoder to validate the token with.
+	 * <p>
+	 * Unlike the login contributions, this one is declared whatever the mode: an open
+	 * console still has endpoints that change the gateway, and on a gateway whose
+	 * authentication is an authorization server rather than a user directory, a Bearer
+	 * token is the only way to reach them.
 	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(ReactiveJwtDecoder.class)
-	@ConditionalOnProperty(prefix = SECURITY_PREFIX, name = "mode", havingValue = "authenticated")
 	static class OAuth2ResourceServerConfiguration {
 
 		/**
@@ -489,18 +615,28 @@ public class GatewayUiSecurityAutoConfiguration {
 		@Bean
 		UiSecurityCustomizer gatewayUiResourceServerCustomizer(ObjectProvider<ReactiveJwtDecoder> decoder,
 				GatewayUiSecurityProperties properties) {
-			return (http) -> {
-				ReactiveJwtDecoder consoleDecoder = decoder(properties, decoder);
-				if (consoleDecoder == null) {
-					return;
-				}
-				http.oauth2ResourceServer((oauth2) -> oauth2.jwt((jwt) -> {
-					jwt.jwtDecoder(consoleDecoder);
-					String claim = properties.getRolesClaim();
-					if (StringUtils.hasText(claim)) {
-						jwt.jwtAuthenticationConverter(rolesConverter(claim));
+			return new UiSecurityCustomizer() {
+
+				@Override
+				public void customize(ServerHttpSecurity http) {
+					ReactiveJwtDecoder consoleDecoder = decoder(properties, decoder);
+					if (consoleDecoder == null) {
+						return;
 					}
-				}));
+					http.oauth2ResourceServer((oauth2) -> oauth2.jwt((jwt) -> {
+						jwt.jwtDecoder(consoleDecoder);
+						String claim = properties.getRolesClaim();
+						if (StringUtils.hasText(claim)) {
+							jwt.jwtAuthenticationConverter(rolesConverter(claim));
+						}
+					}));
+				}
+
+				@Override
+				public boolean appliesWhenOpen() {
+					return decoder(properties, decoder) != null;
+				}
+
 			};
 		}
 

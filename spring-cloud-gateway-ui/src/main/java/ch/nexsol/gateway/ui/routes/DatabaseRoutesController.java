@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.database.controller;
+package ch.nexsol.gateway.ui.routes;
 
 import java.net.URI;
 import java.util.LinkedHashMap;
@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import ch.nexsol.gateway.database.RoutesDatabaseProperties;
 import ch.nexsol.gateway.database.exception.FiltersNotValidException;
 import ch.nexsol.gateway.database.exception.PredicatesNotValidException;
 import ch.nexsol.gateway.database.exception.RouteAlreadyExistException;
@@ -39,34 +40,48 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 
 /**
- * Server-rendered Thymeleaf/HTMX user interface for managing gateway routes, backed by
- * the same {@link ApiService} and {@link GatewayConfigService} that power the REST API.
- * It serves the full page under {@code /ui/routes/db}, rendered inside the gateway UI
- * shell, and the HTMX fragments used to refresh the route list, build the form and load
- * predicate/filter arguments dynamically.
+ * The view over the routes stored in a database: the full page under
+ * {@code /ui/routes/db} and the HTMX fragments that refresh the list, build the form and
+ * load the arguments of a predicate or a filter as one is picked.
+ * <p>
+ * It reads the {@link ApiService} and {@link GatewayConfigService} of the routes-database
+ * plugin, exactly as the traffic view reads the source of the metrics plugin and the
+ * audit view the buffer of the audit plugin: the console owns what is rendered, a plugin
+ * owns what it holds.
+ * <p>
+ * What the plugin publishes is its own decision, not this one. Under
+ * {@code routes-database.access=read-only} the page renders without the affordances that
+ * would change a route, and the two handlers that would have answered them refuse with a
+ * {@code 405} &mdash; the same answer the REST API of the plugin gives, and for the same
+ * reason: an operation that is not published is not a question of who is asking.
  */
 @Controller
 @RequestMapping("/ui/routes/db")
-public class RouteViewController {
+public class DatabaseRoutesController {
 
-	private static final Logger LOG = LoggerFactory.getLogger(RouteViewController.class);
+	private static final Logger LOG = LoggerFactory.getLogger(DatabaseRoutesController.class);
 
 	private static final Pattern INDEX_TOKEN = Pattern.compile("[0-9]+");
 
 	private final ApiService apiService;
 
 	private final GatewayConfigService gatewayConfigService;
+
+	private final boolean readOnly;
 
 	/**
 	 * Monotonic generator of unique row indices used to name the dynamically added
@@ -79,10 +94,25 @@ public class RouteViewController {
 	 * @param apiService the facade service exposing route CRUD operations
 	 * @param gatewayConfigService the service listing the available predicates and
 	 * filters
+	 * @param properties the configuration saying what the route management publishes
 	 */
-	public RouteViewController(ApiService apiService, GatewayConfigService gatewayConfigService) {
+	public DatabaseRoutesController(ApiService apiService, GatewayConfigService gatewayConfigService,
+			RoutesDatabaseProperties properties) {
 		this.apiService = apiService;
 		this.gatewayConfigService = gatewayConfigService;
+		this.readOnly = properties.getAccess() == RoutesDatabaseProperties.Access.READ_ONLY;
+	}
+
+	/**
+	 * Tells every fragment of the view whether the routes may be changed, so the page
+	 * offers no button leading to an operation that would be refused with a {@code 405}.
+	 * Published to the model of every handler of this controller, since the page is
+	 * assembled from fragments each of them serves.
+	 * @return whether the view is read-only
+	 */
+	@ModelAttribute("readOnly")
+	public boolean readOnly() {
+		return this.readOnly;
 	}
 
 	/**
@@ -95,7 +125,7 @@ public class RouteViewController {
 		return addNames(model).then(reloadRoutes(model)).then(Mono.fromCallable(() -> {
 			populateEmptyForm(model);
 			model.addAttribute("activeNav", "routes");
-			return "routes";
+			return "dashboard/routes-db";
 		}));
 	}
 
@@ -106,7 +136,7 @@ public class RouteViewController {
 	 */
 	@GetMapping("/list")
 	public Mono<String> list(Model model) {
-		return reloadRoutes(model).thenReturn("fragments/route-list :: list");
+		return reloadRoutes(model).thenReturn("dashboard/fragments/route-db-list :: list");
 	}
 
 	/**
@@ -119,7 +149,7 @@ public class RouteViewController {
 	public Mono<String> newForm(Model model) {
 		return addNames(model).then(Mono.fromCallable(() -> {
 			populateEmptyForm(model);
-			return "fragments/route-form :: form";
+			return "dashboard/fragments/route-db-form :: form";
 		}));
 	}
 
@@ -150,7 +180,7 @@ public class RouteViewController {
 						.map((f) -> new ElementRowView(this.rowIndex.incrementAndGet(), f.name(),
 								new LinkedHashMap<>(f.args())))
 						.toList());
-		}).thenReturn("fragments/route-form :: form");
+		}).thenReturn("dashboard/fragments/route-db-form :: form");
 	}
 
 	/**
@@ -164,7 +194,7 @@ public class RouteViewController {
 			model.addAttribute("kind", "predicate");
 			model.addAttribute("names", model.getAttribute("predicateNames"));
 			model.addAttribute("row", new ElementRowView(this.rowIndex.incrementAndGet(), null, new LinkedHashMap<>()));
-			return "fragments/element :: row";
+			return "dashboard/fragments/route-db-element :: row";
 		}));
 	}
 
@@ -179,7 +209,7 @@ public class RouteViewController {
 			model.addAttribute("kind", "filter");
 			model.addAttribute("names", model.getAttribute("filterNames"));
 			model.addAttribute("row", new ElementRowView(this.rowIndex.incrementAndGet(), null, new LinkedHashMap<>()));
-			return "fragments/element :: row";
+			return "dashboard/fragments/route-db-element :: row";
 		}));
 	}
 
@@ -206,7 +236,7 @@ public class RouteViewController {
 		model.addAttribute("index", index);
 		model.addAttribute("args", args);
 		model.addAttribute("requiredArgs", required);
-		return Mono.just("fragments/element :: args");
+		return Mono.just("dashboard/fragments/route-db-element :: args");
 	}
 
 	/**
@@ -221,6 +251,9 @@ public class RouteViewController {
 	 */
 	@PostMapping
 	public Mono<String> save(ServerWebExchange exchange, Model model) {
+		if (this.readOnly) {
+			return refuse();
+		}
 		return exchange.getFormData().flatMap((form) -> {
 			String idParam = form.getFirst("id");
 			boolean editing = idParam != null && !idParam.isBlank();
@@ -257,10 +290,22 @@ public class RouteViewController {
 	 */
 	@DeleteMapping("/{id}")
 	public Mono<String> delete(@PathVariable Long id, ServerWebExchange exchange, Model model) {
+		if (this.readOnly) {
+			return refuse();
+		}
 		return this.apiService.deleteRoute(id).then(reloadRoutes(model)).then(Mono.fromCallable(() -> {
 			triggerToast(exchange, "success", "Route deleted");
-			return "fragments/route-list :: list";
+			return "dashboard/fragments/route-db-list :: list";
 		}));
+	}
+
+	/**
+	 * Answers an operation the plugin does not publish. The page offers no button leading
+	 * here, so this is what a request built by hand gets &mdash; the same answer the REST
+	 * API of the plugin gives, since the operation is not a question of who is asking.
+	 */
+	private Mono<String> refuse() {
+		return Mono.error(new ResponseStatusException(HttpStatus.METHOD_NOT_ALLOWED));
 	}
 
 	private Mono<String> renderSaved(ServerWebExchange exchange, Model model, String message) {
@@ -268,7 +313,7 @@ public class RouteViewController {
 		return addNames(model).then(reloadRoutes(model)).then(Mono.fromCallable(() -> {
 			populateEmptyForm(model);
 			model.addAttribute("oob", true);
-			return "fragments/route-form :: saved";
+			return "dashboard/fragments/route-db-form :: saved";
 		}));
 	}
 
@@ -285,7 +330,7 @@ public class RouteViewController {
 			model.addAttribute("predicateRows", buildRows(form, "predicate"));
 			model.addAttribute("filterRows", buildRows(form, "filter"));
 			model.addAttribute("formError", message);
-			return "fragments/route-form :: form";
+			return "dashboard/fragments/route-db-form :: form";
 		}));
 	}
 

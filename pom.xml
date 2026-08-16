@@ -74,6 +74,7 @@
 	</properties>
 
 	<modules>
+		<module>spring-cloud-gateway-commons</module>
 		<module>spring-cloud-gateway-audit</module>
 		<module>spring-cloud-gateway-metrics</module>
 		<module>spring-cloud-gateway-routes</module>

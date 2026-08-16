@@ -17,6 +17,9 @@
 package ch.nexsol.gateway.ui.autoconfigure;
 
 import ch.nexsol.gateway.audit.AuditEventPublisher;
+import ch.nexsol.gateway.commons.security.SecuredPaths;
+import ch.nexsol.gateway.commons.security.SecuredPathsContribution;
+import ch.nexsol.gateway.database.service.ApiService;
 import ch.nexsol.gateway.metrics.InstanceMetricsSource;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
@@ -38,6 +41,7 @@ import ch.nexsol.gateway.ui.openapi.OpenapiViewController;
 import ch.nexsol.gateway.ui.openapi.OpenapiViewProperties;
 import ch.nexsol.gateway.ui.overview.OverviewContribution;
 import ch.nexsol.gateway.ui.overview.OverviewService;
+import ch.nexsol.gateway.ui.routes.DatabaseRoutesController;
 import ch.nexsol.gateway.ui.routes.RouteInventoryController;
 import ch.nexsol.gateway.ui.routes.RouteInventoryService;
 import ch.nexsol.gateway.ui.routes.RouteOverviewContribution;
@@ -49,6 +53,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -75,7 +80,8 @@ import org.springframework.context.annotation.Import;
  * beans it reads through an {@link ObjectProvider}: a view whose source of data is absent
  * reports that it has nothing to show rather than breaking the context.
  */
-@AutoConfiguration(after = MetricsAutoConfiguration.class)
+@AutoConfiguration(after = MetricsAutoConfiguration.class,
+		afterName = "ch.nexsol.gateway.database.autoconfigure.GatewayDatabaseAutoConfiguration")
 @Import({ DashboardController.class, GatewayUiModelAttributes.class })
 public class GatewayUiAutoConfiguration {
 
@@ -111,44 +117,74 @@ public class GatewayUiAutoConfiguration {
 	}
 
 	/**
-	 * Declares the paths of the shell itself: the home page and the assets every page
-	 * loads.
-	 * @return the shell paths
+	 * Declares the path of the shell itself, the one every view hangs under.
+	 * @return the shell path
 	 */
 	@Bean
 	public UiSecuredPaths shellSecuredPaths() {
+		return new UiSecuredPaths("/ui");
+	}
+
+	/**
+	 * Declares the assets every page loads, the login page included. They stay reachable
+	 * without a principal whatever the console does: a login page painted with assets
+	 * that are themselves behind the login has nothing to paint with.
+	 * @return the shell asset paths
+	 */
+	@Bean
+	public SecuredPaths shellAssetPaths() {
 		// The minified Bootstrap files carry a sourceMappingURL, so a browser with its
 		// developer tools open requests maps this module does not ship. Declared so those
 		// requests answer as the 404 they are, and stay out of the audit trail.
-		return new UiSecuredPaths("/ui", "/css/bootstrap.min.css", "/css/bootstrap.min.css.map", "/css/gateway-ui.css",
+		return SecuredPaths.open("/css/bootstrap.min.css", "/css/bootstrap.min.css.map", "/css/gateway-ui.css",
 				"/js/htmx.min.js", "/js/bootstrap.bundle.min.js", "/js/bootstrap.bundle.min.js.map",
 				"/js/gateway-ui.js", "/img/logo.png", "/img/logo-dark.png", "/img/icon.png");
 	}
 
 	/**
-	 * Contributes the routes entry, Spring Boot Admin style, only when the
-	 * database-backed routes management UI is present on the classpath.
-	 * @return the routes menu entry
+	 * Activates the database routes view when the routes-database plugin is on the
+	 * classpath and publishes something: the view renders the routes that plugin holds,
+	 * as the traffic view renders the figures of the metrics plugin.
+	 * <p>
+	 * The view hangs on the declaration the plugin publishes when it publishes its routes
+	 * at all, rather than on its {@code access} property: the plugin is the one deciding,
+	 * and a view over routes it does not publish would be a view over nothing. The bean
+	 * is named rather than typed on purpose &mdash; naming a condition class of an
+	 * optional dependency would have this console fail to start without it, since Spring
+	 * has to load such a class to evaluate it.
 	 */
-	@Bean
-	@ConditionalOnClass(name = "ch.nexsol.gateway.database.controller.RouteViewController")
-	public NavItem routesNavItem() {
-		return new NavItem("routes", "Database routes", "icon-plugin", "/ui/routes/db", 10);
-	}
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(ApiService.class)
+	@ConditionalOnBean(name = "routeApiSecuredPaths")
+	@Import(DatabaseRoutesController.class)
+	static class DatabaseRoutesViewConfiguration {
 
-	/**
-	 * Declares the paths of the database-backed routes view. That view belongs to the
-	 * routes-database plugin, which depends on this module in test scope alone: its paths
-	 * are declared here, next to its menu entry and under the same condition, so it needs
-	 * no compile dependency on the console.
-	 * @return the database routes view paths
-	 */
-	@Bean
-	@ConditionalOnClass(name = "ch.nexsol.gateway.database.controller.RouteViewController")
-	public UiSecuredPaths routesSecuredPaths() {
-		return new UiSecuredPaths("/ui/routes/db", "/ui/routes/db/list", "/ui/routes/db/new",
-				"/ui/routes/db/predicate-row", "/ui/routes/db/filter-row", "/ui/routes/db/element-args/{kind}/{index}",
-				"/ui/routes/db/{id}", "/ui/routes/db/{id}/edit");
+		/**
+		 * Contributes the routes entry, Spring Boot Admin style.
+		 * @return the database routes menu entry
+		 */
+		@Bean
+		NavItem routesNavItem() {
+			return new NavItem("routes", "Database routes", "icon-plugin", "/ui/routes/db", 10);
+		}
+
+		/**
+		 * Declares the paths of the view. They create and delete routes, so they are
+		 * declared as changing the gateway rather than as a view following the mode: a
+		 * console published without a login is a decision, a page that reconfigures the
+		 * routing table without one is an accident.
+		 * <p>
+		 * They keep the CSRF protection of the console: the form and the HTMX fragments
+		 * carry the token it publishes.
+		 * @return the paths of the database routes view
+		 */
+		@Bean
+		SecuredPaths routeViewSecuredPaths() {
+			return SecuredPaths.write("/ui/routes/db", "/ui/routes/db/list", "/ui/routes/db/new",
+					"/ui/routes/db/predicate-row", "/ui/routes/db/filter-row",
+					"/ui/routes/db/element-args/{kind}/{index}", "/ui/routes/db/{id}", "/ui/routes/db/{id}/edit");
+		}
+
 	}
 
 	/**
@@ -433,10 +469,12 @@ public class GatewayUiAutoConfiguration {
 		 * {@code static} because a bean post-processor must not force the enclosing
 		 * configuration to be created early.
 		 * @param securedPaths the provider over the paths contributed by the active views
+		 * and by the plugins the console governs
 		 * @return the post-processor excluding the console paths
 		 */
 		@Bean
-		static BeanPostProcessor auditExclusionBeanPostProcessor(ObjectProvider<UiSecuredPaths> securedPaths) {
+		static BeanPostProcessor auditExclusionBeanPostProcessor(
+				ObjectProvider<SecuredPathsContribution> securedPaths) {
 			return new AuditExclusionBeanPostProcessor(securedPaths);
 		}
 

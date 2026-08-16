@@ -41,7 +41,7 @@ class RouteLocatorResilienceTests {
 	WebTestClient webTestClient;
 
 	@Test
-	void aRouteWithoutPredicateMustNotBreakStaticResources() {
+	void aRouteWithoutPredicateMustNotSwallowWhatTheGatewayServes() {
 		this.routeRepository.deleteAll().block();
 
 		// A gateway route with no predicate acts as a catch-all: without the locator
@@ -55,9 +55,10 @@ class RouteLocatorResilienceTests {
 		this.routeRepository.save(bad).block();
 		this.publisher.publishEvent(new RefreshRoutesEvent(this));
 
-		this.webTestClient.get().uri("/css/bootstrap.min.css").exchange().expectStatus().isOk();
-		this.webTestClient.get().uri("/js/htmx.min.js").exchange().expectStatus().isOk();
-		this.webTestClient.get().uri("/ui/routes/db").exchange().expectStatus().isOk();
+		// The endpoints of this plugin are what it serves itself; a catch-all route would
+		// have swallowed them as it would have swallowed everything else.
+		this.webTestClient.get().uri("/api/gateway/routes").exchange().expectStatus().isOk();
+		this.webTestClient.get().uri("/api/gateway/routes/available-predicates").exchange().expectStatus().isOk();
 	}
 
 }

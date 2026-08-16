@@ -18,6 +18,8 @@ package ch.nexsol.gateway.ui.security;
 
 import java.util.List;
 
+import ch.nexsol.gateway.commons.security.SecuredPathsContribution;
+
 /**
  * The exact paths a UI view serves, contributed to the security filter chain of the
  * shell.
@@ -26,10 +28,16 @@ import java.util.List;
  * actually served is opened. Paths are matched exactly on purpose: a pattern such as
  * {@code /ui/**} would also open any gateway route declared under {@code /ui}, which the
  * UI does not serve and did not intend to expose.
+ * <p>
+ * This is the contribution of a view of the console itself, and the one the audit trail
+ * reads to leave the traffic of the shell out of the events it records. A plugin that is
+ * not the console declares its own paths through
+ * {@link ch.nexsol.gateway.commons.security.SecuredPaths} instead, which asks nothing of
+ * its classpath.
  *
  * @param paths the exact paths served by the contributing view
  */
-public record UiSecuredPaths(List<String> paths) {
+public record UiSecuredPaths(List<String> paths) implements SecuredPathsContribution {
 
 	/**
 	 * Creates a contribution over the given exact paths.

@@ -90,37 +90,20 @@ public class ApiGatewayApplication {
 		http.csrf(ServerHttpSecurity.CsrfSpec::disable);
 		http.authorizeExchange((spec) -> {
 			spec.pathMatchers("/actuator/**").permitAll();
-			// The endpoints the sibling instances poll under the 'metrics-discovery'
-			// profile. They are not paths of the console — the metrics plugin does not
-			// depend on the UI and cannot declare them to its chain — so the rule below
-			// would close them and each instance would report only its own traffic. They
-			// exist only while the discovery provider is selected, and answer with this
-			// instance's own figures.
-			spec.pathMatchers("/ui/metrics/local/**", "/ui/metrics/local").permitAll();
-			// The console is behind its own login page, and the chain the ui plugin
-			// contributes covers the paths its views serve. What is left here is the
-			// database routes page: it belongs to another plugin, it creates and deletes
-			// routes, and the console deliberately leaves it to the application. This
-			// application decides the same thing, and reads the session opened at
-			// /ui/login.
-			//
-			// Named path by path rather than as /ui/**: a route of this gateway
-			// published under /ui must not inherit the rule, and under the
-			// 'plugins-off' profile the console is not there to answer the redirect
-			// this rule would otherwise produce.
-			spec.pathMatchers("/ui/routes/db", "/ui/routes/db/**").authenticated();
-			spec.pathMatchers("/api/gateway/**").permitAll();
-			spec.pathMatchers("/v3/api-docs", "/v3/api-docs/**", "/configuration/ui", "/swagger-resources/**",
-					"/configuration/security", "/swagger-ui.html", "/webjars/**", "/v3/api-docs/swagger-config")
-				.permitAll();
+			// Nothing here about the console, the documentation hub, the endpoints the
+			// sibling instances poll or the route management API. Each plugin declares
+			// the paths it serves, and the chain the ui plugin contributes - ordered
+			// ahead of this one - decides what they mean. The console of this gateway is
+			// behind its own login page, configured in application.yml, and the route
+			// management follows the write-mode set there.
 			spec.anyExchange().permitAll();
 		});
 		/*
 		 * Without this, ServerHttpSecurity brings its own login form and sends the
 		 * visitor to a generated page at /login: a second login page for the same
-		 * session. The one path this chain protects is a page of the console, so it sends
-		 * them there instead. Every other path here is permitted, so no API call reaches
-		 * this entry point.
+		 * session. Every path this chain matches is permitted, so nothing reaches the
+		 * entry point below; it is kept pointing at the console so that a rule added here
+		 * later sends a visitor to the one login page this gateway has.
 		 */
 		http.formLogin(ServerHttpSecurity.FormLoginSpec::disable);
 		http.httpBasic(ServerHttpSecurity.HttpBasicSpec::disable);

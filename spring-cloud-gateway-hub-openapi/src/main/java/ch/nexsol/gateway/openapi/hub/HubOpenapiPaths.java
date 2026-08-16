@@ -54,23 +54,46 @@ public final class HubOpenapiPaths {
 	 */
 	public static List<String> documentationPaths(ObjectProvider<SpringDocConfigProperties> springDocProperties,
 			ObjectProvider<SwaggerUiConfigProperties> swaggerUiProperties) {
-		String apiDocs = springDocProperties.stream()
-			.map((properties) -> properties.getApiDocs().getPath())
-			.findFirst()
-			.orElse(Constants.DEFAULT_API_DOCS_URL);
+		Set<String> paths = new LinkedHashSet<>(probedPaths(springDocProperties));
+		paths.addAll(browsedPaths(springDocProperties, swaggerUiProperties));
+		return List.copyOf(paths);
+	}
+
+	/**
+	 * The paths the hub reads over HTTP rather than the ones a browser asks for: the
+	 * contract of the gateway itself, which the discovery probes on every registered
+	 * instance, the gateway's own included.
+	 * <p>
+	 * That probe carries no credentials, so closing these would not secure the hub
+	 * &mdash; it would empty it of the gateway's own contract. They are declared open
+	 * until the poll is given a way to authenticate.
+	 * @param springDocProperties the SpringDoc configuration, when it is on
+	 * @return the paths the hub probes, in a stable order
+	 */
+	public static List<String> probedPaths(ObjectProvider<SpringDocConfigProperties> springDocProperties) {
+		String apiDocs = apiDocsPath(springDocProperties);
+		// Both suffixed variants: SpringDoc serves them, and the discovery probes them on
+		// every registered instance.
+		return List.of(apiDocs, apiDocs + ".json", apiDocs + ".yaml");
+	}
+
+	/**
+	 * The paths a browser asks for: the Swagger UI, its assets, the configuration
+	 * endpoint driving it and the aggregated contracts it renders. A visitor reaching
+	 * them holds whatever session the console opened, so they can follow it.
+	 * @param springDocProperties the SpringDoc configuration, when it is on
+	 * @param swaggerUiProperties the Swagger UI configuration, when it is on
+	 * @return the paths a browser reads, in a stable order
+	 */
+	public static List<String> browsedPaths(ObjectProvider<SpringDocConfigProperties> springDocProperties,
+			ObjectProvider<SwaggerUiConfigProperties> swaggerUiProperties) {
 		String swaggerUi = swaggerUiProperties.stream()
 			.map(SwaggerUiConfigProperties::getPath)
 			.filter((path) -> path != null)
 			.findFirst()
 			.orElse(Constants.DEFAULT_SWAGGER_UI_PATH);
 		Set<String> paths = new LinkedHashSet<>();
-		// The contract of the gateway itself, and the SpringDoc endpoints driving the UI.
-		paths.add(apiDocs);
-		// Both suffixed variants: SpringDoc serves them, and the discovery probes them on
-		// every registered instance, the gateway's own included.
-		paths.add(apiDocs + ".json");
-		paths.add(apiDocs + ".yaml");
-		paths.add(apiDocs + "/swagger-config");
+		paths.add(apiDocsPath(springDocProperties) + "/swagger-config");
 		paths.add(swaggerUi);
 		// The aggregated contracts, published as gateway routes named after each service.
 		paths.add(HubDiscoveryRouteLocator.API_DOCS_URL + "/*");
@@ -78,6 +101,13 @@ public final class HubOpenapiPaths {
 		paths.add(Constants.SWAGGER_UI_PREFIX + "/**");
 		paths.add(Constants.DEFAULT_WEB_JARS_PREFIX_URL + Constants.SWAGGER_UI_PREFIX + "/**");
 		return List.copyOf(paths);
+	}
+
+	private static String apiDocsPath(ObjectProvider<SpringDocConfigProperties> springDocProperties) {
+		return springDocProperties.stream()
+			.map((properties) -> properties.getApiDocs().getPath())
+			.findFirst()
+			.orElse(Constants.DEFAULT_API_DOCS_URL);
 	}
 
 }

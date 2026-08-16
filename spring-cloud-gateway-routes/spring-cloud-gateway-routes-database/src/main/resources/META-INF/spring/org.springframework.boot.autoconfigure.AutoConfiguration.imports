@@ -1,1 +1,2 @@
 ch.nexsol.gateway.database.autoconfigure.GatewayDatabaseAutoConfiguration
+ch.nexsol.gateway.database.autoconfigure.GatewayDatabaseSecurityAutoConfiguration

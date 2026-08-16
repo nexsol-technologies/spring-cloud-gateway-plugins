@@ -13,6 +13,13 @@
 	<name>spring-cloud-gateway-metrics-discovery</name>
 	<description>Service discovery source for the Spring Cloud Gateway metrics plugin</description>
 	<dependencies>
+		<!-- The contract this module declares the endpoints it serves to its siblings
+		     through, so a console can govern them. Carries no transitive dependency. -->
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-commons</artifactId>
+			<version>${revision}</version>
+		</dependency>
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-metrics-core</artifactId>

@@ -4,8 +4,8 @@
 
 <!-- Combined success response: fresh form plus an out-of-band refresh of the route list. -->
 <th:block th:fragment="saved">
-	<th:block th:replace="~{fragments/route-form :: form}"></th:block>
-	<th:block th:replace="~{fragments/route-list :: list}"></th:block>
+	<th:block th:replace="~{dashboard/fragments/route-db-form :: form}"></th:block>
+	<th:block th:replace="~{dashboard/fragments/route-db-list :: list}"></th:block>
 </th:block>
 
 <!-- Route creation / edition form. -->
@@ -52,7 +52,7 @@
 					<div id="predicate-rows" class="vstack gap-3"
 						th:with="kind='predicate',names=${predicateNames}">
 						<th:block th:each="row : ${predicateRows}">
-							<th:block th:replace="~{fragments/element :: row}"></th:block>
+							<th:block th:replace="~{dashboard/fragments/route-db-element :: row}"></th:block>
 						</th:block>
 					</div>
 				</div>
@@ -67,7 +67,7 @@
 					<div id="filter-rows" class="vstack gap-3"
 						th:with="kind='filter',names=${filterNames}">
 						<th:block th:each="row : ${filterRows}">
-							<th:block th:replace="~{fragments/element :: row}"></th:block>
+							<th:block th:replace="~{dashboard/fragments/route-db-element :: row}"></th:block>
 						</th:block>
 					</div>
 				</div>

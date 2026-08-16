@@ -390,13 +390,12 @@ the shell.
 Menu entries come from a registry: any `NavItem` bean present in the application context
 is collected by `GatewayUiMenu` and rendered in the sidebar.
 
-The built-in `home` entry is always present. A `routes` entry is contributed by this
-plugin but activates &mdash; only when the routes-database API is on the classpath &mdash;
-through a conditionally-guarded bean:
+The built-in `home` entry is always present. Every other entry is declared next to the view
+it leads to, under the same condition, so an entry never points at a view that is not
+served:
 
 ```java
 @Bean
-@ConditionalOnClass(name = "ch.nexsol.gateway.database.controller.RouteViewController")
 NavItem routesNavItem() {
     // id, label, icon (SVG symbol id from the shell sprite), href, order
     return new NavItem("routes", "Database routes", "icon-plugin", "/ui/routes/db", 10);
@@ -428,8 +427,7 @@ supplying a content and a scripts slot:
 
 The sidebar is populated automatically for every rendered view by `GatewayUiModelAttributes`
 (a `@ControllerAdvice` exposing `navItems`); the controller only sets `activeNav` to its
-own entry id. The database routes management page (`spring-cloud-gateway-routes-database`)
-is wired exactly this way and shows up under `/ui/routes/db`.
+own entry id.
 
 ## OpenAPI view
 
@@ -506,10 +504,72 @@ join the chain.
 What is permitted out of the box: `/ui` and the shell assets, plus `/ui/routes`,
 `/ui/routes/list`, `/ui/routes/reload`, `/ui/routes/test`, `/ui/metrics`,
 `/ui/metrics/data`, `/ui/audit`, `/ui/audit/events`, `/ui/openapi` and their assets for the
-views that are active. The contracts the OpenAPI view reads are permitted by the hub's own
-chain, not by this one. The database routes management page (`/ui/routes/db`, which creates and deletes
-routes) is **not** permitted: it belongs to another plugin and stays under the rules of the
-application.
+views that are active.
+
+### The endpoints of the other plugins
+
+The console is also where the other plugins have their own HTTP endpoints governed. They
+do not depend on this module, and this module does not know their paths: each declares
+them through a `SecuredPaths` bean, from `spring-cloud-gateway-commons`, and the chain
+above decides what they mean.
+
+| Kind | Declared with | What the chain does |
+|---|---|---|
+| Read | `SecuredPaths.governed(...)` | Follows the mode: open while the console is open, behind its login once it is not |
+| Open | `SecuredPaths.open(...)` | Reachable without a principal whatever the mode |
+| Write, from a browser | `SecuredPaths.write(...)` | Always asks for a principal &mdash; see the write mode below |
+| Write, from a client | `SecuredPaths.api(...)` | Same, and left out of the CSRF protection |
+
+```java
+@Bean
+SecuredPaths routeApiSecuredPaths() {
+    return SecuredPaths.api("/api/gateway/routes", "/api/gateway/routes/{id}");
+}
+```
+
+What the plugins shipped here declare:
+
+| Endpoints | Plugin | Kind | Without this module |
+|---|---|---|---|
+| Swagger UI, its assets, the aggregated contracts | hub-openapi | Read | permitted by the plugin's own chain |
+| `/v3/api-docs` and its `.json` / `.yaml` variants | hub-openapi | Open &mdash; the hub probes them itself, with no credentials to offer | same |
+| `/ui/metrics/local`, `/ui/metrics/local/instance` | metrics-discovery | Open &mdash; polled by the sibling instances, same reason | left to the application |
+| `/ui/routes/db` and its fragments | this console, over the routes-database plugin | Write, from a browser | the view is not served at all |
+| `/api/gateway/routes` and the rest of the route API | routes-database | Write, from a client | closed by the plugin's own chain |
+
+The chain is ordered ahead of the ones those plugins contribute for themselves, so it
+answers first for the paths it takes over. A gateway assembled without this module keeps
+whatever each plugin declares on its own, unchanged &mdash; in particular, the route
+management closes its own endpoints, and can refuse to publish them at all with
+`spring.cloud.gateway.server.webflux.routes-database.access`.
+
+### The endpoints that change the gateway
+
+They do not follow the mode. Publishing a console without a login is a decision an operator
+makes; publishing an API that reconfigures the routing table without one is not. The chain
+asks for a principal as soon as it has something to authenticate against &mdash; the local
+user below, the user directory of the application, or a Bearer token when an issuer is
+configured &mdash; and says so in the logs when it has nothing:
+
+```
+The gateway endpoints that change its configuration are reachable without authentication:
+[/api/gateway/routes, ...]. The console is open and no user directory was found ...
+```
+
+Closing a door with no key behind it would lock a deployment out of its own route
+management, so that case stays open and visible rather than broken. The two ways out:
+
+```yaml
+spring.cloud.gateway.server.webflux.ui.security:
+  # authenticated: close them whether or not there is a way in
+  # permit-all: treat them as any other path, and follow the mode
+  write-mode: permit-all
+```
+
+An open console serves no login page, so what it puts in front of those paths is HTTP Basic
+against the credentials it holds, and the Bearer tokens of the resource server when an
+issuer is configured. Turning the mode to `authenticated` gives them the login page like
+everything else.
 
 The chain is ordered at `GatewayUiSecurityAutoConfiguration.GATEWAY_UI_CHAIN_ORDER`
 (`Ordered.HIGHEST_PRECEDENCE + 300`), ahead of the chains an application usually declares
@@ -651,6 +711,7 @@ What that gives you:
 | Property | Default | What it does |
 | --- | --- | --- |
 | `...ui.security.mode` | `permit-all` | `authenticated` puts the login page in front of the console |
+| `...ui.security.write-mode` | `auto` | How the endpoints that change the gateway are treated: `auto` closes them as soon as there is a way in, `authenticated` always, `permit-all` never |
 | `...ui.security.user.name` | `admin` | Name of the local user |
 | `...ui.security.user.password` | &mdash; | Password of the local user; unset, no local user is declared |
 | `...ui.security.user.roles` | `[ADMIN]` | Roles the local user holds |

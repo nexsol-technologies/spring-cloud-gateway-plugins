@@ -17,6 +17,7 @@
 package ch.nexsol.gateway.sample;
 
 import ch.nexsol.gateway.audit.AuditEventPublisher;
+import ch.nexsol.gateway.database.locator.DatabaseRouteDefinitionLocator;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.ui.nav.GatewayUiMenu;
 import ch.nexsol.gateway.validation.OpenapiValidationProperties;
@@ -72,14 +73,25 @@ class PluginsOffProfileTests {
 	}
 
 	/**
-	 * The console is excluded rather than disabled, so its paths are not answered at all
-	 * &mdash; and the rule this application keeps over the database routes page must not
-	 * send a visitor to a login page that is no longer served.
+	 * The console is excluded rather than disabled, so its paths are not answered at all,
+	 * and no chain of a plugin is left asking for a principal on a page nobody serves.
 	 */
 	@Test
 	void shouldServeNothingUnderUi() {
 		this.webTestClient.get().uri("/ui").exchange().expectStatus().isNotFound();
 		this.webTestClient.get().uri("/ui/login").exchange().expectStatus().isNotFound();
+		this.webTestClient.get().uri("/ui/routes/db").exchange().expectStatus().isNotFound();
+	}
+
+	/**
+	 * The route management is turned off by its own switch, which unwires the source as
+	 * well as the endpoints: no page, no API, and nothing reading routes from the
+	 * database.
+	 */
+	@Test
+	void shouldLeaveNoRouteManagementBehind() {
+		this.webTestClient.get().uri("/api/gateway/routes").exchange().expectStatus().isNotFound();
+		assertThat(this.context.getBeanNamesForType(DatabaseRouteDefinitionLocator.class)).isEmpty();
 	}
 
 	/**

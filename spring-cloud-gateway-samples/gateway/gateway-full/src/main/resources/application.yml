@@ -329,16 +329,18 @@ spring:
       on-profile:
       - plugins-off
   autoconfigure:
-    # The two plugins carrying no switch of their own: they are wired on the strength of
-    # being on the classpath. Boot's own exclude list is the property that turns them off.
-    # It works differently from the switches below — it silences the auto-configuration
-    # altogether, so /ui and /ui/routes/db answer 404 rather than answering that they are
-    # disabled.
+    # The console carries no switch of its own: it is wired on the strength of being on the
+    # classpath. Boot's own exclude list is the property that turns it off. It works
+    # differently from the switches below — it silences the auto-configuration altogether,
+    # so /ui answers 404 rather than answering that it is disabled.
     exclude:
     - ch.nexsol.gateway.ui.autoconfigure.GatewayUiAutoConfiguration
     - ch.nexsol.gateway.ui.autoconfigure.GatewayUiSecurityAutoConfiguration
-    - ch.nexsol.gateway.database.autoconfigure.GatewayDatabaseAutoConfiguration
 spring.cloud.gateway.server.webflux:
+  # routes-database: the whole plugin, the route source included. Its own 'access' would
+  # only have closed the endpoints and left the database feeding the gateway, which is not
+  # what this profile is about.
+  routes-database.enabled: false
   webfilter:
     # filters: the correlation-id web filter, the only thing that plugin puts on every
     # request. Its filter factories stay registered and unused.
@@ -356,9 +358,9 @@ spring.cloud.gateway.server.webflux:
   metrics:
     enabled: false
     instance.enabled: false
-  # openapi-validation has no enabled flag either, for a different reason: it is attached
-  # route by route, and both directions on OFF is what neutralises it wherever a route
-  # attached it. Quoted, or YAML reads OFF as the boolean false.
+  # openapi-validation has no enabled flag, for a reason of its own: it is attached route
+  # by route, and both directions on OFF is what neutralises it wherever a route attached
+  # it. Quoted, or YAML reads OFF as the boolean false.
   openapi-validation:
     request.mode: "OFF"
     response.mode: "OFF"

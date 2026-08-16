@@ -13,6 +13,13 @@
 	<name>spring-cloud-gateway-ui</name>
 	<description>Plugin exposing a Spring Boot Admin-like web UI shell for Spring Cloud Gateway</description>
 	<dependencies>
+		<!-- The contract the other plugins declare the paths they serve through, so the
+		     console can govern them without either side depending on the other. -->
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-commons</artifactId>
+			<version>${revision}</version>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webflux</artifactId>
@@ -46,6 +53,14 @@
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-audit-core</artifactId>
+			<version>${revision}</version>
+			<optional>true</optional>
+		</dependency>
+		<!-- Optional: the database routes view reads the services of the routes-database
+		     plugin, as the traffic view reads the source of the metrics plugin. -->
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-database</artifactId>
 			<version>${revision}</version>
 			<optional>true</optional>
 		</dependency>
@@ -132,6 +147,23 @@
 		<dependency>
 			<groupId>io.projectreactor</groupId>
 			<artifactId>reactor-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- The database routes view reads real routes from the plugin holding them, over
+		     the in-memory database its schema is written for. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-r2dbc</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.r2dbc</groupId>
+			<artifactId>r2dbc-h2</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

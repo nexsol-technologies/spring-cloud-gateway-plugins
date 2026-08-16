@@ -22,7 +22,7 @@
 								</span>
 							</small>
 						</div>
-						<div class="btn-group btn-group-sm">
+						<div class="btn-group btn-group-sm" th:unless="${readOnly}">
 							<button type="button" class="btn btn-outline-primary"
 								th:attr="hx-get=@{/ui/routes/db/{id}/edit(id=${route.id()})}"
 								hx-target="#route-form-container" hx-swap="outerHTML">Edit</button>

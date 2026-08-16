@@ -242,6 +242,26 @@ spring.cloud.gateway.server.webflux.hub-openapi:
 > its default "everything authenticated" chain. An application that was relying on that
 > default must declare its own chains.
 
+### When the console is there
+
+A gateway that also carries the [UI console](../spring-cloud-gateway-ui/README.md) usually
+wants one answer to "who may read this", not two. The hub therefore declares the same paths
+to the console, which governs them with a chain ordered ahead of this one:
+
+| Path | Under the console |
+|---|---|
+| The Swagger UI, its assets, `/swagger-config` and the aggregated contracts | Follow the console: open while it is open, behind its login once it is not |
+| `springdoc.api-docs.path` and its `.json` / `.yaml` variants | Stay open |
+
+The contract of the gateway itself stays open because the hub reads it over HTTP, on every
+registered instance and its own included, with a client that carries no credentials.
+Closing it would not protect anything: it would remove the gateway from its own hub. Giving
+that poll a way to authenticate is the next step, and until then this is the honest
+description of what is exposed &mdash; the shape of the API, not its data.
+
+The declaration is a plain bean, so the same escape hatch applies: declare your own
+`hubOpenapiSecuredPaths` and the plugin backs off.
+
 ## Auditing
 
 When the [auditing plugin](../spring-cloud-gateway-audit/spring-cloud-gateway-audit-core/README.md)

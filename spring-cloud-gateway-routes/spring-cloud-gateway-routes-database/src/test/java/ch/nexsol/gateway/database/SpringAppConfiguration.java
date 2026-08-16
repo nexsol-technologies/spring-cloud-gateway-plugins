@@ -20,9 +20,20 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 
+/**
+ * Application backing the tests of this module.
+ * <p>
+ * The auto-configuration package is left out of the scan. An {@code @AutoConfiguration}
+ * class is a {@code @Configuration} class, so scanning would register it as an ordinary
+ * one &mdash; skipping the ordering its conditions are written against, and giving these
+ * tests a wiring no application ever gets. What it declares reaches this context the way
+ * it reaches a gateway: through {@code @EnableAutoConfiguration}.
+ */
 @SpringBootConfiguration
-@ComponentScan
+@ComponentScan(excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
+		pattern = "ch\\.nexsol\\.gateway\\.database\\.autoconfigure\\..*"))
 @EnableAutoConfiguration
 public class SpringAppConfiguration {
 
