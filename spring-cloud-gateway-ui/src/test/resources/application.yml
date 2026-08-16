@@ -1,0 +1,7 @@
+# The database routes view is exercised against the plugin that holds the routes, on the
+# in-memory database its schema is written for. CASE_INSENSITIVE_IDENTIFIERS is what makes
+# H2 accept the quoted lower-case identifiers Spring Data R2DBC generates against that
+# schema, whose DDL is unquoted.
+spring:
+  r2dbc:
+    url: r2dbc:h2:mem:///console_routes_db?options=DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;CASE_INSENSITIVE_IDENTIFIERS=TRUE

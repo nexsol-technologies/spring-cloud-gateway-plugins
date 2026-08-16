@@ -19,7 +19,7 @@
 	</div>
 	<div class="element-args mt-2" th:id="|args-${row.index()}|"
 		th:with="index=${row.index()},args=${row.args()}">
-		<th:block th:replace="~{fragments/element :: args}"></th:block>
+		<th:block th:replace="~{dashboard/fragments/route-db-element :: args}"></th:block>
 	</div>
 </div>
 

@@ -36,11 +36,7 @@ import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.MediaType;
-import org.springframework.stereotype.Controller;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -123,14 +119,15 @@ class RouteInventoryControllerTests {
 
 	@Test
 	void shouldLeaveTheDatabaseRoutesPageMappedUnderItsOwnSubPath() {
-		// This view owns /ui/routes; the routes-database plugin owns /ui/routes/db.
+		// This view owns /ui/routes, the database routes view owns /ui/routes/db: a
+		// mapping of one must not swallow the other.
 		this.webTestClient.get()
 			.uri("/ui/routes/db")
 			.exchange()
 			.expectStatus()
 			.isOk()
 			.expectBody(String.class)
-			.isEqualTo("database routes page");
+			.value((body) -> assertThat(body).doesNotContain("id=\"gr-inventory\""));
 	}
 
 	@Test
@@ -168,27 +165,6 @@ class RouteInventoryControllerTests {
 		@Bean
 		RefreshRoutesEventCounter refreshRoutesEventCounter() {
 			return new RefreshRoutesEventCounter();
-		}
-
-		@Bean
-		DatabaseRoutesStubController databaseRoutesStubController() {
-			return new DatabaseRoutesStubController();
-		}
-
-	}
-
-	/**
-	 * Stands in for the management page of {@code spring-cloud-gateway-routes-database},
-	 * which is mapped under a sub-path of this view.
-	 */
-	@Controller
-	@RequestMapping("/ui/routes/db")
-	static class DatabaseRoutesStubController {
-
-		@GetMapping
-		@ResponseBody
-		String index() {
-			return "database routes page";
 		}
 
 	}

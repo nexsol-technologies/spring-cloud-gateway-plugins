@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.database.controller;
+package ch.nexsol.gateway.ui.routes;
 
 import ch.nexsol.gateway.database.entity.RouteEntity;
 import ch.nexsol.gateway.database.model.RouteResponseModel;
@@ -33,9 +33,13 @@ import org.springframework.web.reactive.function.BodyInserters;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Tests the view over the routes a database holds, which the console serves and the
+ * routes-database plugin feeds.
+ */
 @SpringBootTest
 @AutoConfigureWebTestClient(timeout = "300000")
-class RouteViewControllerTests {
+class DatabaseRoutesControllerTests {
 
 	@Autowired
 	RouteRepository routeRepository;
