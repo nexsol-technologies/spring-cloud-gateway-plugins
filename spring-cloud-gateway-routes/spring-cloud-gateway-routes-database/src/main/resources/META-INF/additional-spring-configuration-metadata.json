@@ -1,0 +1,25 @@
+{
+  "properties": [
+    {
+      "name": "spring.cloud.gateway.server.webflux.routes-database.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "ch.nexsol.gateway.database.RoutesDatabaseProperties",
+      "description": "Whether the plugin is wired at all: the route definition locator, the services, the repositories and whatever the access publishes. Turned off, the database stops feeding the gateway its routes, which is a different decision from refusing to publish the endpoints that manage them.",
+      "defaultValue": true
+    },
+    {
+      "name": "spring.cloud.gateway.server.webflux.routes-database.access",
+      "type": "ch.nexsol.gateway.database.RoutesDatabaseProperties$Access",
+      "sourceType": "ch.nexsol.gateway.database.RoutesDatabaseProperties",
+      "description": "What the route management exposes over HTTP: NONE registers no endpoint at all, READ_ONLY answers 405 to anything that would change a route and drops the affordances of the view leading there, UNRESTRICTED publishes everything. Whatever is set, the routes stored in the database keep feeding the gateway: this governs what is published, not where the routes come from.",
+      "defaultValue": "unrestricted"
+    },
+    {
+      "name": "spring.cloud.gateway.server.webflux.routes-database.security-chain-enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "ch.nexsol.gateway.database.RoutesDatabaseProperties",
+      "description": "Whether the plugin contributes the security filter chain asking for an authenticated principal on the endpoints that change the routing table. The chain is only contributed when another SecurityWebFilterChain already exists, so it never displaces the default chain of Spring Security, and only when the application has something to authenticate against. Turn it off to secure those paths from the application instead.",
+      "defaultValue": true
+    }
+  ]
+}

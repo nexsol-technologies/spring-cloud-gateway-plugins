@@ -74,9 +74,9 @@ class GatewayApplicationTests {
 	void shouldKeepTheConsoleBehindItsLoginPage() {
 		this.webTestClient.get().uri("/ui").exchange().expectStatus().isFound().expectHeader().location("/ui/login");
 		/*
-		 * The database routes page belongs to another plugin, so the chain of the console
-		 * leaves it to this application, which asks for a principal just the same and
-		 * sends the visitor to the same login page.
+		 * The database routes page belongs to another plugin, which declares it as an
+		 * endpoint that changes the gateway. The chain of the console asks for a
+		 * principal whatever its mode, and sends the visitor to the same login page.
 		 */
 		this.webTestClient.get()
 			.uri("/ui/routes/db")
@@ -85,6 +85,28 @@ class GatewayApplicationTests {
 			.isFound()
 			.expectHeader()
 			.location("/ui/login");
+	}
+
+	@Test
+	void shouldKeepTheRouteManagementApiBehindThatSameLogin() {
+		/*
+		 * This application declares no rule for it. The plugin serving it declares it as
+		 * an endpoint that changes the gateway, and the chain of the console — ordered
+		 * ahead of the ones here — is what asks for a principal.
+		 */
+		this.webTestClient.get()
+			.uri("/api/gateway/routes")
+			.exchange()
+			.expectStatus()
+			.isFound()
+			.expectHeader()
+			.location("/ui/login");
+		this.webTestClient.get()
+			.uri("/api/gateway/routes")
+			.cookie("SESSION", signIn())
+			.exchange()
+			.expectStatus()
+			.isOk();
 	}
 
 	@Test
