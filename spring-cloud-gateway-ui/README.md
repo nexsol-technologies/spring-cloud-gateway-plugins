@@ -211,40 +211,6 @@ routing can be tested. The tested request carries no body, and a predicate readi
 only an in-flight call has (a response, a session) is reported as failed against that
 predicate rather than failing the whole test.
 
-## Audit view
-
-The tail of the exchanges the audit plugin captured, newest first: time, method, path,
-status (colour-coded by class), user, ip and trace id. A row expands into **every** attribute
-the audit plugin collected for that exchange &mdash; JWT claims, headers, trace and span ids.
-
-![The audit view](doc/audit-light.png)
-
-Filter by status class (2xx to 5xx) and search across method, path, user, ip and trace id.
-The **Live** switch polls every 3 seconds.
-
-The events are read on their way to the audit backend: the plugin's `AuditEventPublisher`
-bean is wrapped in a decorator that keeps a copy, so the view works whichever backend is
-configured &mdash; the default publisher, Redis, Kafka, a database or an
-application-provided one.
-
-The tail is a bounded in-memory buffer of at most 500 events, cleared on restart: it shows
-the gateway's own recent traffic without querying the backend, which keeps the durable copy.
-Auditing must be enabled on a route (the `Audit` gateway filter) or globally (the audit web
-filter) for anything to show up.
-
-The console keeps itself out of the trail. Its own paths &mdash; the pages, the HTMX
-fragments they poll (`/ui/audit/events`, `/ui/metrics/data`) and the static assets
-(`/js/echarts.min.js` and the rest) &mdash; are added to
-`spring.cloud.gateway.server.webflux.audit.web-filter.exclude-paths`, so the global audit
-web filter never records them: the view shows the traffic the gateway routed, not the
-traffic of looking at it. The exclusions are the exact paths the active views declare
-through `UiSecuredPaths`, never a `/ui/**` pattern, so a gateway route declared under `/ui`
-keeps being audited. Add your own with the same property.
-
-Setting `spring.cloud.gateway.server.webflux.audit.enabled=false` turns the audit plugin off,
-and with it this view: the menu entry, the home page figure and the `/ui/audit` paths all
-disappear, exactly as if the plugin were not on the classpath.
-
 ## Traffic view
 
 When Micrometer is on the classpath, a **Traffic** entry appears (`/ui/metrics`), built
@@ -426,50 +392,6 @@ computed over: the calls one instance counted, the calls every instance counted,
 graph a tracing backend derived from the spans. It stays hidden when the plugin is absent,
 and shows an empty state until traffic has flowed.
 
-## Menu entries (Spring Boot Admin style)
-
-Menu entries come from a registry: any `NavItem` bean present in the application context
-is collected by `GatewayUiMenu` and rendered in the sidebar.
-
-The built-in `home` entry is always present. Every other entry is declared next to the view
-it leads to, under the same condition, so an entry never points at a view that is not
-served:
-
-```java
-@Bean
-NavItem routesNavItem() {
-    // id, label, icon (SVG symbol id from the shell sprite), href, order
-    return new NavItem("routes", "Database routes", "icon-plugin", "/ui/routes/db", 10);
-}
-```
-
-Any module can light up its own entry the same way, simply by declaring a `NavItem` bean
-(optionally guarded by a condition). Icons reference the SVG sprite declared in
-`templates/dashboard/fragments/layout.html` (`icon-home`, `icon-plugin`, `icon-route`,
-`icon-target`, `icon-chart`, `icon-book`, `icon-list`).
-
-The built-in entries are ordered `home` (0), `Routes` (5), `Database routes` (10),
-`Route tester` (15), `Traffic` (20), `OpenAPI` (25) and `Audit` (30), leaving room for your
-own in between.
-
-## Hosting a plugin page inside the shell
-
-A plugin renders its own page inside the shell by targeting the layout fragment and
-supplying a content and a scripts slot:
-
-```html
-<html th:replace="~{dashboard/fragments/layout :: layout('Title', ~{:: #content}, ~{:: #scripts})}">
-<body>
-    <div id="content"> ... page markup ... </div>
-    <script id="scripts"> ... page JS (Bootstrap/HTMX already loaded) ... </script>
-</body>
-</html>
-```
-
-The sidebar is populated automatically for every rendered view by `GatewayUiModelAttributes`
-(a `@ControllerAdvice` exposing `navItems`); the controller only sets `activeNav` to its
-own entry id.
-
 ## OpenAPI view
 
 When [spring-cloud-gateway-hub-openapi](../spring-cloud-gateway-hub-openapi/README.md) is on
@@ -516,6 +438,84 @@ the operation, which suits a short label better than this mapping does.
 The Scalar bundle ships with the plugin (`/js/scalar.standalone.js`, `@scalar/api-reference`
 1.63.0, 3.6 MB) and its default web fonts are switched off, so the view works on an isolated
 network without reaching any CDN.
+
+## Audit view
+
+The tail of the exchanges the audit plugin captured, newest first: time, method, path,
+status (colour-coded by class), user, ip and trace id. A row expands into **every** attribute
+the audit plugin collected for that exchange &mdash; JWT claims, headers, trace and span ids.
+
+![The audit view](doc/audit-light.png)
+
+Filter by status class (2xx to 5xx) and search across method, path, user, ip and trace id.
+The **Live** switch polls every 3 seconds.
+
+The events are read on their way to the audit backend: the plugin's `AuditEventPublisher`
+bean is wrapped in a decorator that keeps a copy, so the view works whichever backend is
+configured &mdash; the default publisher, Redis, Kafka, a database or an
+application-provided one.
+
+The tail is a bounded in-memory buffer of at most 500 events, cleared on restart: it shows
+the gateway's own recent traffic without querying the backend, which keeps the durable copy.
+Auditing must be enabled on a route (the `Audit` gateway filter) or globally (the audit web
+filter) for anything to show up.
+
+The console keeps itself out of the trail. Its own paths &mdash; the pages, the HTMX
+fragments they poll (`/ui/audit/events`, `/ui/metrics/data`) and the static assets
+(`/js/echarts.min.js` and the rest) &mdash; are added to
+`spring.cloud.gateway.server.webflux.audit.web-filter.exclude-paths`, so the global audit
+web filter never records them: the view shows the traffic the gateway routed, not the
+traffic of looking at it. The exclusions are the exact paths the active views declare
+through `UiSecuredPaths`, never a `/ui/**` pattern, so a gateway route declared under `/ui`
+keeps being audited. Add your own with the same property.
+
+Setting `spring.cloud.gateway.server.webflux.audit.enabled=false` turns the audit plugin off,
+and with it this view: the menu entry, the home page figure and the `/ui/audit` paths all
+disappear, exactly as if the plugin were not on the classpath.
+
+## Menu entries (Spring Boot Admin style)
+
+Menu entries come from a registry: any `NavItem` bean present in the application context
+is collected by `GatewayUiMenu` and rendered in the sidebar.
+
+The built-in `home` entry is always present. Every other entry is declared next to the view
+it leads to, under the same condition, so an entry never points at a view that is not
+served:
+
+```java
+@Bean
+NavItem routesNavItem() {
+    // id, label, icon (SVG symbol id from the shell sprite), href, order
+    return new NavItem("routes", "Database routes", "icon-plugin", "/ui/routes/db", 10);
+}
+```
+
+Any module can light up its own entry the same way, simply by declaring a `NavItem` bean
+(optionally guarded by a condition). Icons reference the SVG sprite declared in
+`templates/dashboard/fragments/layout.html` (`icon-home`, `icon-plugin`, `icon-route`,
+`icon-target`, `icon-chart`, `icon-book`, `icon-list`).
+
+The built-in entries are ordered `home` (0), `Routes` (5), `Database routes` (10),
+`Route tester` (15), `Traffic` (20), `OpenAPI` (25) and `Audit` (30), leaving room for your
+own in between.
+
+## Hosting a plugin page inside the shell
+
+A plugin renders its own page inside the shell by targeting the layout fragment and
+supplying a content and a scripts slot:
+
+```html
+<html th:replace="~{dashboard/fragments/layout :: layout('Title', ~{:: #content}, ~{:: #scripts})}">
+<body>
+    <div id="content"> ... page markup ... </div>
+    <script id="scripts"> ... page JS (Bootstrap/HTMX already loaded) ... </script>
+</body>
+</html>
+```
+
+The sidebar is populated automatically for every rendered view by `GatewayUiModelAttributes`
+(a `@ControllerAdvice` exposing `navItems`); the controller only sets `activeNav` to its
+own entry id.
 
 ## Spring Security
 
