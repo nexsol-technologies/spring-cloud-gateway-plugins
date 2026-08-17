@@ -283,6 +283,10 @@ eureka:
     fetch-registry: true
 # The sample routes now go through the load balancer, which is also what makes the service
 # graph name their far end 'service-a' and 'service-b' rather than an address.
+#
+# Both backends have to run under their own 'eureka' profile for that: they do not register
+# otherwise, the load balancer then finds no instance, and the gateway answers 503 — which
+# reads like the service being down rather than like it never having registered.
 sample:
   service-a.uri: lb://service-a
   service-b.uri: lb://service-b

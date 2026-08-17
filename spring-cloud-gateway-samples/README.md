@@ -58,8 +58,12 @@ both hops transited the gateway. The second draws only one: its second hop went 
 from `service-a` to `service-b` on port 8081, and no counter of the gateway can know about
 a call it never carried. Only a source reading a tracing backend can.
 
-Run `service-b` and `service-a` (in that order), then `gateway-full`, and read the graph the
-gateway holds:
+Run `service-b` and `service-a` (in that order), then `gateway-full`. Either run all three
+without a profile, or all three with `eureka` — a gateway on the `eureka` profile routes to
+`lb://service-b`, and a backend that did not register leaves the load balancer with no
+instance and the gateway answering `503`.
+
+Then read the graph the gateway holds:
 
 ```console
 curl localhost:8181/actuator/metrics/gateway.service.graph.calls
