@@ -108,6 +108,8 @@ spring:
           service-graph:
             enabled: true          # the plugin is on by default
             instance-id: gateway-1 # defaults to HOSTNAME, then the host name
+            excluded-routes:       # route ids never drawn; the whole id must match
+              - openapi-docs-.*
             caller:
               claims: [azp, client_id]  # read in order, first one carrying a value wins
               header:                   # names the caller when no claim did; unset by default
@@ -130,6 +132,12 @@ It is incremented once per **routed** exchange: a request the gateway answered i
 that matched no route, has no second endpoint to draw and is not counted. A call that
 failed is counted before the failure is propagated — an upstream that refused the
 connection is exactly the edge worth seeing.
+
+A route matching `excluded-routes` is not counted at all — dropped where the calls are
+counted rather than where the graph is read, so it never becomes a series in the registry
+or in whatever scrapes it. The one default, `openapi-docs-.*`, leaves out the documentation
+routes the OpenAPI hub publishes: fetching a contract is not one service calling another,
+and drawing it would put the console among the callers of every service it documents.
 
 The route is part of what makes an edge rather than a label on it, so two routes between
 the same pair stay two edges: which one carries the traffic is a question the graph should

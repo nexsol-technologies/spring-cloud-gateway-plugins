@@ -26,10 +26,24 @@ import java.util.List;
 public class ServiceGraphProperties {
 
 	/**
+	 * Default exclusion: the documentation routes the OpenAPI hub publishes. A contract
+	 * being fetched is not one service calling another, and drawing it would put the
+	 * console among the callers of every service it documents.
+	 */
+	public static final String OPENAPI_DOCS_PATTERN = "openapi-docs-.*";
+
+	/**
 	 * Whether the service graph plugin is active. When {@code false} nothing is counted
 	 * and no source is registered.
 	 */
 	private boolean enabled = true;
+
+	/**
+	 * Regular expressions matched against the route id: a call taking a route matching
+	 * any of them is never counted. The whole id must match. Set to an empty list to draw
+	 * every route.
+	 */
+	private List<String> excludedRoutes = new ArrayList<>(List.of(OPENAPI_DOCS_PATTERN));
 
 	/**
 	 * Selected graph source. Read by the provider modules to activate their source. When
@@ -88,6 +102,20 @@ public class ServiceGraphProperties {
 	 */
 	public void setInstanceId(String instanceId) {
 		this.instanceId = instanceId;
+	}
+
+	/**
+	 * @return the route id exclusion patterns
+	 */
+	public List<String> getExcludedRoutes() {
+		return this.excludedRoutes;
+	}
+
+	/**
+	 * @param excludedRoutes the route id exclusion patterns
+	 */
+	public void setExcludedRoutes(List<String> excludedRoutes) {
+		this.excludedRoutes = excludedRoutes;
 	}
 
 	/**

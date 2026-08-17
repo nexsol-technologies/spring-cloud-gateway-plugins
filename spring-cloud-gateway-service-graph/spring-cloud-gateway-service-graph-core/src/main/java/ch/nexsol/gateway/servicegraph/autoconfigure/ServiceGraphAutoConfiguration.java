@@ -81,13 +81,14 @@ public class ServiceGraphAutoConfiguration {
 	 * Registers the filter counting one call per routed exchange.
 	 * @param meterRegistry the provider over the application meter registry
 	 * @param callerResolver the resolver naming the caller
+	 * @param properties the service graph properties holding the route exclusions
 	 * @return the service graph filter bean
 	 */
 	@Bean
 	@ConditionalOnMissingBean
 	public ServiceGraphFilter serviceGraphFilter(ObjectProvider<MeterRegistry> meterRegistry,
-			CallerResolver callerResolver) {
-		return new ServiceGraphFilter(meterRegistry, callerResolver);
+			CallerResolver callerResolver, ServiceGraphProperties properties) {
+		return new ServiceGraphFilter(meterRegistry, callerResolver, properties);
 	}
 
 	/**

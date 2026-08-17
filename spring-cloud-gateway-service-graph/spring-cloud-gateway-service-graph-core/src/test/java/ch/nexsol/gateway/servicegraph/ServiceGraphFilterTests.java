@@ -16,6 +16,8 @@
 
 package ch.nexsol.gateway.servicegraph;
 
+import java.util.List;
+
 import ch.nexsol.gateway.servicegraph.ServiceGraphProperties.Caller;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -106,6 +108,24 @@ class ServiceGraphFilterTests {
 	}
 
 	@Test
+	void countsNothingForAnExcludedRoute() {
+		this.filter.filter(routed("openapi-docs-orders", HttpStatus.OK), EMPTY_CHAIN).block();
+
+		assertThat(this.registry.find(CALLS_METER).counters()).isEmpty();
+	}
+
+	@Test
+	void drawsEveryRouteWhenTheExclusionsAreEmptied() {
+		ServiceGraphProperties properties = new ServiceGraphProperties();
+		properties.setExcludedRoutes(List.of());
+		ServiceGraphFilter drawing = filter(this.registry, properties);
+
+		drawing.filter(routed("openapi-docs-orders", HttpStatus.OK), EMPTY_CHAIN).block();
+
+		assertThat(counter("partner-a", "openapi-docs-orders", ServiceGraphFilter.SUCCESS)).isEqualTo(1.0);
+	}
+
+	@Test
 	void countsNothingWhenTheRouteHasNoId() {
 		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/orders"));
 		exchange.getAttributes()
@@ -150,12 +170,16 @@ class ServiceGraphFilterTests {
 	}
 
 	private static ServiceGraphFilter filter(MeterRegistry registry) {
-		Caller properties = new Caller();
-		properties.setHeader("X-Caller");
+		return filter(registry, new ServiceGraphProperties());
+	}
+
+	private static ServiceGraphFilter filter(MeterRegistry registry, ServiceGraphProperties properties) {
+		Caller caller = properties.getCaller();
+		caller.setHeader("X-Caller");
 		@SuppressWarnings("unchecked")
 		ObjectProvider<MeterRegistry> provider = mock(ObjectProvider.class);
 		when(provider.getIfAvailable()).thenReturn(registry);
-		return new ServiceGraphFilter(provider, new CallerResolver(properties));
+		return new ServiceGraphFilter(provider, new CallerResolver(caller), properties);
 	}
 
 	private static MockServerWebExchange routed(String routeId, HttpStatus status) {

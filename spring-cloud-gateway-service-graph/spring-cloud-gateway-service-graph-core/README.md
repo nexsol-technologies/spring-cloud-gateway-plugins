@@ -55,6 +55,10 @@ Losing an edge never costs a response — a failure while counting is logged at 
 swallowed. An application that publishes no metrics has no `MeterRegistry`, and then nothing
 is counted at all: the filter passes the exchange straight through.
 
+`RouteExclusions` is applied here, and only here. Excluding at read time would leave the
+series behind; excluding at count time means an excluded route costs nothing anywhere. A
+route with no id is excluded by the same check — an edge has to name what it reached.
+
 ## Naming the caller
 
 `CallerResolver` reads the first configured claim carrying a value, then the configured

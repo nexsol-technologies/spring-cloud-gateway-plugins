@@ -82,15 +82,20 @@ public class ServiceGraphFilter implements GlobalFilter, Ordered {
 
 	private final CallerResolver callerResolver;
 
+	private final RouteExclusions excludedRoutes;
+
 	/**
 	 * Creates the filter.
 	 * @param meterRegistry the provider over the application meter registry, absent in an
 	 * application that publishes no metrics
 	 * @param callerResolver the resolver naming the caller
+	 * @param properties the service graph configuration, holding the route exclusions
 	 */
-	public ServiceGraphFilter(ObjectProvider<MeterRegistry> meterRegistry, CallerResolver callerResolver) {
+	public ServiceGraphFilter(ObjectProvider<MeterRegistry> meterRegistry, CallerResolver callerResolver,
+			ServiceGraphProperties properties) {
 		this.meterRegistry = meterRegistry;
 		this.callerResolver = callerResolver;
+		this.excludedRoutes = new RouteExclusions(properties.getExcludedRoutes());
 	}
 
 	/**
@@ -115,7 +120,10 @@ public class ServiceGraphFilter implements GlobalFilter, Ordered {
 	private Mono<Void> count(ServerWebExchange exchange) {
 		MeterRegistry registry = this.meterRegistry.getIfAvailable();
 		Route route = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
-		if (registry == null || route == null || !StringUtils.hasText(route.getId())) {
+		// An excluded route is dropped here rather than when the graph is read, so it
+		// never becomes a series at all. A route with no id is excluded by the same
+		// check: an edge has to name what it reached.
+		if (registry == null || route == null || this.excludedRoutes.excludes(route.getId())) {
 			return Mono.empty();
 		}
 		String routeId = route.getId();
