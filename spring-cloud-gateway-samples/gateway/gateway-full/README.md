@@ -28,6 +28,7 @@ each name what they additionally need.
 | `routes-security` | on the classpath; this gateway permits everything, so nothing here needs exempting — see [gateway-secured](../gateway-secured/README.md) |
 | `hub-openapi` | `/swagger-ui.html`, under the `eureka` profile |
 | `metrics` | `/ui/metrics` and `/ui/metrics/instances`, both instrumentation switches on, the consolidating sources behind the `metrics-*` profiles |
+| `service-graph` | the `service-a` and `service-b` routes, and the two flows [below](#who-calls-what) |
 | `audit` | `/ui/audit`, with the global web filter on |
 | `ui` | `/ui` |
 
@@ -259,6 +260,44 @@ sources are told by the instance itself.
 The two share what lives outside the JVM — the Redis keys, the Eureka registration — and
 nothing else: the database routes run on a private in-memory H2, so each has its own. Run
 both under `pgsql` to share those too.
+
+## Who calls what
+
+The `service-a` and `service-b` routes exist to make the
+[service graph](../../../spring-cloud-gateway-service-graph/README.md) show something real.
+Start the two backends, then this gateway:
+
+```console
+# from spring-cloud-gateway-samples/service-b, then service-a
+mvn spring-boot:run
+```
+
+```console
+curl -H 'X-Caller: frontend' localhost:8181/service-a/call-through-gateway
+curl -H 'X-Caller: frontend' localhost:8181/service-a/call-direct
+```
+
+Both endpoints of `service-a` call `service-b`. The first goes through this gateway, which
+counts the hop and draws `service-a -> service-b`; the second goes straight to port 8081,
+and no counter here can know it happened. That difference is what separates the three
+sources counting this gateway's traffic from the one reading a tracing backend.
+
+```console
+curl -s localhost:8181/actuator/metrics/gateway.service.graph.calls | jq
+```
+
+Two things to notice while reading it:
+
+* **The far end is named after what the route targets.** `localhost:8080` in the default
+  profile, `service-a` under the `eureka` one, where the routes go through the load
+  balancer. That is `targetService` reading the route URI, not a name the plugin invents.
+* **The caller comes from a header here**, because these samples carry no token —
+  `service-graph.caller.header: X-Caller`, and `service-a` names itself when it calls. A
+  deployment where the services present their own tokens needs none of it: `azp` names the
+  caller and the claims are read first. A header is chosen by whoever calls, and is trusted
+  here only because everything is on one machine.
+* **The documentation routes are absent**, and deliberately: `excluded-routes` leaves out
+  `openapi-docs-.*`, since fetching a contract is not one service calling another.
 
 ## Turning the plugins off
 

@@ -1,0 +1,16 @@
+server.port: 8081
+spring.application.name: service-b
+eureka:
+  client:
+    enabled: false
+---
+spring:
+  config:
+    activate:
+      on-profile:
+      - eureka
+eureka:
+  client:
+    enabled: true
+    fetch-registry: true
+    register-with-eureka: true

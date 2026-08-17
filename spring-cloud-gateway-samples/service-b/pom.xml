@@ -9,11 +9,9 @@
 		<version>${revision}</version>
 		<relativePath>../pom.xml </relativePath>
 	</parent>
-	<artifactId>sample-service-a</artifactId>
-	<name>sample-service-a</name>
-	<description>Api for testing filters</description>
-	<properties>
-	</properties>
+	<artifactId>sample-service-b</artifactId>
+	<name>sample-service-b</name>
+	<description>Downstream api service-a calls, directly and through the gateway</description>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
@@ -26,16 +24,6 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webflux</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-webclient</artifactId>
-		</dependency>
-		
-		<dependency>
-			<groupId>org.springdoc</groupId>
-			<artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
-			<version>3.0.3</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
