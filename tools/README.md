@@ -46,7 +46,7 @@ overwriting what is there, and prints each file as it goes.
 | `--base` | `http://localhost:8181` | Where the gateway is listening |
 | `--out` | `spring-cloud-gateway-ui/doc` | Where the PNGs are written |
 | `--user`, `--password` | `superadmin` / `superadmin` | The console user to sign in as. Ignored when the console is open |
-| `--views` | every view | Comma-separated: `home`, `collapsed`, `routes`, `routes-db`, `route-tester`, `traffic`, `instances`, `audit`, `openapi`, `forbidden`, `login` |
+| `--views` | every view | Comma-separated: `home`, `collapsed`, `routes`, `routes-db`, `route-tester`, `traffic`, `instances`, `service-graph`, `audit`, `openapi`, `forbidden`, `login` |
 | `--themes` | `light,dark` | Which drawings to produce |
 | `--width`, `--height` | `1280`, `860` | The viewport |
 | `--settle` | `4000` | Milliseconds a view is given to draw before it is shot |

@@ -23,6 +23,7 @@ import ch.nexsol.gateway.database.service.ApiService;
 import ch.nexsol.gateway.metrics.InstanceMetricsSource;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
+import ch.nexsol.gateway.servicegraph.ServiceGraphSource;
 import ch.nexsol.gateway.ui.audit.AuditExclusionBeanPostProcessor;
 import ch.nexsol.gateway.ui.audit.AuditOverviewContribution;
 import ch.nexsol.gateway.ui.audit.AuditTailBeanPostProcessor;
@@ -48,6 +49,8 @@ import ch.nexsol.gateway.ui.routes.RouteOverviewContribution;
 import ch.nexsol.gateway.ui.routes.RouteTesterController;
 import ch.nexsol.gateway.ui.routes.RouteTesterService;
 import ch.nexsol.gateway.ui.security.UiSecuredPaths;
+import ch.nexsol.gateway.ui.servicegraph.ServiceGraphController;
+import ch.nexsol.gateway.ui.servicegraph.ServiceGraphOverviewContribution;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -392,6 +395,58 @@ public class GatewayUiAutoConfiguration {
 						"/js/gateway-instances.js");
 			}
 
+		}
+
+	}
+
+	/**
+	 * Activates the service graph view when the service graph plugin is on the classpath
+	 * and enabled: the view draws whichever {@code ServiceGraphSource} that plugin
+	 * resolved &mdash; the calls this instance counted by default, a consolidated graph
+	 * when a provider module is added, the graph of a tracing backend when one is
+	 * configured.
+	 * <p>
+	 * The conditions mirror those of the plugin's own auto-configuration rather than
+	 * testing for the source bean, for the same reason the traffic view does:
+	 * {@code @ConditionalOnBean} depends on the order configurations are applied in,
+	 * which does not hold under a component scan.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(ServiceGraphSource.class)
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.service-graph.enabled", matchIfMissing = true)
+	@Import(ServiceGraphController.class)
+	static class ServiceGraphConfiguration {
+
+		/**
+		 * Contributes the size of the graph to the home page.
+		 * @param graphSource the provider over the active graph source
+		 * @return the service graph overview contribution
+		 */
+		@Bean
+		ServiceGraphOverviewContribution serviceGraphOverviewContribution(
+				ObjectProvider<ServiceGraphSource> graphSource) {
+			return new ServiceGraphOverviewContribution(graphSource);
+		}
+
+		/**
+		 * Contributes the service graph entry to the side menu, next to the traffic and
+		 * instances entries: the same traffic seen as a graph rather than as figures.
+		 * @return the service graph menu entry
+		 */
+		@Bean
+		NavItem serviceGraphNavItem() {
+			return new NavItem("service-graph", "Service graph", "icon-graph", "/ui/service-graph", 22);
+		}
+
+		/**
+		 * Declares the paths of the service graph view and of the charting library it
+		 * loads, so the console governs them like its own.
+		 * @return the service graph view paths
+		 */
+		@Bean
+		UiSecuredPaths serviceGraphSecuredPaths() {
+			return new UiSecuredPaths("/ui/service-graph", "/ui/service-graph/data", "/js/echarts.min.js",
+					"/js/gateway-service-graph.js");
 		}
 
 	}

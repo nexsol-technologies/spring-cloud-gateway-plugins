@@ -64,6 +64,12 @@
 			<version>${revision}</version>
 			<optional>true</optional>
 		</dependency>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-service-graph-core</artifactId>
+			<version>${revision}</version>
+			<optional>true</optional>
+		</dependency>
 		<!-- The traffic view reads whichever RouteMetricsSource is active: the local meter
 		     registry by default, a consolidating one when a provider module is added. -->
 		<dependency>

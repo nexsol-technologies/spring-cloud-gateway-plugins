@@ -91,6 +91,7 @@ is the same home page in both.
 ![The route tester in the dark theme](doc/route-tester-dark.png)
 ![The traffic view in the dark theme](doc/traffic-dark.png)
 ![The instances view in the dark theme](doc/instances-dark.png)
+![The service graph in the dark theme](doc/service-graph-dark.png)
 ![The OpenAPI view in the dark theme](doc/openapi-dark.png)
 ![The audit view in the dark theme](doc/audit-dark.png)
 
@@ -384,6 +385,46 @@ no ceiling &mdash; is shown as a dash rather than as a zero.
 Plain markup and CSS, no charting library: these are bars, and the page already costs a
 poll. The auto-refresh switch is remembered across page loads like every other control of
 the shell.
+
+## Service graph view
+
+When the [service graph plugin](../spring-cloud-gateway-service-graph/README.md) is on the
+classpath, a **Service graph** entry appears (`/ui/service-graph`): the same traffic as the
+traffic view, drawn as who calls what rather than as figures per route.
+
+![The service graph view](doc/service-graph-light.png)
+
+**Summary** &mdash; services, callers, calls, failed calls. A node the gateway routed to is
+a service; one that only ever called is a caller. An endpoint that does both &mdash; a
+service reaching another one through the gateway &mdash; is one node, not two.
+
+**The graph** &mdash; ECharts, the same vendored copy the traffic view loads. Scroll to
+zoom, drag to pan, drag a node to move it. An arrow goes from the caller to what it reached:
+it thickens with the number of calls and reddens with the share that failed, and node size
+is the calls the node took part in, whichever side of an edge.
+
+Four ways to narrow what is drawn, all applied in the browser on the payload already
+fetched:
+
+| Control | Keeps |
+| --- | --- |
+| Focus | one node and the edges it takes part in, whichever side &mdash; clicking a node does the same, clicking it again comes back |
+| Keep only | the edges whose caller or callee carries the fragment |
+| Min calls | the edges above a volume, for dropping the noise of a busy graph |
+| Failing only | the edges that saw at least one 5xx |
+
+**Freeze layout** keeps the positions the force layout settled on, so a refresh redraws the
+same picture instead of shuffling it; unfreezing lets the simulation run again. The view is
+refreshed on demand and never on a timer &mdash; a graph that moves while it is being read
+is unreadable, which is the one place this console does not offer an auto poll.
+
+**All calls** &mdash; the same edges as a sortable table, with the route each one went
+through and the exact numbers.
+
+The view is fed by `GET /ui/service-graph/data` (JSON), and states the coverage it was
+computed over: the calls one instance counted, the calls every instance counted, or the
+graph a tracing backend derived from the spans. It stays hidden when the plugin is absent,
+and shows an empty state until traffic has flowed.
 
 ## Menu entries (Spring Boot Admin style)
 
