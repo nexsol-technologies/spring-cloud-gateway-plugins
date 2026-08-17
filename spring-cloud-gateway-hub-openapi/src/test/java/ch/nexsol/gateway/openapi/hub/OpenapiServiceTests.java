@@ -250,9 +250,9 @@ class OpenapiServiceTests {
 		StepVerifier.create(discover()).verifyComplete();
 		StepVerifier.create(discover()).verifyComplete();
 
-		// Probed again rather than remembered, and stopped at the first path: the same
-		// instance refuses the others the same way.
-		assertThat(this.probedUrls).containsExactly(JSON_URL, JSON_URL);
+		// Probed again rather than remembered, and every path tried on each refresh: a
+		// refusal is decided path by path.
+		assertThat(this.probedUrls).containsExactly(JSON_URL, YAML_URL, PLAIN_URL, JSON_URL, YAML_URL, PLAIN_URL);
 	}
 
 	@Test
@@ -263,7 +263,43 @@ class OpenapiServiceTests {
 		StepVerifier.create(discover()).verifyComplete();
 		StepVerifier.create(discover()).verifyComplete();
 
-		assertThat(this.probedUrls).containsExactly(JSON_URL, JSON_URL);
+		assertThat(this.probedUrls).containsExactly(JSON_URL, YAML_URL, PLAIN_URL, JSON_URL, YAML_URL, PLAIN_URL);
+	}
+
+	/**
+	 * An authorization permitting {@code /v3/api-docs/**} refuses the suffixed paths,
+	 * which that pattern does not match, and serves the plain one. Stopping at the first
+	 * refusal is what kept those services out of the hub.
+	 */
+	@Test
+	void probingCarriesOnPastARefusedPath() {
+		givenInstance(Map.of());
+		this.exchange = (url) -> Mono
+			.just(url.equals(PLAIN_URL) ? okDocument() : ClientResponse.create(HttpStatus.UNAUTHORIZED).build());
+
+		StepVerifier.create(discover())
+			.assertNext((discovered) -> assertThat(discovered.path()).isEqualTo("/v3/api-docs"))
+			.verifyComplete();
+
+		assertThat(this.probedUrls).containsExactly(JSON_URL, YAML_URL, PLAIN_URL);
+	}
+
+	/**
+	 * The absence has to be answered on every candidate path to be one: a refusal on any
+	 * of them leaves the question open, and caching it as an absence would keep the
+	 * service out of the hub for the whole cache interval after the authorization is
+	 * fixed.
+	 */
+	@Test
+	void aRefusalOnOnePathIsNotCachedAsAnAbsenceBecauseAnotherAnsweredNotThere() {
+		givenInstance(Map.of());
+		this.exchange = (url) -> Mono
+			.just(url.equals(JSON_URL) ? ClientResponse.create(HttpStatus.UNAUTHORIZED).build() : notFound());
+
+		StepVerifier.create(discover()).verifyComplete();
+		StepVerifier.create(discover()).verifyComplete();
+
+		assertThat(this.probedUrls).containsExactly(JSON_URL, YAML_URL, PLAIN_URL, JSON_URL, YAML_URL, PLAIN_URL);
 	}
 
 	private void givenInstance(Map<String, String> metadata) {

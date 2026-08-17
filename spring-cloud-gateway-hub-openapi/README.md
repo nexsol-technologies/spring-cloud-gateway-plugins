@@ -39,6 +39,45 @@ up to three, which matters on a large registry:
 eureka.instance.metadata-map.openapi_path: /v3/api-docs
 ```
 
+The key the hub reads is `openapi_path`, in the metadata of the `ServiceInstance` &mdash; the
+Spring Cloud Commons abstraction, not an Eureka one. Any discovery client that fills that map
+declares the path the same way.
+
+### Declaring the path on Kubernetes
+
+Instance metadata is built from the **Service** labels and annotations, so the declaration is
+an annotation on the Service:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-a
+  annotations:
+    openapi_path: /v3/api-docs
+```
+
+An annotation, not a label: a label *value* has to begin and end with an alphanumeric and
+accepts only `-`, `_` and `.` in between, so `/v3/api-docs` is rejected by the API server.
+Annotation values are arbitrary.
+
+On the Service, not on the Deployment: the annotations of the *pod* are only read when
+`spring.cloud.kubernetes.discovery.metadata.add-pod-annotations` is turned on &mdash; it is off
+by default, and it needs RBAC on `pods` on top of the `services` and `endpoints` the discovery
+already reads.
+
+Two settings decide whether the hub sees the annotation at all, both of them defaults:
+
+```yaml
+spring.cloud.kubernetes.discovery.metadata:
+  add-annotations: true      # off, and the annotation never reaches the metadata
+  annotations-prefix:        # set, and the key becomes <prefix>openapi_path
+```
+
+The hub looks for the exact key `openapi_path`. Under a prefix, or with the annotations left
+out, it finds nothing and falls back on probing the well-known paths &mdash; the declaration is
+simply ignored, without an error.
+
 ### Sizing the discovery
 
 The gateway refreshes its routes on every discovery heartbeat, and each refresh probes the
@@ -71,11 +110,17 @@ be reached, or that refused to hand its document over, has said nothing about ha
 it is probed again on the next refresh, so a service that was down when the gateway started
 appears in the hub as soon as it comes back, without waiting for `cache-ttl`.
 
-Probing an instance stops at the first path that settles the question, instead of trying the
-remaining ones: an unreachable instance and a refused document answer the same way whatever
-the path. An unreachable service therefore costs one `timeout`, not one per candidate path
-&mdash; which is what keeps the few services that are always down or draining in a large
-registry from dominating the refresh.
+Probing an instance stops as soon as the instance turns out to be unreachable, instead of
+trying the remaining paths: they lead to the same instance and fail the same way. An
+unreachable service therefore costs one `timeout`, not one per candidate path &mdash; which
+is what keeps the few services that are always down or draining in a large registry from
+dominating the refresh.
+
+A refusal does not stop it. Authorization is granted path by path: a rule permitting
+`/v3/api-docs/**` serves `/v3/api-docs` and answers `401` on `/v3/api-docs.json` and
+`/v3/api-docs.yaml`, which that pattern does not match. The remaining paths are therefore
+probed &mdash; at the cost of an immediate answer each, not a timeout &mdash; and the service
+is only reported as refusing its document once none of them served it.
 
 ### A service that does not appear in the hub
 
