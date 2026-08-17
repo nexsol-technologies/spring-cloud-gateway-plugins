@@ -13,9 +13,6 @@
 	<name>spring-cloud-gateway-service-graph-tempo</name>
 	<description>Tempo service graph source for the Spring Cloud Gateway service graph plugin</description>
 	<dependencies>
-		<!-- The service graph of Tempo is a set of Prometheus series, written there by its
-		     metrics-generator. This module reads them, so it reuses the query runner of the
-		     Prometheus source rather than carrying a second copy of it. -->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-service-graph-prometheus</artifactId>

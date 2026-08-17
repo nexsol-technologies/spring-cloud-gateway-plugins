@@ -29,6 +29,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
+import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Auto-configuration registering the OAuth 2.0 gateway filter factories and web filters,
@@ -60,20 +61,23 @@ public class FiltersAutoConfiguration {
 	 * Registers the Basic-auth to access-token exchange web filter. The token cache and
 	 * the observation registry are taken from the application when it provides them, and
 	 * default to an in-memory cache and to a no-op registry otherwise, so that this
-	 * module does not require caching to be enabled in the host application.
+	 * module does not require caching to be enabled in the host application. The web
+	 * client is the one the application configured, so the exchange with the
+	 * authorization server is instrumented like any other call it makes.
 	 * @param properties the exchange configuration
 	 * @param cacheManager the optional application cache manager
 	 * @param observationRegistry the optional application observation registry
+	 * @param webClientBuilder the application web client builder
 	 * @return the Basic-auth exchange web filter bean
 	 */
 	@Bean
 	@Conditional(BasicAuthExchangeConfiguredCondition.class)
 	BasicAuthExchangeToAccessTokenGatewayWebFilter basicAuthExchangeGatewayWebFilter(
 			BasicAuthExchangeToAccessTokenProperties properties, ObjectProvider<CacheManager> cacheManager,
-			ObjectProvider<ObservationRegistry> observationRegistry) {
+			ObjectProvider<ObservationRegistry> observationRegistry, WebClient.Builder webClientBuilder) {
 		return new BasicAuthExchangeToAccessTokenGatewayWebFilter(properties,
 				cacheManager.getIfAvailable(ConcurrentMapCacheManager::new),
-				observationRegistry.getIfAvailable(() -> ObservationRegistry.NOOP));
+				observationRegistry.getIfAvailable(() -> ObservationRegistry.NOOP), webClientBuilder);
 	}
 
 }
