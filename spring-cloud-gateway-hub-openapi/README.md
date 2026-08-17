@@ -39,6 +39,45 @@ up to three, which matters on a large registry:
 eureka.instance.metadata-map.openapi_path: /v3/api-docs
 ```
 
+The key the hub reads is `openapi_path`, in the metadata of the `ServiceInstance` &mdash; the
+Spring Cloud Commons abstraction, not an Eureka one. Any discovery client that fills that map
+declares the path the same way.
+
+### Declaring the path on Kubernetes
+
+Instance metadata is built from the **Service** labels and annotations, so the declaration is
+an annotation on the Service:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-a
+  annotations:
+    openapi_path: /v3/api-docs
+```
+
+An annotation, not a label: a label *value* has to begin and end with an alphanumeric and
+accepts only `-`, `_` and `.` in between, so `/v3/api-docs` is rejected by the API server.
+Annotation values are arbitrary.
+
+On the Service, not on the Deployment: the annotations of the *pod* are only read when
+`spring.cloud.kubernetes.discovery.metadata.add-pod-annotations` is turned on &mdash; it is off
+by default, and it needs RBAC on `pods` on top of the `services` and `endpoints` the discovery
+already reads.
+
+Two settings decide whether the hub sees the annotation at all, both of them defaults:
+
+```yaml
+spring.cloud.kubernetes.discovery.metadata:
+  add-annotations: true      # off, and the annotation never reaches the metadata
+  annotations-prefix:        # set, and the key becomes <prefix>openapi_path
+```
+
+The hub looks for the exact key `openapi_path`. Under a prefix, or with the annotations left
+out, it finds nothing and falls back on probing the well-known paths &mdash; the declaration is
+simply ignored, without an error.
+
 ### Sizing the discovery
 
 The gateway refreshes its routes on every discovery heartbeat, and each refresh probes the
