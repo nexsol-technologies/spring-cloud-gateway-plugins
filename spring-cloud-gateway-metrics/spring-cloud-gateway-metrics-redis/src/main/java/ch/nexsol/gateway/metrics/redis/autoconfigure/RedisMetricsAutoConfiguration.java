@@ -16,7 +16,7 @@
 
 package ch.nexsol.gateway.metrics.redis.autoconfigure;
 
-import ch.nexsol.gateway.metrics.InstanceIdentity;
+import ch.nexsol.gateway.commons.InstanceIdentity;
 import ch.nexsol.gateway.metrics.InstanceMetricsSource;
 import ch.nexsol.gateway.metrics.LocalInstanceMetricsSource;
 import ch.nexsol.gateway.metrics.LocalRouteMetricsSource;

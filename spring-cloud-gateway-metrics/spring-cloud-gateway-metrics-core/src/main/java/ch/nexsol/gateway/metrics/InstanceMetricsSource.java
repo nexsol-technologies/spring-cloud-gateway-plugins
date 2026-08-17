@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.metrics;
 
+import ch.nexsol.gateway.commons.InstanceIdentity;
 import reactor.core.publisher.Mono;
 
 /**

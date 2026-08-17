@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import ch.nexsol.gateway.commons.InstanceIdentity;
 import ch.nexsol.gateway.metrics.InstanceMetric.InstanceInstrumentation;
 import ch.nexsol.gateway.metrics.InstanceMetric.JvmStats;
 import ch.nexsol.gateway.metrics.InstanceMetric.NettyStats;

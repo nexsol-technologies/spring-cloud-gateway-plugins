@@ -19,6 +19,8 @@ package ch.nexsol.gateway.metrics;
 import java.util.Collections;
 import java.util.List;
 
+import ch.nexsol.gateway.commons.InstanceIdentity;
+
 /**
  * The technical figures of a single gateway instance, whatever source they were read
  * from.

@@ -16,7 +16,7 @@
 
 package ch.nexsol.gateway.metrics.redis;
 
-import ch.nexsol.gateway.metrics.InstanceIdentity;
+import ch.nexsol.gateway.commons.InstanceIdentity;
 import ch.nexsol.gateway.metrics.LocalInstanceMetricsSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;

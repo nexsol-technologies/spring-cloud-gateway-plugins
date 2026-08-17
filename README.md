@@ -35,7 +35,7 @@ Validates the requests and the responses of a route against an OpenAPI contract 
 A Spring Boot Admin-like web UI served under `/ui`, where each gateway plugin lights up its own view automatically when present on the classpath: an overview home page, the resolved routes with the source each one came from, a route tester answering which route would handle a described request (and why, predicate by predicate), a traffic chart, the technical health of every running instance and a live tail of the audit events. It is also where the HTTP endpoints of the other plugins are governed: they follow the console when it is behind a login, and stay open when it is not.
 
 [spring-cloud-gateway-commons](spring-cloud-gateway-commons/README.md)<br>
-The contracts the plugins share. Today, one: how a plugin declares the paths it serves, so the console above can decide who reaches them without either side depending on the other.
+The contracts the plugins share: how a plugin declares the paths it serves, so the console above can decide who reaches them without either side depending on the other, and how the running instance is named, so two plugins can label their figures with the same pod without depending on each other.
 
 ## Samples
 

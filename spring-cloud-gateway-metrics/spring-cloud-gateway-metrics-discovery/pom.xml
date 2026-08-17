@@ -14,7 +14,7 @@
 	<description>Service discovery source for the Spring Cloud Gateway metrics plugin</description>
 	<dependencies>
 		<!-- The contract this module declares the endpoints it serves to its siblings
-		     through, so a console can govern them. Carries no transitive dependency. -->
+		     through, so a console can govern them. -->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-commons</artifactId>

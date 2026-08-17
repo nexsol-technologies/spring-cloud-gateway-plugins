@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.metrics;
+package ch.nexsol.gateway.commons;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
