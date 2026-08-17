@@ -17,6 +17,8 @@
 package ch.nexsol.gateway.filter.autoconfigure;
 
 import ch.nexsol.gateway.filter.CorrelationIdFilter;
+import ch.nexsol.gateway.filter.IdentityPropagationFilter;
+import ch.nexsol.gateway.filter.IdentityPropagationProperties;
 import ch.nexsol.gateway.filter.factory.AuthorizationGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.ConvertHttpMethodGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.RecaptchaGatewayFilterFactory;
@@ -26,6 +28,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -75,6 +78,31 @@ public class FiltersAutoConfiguration {
 			matchIfMissing = true)
 	CorrelationIdFilter correlationIdFilter() {
 		return new CorrelationIdFilter();
+	}
+
+	/**
+	 * Binds the identity propagation configuration.
+	 * @return the identity propagation properties bean
+	 */
+	@Bean
+	@ConfigurationProperties(prefix = "spring.cloud.gateway.server.webflux.identity-propagation")
+	IdentityPropagationProperties identityPropagationProperties() {
+		return new IdentityPropagationProperties();
+	}
+
+	/**
+	 * Registers the identity propagation filter when it has been asked for.
+	 * <p>
+	 * Off unless enabled: it rewrites headers on every routed request, and a gateway
+	 * already forwarding headers of these names would see them replaced.
+	 * @param properties the identity propagation configuration
+	 * @return the identity propagation filter bean
+	 */
+	@Bean
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.identity-propagation.enabled",
+			havingValue = "true")
+	IdentityPropagationFilter identityPropagationFilter(IdentityPropagationProperties properties) {
+		return new IdentityPropagationFilter(properties);
 	}
 
 	/**

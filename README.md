@@ -20,7 +20,7 @@ Collects the figures the UI plots, from a pluggable source: the per-route reques
 Manages gateway route definitions from pluggable sources aggregated into a route locator: a database (with a management GUI), JSON/YAML files (GitOps friendly), a Config Server and OpenAPI contracts.
 
 [spring-cloud-gateway-filters](spring-cloud-gateway-filters/README.md)<br>
-Custom gateway filters: `Authorization`, `ConvertHttpMethod`, `CorrelationId` and `Recaptcha`.
+Custom gateway filters: `Authorization`, `ConvertHttpMethod`, `CorrelationId`, `IdentityPropagation` and `Recaptcha`. `IdentityPropagation` carries the identity behind a request to the services downstream — who is calling now, and who started the chain — and only believes the origin a request already carries when it comes from a declared internal client.
 
 [spring-cloud-gateway-oauth2](spring-cloud-gateway-oauth2/README.md)<br>
 OAuth2 support for Spring Cloud Gateway: multi-tenant authentication, JWT validation, and the `AuthorizationToken` filter validating an access token per route.
