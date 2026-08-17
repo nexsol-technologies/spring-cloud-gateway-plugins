@@ -159,9 +159,11 @@ public class OpenapiService implements DisposableBean {
 
 		// concatMap preserves the .json -> .yaml -> plain preference order and takeUntil
 		// stops at the first path that settles the question, instead of firing all the
-		// probes in parallel. Only a plain "not there" is worth trying the next path for:
-		// an unreachable instance and a refused document answer the same way whatever the
-		// path, each costing another full timeout.
+		// probes in parallel. An unreachable instance is the only answer worth stopping
+		// on before the paths run out: it answers the same way whatever the path, each
+		// attempt costing another full timeout. A refusal, on the other hand, is decided
+		// per path: a rule permitting /v3/api-docs/** refuses the suffixed paths and
+		// serves the plain one, and each attempt costs an answer, not a timeout.
 		return Flux.fromIterable(paths)
 			.concatMap((path) -> probe(uri, path, routeDefinition))
 			.takeUntil(Probe::settles)
@@ -176,16 +178,24 @@ public class OpenapiService implements DisposableBean {
 			this.reported.remove(uri.toString());
 			return Mono.just(new OpenapiDiscover(last.path(), last.routeDefinition()));
 		}
-		// Only a service that answered "not there" tells us it has no document. A refused
-		// or unreachable one says nothing, and caching that would keep it out of the hub
+		// Only a service that answered "not there" tells us it has no document, and it
+		// has
+		// to have answered that on every candidate path: one refused path leaves the
+		// question open, whatever the paths probed after it answered. A refused or
+		// unreachable instance says nothing, and caching that would keep it out of the
+		// hub
 		// until the entry expires, long after it came back.
-		if (last.outcome() == Probe.Outcome.ABSENT) {
+		Probe unresolved = probes.stream()
+			.filter((probe) -> probe.outcome() != Probe.Outcome.ABSENT)
+			.findFirst()
+			.orElse(null);
+		if (unresolved == null) {
 			cache(uri, null);
 			this.reported.remove(uri.toString());
 			LOG.debug("No OpenAPI document under {} for route {}; it is left out of the hub", uri, routeId);
 			return Mono.empty();
 		}
-		report(uri, last, routeId);
+		report(uri, unresolved, routeId);
 		return Mono.empty();
 	}
 
@@ -324,13 +334,14 @@ public class OpenapiService implements DisposableBean {
 
 		/**
 		 * Whether this probe settles the question, leaving the remaining candidate paths
-		 * nothing to add. Only a plain "not there" does not: the same instance refuses or
-		 * fails to answer the same way whatever the path, each attempt costing another
-		 * full timeout.
-		 * @return {@code true} unless the service answered that this path has no document
+		 * nothing to add. A found document does, and so does an unreachable instance,
+		 * which fails to answer the same way whatever the path and costs another full
+		 * timeout per attempt. A refusal does not: authorization is granted path by path,
+		 * and the next candidate is one immediate answer away.
+		 * @return {@code true} for a document found or an instance out of reach
 		 */
 		boolean settles() {
-			return this.outcome != Outcome.ABSENT;
+			return this.outcome == Outcome.FOUND || this.outcome == Outcome.FAILED;
 		}
 
 	}

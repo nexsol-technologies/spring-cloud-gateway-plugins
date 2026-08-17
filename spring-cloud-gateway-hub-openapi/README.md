@@ -71,11 +71,17 @@ be reached, or that refused to hand its document over, has said nothing about ha
 it is probed again on the next refresh, so a service that was down when the gateway started
 appears in the hub as soon as it comes back, without waiting for `cache-ttl`.
 
-Probing an instance stops at the first path that settles the question, instead of trying the
-remaining ones: an unreachable instance and a refused document answer the same way whatever
-the path. An unreachable service therefore costs one `timeout`, not one per candidate path
-&mdash; which is what keeps the few services that are always down or draining in a large
-registry from dominating the refresh.
+Probing an instance stops as soon as the instance turns out to be unreachable, instead of
+trying the remaining paths: they lead to the same instance and fail the same way. An
+unreachable service therefore costs one `timeout`, not one per candidate path &mdash; which
+is what keeps the few services that are always down or draining in a large registry from
+dominating the refresh.
+
+A refusal does not stop it. Authorization is granted path by path: a rule permitting
+`/v3/api-docs/**` serves `/v3/api-docs` and answers `401` on `/v3/api-docs.json` and
+`/v3/api-docs.yaml`, which that pattern does not match. The remaining paths are therefore
+probed &mdash; at the cost of an immediate answer each, not a timeout &mdash; and the service
+is only reported as refusing its document once none of them served it.
 
 ### A service that does not appear in the hub
 
