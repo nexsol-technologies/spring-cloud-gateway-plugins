@@ -16,6 +16,9 @@ Audits gateway requests and responses (JWT, request, response and trace attribut
 [spring-cloud-gateway-metrics](spring-cloud-gateway-metrics/README.md)<br>
 Collects the figures the UI plots, from a pluggable source: the per-route request figures the traffic view charts, and the per-instance technical figures the instances view lists (memory, processor, threads, and the connection pools towards the downstream services). The default reads the meter registry of the running instance; behind a load balancer that is only its own share, so a provider consolidates every instance instead (Prometheus, Redis, or the service registry). Every figure is reported with the coverage it was computed over.
 
+[spring-cloud-gateway-service-graph](spring-cloud-gateway-service-graph/README.md)<br>
+Draws who calls what: one counter per routed exchange, from the caller — the client its token was issued to — to the service the route targets, read back through a pluggable source. Where services reach each other through the gateway, that is the service graph itself. The default reads the counters of the running instance; behind a load balancer that is a sample of the traffic, and a sticky balancer makes it a biased one, so a provider consolidates every instance instead (Redis, Prometheus) — or reads the graph Tempo derived from the spans, which is the only one that also sees the calls that never transited the gateway. The number of distinct callers is capped by construction, because a caller is a metric tag and a tag with unbounded values is a series per value.
+
 [spring-cloud-gateway-routes](spring-cloud-gateway-routes/README.md)<br>
 Manages gateway route definitions from pluggable sources aggregated into a route locator: a database (with a management GUI), JSON/YAML files (GitOps friendly), a Config Server and OpenAPI contracts.
 

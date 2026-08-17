@@ -77,6 +77,7 @@
 		<module>spring-cloud-gateway-commons</module>
 		<module>spring-cloud-gateway-audit</module>
 		<module>spring-cloud-gateway-metrics</module>
+		<module>spring-cloud-gateway-service-graph</module>
 		<module>spring-cloud-gateway-routes</module>
 		<module>spring-cloud-gateway-filters</module>
 		<module>spring-cloud-gateway-oauth2</module>
