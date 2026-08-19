@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Service graph', ~{:: #graph-content}, ~{:: #graph-scripts})}">
+<body>
+	<div id="graph-content">
+		<header class="mb-4">
+			<h1 class="h3 fw-bold mb-1">Service graph</h1>
+			<p class="text-secondary mb-0">Who calls what, and how often it fails.</p>
+		</header>
+
+		<!-- Summary of the whole graph, read before the drawing below. -->
+		<div class="row g-3 mb-3">
+			<div class="col-6 col-lg-3">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small">Services</div>
+						<div class="h4 fw-semibold mb-0" id="gg-kpi-services">&mdash;</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-lg-3">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small">Callers</div>
+						<div class="h4 fw-semibold mb-0" id="gg-kpi-callers">&mdash;</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-lg-3">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small">Calls</div>
+						<div class="h4 fw-semibold mb-0" id="gg-kpi-calls">&mdash;</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-lg-3">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small">Failed calls (5xx)</div>
+						<div class="h4 fw-semibold mb-0" id="gg-kpi-errors">&mdash;</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="card border-0 shadow-sm mb-3">
+			<div class="card-body">
+				<div class="d-flex flex-wrap gap-3 align-items-end mb-2">
+					<div>
+						<label class="form-label small text-secondary mb-1" for="gg-focus">Focus</label>
+						<select id="gg-focus" class="form-select form-select-sm" style="min-width: 14rem">
+							<option value="">The whole graph</option>
+						</select>
+					</div>
+					<div>
+						<label class="form-label small text-secondary mb-1" for="gg-search">Keep only</label>
+						<input type="search" id="gg-search" class="form-control form-control-sm"
+								style="min-width: 12rem" placeholder="name fragment">
+					</div>
+					<div>
+						<label class="form-label small text-secondary mb-1" for="gg-min-calls">Min calls</label>
+						<input type="number" id="gg-min-calls" class="form-control form-control-sm" min="0" value="0"
+								style="width: 7rem">
+					</div>
+					<div class="ms-auto d-flex align-items-center gap-3">
+						<div class="form-check form-switch mb-0">
+							<input class="form-check-input" type="checkbox" role="switch" id="gg-failing">
+							<label class="form-check-label small" for="gg-failing">Failing only</label>
+						</div>
+						<div class="form-check form-switch mb-0">
+							<input class="form-check-input" type="checkbox" role="switch" id="gg-freeze" checked>
+							<label class="form-check-label small" for="gg-freeze">Freeze layout</label>
+						</div>
+						<button type="button" id="gg-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
+					</div>
+				</div>
+
+				<div class="alert alert-light border py-2 px-3 small text-secondary mb-3">
+					Scroll to zoom, drag to pan, drag a node to move it. Click a node to focus it and its
+					neighbours, click it again to come back. An arrow goes from the caller to what it
+					reached; it thickens with the number of calls and reddens with the share that failed.
+					The graph is refreshed on demand, never on a timer, so a layout you are reading does
+					not move under you.
+					<br>
+					The gateway itself is not a node: it sits on every edge, which is what lets it count
+					them. A caller it could not name &mdash; no client claim in a token, no caller header
+					&mdash; is drawn as <code>unknown</code>.
+				</div>
+
+				<!-- What this graph covers: one instance, every instance through a provider, or a
+				     tracing backend. Filled from the payload on every refresh. -->
+				<p class="text-secondary small mb-2" id="gg-coverage"></p>
+
+				<div id="gg-chart" style="width: 100%; height: 62vh; min-height: 420px" data-gw-theme-reload
+						th:attr="data-url=@{/ui/service-graph/data}" data-url="/ui/service-graph/data"></div>
+				<div id="gg-empty" class="text-secondary text-center py-5" style="display: none">
+					Nothing to draw yet &mdash; send some traffic through the gateway, then refresh.
+				</div>
+				<p class="text-secondary small mb-0 mt-2" id="gg-legend"></p>
+			</div>
+		</div>
+
+		<!-- Detail: the same edges, sortable, for the exact numbers. -->
+		<div class="card border-0 shadow-sm">
+			<div class="card-body">
+				<h2 class="h6 fw-semibold mb-3">All calls
+					<span class="text-secondary fw-normal small">(click a column to sort)</span>
+				</h2>
+				<div class="table-responsive">
+					<table class="table table-sm align-middle mb-0">
+						<thead>
+							<tr class="text-secondary small">
+								<th class="gw-sortable" data-sort="from">Caller</th>
+								<th class="gw-sortable" data-sort="to">Called</th>
+								<th class="gw-sortable" data-sort="routeId">Route</th>
+								<th class="gw-sortable text-end" data-sort="calls">Calls</th>
+								<th class="gw-sortable text-end" data-sort="errors">5xx</th>
+								<th class="gw-sortable text-end" data-sort="errorRate">Error rate</th>
+							</tr>
+						</thead>
+						<tbody id="gg-tbody"></tbody>
+					</table>
+				</div>
+				<div id="gg-table-empty" class="text-secondary text-center py-4" style="display: none">
+					Nothing to show yet.
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="graph-scripts">
+		<script th:src="@{/js/echarts.min.js}" src="/js/echarts.min.js"></script>
+		<script th:src="@{/js/gateway-service-graph.js}" src="/js/gateway-service-graph.js"></script>
+	</div>
+</body>
+</html>

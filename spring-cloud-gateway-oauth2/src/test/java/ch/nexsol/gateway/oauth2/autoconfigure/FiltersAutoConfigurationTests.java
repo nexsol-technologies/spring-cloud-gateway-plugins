@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.webclient.autoconfigure.WebClientAutoConfiguration;
 import org.springframework.cache.CacheManager;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,7 +40,7 @@ class FiltersAutoConfigurationTests {
 			+ "basicauth-exchange-oauth2.token-uris.alice=http://auth.example/token";
 
 	private final ApplicationContextRunner runner = new ApplicationContextRunner()
-		.withConfiguration(AutoConfigurations.of(FiltersAutoConfiguration.class));
+		.withConfiguration(AutoConfigurations.of(WebClientAutoConfiguration.class, FiltersAutoConfiguration.class));
 
 	@Test
 	void authorizationTokenFilterFactoryIsAlwaysRegistered() {

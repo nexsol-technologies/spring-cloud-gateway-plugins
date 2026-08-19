@@ -64,6 +64,74 @@ spring.cloud.gateway.server.webflux:
     - ConvertHttpMethod=POST
 ```
 
+### IdentityPropagation
+
+Writes the identity behind a request onto the request the gateway forwards, as two sets of
+headers: who is calling now, and who started the chain.
+
+Where a service reaches another one through the gateway, it presents a token of its own —
+so the token of a given hop only ever names the last caller. The `origin` headers carry the
+identity of the client the chain started from, all the way down, which is what a downstream
+service needs to log, audit or authorise against a caller it never sees.
+
+```yaml
+spring.cloud.gateway.server.webflux:
+  identity-propagation:
+    enabled: true                     # off by default: it rewrites headers on every routed request
+    internal-clients: [service-a, service-b]
+```
+
+| Header | Carries |
+|---|---|
+| `x-issuerid`, `x-clientid`, `x-userid` | the identity of the caller of this hop, from its validated token |
+| `x-origin-issuerid`, `x-origin-clientid`, `x-origin-userid` | the identity the chain started from |
+
+The names are configurable under `current.*` and `origin.*` (`issuer`, `client`, `user`).
+The client is read from `azp`, then `client_id`; the user from `preferred_username`, then
+`sub` — the same precedence the audit plugin uses.
+
+> **The origin is only believed from a declared internal client.** These are headers, and
+> anyone calling the gateway from outside can send them. Every header the filter owns is
+> removed from the incoming request and written again from the validated token; the one
+> exception is a caller whose `client_id` is listed in `internal-clients`, whose origin
+> headers were put there by the gateway on an earlier hop. `internal-clients` is empty by
+> default, so nothing is believed until you say so. Matching is exact: a client id is case
+> sensitive.
+
+An internal client that carries no origin is the start of a chain of its own — a scheduled
+job calling another service is nobody's second hop — so it becomes the origin rather than
+losing one. A request with no token has no identity to propagate: the headers are removed
+and nothing is written back.
+
+#### Reaching the logs and the traces of the services downstream
+
+The gateway sets plain HTTP headers, so they arrive whatever the tracing setup. A service
+that declares them as baggage picks them up and gets them in its trace context and its log
+MDC for free — **this belongs in the configuration of the services, not of the gateway**:
+
+```yaml
+# in service-a, service-b, ... — NOT in the gateway
+management.tracing.baggage:
+  remote-fields: [x-origin-issuerid, x-origin-clientid, x-origin-userid]
+  correlation.fields: [x-origin-clientid, x-origin-userid]
+```
+
+> **Declaring these fields as `remote-fields` on the gateway undoes the filter.** A remote
+> baggage field is *extracted* from the incoming request into the trace context, then
+> *injected* into the outgoing one when the gateway calls upstream — after every gateway
+> filter has run. The injected value is the one that arrived, so the header this filter
+> stripped and rewrote would be overwritten by the forged one on the way out. Leave the
+> propagated names out of the gateway's `remote-fields`.
+
+How a remote field travels depends on the bridge — Brave sends one header per field, which
+is what the gateway writes; the OpenTelemetry bridge uses the single W3C `baggage` header
+instead, and a service behind an OTel-based chain needs to read the headers itself. Check
+it against the bridge you deploy.
+
+Beware `tag-fields`: it puts a baggage field on every span as a tag, and a field carrying
+the user is unbounded. That is fine for a trace store and fatal for anything deriving
+metrics from span tags.
+
 ### CorrelationId
 
 The `CorrelationId` filter adds an `x-correlation-id` header to the response, carrying the

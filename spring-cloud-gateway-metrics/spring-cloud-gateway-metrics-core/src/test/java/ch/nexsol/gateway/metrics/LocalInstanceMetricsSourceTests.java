@@ -19,6 +19,7 @@ package ch.nexsol.gateway.metrics;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import ch.nexsol.gateway.commons.InstanceIdentity;
 import ch.nexsol.gateway.metrics.InstanceMetric.PoolStats;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;

@@ -1,8 +1,10 @@
 # spring-cloud-gateway-commons
 
-The contracts the gateway plugins share. One so far, and it exists to answer a single
-question: **when the console in front of a gateway is behind a login, what happens to the
-HTTP endpoints the other plugins serve?**
+The contracts the gateway plugins share.
+
+The first, and the reason this module exists, answers a single question: **when the console
+in front of a gateway is behind a login, what happens to the HTTP endpoints the other
+plugins serve?**
 
 A plugin knows the paths it answers. Only the console knows how to authenticate a visitor
 — its login page, its identity providers, its Bearer tokens, its roles. Neither can depend
@@ -10,7 +12,8 @@ on the other: the hub is on the classpath of consoles that do not exist yet, and
 is assembled without knowing which plugins came with it. This module is the thin thing in
 the middle.
 
-It carries no dependency of its own. Adding it to a plugin adds a jar of two types.
+Adding it to a plugin adds a small jar, `spring-core` and `slf4j-api` &mdash; both already
+on the classpath of any gateway.
 
 ## Declaring the paths a plugin serves
 
@@ -55,3 +58,14 @@ on its own. Declaring paths is never what closes them.
 The paths declared as read or open are also what the console keeps out of the audit trail:
 browsing a dashboard is not gateway traffic. The ones that change the gateway are not
 excluded — who created a route, and when, is the very thing an audit trail is kept for.
+
+## Naming the running instance
+
+`InstanceIdentity` resolves, once at startup, the name a figure collected locally is
+reported under: the configured id, then the `HOSTNAME` environment variable — which
+Kubernetes sets to the pod name — then the host name itself. The lookup can hit DNS, which
+is why it is not done per request.
+
+It lives here because more than one plugin needs it: the metrics plugin labels its figures
+with it, the service graph plugin labels its graph and keys its Redis entry with it, and
+neither should depend on the other to say which pod answered.

@@ -19,6 +19,7 @@ package ch.nexsol.gateway.metrics;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import ch.nexsol.gateway.commons.InstanceIdentity;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

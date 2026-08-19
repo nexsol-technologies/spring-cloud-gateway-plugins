@@ -89,15 +89,25 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 
 	/**
 	 * Create a new filter.
+	 * <p>
+	 * The client is derived from the application {@code WebClient.Builder} rather than
+	 * built from scratch, so every {@code WebClientCustomizer} the application configured
+	 * applies to it &mdash; the connector and its timeouts, the codecs, and the
+	 * observation registry. That last one is the reason this matters here: without it the
+	 * exchange with the authorization server carries no client span and does not
+	 * propagate the trace context, which makes an authentication hop invisible in a
+	 * gateway that traces everything else. The builder Spring Boot auto-configures is
+	 * prototype scoped, so configuring it here affects nothing else.
 	 * @param properties the Basic-auth to access-token exchange configuration
 	 * @param cacheManager the cache manager providing the token exchange cache
 	 * @param registry the observation registry used to instrument the exchange
+	 * @param webClientBuilder the application web client builder
 	 */
 	public BasicAuthExchangeToAccessTokenGatewayWebFilter(BasicAuthExchangeToAccessTokenProperties properties,
-			CacheManager cacheManager, ObservationRegistry registry) {
+			CacheManager cacheManager, ObservationRegistry registry, WebClient.Builder webClientBuilder) {
 		this.properties = properties;
 		this.registry = registry;
-		this.webClient = WebClient.builder()
+		this.webClient = webClientBuilder
 			.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
 			.filter((request, next) -> next.exchange(request)
 				.retryWhen(Retry.backoff(3, Duration.ofSeconds(5))

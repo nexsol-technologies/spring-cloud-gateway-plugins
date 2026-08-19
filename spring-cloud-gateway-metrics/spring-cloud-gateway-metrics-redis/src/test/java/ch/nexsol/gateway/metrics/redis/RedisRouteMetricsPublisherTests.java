@@ -20,7 +20,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import ch.nexsol.gateway.metrics.InstanceIdentity;
+import ch.nexsol.gateway.commons.InstanceIdentity;
 import ch.nexsol.gateway.metrics.LocalRouteMetricsSource;
 import ch.nexsol.gateway.metrics.MetricsProperties;
 import ch.nexsol.gateway.metrics.RouteMetric;

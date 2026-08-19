@@ -16,7 +16,7 @@
 
 package ch.nexsol.gateway.metrics.redis;
 
-import ch.nexsol.gateway.metrics.InstanceIdentity;
+import ch.nexsol.gateway.commons.InstanceIdentity;
 import ch.nexsol.gateway.metrics.LocalRouteMetricsSource;
 import ch.nexsol.gateway.metrics.RouteMetricsAggregator;
 import com.fasterxml.jackson.databind.ObjectMapper;

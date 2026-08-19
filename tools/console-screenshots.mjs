@@ -45,6 +45,7 @@ const VIEWS = [
 	{ name: 'route-tester', path: '/ui/routes/test' },
 	{ name: 'traffic', path: '/ui/metrics' },
 	{ name: 'instances', path: '/ui/metrics/instances' },
+	{ name: 'service-graph', path: '/ui/service-graph' },
 	{ name: 'audit', path: '/ui/audit' },
 	{ name: 'openapi', path: '/ui/openapi' },
 	// Shown to a signed-in visitor holding none of the required roles. It renders for any

@@ -3,6 +3,11 @@ spring.application.name: service-a
 eureka:
   client:
     enabled: false
+# The two flows of the service graph sample: service-a calls service-b directly, and again
+# through the gateway. Only the second one is a call the gateway can count.
+sample.service-b:
+  direct-url: http://localhost:8081/data
+  gateway-url: http://localhost:8181/service-b/data
 springdoc:
   swagger-ui:
     show-extensions: true

@@ -37,10 +37,41 @@ The ports never collide, so several gateways can run side by side.
 
 | Module | Port | What it is |
 | --- | --- | --- |
-| [service-a](service-a) | 8080 | the downstream backend, exposing one controller and its OpenAPI contract |
+| [service-a](service-a) | 8080 | the downstream backend, exposing one controller and its OpenAPI contract, plus the two flows towards `service-b` |
+| [service-b](service-b) | 8081 | a second backend, called by `service-a` — directly, and through the gateway |
 | [eureka](eureka) | 8761 | the service registry |
 | [config-server](config-server) | 8888 | a Config Server serving route files from a classpath repository |
 | [auth-server](auth-server) | 9090 | an OAuth2 authorization server; accounts `user:user` (role `READ`) and `admin:admin` (role `ADMIN`), client `messaging-client:secret` |
+
+### The two flows towards service-b
+
+`service-a` reaches `service-b` twice, and the difference is the whole point of the
+[service graph](../spring-cloud-gateway-service-graph/README.md):
+
+```console
+curl -H 'X-Caller: frontend' localhost:8181/service-a/call-through-gateway
+curl -H 'X-Caller: frontend' localhost:8181/service-a/call-direct
+```
+
+The first draws two edges — `frontend -> service-a` and `service-a -> service-b` — because
+both hops transited the gateway. The second draws only one: its second hop went straight
+from `service-a` to `service-b` on port 8081, and no counter of the gateway can know about
+a call it never carried. Only a source reading a tracing backend can.
+
+Run `service-b` and `service-a` (in that order), then `gateway-full`. Either run all three
+without a profile, or all three with `eureka` — a gateway on the `eureka` profile routes to
+`lb://service-b`, and a backend that did not register leaves the load balancer with no
+instance and the gateway answering `503`.
+
+Then read the graph the gateway holds:
+
+```console
+curl localhost:8181/actuator/metrics/gateway.service.graph.calls
+```
+
+The far end of an edge is named after what the route targets, so it reads `localhost:8080`
+in the default profile and `service-a` under the `eureka` one, where the routes go through
+the load balancer.
 
 Check a file served by the Config Server with:
 

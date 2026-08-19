@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
+import org.springframework.boot.webclient.autoconfigure.WebClientAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
@@ -41,8 +42,8 @@ class BasicAuthExchangeSecurityAutoConfigurationTests {
 			+ "basicauth-exchange-oauth2.token-uris.alice=http://auth.example/token";
 
 	private final ReactiveWebApplicationContextRunner runner = new ReactiveWebApplicationContextRunner()
-		.withConfiguration(
-				AutoConfigurations.of(FiltersAutoConfiguration.class, BasicAuthExchangeSecurityAutoConfiguration.class))
+		.withConfiguration(AutoConfigurations.of(WebClientAutoConfiguration.class, FiltersAutoConfiguration.class,
+				BasicAuthExchangeSecurityAutoConfiguration.class))
 		.withUserConfiguration(WebFluxSecurityConfiguration.class);
 
 	@Test

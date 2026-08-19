@@ -356,6 +356,22 @@
 	width: 1%;
 }
 
+/*
+ * Predicates and filters each keep a readable floor. Left to itself the browser hands the
+ * width to whichever of the two asks for more across all the rows, so a gateway resolving
+ * many routes with long predicates crushes the filters into a ribbon of one token per
+ * line — the same column that reads fine on a gateway with ten routes. A floor rather than
+ * a share, for the reason the table already carries a min-width: below what it takes to be
+ * read, this table would rather scroll than squeeze.
+ *
+ * The value is bounded by that same min-width: 58rem less the 14rem of the route column and
+ * the 10rem or so the source and order take leaves 34rem for the two, so anything above
+ * 17rem each pushes the table into a horizontal scroll on the width it was drawn for.
+ */
+.gw-routes .gw-col-chips {
+	min-width: 16rem;
+}
+
 .gw-route-id {
 	overflow-wrap: anywhere;
 }

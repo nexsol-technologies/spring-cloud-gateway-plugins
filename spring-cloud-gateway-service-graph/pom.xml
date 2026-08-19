@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>ch.nexsol-tech.gateway</groupId>
+		<artifactId>spring-cloud-gateway-plugins</artifactId>
+		<version>${revision}</version>
+		<relativePath>../pom.xml </relativePath>
+	</parent>
+	<artifactId>spring-cloud-gateway-service-graph</artifactId>
+	<name>spring-cloud-gateway-service-graph</name>
+	<description>Service graph plugin for Spring Cloud Gateway with pluggable sources</description>
+	<packaging>pom</packaging>
+	<modules>
+		<module>spring-cloud-gateway-service-graph-core</module>
+		<module>spring-cloud-gateway-service-graph-redis</module>
+		<module>spring-cloud-gateway-service-graph-prometheus</module>
+		<module>spring-cloud-gateway-service-graph-tempo</module>
+	</modules>
+
+</project>

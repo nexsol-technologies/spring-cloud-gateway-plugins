@@ -42,6 +42,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT;
@@ -325,7 +326,7 @@ class BasicAuthExchangeToAccessTokenGatewayWebFilterIntegrationTests extends Bas
 		// -----------------------------------------------------------------------------------------
 
 		return new BasicAuthExchangeToAccessTokenGatewayWebFilter(properties, this.cacheManager,
-				this.observationRegistry);
+				this.observationRegistry, WebClient.builder());
 	}
 
 }

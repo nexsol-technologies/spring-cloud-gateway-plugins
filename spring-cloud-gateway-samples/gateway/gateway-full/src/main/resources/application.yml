@@ -40,6 +40,30 @@ spring.cloud.gateway.server.webflux:
           roles: 'READ'
     - RewritePath=/test-authorization-token/?(?<segment>.*), /$\{segment}
 
+  # The two flows of the service graph sample. 'service-a' is what a browser calls;
+  # 'service-b' is what service-a calls back through this gateway, which is the hop that
+  # puts the edge service-a -> service-b in the graph. Its other flow, calling service-b
+  # directly, never reaches here — and that is the point: no counter of this gateway can
+  # draw an edge it never carried.
+  #
+  # The target is a placeholder so the 'eureka' profile can point these two at the
+  # registry without repeating the whole route list. It also decides how the graph names
+  # the far end of the edge, which is read from the route URI: 'localhost:8080' here, and
+  # 'service-a' once the load balancer resolves it.
+  - id: service-a
+    uri: ${sample.service-a.uri:http://localhost:8080}
+    predicates:
+    - Path=/service-a/**
+    filters:
+    - StripPrefix=1
+
+  - id: service-b
+    uri: ${sample.service-b.uri:http://localhost:8081}
+    predicates:
+    - Path=/service-b/**
+    filters:
+    - StripPrefix=1
+
   - id: test-authorization-token-KO
     uri: http://localhost:8080
     predicates:
@@ -119,6 +143,31 @@ spring.cloud.gateway.server.webflux.metrics:
     # is a real cost on the data path — on here so the instances view is complete.
     instrument-http-client: true
 
+# Who calls what (spring-cloud-gateway-service-graph). No provider by default: the graph is
+# the one this instance counted.
+#
+#   mvn spring-boot:run                     # in samples/service-b, then samples/service-a
+#   curl -H 'X-Caller: frontend' localhost:8181/service-a/call-through-gateway
+#   curl -H 'X-Caller: frontend' localhost:8181/service-a/call-direct
+#
+# The first call draws two edges — frontend -> service-a and service-a -> service-b — the
+# second only one, because its second hop never reached this gateway.
+spring.cloud.gateway.server.webflux.service-graph:
+  instance-id: gateway-full-1
+  # There is no path exclusion to write next to the audit one above: the graph counts
+  # routed exchanges only, and /actuator and /eureka are served by this gateway rather than
+  # routed by it, so they never reach the counter. What is excluded here is excluded by
+  # route id.
+  # Left out of the graph: fetching a contract is not one service calling another.
+  excluded-routes:
+    - openapi-docs-.*
+  caller:
+    # These samples carry no token, so the calling service names itself in a header. A
+    # deployment where service-a presents its own token needs none of this: 'azp' names it
+    # and the claims are read first. Note that a header is chosen by whoever calls — it is
+    # trusted here because everything on this machine is.
+    header: X-Caller
+
 # Publishes the connection pool counters the instances view plots. A gateway property
 # rather than a plugin one: it is read while the HTTP client is being built, too early
 # for any bean to turn it on.
@@ -133,6 +182,17 @@ spring.cloud.gateway.server.webflux.audit:
     environment: sample
   web-filter:
     enabled: true
+    # The web filter audits whatever this gateway serves, its own endpoints included, and a
+    # probe polling /actuator/health or a Prometheus scraping /actuator/prometheus is not
+    # gateway traffic. '/actuator' is listed next to '/actuator/**' because the pattern
+    # matches what is under the path, not the path itself. '/eureka/**' is a guard for a
+    # deployment proxying the registry through the gateway; nothing serves it here, since
+    # the Eureka client of this gateway calls the registry directly. The console adds the
+    # paths of its own views on its own, which is why they are not repeated here.
+    exclude-paths:
+    - /actuator
+    - /actuator/**
+    - /eureka/**
 
 spring.cloud.gateway.server.webflux.ui:
   openapi:
@@ -221,9 +281,23 @@ eureka:
   client:
     enabled: true
     fetch-registry: true
+# The sample routes now go through the load balancer, which is also what makes the service
+# graph name their far end 'service-a' and 'service-b' rather than an address.
+#
+# Both backends have to run under their own 'eureka' profile for that: they do not register
+# otherwise, the load balancer then finds no instance, and the gateway answers 503 — which
+# reads like the service being down rather than like it never having registered.
+sample:
+  service-a.uri: lb://service-a
+  service-b.uri: lb://service-b
 spring.cloud.gateway.server.webflux:
   discovery:
     locator:
+      # Adds one route per registered service, '/SERVICE-A/**' -> 'lb://SERVICE-A', with an
+      # id of its own. It does not collide with the two routes above: Eureka upper cases a
+      # service id and path matching is case sensitive, so the paths differ. Turning
+      # 'lower-case-service-id' on would make them the same path served by two routes, and
+      # the same service drawn under two names in the graph.
       enabled: true
 spring.cloud.gateway.server.webflux.hub-openapi:
   enabled: true

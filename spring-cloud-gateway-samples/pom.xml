@@ -44,6 +44,7 @@
     <modules>
         <module>gateway</module>
         <module>service-a</module>
+        <module>service-b</module>
         <module>eureka</module>
         <module>config-server</module>
         <module>auth-server</module>

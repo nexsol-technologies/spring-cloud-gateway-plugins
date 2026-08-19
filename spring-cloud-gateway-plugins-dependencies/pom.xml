@@ -44,6 +44,26 @@
             </dependency>
             <dependency>
                 <groupId>ch.nexsol-tech.gateway</groupId>
+                <artifactId>spring-cloud-gateway-service-graph-core</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol-tech.gateway</groupId>
+                <artifactId>spring-cloud-gateway-service-graph-redis</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol-tech.gateway</groupId>
+                <artifactId>spring-cloud-gateway-service-graph-prometheus</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol-tech.gateway</groupId>
+                <artifactId>spring-cloud-gateway-service-graph-tempo</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol-tech.gateway</groupId>
                 <artifactId>spring-cloud-gateway-metrics-core</artifactId>
                 <version>${revision}</version>
             </dependency>
