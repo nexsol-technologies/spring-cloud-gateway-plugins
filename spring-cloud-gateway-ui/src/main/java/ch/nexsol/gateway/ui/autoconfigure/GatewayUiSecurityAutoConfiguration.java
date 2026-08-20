@@ -33,6 +33,7 @@ import ch.nexsol.gateway.ui.security.LoginController;
 import ch.nexsol.gateway.ui.security.UiAccessDeniedHandler;
 import ch.nexsol.gateway.ui.security.UiAuthenticationEntryPoint;
 import ch.nexsol.gateway.ui.security.UiLoginProviders;
+import ch.nexsol.gateway.ui.security.UiLoginRegistrations;
 import ch.nexsol.gateway.ui.security.UiSecuredPaths;
 import ch.nexsol.gateway.ui.security.UiSecurityCustomizer;
 import ch.nexsol.gateway.ui.security.UiSecurityModelAttributes;
@@ -47,10 +48,15 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientProperties;
+import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientPropertiesMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.authentication.UserDetailsRepositoryReactiveAuthenticationManager;
@@ -66,8 +72,10 @@ import org.springframework.security.oauth2.client.oidc.userinfo.OidcReactiveOAut
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.web.server.logout.OidcClientInitiatedServerLogoutSuccessHandler;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.InMemoryReactiveClientRegistrationRepository;
 import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.ReactiveOAuth2UserService;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
@@ -466,8 +474,8 @@ public class GatewayUiSecurityAutoConfiguration {
 
 	/**
 	 * Contributes the OpenID Connect login to the chain, and the buttons the login page
-	 * offers it under. Both back off when the application registered no client: the
-	 * module being on the classpath does not mean a provider was configured.
+	 * offers it under. Both back off when no client is registered: the module being on
+	 * the classpath does not mean a provider was configured.
 	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(ReactiveClientRegistrationRepository.class)
@@ -475,22 +483,34 @@ public class GatewayUiSecurityAutoConfiguration {
 	static class OAuth2LoginConfiguration {
 
 		/**
+		 * Prefix the console declares the identity providers of its login page under,
+		 * spelling out the Spring Security keys it mirrors.
+		 */
+		private static final String CLIENT_PREFIX = SECURITY_PREFIX + ".spring.security.oauth2.client";
+
+		/**
 		 * Contributes the OpenID Connect login to the chain of the console.
 		 * @param registrations the client registrations of the application, if it has any
+		 * @param consoleRegistrations the ones the console declared for itself, if the
+		 * properties module is on the classpath
 		 * @return the contribution, which does nothing when no client is registered
 		 */
 		@Bean
 		UiSecurityCustomizer gatewayUiOAuth2LoginCustomizer(
-				ObjectProvider<ReactiveClientRegistrationRepository> registrations) {
+				ObjectProvider<ReactiveClientRegistrationRepository> registrations,
+				ObjectProvider<UiLoginRegistrations> consoleRegistrations) {
 			return new UiSecurityCustomizer() {
 
 				@Override
 				public void customize(ServerHttpSecurity http) {
-					ReactiveClientRegistrationRepository repository = registrations.getIfAvailable();
+					ReactiveClientRegistrationRepository repository = repository(consoleRegistrations, registrations);
 					if (repository == null) {
 						return;
 					}
 					http.oauth2Login((oauth2) -> {
+						// Named rather than left to the bean of the application, which is
+						// the one the console narrowed or replaced.
+						oauth2.clientRegistrationRepository(repository);
 						// Without it, Spring Security generates a provider chooser of its
 						// own at /login and the console would have two login pages.
 						oauth2.loginPage(LOGIN_PATH);
@@ -503,11 +523,28 @@ public class GatewayUiSecurityAutoConfiguration {
 
 				@Override
 				public List<String> paths() {
-					return (registrations.getIfAvailable() != null)
+					return (repository(consoleRegistrations, registrations) != null)
 							? List.of("/oauth2/authorization/**", "/login/oauth2/code/**") : List.of();
 				}
 
 			};
+		}
+
+		/**
+		 * The registrations the console signs in through.
+		 * <p>
+		 * {@link UiLoginRegistrations} is the answer whenever it was resolved, including
+		 * when it resolved to nothing: having narrowed the registrations down to none is
+		 * a decision, and falling back on those of the application would hand back the
+		 * very list the narrowing was there to leave out. The application is only asked
+		 * when the bean is absent altogether, which is the classpath holding the Spring
+		 * Security client without the Spring Boot module reading its properties.
+		 */
+		private static ReactiveClientRegistrationRepository repository(
+				ObjectProvider<UiLoginRegistrations> consoleRegistrations,
+				ObjectProvider<ReactiveClientRegistrationRepository> registrations) {
+			UiLoginRegistrations console = consoleRegistrations.getIfAvailable();
+			return (console != null) ? console.repository() : registrations.getIfAvailable();
 		}
 
 		/**
@@ -540,13 +577,16 @@ public class GatewayUiSecurityAutoConfiguration {
 		 * them in memory can be enumerated, and one resolving issuers dynamically offers
 		 * nothing to list.
 		 * @param registrations the client registrations of the application, if it has any
+		 * @param consoleRegistrations the ones the console signs in through, if the
+		 * properties module is on the classpath
 		 * @return the providers the login page offers a button for
 		 */
 		@Bean
 		@ConditionalOnMissingBean
-		UiLoginProviders gatewayUiLoginProviders(ObjectProvider<ReactiveClientRegistrationRepository> registrations) {
+		UiLoginProviders gatewayUiLoginProviders(ObjectProvider<ReactiveClientRegistrationRepository> registrations,
+				ObjectProvider<UiLoginRegistrations> consoleRegistrations) {
 			Map<String, String> providers = new LinkedHashMap<>();
-			if (registrations.getIfAvailable() instanceof Iterable<?> iterable) {
+			if (repository(consoleRegistrations, registrations) instanceof Iterable<?> iterable) {
 				for (Object candidate : iterable) {
 					if (candidate instanceof ClientRegistration registration) {
 						providers.put(registration.getRegistrationId(), registration.getClientName());
@@ -587,6 +627,106 @@ public class GatewayUiSecurityAutoConfiguration {
 						? new DefaultOidcUser(authorities, user.getIdToken(), user.getUserInfo(), nameAttribute)
 						: new DefaultOidcUser(authorities, user.getIdToken(), user.getUserInfo());
 			});
+		}
+
+		/**
+		 * Decides, once at start-up, which client registrations the console signs in
+		 * through.
+		 * <p>
+		 * Left alone, those are the ones the application registered, which is right on a
+		 * gateway whose console answers to the provider its traffic answers to. Where it
+		 * is not, {@code spring.security.oauth2.client} holds the technical clients the
+		 * routes relay tokens with, and the login page would offer a button per one of
+		 * them. Three ways out, from the narrowest:
+		 * <ul>
+		 * <li>a registration that is not an authorization code client is never offered
+		 * &mdash; a button starting a grant no browser can complete cannot work, so it is
+		 * dropped whatever the configuration says;</li>
+		 * <li>{@code ...client.use} names the registration ids the console keeps out of
+		 * the ones the application declared;</li>
+		 * <li>{@code ...client.registration} and {@code ...client.provider} declare
+		 * registrations of the console's own, read exactly as the Spring Security keys
+		 * they spell out, and replace the ones of the application altogether.</li>
+		 * </ul>
+		 * <p>
+		 * The whole configuration is bound here rather than through
+		 * {@code @ConfigurationProperties}: a second {@link OAuth2ClientProperties} bean
+		 * would make the one Spring Boot injects into its own client auto-configuration
+		 * ambiguous, and the gateway would fail to start.
+		 */
+		@Configuration(proxyBeanMethods = false)
+		@ConditionalOnClass(OAuth2ClientProperties.class)
+		static class ConsoleRegistrationsConfiguration {
+
+			/**
+			 * Resolves the registrations the console offers on its login page.
+			 * @param environment the environment the configuration of the console is read
+			 * from
+			 * @param registrations the client registrations of the application, if it has
+			 * any
+			 * @return the registrations the console signs in through
+			 */
+			@Bean
+			@ConditionalOnMissingBean
+			UiLoginRegistrations gatewayUiLoginRegistrations(Environment environment,
+					ObjectProvider<ReactiveClientRegistrationRepository> registrations) {
+				Binder binder = Binder.get(environment);
+				OAuth2ClientProperties declared = binder.bind(CLIENT_PREFIX, OAuth2ClientProperties.class)
+					.orElseGet(OAuth2ClientProperties::new);
+				declared.validate();
+				List<String> use = binder.bind(CLIENT_PREFIX + ".use", Bindable.listOf(String.class)).orElse(List.of());
+				Map<String, ClientRegistration> own = new OAuth2ClientPropertiesMapper(declared)
+					.asClientRegistrations();
+				if (!own.isEmpty()) {
+					return new UiLoginRegistrations(offered(own.values(), use));
+				}
+				ReactiveClientRegistrationRepository application = registrations.getIfAvailable();
+				// A repository resolving issuers dynamically cannot be enumerated, so
+				// there is nothing to narrow and no button to offer either.
+				return new UiLoginRegistrations((application instanceof Iterable<?> iterable)
+						? offered(clientRegistrations(iterable), use) : application);
+			}
+
+			/**
+			 * Keeps the registrations the console may actually sign in through, and holds
+			 * them in a repository of its own. None left, there is no provider to offer
+			 * and the login page falls back on the credentials form alone.
+			 */
+			private static ReactiveClientRegistrationRepository offered(Collection<ClientRegistration> candidates,
+					List<String> use) {
+				List<ClientRegistration> offered = candidates.stream()
+					.filter((registration) -> AuthorizationGrantType.AUTHORIZATION_CODE
+						.equals(registration.getAuthorizationGrantType()))
+					.filter((registration) -> use.isEmpty() || use.contains(registration.getRegistrationId()))
+					.toList();
+				if (offered.isEmpty()) {
+					if (!candidates.isEmpty()) {
+						LOG.warn("None of the {} client registration(s) found can sign into the console: an "
+								+ "authorization code client is needed, and {}. The login page offers no provider.",
+								candidates.size(), use.isEmpty() ? "none of them is one"
+										: "%s.use narrows them to %s".formatted(CLIENT_PREFIX, use));
+					}
+					return null;
+				}
+				return new InMemoryReactiveClientRegistrationRepository(offered);
+			}
+
+			/**
+			 * Reads the registrations out of a repository holding them in memory. The
+			 * element type is lost with the {@code instanceof} that got us here &mdash;
+			 * {@code ReactiveClientRegistrationRepository} is not itself an
+			 * {@code Iterable}, so what it holds can only be checked one item at a time.
+			 */
+			private static List<ClientRegistration> clientRegistrations(Iterable<?> repository) {
+				List<ClientRegistration> registrations = new ArrayList<>();
+				for (Object candidate : repository) {
+					if (candidate instanceof ClientRegistration registration) {
+						registrations.add(registration);
+					}
+				}
+				return registrations;
+			}
+
 		}
 
 	}

@@ -19,6 +19,21 @@
       "sourceType": "ch.nexsol.gateway.ui.security.GatewayUiSecurityProperties",
       "description": "How the chain treats the paths a plugin declared as changing the gateway, such as the route management API: AUTO asks for a principal as soon as there is something to authenticate against and leaves them open with a warning otherwise, AUTHENTICATED always asks for one, PERMIT_ALL treats them as any other path and follows the mode.",
       "defaultValue": "auto"
+    },
+    {
+      "name": "spring.cloud.gateway.server.webflux.ui.security.spring.security.oauth2.client.use",
+      "type": "java.util.List<java.lang.String>",
+      "description": "The registration ids the login page of the console offers, out of the ones the application registered under spring.security.oauth2.client. Empty, it offers all of them. A registration that is not an authorization code client is never offered either way."
+    },
+    {
+      "name": "spring.cloud.gateway.server.webflux.ui.security.spring.security.oauth2.client.registration",
+      "type": "java.util.Map<java.lang.String,org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientProperties$Registration>",
+      "description": "The client registrations the console signs in through, read exactly as spring.security.oauth2.client.registration is. Declared here, they replace the ones of the application on the login page rather than adding to them."
+    },
+    {
+      "name": "spring.cloud.gateway.server.webflux.ui.security.spring.security.oauth2.client.provider",
+      "type": "java.util.Map<java.lang.String,org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientProperties$Provider>",
+      "description": "The providers the registrations of the console point at, read exactly as spring.security.oauth2.client.provider is."
     }
   ]
 }

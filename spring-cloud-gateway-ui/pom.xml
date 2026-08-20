@@ -96,6 +96,11 @@
 			<artifactId>spring-security-oauth2-client</artifactId>
 			<optional>true</optional>
 		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-security-oauth2-client</artifactId>
+			<optional>true</optional>
+		</dependency>
 		<!-- Optional: the endpoints of the console also accept a Bearer token. -->
 		<dependency>
 			<groupId>org.springframework.security</groupId>

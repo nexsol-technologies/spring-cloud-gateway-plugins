@@ -689,6 +689,58 @@ What that gives you:
   provider, and the local user stays as the way in when the provider is unreachable. With a
   provider alone and no local user, the credentials form is left out rather than shown
   unable to succeed.
+
+  On a gateway, though, `spring.security.oauth2.client` rarely holds the console alone. It
+  is where the technical clients live &mdash; the ones the routes relay tokens with, one per
+  downstream realm &mdash; and a button per one of those is a list of internal plumbing
+  shown to whoever opens the console. Three things narrow it, from the one that always
+  applies to the one that takes over:
+
+  * A registration that is **not an authorization code client** is never offered. A button
+    starting a `client_credentials` grant is one no browser could complete, so it is dropped
+    whatever the configuration says.
+  * `use` names the registration ids the console keeps, out of the ones the application
+    declared:
+
+    ```yaml
+    spring.cloud.gateway.server.webflux.ui.security.spring.security.oauth2.client:
+      use: [console]
+    ```
+
+  * `registration` and `provider` declare the clients of the console itself, read exactly as
+    the Spring Security keys they spell out, and replace those of the application
+    altogether:
+
+    ```yaml
+    spring.cloud.gateway.server.webflux.ui.security.spring.security.oauth2.client:
+      registration.console:
+        client-id: gateway-console
+        client-secret: ${OIDC_CLIENT_SECRET}
+        client-name: Operators
+        scope: openid,profile,email
+      provider.console:
+        issuer-uri: https://your-idp.example.com/realms/operators
+    ```
+
+    The prefix spells out the Spring keys on purpose: whatever
+    `spring.security.oauth2.client` accepts, this accepts, so a registration is moved from
+    one to the other by moving the lines. Unlike the resource server issuer below, an
+    `issuer-uri` here is resolved at start-up &mdash; as Spring Boot resolves its own &mdash;
+    so the provider has to be answering for the gateway to come up.
+
+  Left out of the console's chain does not mean left out of the application: the
+  registrations of the gateway keep working for the routes that relay them. Only the login
+  page, and the logout that ends the provider session behind it, are narrowed. Narrowed to
+  nothing, the console offers no provider at all rather than falling back on the list it was
+  told to leave out &mdash; and a warning at start-up names how many registrations were
+  found and why none of them made it, since a login page silently short of its button is
+  otherwise hard to account for.
+
+  All three read the configuration through `spring-boot-security-oauth2-client`, the module
+  that maps `spring.security.oauth2.client` for the application in the first place. Any
+  gateway registering a client from properties already has it; one declaring a
+  `ReactiveClientRegistrationRepository` bean by hand, against Spring Security alone, gets
+  the previous behaviour &mdash; every registration of the repository offered.
 * **A Bearer token** &mdash; name an issuer and the endpoints of the console answer a token
   as well as a session, for a script or an external dashboard reading `/ui/metrics/data` and
   the like:
@@ -758,6 +810,8 @@ What that gives you:
 | `...ui.security.user.roles` | `[ADMIN]` | Roles the local user holds |
 | `...ui.security.roles-claim` | &mdash; | Dotted path the roles of a token are read from |
 | `...ui.security.required-roles` | `[]` | Roles a principal must hold; empty lets any authenticated principal through |
+| `...ui.security.spring.security.oauth2.client.use` | `[]` | Registration ids the login page offers, out of the ones the application declared; empty offers all of them |
+| `...ui.security.spring.security.oauth2.client.registration` / `.provider` | &mdash; | Client registrations of the console's own, read as the Spring Security keys they spell out; declared, they replace those of the application |
 
 Signing in resumes the navigation it interrupted: the page the visitor was heading for is
 saved and served once the session opens, falling back on `/ui`. The side menu then shows who
