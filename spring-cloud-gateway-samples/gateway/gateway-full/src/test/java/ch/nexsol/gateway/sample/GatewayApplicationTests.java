@@ -72,7 +72,13 @@ class GatewayApplicationTests {
 
 	@Test
 	void shouldKeepTheConsoleBehindItsLoginPage() {
-		this.webTestClient.get().uri("/ui").exchange().expectStatus().isFound().expectHeader().location("/ui/login");
+		this.webTestClient.get()
+			.uri("/ui")
+			.exchange()
+			.expectStatus()
+			.isFound()
+			.expectHeader()
+			.location("/ui/login?unauthorized");
 		/*
 		 * The database routes page belongs to another plugin, which declares it as an
 		 * endpoint that changes the gateway. The chain of the console asks for a
@@ -84,7 +90,7 @@ class GatewayApplicationTests {
 			.expectStatus()
 			.isFound()
 			.expectHeader()
-			.location("/ui/login");
+			.location("/ui/login?unauthorized");
 	}
 
 	@Test
@@ -100,7 +106,7 @@ class GatewayApplicationTests {
 			.expectStatus()
 			.isFound()
 			.expectHeader()
-			.location("/ui/login");
+			.location("/ui/login?unauthorized");
 		this.webTestClient.get()
 			.uri("/api/gateway/routes")
 			.cookie("SESSION", signIn())
