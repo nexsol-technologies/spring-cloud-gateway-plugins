@@ -47,7 +47,13 @@ class SecuredUiGatewayApplicationTests {
 
 	@Test
 	void shouldSendAnAnonymousVisitorToTheLoginPage() {
-		this.webTestClient.get().uri("/ui").exchange().expectStatus().isFound().expectHeader().location("/ui/login");
+		this.webTestClient.get()
+			.uri("/ui")
+			.exchange()
+			.expectStatus()
+			.isFound()
+			.expectHeader()
+			.location("/ui/login?unauthorized");
 	}
 
 	@Test
