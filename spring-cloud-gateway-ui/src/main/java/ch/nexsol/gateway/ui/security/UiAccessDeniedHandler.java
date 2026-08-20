@@ -23,7 +23,6 @@ import reactor.core.publisher.Mono;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.server.DefaultServerRedirectStrategy;
 import org.springframework.security.web.server.authorization.ServerAccessDeniedHandler;
@@ -80,7 +79,7 @@ public class UiAccessDeniedHandler implements ServerAccessDeniedHandler {
 	private static boolean navigation(ServerWebExchange exchange) {
 		HttpHeaders headers = exchange.getRequest().getHeaders();
 		return HttpMethod.GET.equals(exchange.getRequest().getMethod())
-				&& !headers.getAccept().contains(MediaType.TEXT_EVENT_STREAM)
+				&& AcceptedMediaTypes.acceptsHtml(exchange.getRequest())
 				&& headers.getFirst(HttpHeaders.AUTHORIZATION) == null;
 	}
 

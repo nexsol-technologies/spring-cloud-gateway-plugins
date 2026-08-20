@@ -145,10 +145,20 @@
             <artifactId>spring-cloud-gateway-service-graph-tempo</artifactId>
             <version>${revision}</version>
         </dependency>
-        <!-- Publishes /actuator/prometheus, which the prometheus source reads back. -->
+        <!-- Publishes /actuator/prometheus, which the prometheus source reads
+        back. -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-session-data-redis</artifactId>
         </dependency>
     </dependencies>
 
