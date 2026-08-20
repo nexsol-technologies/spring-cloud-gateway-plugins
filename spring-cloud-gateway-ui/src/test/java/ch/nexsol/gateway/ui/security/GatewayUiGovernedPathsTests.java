@@ -57,7 +57,7 @@ class GatewayUiGovernedPathsTests {
 			.expectStatus()
 			.isFound()
 			.expectHeader()
-			.location("/ui/login");
+			.location("/ui/login?unauthorized");
 	}
 
 	@Test
@@ -75,7 +75,7 @@ class GatewayUiGovernedPathsTests {
 			.expectStatus()
 			.isFound()
 			.expectHeader()
-			.location("/ui/login");
+			.location("/ui/login?unauthorized");
 	}
 
 	@Test

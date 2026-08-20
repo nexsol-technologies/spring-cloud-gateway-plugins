@@ -38,8 +38,19 @@ import org.springframework.web.server.ServerWebExchange;
  * &mdash; served the login page instead, it would keep reconnecting to it. So does a
  * request that carried an {@code Authorization} header: a client presenting a token asked
  * an API a question, and an HTML login page is not an answer to it.
+ * <p>
+ * Both ways to the page carry {@code ?unauthorized}, so it can say why it is being shown.
+ * A visitor who asked for a view of the console and was handed a login form instead is
+ * owed that much: without it the page reads as the one they asked for, and an operator
+ * whose session ended mid-navigation has nothing telling them so.
  */
 public class UiAuthenticationEntryPoint implements ServerAuthenticationEntryPoint {
+
+	/**
+	 * Marker the login page reads to say that it is standing in for a page the visitor
+	 * asked for.
+	 */
+	public static final String UNAUTHORIZED_PARAMETER = "unauthorized";
 
 	private static final String HTMX_REQUEST_HEADER = "HX-Request";
 
@@ -54,8 +65,8 @@ public class UiAuthenticationEntryPoint implements ServerAuthenticationEntryPoin
 	 * @param loginPage the path of the login page
 	 */
 	public UiAuthenticationEntryPoint(String loginPage) {
-		this.loginPage = loginPage;
-		this.redirect = new RedirectServerAuthenticationEntryPoint(loginPage);
+		this.loginPage = loginPage + "?" + UNAUTHORIZED_PARAMETER;
+		this.redirect = new RedirectServerAuthenticationEntryPoint(this.loginPage);
 	}
 
 	@Override

@@ -650,6 +650,26 @@ spring.cloud.gateway.server.webflux:
 Every path the active views serve is then behind an authenticated principal; the login page
 and the static assets it paints with are the only ones left open.
 
+A visitor with no session who asked for a view is sent to the login page, which says why
+rather than standing there as if it were the page they wanted. It reads four markers:
+
+| Marker | Set by | What the page says |
+| --- | --- | --- |
+| `?unauthorized` | a **401**: no session, on a path that needs one | You need to be signed in to reach that page |
+| `?error` | the credentials form was rejected | Wrong user name or password |
+| `?error_oauth2` | the provider refused the exchange | The sign-in was refused, the logs say why |
+| `?logout` | the session was just ended | You are signed out |
+
+A **403** is deliberately not one of them: a visitor holding none of the `required-roles`
+is already signed in, so a login page would hand them back the same roles. They are sent to
+`/ui/forbidden`, which explains the refusal and carries the button that ends the session
+&mdash; see `required-roles` below.
+
+Only page navigations are redirected. An HTMX fragment answers its status with an
+`HX-Redirect` header the browser turns into a full page load; a subscription to an event
+stream and a request carrying an `Authorization` header keep their bare `401`/`403`, since
+an HTML page is no answer to either.
+
 ![The login page of the console](doc/login-light.png)
 
 > The two screenshots of this section come from the
