@@ -20,10 +20,14 @@ import ch.nexsol.gateway.audit.AuditEventPublisher;
 import ch.nexsol.gateway.ui.security.LoginController;
 import ch.nexsol.gateway.ui.security.UiSecurityModelAttributes;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import reactor.core.publisher.Mono;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -33,6 +37,10 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.web.server.WebSession;
+import org.springframework.web.server.session.DefaultWebSessionManager;
+import org.springframework.web.server.session.WebSessionManager;
+import org.springframework.web.server.session.WebSessionStore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Auto-configuration tests for {@link GatewayUiSecurityAutoConfiguration}, checking that
  * the contributed chain matches the paths the shell serves and nothing else.
  */
+@ExtendWith(OutputCaptureExtension.class)
 class GatewayUiSecurityAutoConfigurationTests {
 
 	private final ReactiveWebApplicationContextRunner runner = new ReactiveWebApplicationContextRunner()
@@ -128,6 +137,34 @@ class GatewayUiSecurityAutoConfigurationTests {
 	}
 
 	@Test
+	void warnsThatTheSessionsOfAnAuthenticatedConsoleLiveInThisInstanceAlone(CapturedOutput output) {
+		this.runner.withPropertyValues("spring.cloud.gateway.server.webflux.ui.security.mode=authenticated")
+			.withUserConfiguration(InMemorySessionConfiguration.class)
+			.run((context) -> {
+				assertThat(context).hasNotFailed();
+				// The starter, and not the Spring Session artifact on its own: that one
+				// carries no auto-configuration, so it leaves the sessions in memory.
+				assertThat(output).contains("keeps the sessions it opens in its own memory")
+					.contains("spring-boot-starter-session-data-redis");
+			});
+	}
+
+	@Test
+	void saysNothingOfTheSessionsWhenTheyAreHeldOutsideThisInstance(CapturedOutput output) {
+		this.runner.withPropertyValues("spring.cloud.gateway.server.webflux.ui.security.mode=authenticated")
+			.withUserConfiguration(SharedSessionConfiguration.class)
+			.run((context) -> assertThat(output).doesNotContain("keeps the sessions it opens in its own memory"));
+	}
+
+	@Test
+	void saysNothingOfTheSessionsWhileTheConsoleIsOpen(CapturedOutput output) {
+		// An open console opens no session of its own, so where they live is not its
+		// business and the warning would be noise.
+		this.runner.withUserConfiguration(InMemorySessionConfiguration.class)
+			.run((context) -> assertThat(output).doesNotContain("keeps the sessions it opens in its own memory"));
+	}
+
+	@Test
 	void chainCanBeDisabled() {
 		this.runner.withPropertyValues("spring.cloud.gateway.server.webflux.ui.security-chain-enabled=false")
 			.run((context) -> assertThat(context).doesNotHaveBean("gatewayUiSecurityWebFilterChain"));
@@ -158,6 +195,65 @@ class GatewayUiSecurityAutoConfigurationTests {
 		MapReactiveUserDetailsService userDetailsService() {
 			return new MapReactiveUserDetailsService(
 					User.withUsername("user").password("{noop}password").roles("USER").build());
+		}
+
+	}
+
+	/**
+	 * What WebFlux configures on its own: a session manager holding the sessions in the
+	 * memory of this instance.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	static class InMemorySessionConfiguration {
+
+		@Bean
+		WebSessionManager webSessionManager() {
+			return new DefaultWebSessionManager();
+		}
+
+	}
+
+	/**
+	 * What a shared store looks like from here: a session manager whose store is not the
+	 * in-memory one, as Spring Session substitutes.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	static class SharedSessionConfiguration {
+
+		@Bean
+		WebSessionManager webSessionManager() {
+			DefaultWebSessionManager manager = new DefaultWebSessionManager();
+			manager.setSessionStore(new SharedWebSessionStore());
+			return manager;
+		}
+
+	}
+
+	/**
+	 * Stands in for the store Spring Session contributes, which the console never talks
+	 * to directly: only its type is read, to tell a session that outlives this instance
+	 * from one that does not.
+	 */
+	static class SharedWebSessionStore implements WebSessionStore {
+
+		@Override
+		public Mono<WebSession> createWebSession() {
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<WebSession> retrieveSession(String sessionId) {
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<Void> removeSession(String sessionId) {
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<WebSession> updateLastAccessTime(WebSession webSession) {
+			return Mono.empty();
 		}
 
 	}
