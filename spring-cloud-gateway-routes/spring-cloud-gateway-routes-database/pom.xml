@@ -13,8 +13,6 @@
     <name>spring-cloud-gateway-routes-database</name>
     <description>Plugin to expose Spring Cloud Gateway's routes in database</description>
     <dependencies>
-        <!-- The contract this module declares the paths it serves through, so a console
-             can govern them. Carries no transitive dependency of its own. -->
         <dependency>
             <groupId>ch.nexsol-tech.gateway</groupId>
             <artifactId>spring-cloud-gateway-commons</artifactId>
@@ -28,9 +26,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
-        <!-- Optional: the plugin contributes its own security filter chain, closing the
-             endpoints that change the routing table, when the application secures the
-             gateway with Spring Security. -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-config</artifactId>

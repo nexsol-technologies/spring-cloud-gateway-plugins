@@ -19,20 +19,14 @@
 			<artifactId>spring-cloud-gateway-ui</artifactId>
 			<version>${revision}</version>
 		</dependency>
-		<!--
-			The console builds its chain from a ServerHttpSecurity, which only exists once
-			this starter enables WebFlux security.
-		-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
-		<!-- Signing in through the identity provider. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-oauth2-client</artifactId>
 		</dependency>
-		<!-- Calling the endpoints of the console with a Bearer token rather than a session. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>

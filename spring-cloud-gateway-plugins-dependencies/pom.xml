@@ -150,7 +150,6 @@
                 <inherited>false</inherited>
                 <executions>
                     <execution>
-                        <!-- Flatten and simplify our own POM for install/deploy -->
                         <id>flatten</id>
                         <phase>process-resources</phase>
                         <goals>
@@ -172,6 +171,5 @@
             </plugin>
         </plugins>
     </build>
-
 
 </project>

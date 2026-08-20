@@ -46,7 +46,6 @@
 		
 		<checkstyle.version>12.3.1</checkstyle.version>
 
-		<!-- plugin versions -->
 		<build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
 		<maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
 		<versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
@@ -130,11 +129,6 @@
 					<parameters>true</parameters>
 					<source>${maven.compiler.source}</source>
 					<target>${maven.compiler.target}</target>
-					<!--
-						Declared explicitly rather than discovered from the classpath: since JDK 23
-						javac no longer runs processors it merely finds there, so without this the
-						configuration metadata the IDEs read is silently never generated.
-					-->
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.springframework.boot</groupId>
@@ -242,8 +236,6 @@
 					<configuration>
 						<archive>
 							<manifest>
-								<!-- Adds Implementation-Version, read back at runtime: the UI shows the
-									version of the plugins at the bottom of its side menu. -->
 								<addDefaultImplementationEntries>true</addDefaultImplementationEntries>
 							</manifest>
 						</archive>
@@ -383,18 +375,12 @@
 						<groupId>org.jacoco</groupId>
 						<artifactId>jacoco-maven-plugin</artifactId>
 						<executions>
-							<!-- Prepares the property pointing to the JaCoCo
-							runtime agent which is passed as
-                                 VM argument when Maven the Surefire plugin is executed. -->
 							<execution>
 								<id>pre-unit-test</id>
 								<goals>
 									<goal>prepare-agent</goal>
 								</goals>
 							</execution>
-							<!-- Ensures that the code coverage report for unit
-							tests is created after unit tests have
-                                 been run. -->
 							<execution>
 								<id>post-unit-test</id>
 								<goals>
@@ -422,9 +408,6 @@
 									<goal>sign</goal>
 								</goals>
 								<configuration>
-									<!-- This is necessary for gpg to not try to
-									use
-								the pinentry programs -->
 									<gpgArguments>
 										<arg>--pinentry-mode</arg>
 										<arg>loopback</arg>

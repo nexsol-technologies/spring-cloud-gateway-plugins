@@ -13,8 +13,6 @@
 	<name>spring-cloud-gateway-ui</name>
 	<description>Plugin exposing a Spring Boot Admin-like web UI shell for Spring Cloud Gateway</description>
 	<dependencies>
-		<!-- The contract the other plugins declare the paths they serve through, so the
-		     console can govern them without either side depending on the other. -->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-commons</artifactId>
@@ -28,36 +26,27 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-thymeleaf</artifactId>
 		</dependency>
-		<!-- Optional: the traffic view reads gateway request metrics from the
-		     MeterRegistry when Micrometer is on the classpath. -->
 		<dependency>
 			<groupId>io.micrometer</groupId>
 			<artifactId>micrometer-core</artifactId>
 			<optional>true</optional>
 		</dependency>
-		<!-- Optional: the routes and route tester views read the gateway route
-		     definitions and route table. Always present in a gateway application. -->
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-gateway-server-webflux</artifactId>
 			<optional>true</optional>
 		</dependency>
-		<!-- Optional: the instances view names the routes a connection pool serves, which
-		     for a load-balanced route is only known to the service registry. -->
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-commons</artifactId>
 			<optional>true</optional>
 		</dependency>
-		<!-- Optional: the audit view tails the events produced by the audit plugin. -->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-audit-core</artifactId>
 			<version>${revision}</version>
 			<optional>true</optional>
 		</dependency>
-		<!-- Optional: the database routes view reads the services of the routes-database
-		     plugin, as the traffic view reads the source of the metrics plugin. -->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-routes-database</artifactId>
@@ -70,15 +59,11 @@
 			<version>${revision}</version>
 			<optional>true</optional>
 		</dependency>
-		<!-- The traffic view reads whichever RouteMetricsSource is active: the local meter
-		     registry by default, a consolidating one when a provider module is added. -->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-metrics-core</artifactId>
 			<version>${revision}</version>
 		</dependency>
-		<!-- Optional: the shell contributes its own security filter chain when the
-		     application secures the gateway with Spring Security. -->
 		<dependency>
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-config</artifactId>
@@ -89,8 +74,6 @@
 			<artifactId>spring-security-web</artifactId>
 			<optional>true</optional>
 		</dependency>
-		<!-- Optional: the login page offers a button per identity provider, and the console
-		     accepts the session an OpenID Connect provider issued. -->
 		<dependency>
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-oauth2-client</artifactId>
@@ -101,7 +84,6 @@
 			<artifactId>spring-boot-security-oauth2-client</artifactId>
 			<optional>true</optional>
 		</dependency>
-		<!-- Optional: the endpoints of the console also accept a Bearer token. -->
 		<dependency>
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-oauth2-resource-server</artifactId>
@@ -118,33 +100,17 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<!--
-			The module depends on Spring Security itself, not on the starter that
-			auto-configures it. The tests need that auto-configuration: without it there is no
-			ServerHttpSecurity to build the chain of the console from, and the chain the tests
-			exercise would never be contributed.
-		-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<!--
-			The OpenAPI view activates on a class name of the hub plugin. Depending on it in
-			test scope keeps that condition honest: a renamed class breaks the test, not the
-			application.
-		-->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-hub-openapi</artifactId>
 			<version>${revision}</version>
 			<scope>test</scope>
 		</dependency>
-		<!--
-			The gateway brings spring-boot-micrometer-observation, which switches on the WebFlux
-			observation auto-configuration; introspecting it needs the metrics module. A real
-			gateway application gets it through its own actuator or metrics starter.
-		-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-micrometer-metrics</artifactId>
@@ -160,8 +126,6 @@
 			<artifactId>reactor-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<!-- The database routes view reads real routes from the plugin holding them, over
-		     the in-memory database its schema is written for. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-r2dbc</artifactId>

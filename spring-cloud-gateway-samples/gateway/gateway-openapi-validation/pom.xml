@@ -19,7 +19,6 @@
 			<artifactId>spring-cloud-gateway-openapi-validation</artifactId>
 			<version>${revision}</version>
 		</dependency>
-		<!-- Exposes the validation counters, and shows them landing in the audit trail. -->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-audit-core</artifactId>

@@ -19,7 +19,6 @@
 			<artifactId>spring-cloud-gateway-routes-files</artifactId>
 			<version>${revision}</version>
 		</dependency>
-		<!-- The routes view attributes each route to the source it was read from. -->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-ui</artifactId>

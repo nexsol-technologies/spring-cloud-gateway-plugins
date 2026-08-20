@@ -15,7 +15,6 @@
 	<packaging>pom</packaging>
 
 	<modules>
-		<!-- One plugin each -->
 		<module>gateway-filters</module>
 		<module>gateway-openapi-validation</module>
 		<module>gateway-oauth2</module>
@@ -25,18 +24,11 @@
 		<module>gateway-audit</module>
 		<module>gateway-metrics</module>
 		<module>gateway-routes-files</module>
-		<!-- Combinations -->
 		<module>gateway-routes-all</module>
 		<module>gateway-secured</module>
 		<module>gateway-full</module>
 	</modules>
 
-	<!--
-		What every gateway sample needs: the gateway itself, and the actuator the plugins
-		read the meter registry and the refresh endpoint through. Anything beyond that is
-		declared by the sample that exercises it, so each pom reads as the list of plugins
-		its scenario is about.
-	-->
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>

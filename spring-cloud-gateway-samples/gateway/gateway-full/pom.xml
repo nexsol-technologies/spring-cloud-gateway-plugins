@@ -145,8 +145,6 @@
             <artifactId>spring-cloud-gateway-service-graph-tempo</artifactId>
             <version>${revision}</version>
         </dependency>
-        <!-- Publishes /actuator/prometheus, which the prometheus source reads
-        back. -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>

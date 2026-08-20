@@ -18,7 +18,6 @@
 			<artifactId>spring-cloud-gateway-routes-core</artifactId>
 			<version>${revision}</version>
 		</dependency>
-		<!-- Reuses the JSON/YAML RouteDefinition parser shared with the file-based locator. -->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-routes-files</artifactId>

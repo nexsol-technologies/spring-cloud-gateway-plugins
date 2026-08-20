@@ -26,12 +26,6 @@
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
 		</dependency>
-		<!--
-			swagger-parser-v3 transitively pulls the non-jakarta swagger-core/models/annotations,
-			which clash on the classpath with the jakarta variants used by Spring Boot 4 / springdoc
-			(same io.swagger.v3.oas.models.* package in two artifacts). Exclude the plain flavour and
-			bring the jakarta one; the parser is compiled against the same API and works with either.
-		-->
 		<dependency>
 			<groupId>io.swagger.parser.v3</groupId>
 			<artifactId>swagger-parser-v3</artifactId>
@@ -56,7 +50,6 @@
 			<artifactId>swagger-core-jakarta</artifactId>
 			<version>${swagger-core.version}</version>
 		</dependency>
-		<!-- Reads the documents the 'sources-locations' point at. -->
 		<dependency>
 			<groupId>tools.jackson.dataformat</groupId>
 			<artifactId>jackson-dataformat-yaml</artifactId>

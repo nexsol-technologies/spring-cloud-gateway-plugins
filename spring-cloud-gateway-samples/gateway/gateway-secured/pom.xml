@@ -29,7 +29,6 @@
 			<artifactId>spring-cloud-gateway-routes-security</artifactId>
 			<version>${revision}</version>
 		</dependency>
-		<!-- The public flag has to come from somewhere: here, a route file. -->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-routes-files</artifactId>

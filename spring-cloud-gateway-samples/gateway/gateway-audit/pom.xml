@@ -19,11 +19,6 @@
 			<artifactId>spring-cloud-gateway-audit-core</artifactId>
 			<version>${revision}</version>
 		</dependency>
-		<!--
-			The three providers, so a single sample can switch between them with a
-			profile. Each activates on audit.provider, so only the selected one publishes;
-			with none selected the core default publisher does.
-		-->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-audit-redis</artifactId>
@@ -39,21 +34,15 @@
 			<artifactId>spring-cloud-gateway-audit-r2dbc</artifactId>
 			<version>${revision}</version>
 		</dependency>
-		<!-- The audit view of the shell, a live tail of the events. -->
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-ui</artifactId>
 			<version>${revision}</version>
 		</dependency>
-		<!-- The trace group audits the traceId and the spanId of the exchange. -->
 		<dependency>
 			<groupId>io.micrometer</groupId>
 			<artifactId>micrometer-tracing-bridge-brave</artifactId>
 		</dependency>
-		<!--
-			audit-r2dbc brings the R2DBC starter but no driver: H2 backs the default
-			profile, PostgreSQL the 'r2dbc' one.
-		-->
 		<dependency>
 			<groupId>io.r2dbc</groupId>
 			<artifactId>r2dbc-h2</artifactId>

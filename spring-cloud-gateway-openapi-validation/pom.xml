@@ -22,13 +22,6 @@
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
 		</dependency>
-		<!--
-			Same exclusion as spring-cloud-gateway-routes-openapi: swagger-parser-v3 transitively
-			pulls the non-jakarta swagger-core/models/annotations, which clash on the classpath with
-			the jakarta variants used by Spring Boot 4 / springdoc (same io.swagger.v3.oas.models.*
-			package in two artifacts). Exclude the plain flavour and bring the jakarta one; the parser
-			is compiled against the same API and works with either.
-		-->
 		<dependency>
 			<groupId>io.swagger.parser.v3</groupId>
 			<artifactId>swagger-parser-v3</artifactId>
@@ -53,20 +46,11 @@
 			<artifactId>swagger-core-jakarta</artifactId>
 			<version>${swagger-core.version}</version>
 		</dependency>
-		<!--
-			Validates the request and response bodies against the JSON Schema of the contract.
-			Covers draft-04 through 2020-12, so both OpenAPI 3.0 and 3.1 documents are honoured.
-		-->
 		<dependency>
 			<groupId>com.networknt</groupId>
 			<artifactId>json-schema-validator</artifactId>
 			<version>${json-schema-validator.version}</version>
 		</dependency>
-		<!--
-			Counters for the validation outcomes. Emitting plain Micrometer meters is what lets
-			the host application export them to Prometheus, OpenTelemetry or anything else it
-			already configures a registry for, without this module knowing about any of them.
-		-->
 		<dependency>
 			<groupId>io.micrometer</groupId>
 			<artifactId>micrometer-core</artifactId>

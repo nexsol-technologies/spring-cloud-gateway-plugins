@@ -17,11 +17,6 @@
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
 		</dependency>
-		<!--
-			Optional: brings RefreshScopeRefreshedEvent so refreshable locators can re-load on
-			/actuator/refresh and /actuator/busrefresh. Present whenever the application uses the
-			Spring Cloud Config client; the refresh support degrades gracefully otherwise.
-		-->
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-context</artifactId>
