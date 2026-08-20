@@ -1,11 +1,11 @@
 # gateway-ui-secured
 
-The console of [spring-cloud-gateway-ui](../../../spring-cloud-gateway-ui/README.md) behind
-its own login page, on port `8213`: a local user out of the box, and single sign-on through
-a Keycloak the sample brings with it.
+The console of [spring-cloud-gateway-ui](../../../spring-cloud-gateway-ui/README.md) behind its
+own login page — port `8213`: a local user out of the box, and single sign-on through a
+Keycloak the sample brings with it.
 
-The sample declares **no security bean and no filter chain**. The plugin contributes the
-chain; the whole configuration is:
+The sample declares **no security bean and no filter chain**. The plugin contributes the chain;
+the whole configuration is:
 
 ```yaml
 spring.cloud.gateway.server.webflux.ui.security:
@@ -15,23 +15,23 @@ spring.cloud.gateway.server.webflux.ui.security:
     password: ${ADMIN_PASSWORD:superadmin}
 ```
 
-The rest is the three starters in the `pom.xml` &mdash; `security`, `oauth2-client` and
-`oauth2-resource-server` &mdash; and a profile naming the realm.
+The rest is the three starters in the `pom.xml` — `security`, `oauth2-client` and
+`oauth2-resource-server` — and a profile naming the realm.
 
-## The local user alone
+## Run it — the local user alone
 
 ```console
 mvn spring-boot:run
 ```
 
 Open http://localhost:8213/ui: it redirects to `/ui/login`. Sign in with
-`superadmin` / `superadmin` (set `ADMIN_PASSWORD` to change it) and the shell opens on the
-page you were heading for. The side menu then shows who is signed in, with the button that
-ends the session next to the theme switch.
+`superadmin` / `superadmin` (set `ADMIN_PASSWORD` to change it) and the shell opens on the page
+you were heading for. The side menu then shows who is signed in, with the button that ends the
+session next to the theme switch.
 
 Nothing else is running under this profile: no Keycloak, no Docker.
 
-## With Keycloak
+## Run it — with Keycloak
 
 ```console
 docker compose up -d
@@ -49,12 +49,12 @@ What the realm holds:
 | Realm | `gateway` |
 | Client | `gateway-console`, confidential, secret `gateway-console-secret` |
 | Redirect URI | `http://localhost:8213/login/oauth2/code/keycloak` |
-| `operator` / `operator` | holds `ADMIN` &mdash; reaches the console |
-| `visitor` / `visitor` | holds `READER` &mdash; signs in, then gets a `403` |
+| `operator` / `operator` | holds `ADMIN` — reaches the console |
+| `visitor` / `visitor` | holds `READER` — signs in, then gets a `403` |
 | Keycloak admin | `admin` / `admin` on http://localhost:8380 |
 
 Signing out goes through Keycloak's end-session endpoint, so the realm session ends with the
-console one and the next sign-in asks for credentials again &mdash; which is what lets you
+console one and the next sign-in asks for credentials again — which is what lets you
 try `operator` and `visitor` one after the other. The realm registers
 `http://localhost:8213/ui/login*` as a valid post-logout destination for that to be
 accepted.
@@ -65,7 +65,7 @@ the local user stays as the way in when the provider is unreachable.
 
 Signing in as `visitor` is worth doing once: the exchange with Keycloak succeeds and the
 console still turns them away, because the profile narrows it to the principals holding
-`ADMIN`. They land on a page saying so, with the button that ends the session &mdash; not on
+`ADMIN`. They land on a page saying so, with the button that ends the session — not on
 a bare `403`, which would leave them signed in with no way out and no way in:
 
 ```yaml
@@ -97,7 +97,7 @@ HTML login page.
 ## Why the provider sits in a profile
 
 `issuer-uri` makes the gateway fetch the OpenID configuration of the realm at start-up. In
-`application.yml` that would make the sample &mdash; and its tests &mdash; refuse to start
+`application.yml` that would make the sample — and its tests — refuse to start
 unless Keycloak is up. In a profile, the default sample stays runnable on its own.
 
 ## What it does not show
@@ -105,5 +105,5 @@ unless Keycloak is up. In a profile, the default sample stays runnable on its ow
 This sample runs only the UI plugin, so the menu has no **Database routes** and no **Audit**
 entry. The [gateway-full](../gateway-full/README.md) sample is the same shell with every
 plugin present; [gateway-secured](../gateway-secured/README.md) is the other half of the
-picture &mdash; securing the *traffic* the gateway routes rather than the console that
+picture — securing the *traffic* the gateway routes rather than the console that
 watches it.

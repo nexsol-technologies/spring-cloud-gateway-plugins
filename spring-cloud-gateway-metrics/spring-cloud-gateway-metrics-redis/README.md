@@ -1,106 +1,86 @@
 # spring-cloud-gateway-metrics-redis
 
-Each instance publishes what it counted into Redis; the traffic view sums whatever is
-there. No instance ever calls another.
+Each instance publishes what it counted into Redis; the views read whatever is there. No
+instance ever calls another.
 
-## Dependency
+## Install
 
 ```xml
-    <dependency>
-       <groupId>ch.nexsol-tech.gateway</groupId>
-       <artifactId>spring-cloud-gateway-metrics-redis</artifactId>
-       <version>${spring-cloud-gateway-plugins.version}</version>
-    </dependency>
+<dependency>
+    <groupId>ch.nexsol-tech.gateway</groupId>
+    <artifactId>spring-cloud-gateway-metrics-redis</artifactId>
+    <version>${spring-cloud-gateway-plugins.version}</version>
+</dependency>
 ```
+
+It brings `spring-boot-starter-data-redis-reactive`, so Spring Boot auto-configures a
+`ReactiveStringRedisTemplate` from the `spring.data.redis.*` properties and this provider
+reuses it. The plugin declares no connection property of its own — `database` included, which
+would give the same setting two places to disagree.
+
+```yaml
+spring.data.redis:
+  host: localhost
+  port: 6379
+  database: 0                    # the logical database the keys land in
+  # username: default            # Redis ACL user
+  # password: ${REDIS_PASSWORD}
+  # ssl.enabled: true
+```
+
+Two consequences: the database index is **shared** with everything else reusing that
+connection (the keys never collide, but metrics cannot live in a database of their own), and
+Redis Cluster only has database 0, where the setting is ignored.
 
 ## Configuration
 
-```yaml
-spring:
-  cloud:
-    gateway:
-      server:
-        webflux:
-          metrics:
-            provider: redis
-            redis:
-              key-prefix: "gateway:metrics:"
-              instance-key-prefix: "gateway:instances:"
-              publish-interval: 10s
-              time-to-live: 45s
-```
-
-| Property | Default | Description |
-|----------|---------|-------------|
-| `key-prefix` | `gateway:metrics:` | Prefix of the route figures key each instance writes under |
-| `instance-key-prefix` | `gateway:instances:` | Prefix of the technical figures key each instance writes under |
-| `publish-interval` | `10s` | How often an instance publishes its figures |
-| `time-to-live` | `45s` | How long a published key survives |
-
-**The two prefixes must not nest.** The route source scans `key-prefix` with a wildcard, so
-an instance prefix placed under it — `gateway:metrics:instance:` — would come back in that
-scan and be discarded as unreadable, one warning per entry, on every single refresh. Hence
-a namespace of its own rather than the more obvious suffix.
-
-## The connection
-
-It brings `spring-boot-starter-data-redis-reactive`, so Spring Boot auto-configures a
-`ReactiveStringRedisTemplate` from your `spring.data.redis.*` properties and this provider
-reuses it:
+All properties are under `spring.cloud.gateway.server.webflux.metrics`.
 
 ```yaml
-spring:
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      database: 0                    # the logical database the keys land in
-      # username: default            # Redis ACL user (optional)
-      # password: ${REDIS_PASSWORD}
-      # ssl:
-      #   enabled: true
+spring.cloud.gateway.server.webflux.metrics:
+  provider: redis
+  redis:
+    key-prefix: "gateway:metrics:"
+    instance-key-prefix: "gateway:instances:"
+    publish-interval: 10s
+    time-to-live: 45s
 ```
 
-The plugin declares no connection property of its own, `database` included: it would
-duplicate `spring.data.redis.database` and give the same setting two places to disagree.
+| Property | Default | What it does |
+| --- | --- | --- |
+| `...redis.key-prefix` | `gateway:metrics:` | Prefix of the route figures key each instance writes under |
+| `...redis.instance-key-prefix` | `gateway:instances:` | Prefix of the instance figures key each instance writes under |
+| `...redis.publish-interval` | `10s` | How often an instance publishes its figures |
+| `...redis.time-to-live` | `45s` | How long a published key survives |
 
-Two consequences:
+> **The two prefixes must not nest.** The route source scans `key-prefix` with a wildcard, so
+> an instance prefix placed under it — `gateway:metrics:instance:` — comes back in that scan
+> and is discarded as unreadable, one warning per entry, on every refresh.
 
-- **The database index is shared.** Everything reusing that connection — the audit plugin,
-  your cache, your sessions — lives in the same logical database. The keys still do not
-  collide, since this provider only ever reads and writes its own `key-prefix`, but you
-  cannot put the metrics in one database and the rest elsewhere.
-- **Redis Cluster only has database 0.** Setting `database` there is ignored, so do not
-  count on it to separate anything in a clustered deployment.
+> **`time-to-live` must comfortably outlive `publish-interval`.** Set too close, an instance
+> disappears from the figures between two of its own writes and the totals dip for no reason.
 
 ## How it works
 
-Each instance writes **its own key** (`<prefix><instance-id>`) and never touches the
-others'. That is what lets every instance write concurrently without any locking. Two keys
-per instance, one per family of figures.
+Each instance writes **its own keys** (`<prefix><instance-id>`, one per family) and never
+touches the others'. That is what lets every instance write concurrently without any locking.
 
-The route figures are summed on read; the technical ones are not. One instance is one row,
-so they are concatenated: a gateway with the combined heap of three instances is not a
-thing that exists.
-
-Keys carry a time to live, so an instance that stops publishing fades out of the figures on
-its own — a replaced pod stops being counted without anyone cleaning up after it.
-
-**`time-to-live` must comfortably outlive `publish-interval`.** Set it too close and an
-instance disappears from the figures between two of its own writes, making the totals dip
-for no reason.
-
-Reading uses `SCAN`, not `KEYS`, so a large keyspace is not blocked while the view
-refreshes.
+Route figures are summed on read; instance figures are concatenated — one instance is one
+row. Keys carry a time to live, so an instance that stops publishing fades out on its own and
+a replaced pod stops being counted without anyone cleaning up after it. Reading uses `SCAN`,
+not `KEYS`, so a large keyspace is not blocked while a view refreshes.
 
 ## What it costs
 
-- The figures lag by up to one publish interval. That is the trade for never calling
-  another instance: an instance that is busy, or behind a closed network, still counts
-  through what it last published.
-- Counters live in memory, so an instance that restarts loses what it had counted. Only the
-  Prometheus source keeps history across restarts.
+* The figures lag by up to one publish interval — the trade for never calling another
+  instance: a busy or unreachable instance still counts through what it last published.
+* Counters live in memory, so an instance that restarts loses what it had counted. Only the
+  [Prometheus source](../spring-cloud-gateway-metrics-prometheus/README.md) keeps history.
 
-An entry that cannot be read — written by an older version, or by something else — is
-skipped rather than costing the figures of every other instance. If Redis is unreachable the
-view reports no data and says so.
+An entry that cannot be read is skipped rather than costing the figures of every other
+instance. If Redis is unreachable, the views report no data and say so.
+
+## Sample
+
+[gateway-metrics](../../spring-cloud-gateway-samples/gateway/gateway-metrics/README.md),
+`redis` profile — port `8206`.

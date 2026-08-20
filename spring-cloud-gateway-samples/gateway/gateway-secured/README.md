@@ -1,17 +1,15 @@
 # gateway-secured
 
-**A combination.** The three plugins a secured gateway uses together — `oauth2`, `filters`
-and `routes-security` — on port `8211`.
-
-Each decides at a different moment, which is the whole point:
+**A combination** — port `8211`: the three plugins a secured gateway uses together, `oauth2`,
+`filters` and `routes-security`. Each decides at a different moment, which is the whole point:
 
 | Plugin | Decides | When |
 | --- | --- | --- |
-| `routes-security` | is this route public? | **before** authentication, by replaying the predicates |
-| `oauth2` (resource server) | is this token valid? | at authentication |
-| `oauth2` / `filters` | does this token grant *this* route? | after the route is resolved |
+| `routes-security` | Is this route public? | **Before** authentication, by replaying the predicates |
+| `oauth2` (resource server) | Is this token valid? | At authentication |
+| `oauth2` / `filters` | Does this token grant *this* route? | After the route is resolved |
 
-## Running it
+## Run it
 
 ```console
 # from spring-cloud-gateway-samples/auth-server
@@ -51,8 +49,8 @@ $ TOKEN=$(curl -s -u messaging-client:secret \
 
 | Url | Guarded by | Checks |
 | --- | --- | --- |
-| http://localhost:8211/secured/sample | `AuthorizationToken` (oauth2) | the token's `iss` is the sample authorization server |
-| http://localhost:8211/secured-read/sample | `Authorization` (filters) | the principal carries the `READ` authority |
+| http://localhost:8211/secured/sample | `AuthorizationToken` (oauth2) | The token's `iss` is the sample authorization server |
+| http://localhost:8211/secured-read/sample | `Authorization` (filters) | The principal carries the `READ` authority |
 
 ```console
 $ curl -H "Authorization: Bearer $TOKEN" http://localhost:8211/secured/sample -o /dev/null -w '%{http_code}\n'

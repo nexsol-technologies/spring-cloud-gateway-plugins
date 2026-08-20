@@ -1,9 +1,9 @@
 # gateway-audit
 
-Exercises [spring-cloud-gateway-audit](../../../spring-cloud-gateway-audit/README.md) on port
+Exercises [spring-cloud-gateway-audit](../../../spring-cloud-gateway-audit/README.md) — port
 `8205`, with its three providers behind a profile each.
 
-## Running it
+## Run it
 
 ```console
 mvn spring-boot:run
@@ -29,9 +29,9 @@ INFO  c.n.g.s.audit.AuditEventListener : audit {request.method=GET, request.path
 
 | Url | Audited |
 | --- | --- |
-| http://localhost:8205/audited/sample | yes — the route carries the `Audit` filter (backend: `service-a` on `:8080`, audited even when nothing answers there) |
-| http://localhost:8205/audited-httpbin/get | yes — the route carries the `Audit` filter |
-| http://localhost:8205/not-audited/get | no — same backend, no filter |
+| http://localhost:8205/audited/sample | Yes — the route carries the `Audit` filter (backend: `service-a` on `:8080`, audited even when nothing answers there) |
+| http://localhost:8205/audited-httpbin/get | Yes — the route carries the `Audit` filter |
+| http://localhost:8205/not-audited/get | No — same backend, no filter |
 
 The `global` profile swaps the per-route filter for the web filter and audits **everything**
 the gateway answers, the actuator endpoints included:

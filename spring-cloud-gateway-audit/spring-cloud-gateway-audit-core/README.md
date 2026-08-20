@@ -1,205 +1,141 @@
 # spring-cloud-gateway-audit-core
 
-Core of the auditing plugin: the attribute collector, the per-route and global filters,
-the publishing SPI and a default publisher. Add a
-[provider module](../README.md#modules) to push events to a backend.
+The attribute collector, the per-route and global filters, the publishing SPI and a default
+publisher. Add a [provider module](../README.md#modules) to push events to a backend.
 
-## Dependency
+## Install
 
 ```xml
 <dependency>
     <groupId>ch.nexsol-tech.gateway</groupId>
     <artifactId>spring-cloud-gateway-audit-core</artifactId>
+    <version>${spring-cloud-gateway-plugins.version}</version>
 </dependency>
 ```
 
-## Audited attributes
+## Where auditing runs
 
-Attributes are grouped so each group can be enabled or disabled independently.
-
-| Group      | Attributes |
-|------------|------------|
-| `jwt`      | `jwt.client.id`, `jwt.impersonator.user.id`, `jwt.impersonator.user.name`, `jwt.issuer.id`, `jwt.user.id` |
-| `request`  | `request.header.accept`, `request.header.content-length`, `request.header.content-type`, `request.ip`, `request.method`, `request.parameters`, `request.path` |
-| `response` | `response.header.content-length`, `response.header.content-type`, `response.status` |
-| `trace`    | `trace.id`, `span.id` |
-| `route`    | `route.id`, `route.metadata.<key>` for every metadata declared on that route |
-| `validation` | `openapi.validation.operation`, `openapi.validation.request.valid`, `openapi.validation.request.errors`, `openapi.validation.response.valid`, `openapi.validation.response.errors` |
-
-Absent values are rendered as `_none_`; an expected-but-unresolved content type is
-rendered as `unknown`.
-
-The `validation` group carries the outcome published by
-[spring-cloud-gateway-openapi-validation](../../spring-cloud-gateway-openapi-validation/README.md).
-The two plugins do not depend on each other: the filter stamps its outcome on the exchange
-and this group reads it if it is there, so either plugin can be absent. Nothing is added for
-an exchange no contract was applied to, and an `errors` attribute only appears when there
-were violations &mdash; so an audited exchange never looks validated when it was not.
-
-The `trace` group is read from the current Micrometer Tracing observation, so it needs a
-tracer that is actually wired. Since Spring Boot 4 that takes two dependencies &mdash; the
-bridge *and* its auto-configuration module &mdash; and declaring only the bridge yields
-empty `trace.id` and `span.id` on every event without any error. See
-[wiring a real tracer](../../spring-cloud-gateway-filters/README.md#wiring-a-real-tracer)
-for the Brave and OpenTelemetry pairs.
-
-The `route` group answers *which route handled this call, and what does the configuration
-say about it*. The metadata is read from the route that actually matched, so anything
-declared there &mdash; the owning team, the tenant, a criticality level &mdash; travels
-with the event to the audit backend:
+**Per route** — add the `Audit` gateway filter to the routes that need it:
 
 ```yaml
-routes:
+spring.cloud.gateway.server.webflux.routes:
   - id: book
     uri: https://backend
     predicates:
       - Path=/book/**
     filters:
       - Audit
-    metadata:
-      tenant: acme
-      criticality: high
 ```
 
-audits `route.id=book`, `route.metadata.tenant=acme` and
-`route.metadata.criticality=high`. An exchange no route handled &mdash; a request that
-matched nothing, or a page the gateway served itself when the global web filter is on
-&mdash; is audited as `route.id=_none_`, with no metadata attribute.
-
-## Global metadata
-
-What identifies the gateway rather than the exchange is declared once and stamped on every
-event, under the `metadata.` prefix:
+**Globally** — turn the web filter on and every exchange is audited, including the ones the
+gateway answers itself:
 
 ```yaml
-audit:
-  metadata:
+spring.cloud.gateway.server.webflux.audit.web-filter:
+  enabled: true
+  exclude-paths:
+    - /actuator/**
+```
+
+`exclude-paths` is empty by default: what a gateway serves belongs to its audit trail unless
+declared otherwise. Two plugins append their own paths to it, so their chatter never reaches
+the trail — the [console](../../spring-cloud-gateway-ui/README.md) adds the exact paths of
+its active views (never a `/ui/**` pattern, so a gateway route declared under `/ui` keeps
+being audited), and the [OpenAPI hub](../../spring-cloud-gateway-hub-openapi/README.md) adds
+its documentation endpoints, which a Swagger console polls relentlessly. Both are additive
+and neither affects the per-route `Audit` filter.
+
+## Configuration
+
+All properties are under `spring.cloud.gateway.server.webflux.audit`.
+
+```yaml
+spring.cloud.gateway.server.webflux.audit:
+  provider: kafka           # kafka | redis | r2dbc; unset = the default publisher
+  metadata:                 # stamped on every event under metadata.*
     environment: prod
     datacenter: geneva
+  masked-parameters:        # query parameters whose value becomes ***
+    - access_token
+    - signature
+  groups:                   # each attribute group, all on by default
+    jwt: true
+    request: true
+    response: true
+    trace: true
+    route: true
+    validation: true
+  web-filter:
+    enabled: false          # global auditing, opt-in
+    exclude-paths:
+      - /actuator/**
 ```
 
-audits `metadata.environment=prod` and `metadata.datacenter=geneva` on every event. The two
-prefixes are distinct namespaces, so a route metadata and a global one may share a name
-without either overwriting the other (`metadata.tenant` and `route.metadata.tenant` coexist).
-
-`jwt.user.id` is the JWT `preferred_username` (falling back to `sub`), or the Basic-auth
-user name when the request is authenticated with Basic credentials. `jwt.client.id` reads
-`azp` (falling back to `client_id`). The impersonator attributes read the RFC 8693 `act`
-(actor) claim.
-
-## Where auditing runs
-
-- Per route: add the `Audit` gateway filter to a route.
-- Globally: enable the auditing web filter to audit every request.
-
-```yaml
-spring:
-  cloud:
-    gateway:
-      server:
-        webflux:
-          audit:
-            enabled: true            # master switch (default true)
-            provider:                # kafka | redis | r2dbc ; unset = default publisher
-            metadata:                # stamped on every event under metadata.*
-              environment: prod
-            groups:
-              jwt: true              # default true
-              request: true          # default true
-              response: true         # default true
-              trace: true            # default true
-              route: true            # default true
-              validation: true       # default true; OpenAPI validation outcome, when that plugin is in use
-            web-filter:
-              enabled: false         # global auditing, opt-in (default false)
-              exclude-paths:         # paths the global filter never audits (default none)
-                - /actuator/**
-          routes:
-            - id: book
-              uri: https://backend
-              predicates:
-                - Path=/book/**
-              filters:
-                - Audit
-```
-
-### Excluding paths from the global filter
-
-The global filter audits every exchange the gateway serves, including the ones it answers
-itself. `web-filter.exclude-paths` takes it back: an exchange whose path matches one of the
-patterns is passed straight through, so no event is built and nothing reaches the publisher.
-The list is empty by default — what a gateway serves belongs to its audit trail unless it is
-explicitly declared not to.
-
-Two plugins fill that list in for themselves, so their own chatter never reaches the trail:
-
-- the [gateway UI](../../spring-cloud-gateway-ui/README.md) adds the paths of its console,
-  so browsing it does not fill the trail with its pages, fragments and assets. Only the
-  exact paths the active views serve are excluded, never a `/ui/**` pattern: a gateway route
-  declared under `/ui` keeps being audited.
-- the [OpenAPI hub](../../spring-cloud-gateway-hub-openapi/README.md) adds its documentation
-  endpoints, which a Swagger or Scalar console polls relentlessly. That list includes
-  `/v3/api-docs/*`, the aggregated contracts, which *are* proxied routes &mdash; so this one
-  does take genuinely routed traffic out of the trail.
-
-Both are additive: what the application configured is kept, and only the missing paths are
-appended. Neither affects the per-route `Audit` gateway filter, which audits whatever route
-carries it.
-
-## Configuration properties
-
-All keys are under `spring.cloud.gateway.server.webflux.audit`.
-
-| Property | Default | Description |
-|----------|---------|-------------|
-| `enabled` | `true` | Master switch; when `false` no audit filter is registered |
-| `provider` | _(unset)_ | Provider selector, read by the provider modules |
-| `metadata.<key>` | _(empty)_ | Metadata added to every event as `metadata.<key>` |
-| `masked-parameters` | `access_token`, `id_token`, `refresh_token`, `token`, `code`, `client_secret`, `password`, `secret`, `api_key`, `apikey` | Query parameters whose value is replaced by `***` in `request.parameters`, matched without regard to case |
-| `groups.jwt` / `groups.request` / `groups.response` / `groups.trace` / `groups.route` / `groups.validation` | `true` | Toggle each attribute group |
-| `web-filter.enabled` | `false` | Register the global auditing web filter |
-| `web-filter.exclude-paths` | _(empty)_ | Path patterns the global filter never audits; a matching exchange produces no event at all |
+| Property | Default | What it does |
+| --- | --- | --- |
+| `...audit.enabled` | `true` | Master switch; `false` registers no audit filter |
+| `...audit.provider` | — | `kafka` \| `redis` \| `r2dbc`; read by the provider modules |
+| `...audit.metadata.<key>` | — | Added to every event as `metadata.<key>` |
+| `...audit.masked-parameters` | see below | Query parameters whose value is replaced by `***`, matched ignoring case |
+| `...audit.groups.<group>` | `true` | Toggle one attribute group: `jwt`, `request`, `response`, `trace`, `route`, `validation` |
+| `...audit.web-filter.enabled` | `false` | Register the global auditing web filter |
+| `...audit.web-filter.exclude-paths` | — | Path patterns the global filter never audits; a match produces no event at all |
 
 ### Secrets in the query string
 
 `request.parameters` audits the query string as it came in, and a gateway sees the query
-strings of everyone behind it. Anything passed there — a token, an authorization code, a
-password in a badly designed form — would otherwise land in Kafka, in Redis or in a table, and
-outlive the request by as long as the trail is kept. The values of `masked-parameters` are
-replaced by `***`; the names, the order and the encoding are left as they were.
+strings of everyone behind it. A token, an authorization code or a password passed there
+would otherwise land in Kafka, in Redis or in a table and outlive the request by as long as
+the trail is kept.
 
-The defaults cover the usual names. Add the ones the services behind this gateway use:
+`masked-parameters` defaults to `access_token`, `id_token`, `refresh_token`, `token`, `code`,
+`client_secret`, `password`, `secret`, `api_key`, `apikey`. Only the values are replaced —
+names, order and encoding are left as they were. Set it to an empty list to audit the query
+string exactly as received.
 
-```yaml
-spring.cloud.gateway.server.webflux.audit:
-  masked-parameters:
-  - access_token
-  - signature   # whatever the APIs behind this gateway carry in their query strings
-```
+## Audited attributes
 
-Set it to an empty list to audit the query string exactly as received.
+| Group | Attributes |
+| --- | --- |
+| `jwt` | `jwt.client.id`, `jwt.impersonator.user.id`, `jwt.impersonator.user.name`, `jwt.issuer.id`, `jwt.user.id` |
+| `request` | `request.header.accept`, `request.header.content-length`, `request.header.content-type`, `request.ip`, `request.method`, `request.parameters`, `request.path` |
+| `response` | `response.header.content-length`, `response.header.content-type`, `response.status` |
+| `trace` | `trace.id`, `span.id` |
+| `route` | `route.id`, `route.metadata.<key>` for every metadata declared on the matched route |
+| `validation` | `openapi.validation.operation`, `openapi.validation.request.valid`, `openapi.validation.request.errors`, `openapi.validation.response.valid`, `openapi.validation.response.errors` |
 
-## Default publisher
+Absent values are rendered as `_none_`; an expected but unresolved content type as `unknown`.
 
-Without a provider module, the default publisher logs each event at `DEBUG` and
-republishes it as a Spring `AuditApplicationEvent`. Forward it with a listener:
+* `jwt.user.id` is the JWT `preferred_username` falling back to `sub`, or the Basic-auth user
+  name. `jwt.client.id` reads `azp` falling back to `client_id`. The impersonator attributes
+  read the RFC 8693 `act` claim.
+* `trace` is read from the current Micrometer Tracing observation, so it needs a tracer that
+  is actually wired — since Spring Boot 4 that takes the bridge **and** its
+  auto-configuration module, and declaring only the bridge yields empty ids without any
+  error. See [wiring a real tracer](../../spring-cloud-gateway-filters/README.md#wiring-a-real-tracer).
+* `route` reads the metadata of the route that actually matched, so anything declared there —
+  owning team, tenant, criticality — travels with the event. An exchange no route handled is
+  audited as `route.id=_none_`, with no metadata attribute.
+* `validation` carries the outcome published by
+  [spring-cloud-gateway-openapi-validation](../../spring-cloud-gateway-openapi-validation/README.md).
+  Neither plugin depends on the other; nothing is added for an exchange no contract was
+  applied to, and an `errors` attribute only appears when there were violations.
 
-```java
-@Component
-class AuditListener {
+Global `metadata.*` and route `route.metadata.*` are distinct namespaces, so the two may share
+a key name without either overwriting the other.
 
-    @EventListener
-    void on(AuditApplicationEvent event) {
-        Map<String, String> attributes = event.getAuditEvent().attributes();
-        // forward attributes to your backend
-    }
-}
-```
+## SPI
 
-## Custom publisher
+| Type | What it is |
+| --- | --- |
+| `AuditEventPublisher` | Functional interface, `void publish(AuditEvent event)` |
+| `AuditEvent` | `record(Instant timestamp, Map<String, String> attributes)` |
+| `AuditEventSerializer` | Renders the attributes to a JSON string; reused by the providers |
+| `AuditApplicationEvent` | Spring event wrapping an `AuditEvent`, published by the default publisher |
 
-Replace the publisher by declaring your own `AuditEventPublisher` bean; the default (and
-any provider) then backs off:
+Without a provider module, the default publisher logs each event at `DEBUG` and republishes
+it as an `AuditApplicationEvent`. Forward it with a listener, or replace the publisher
+entirely — the default and any provider then back off:
 
 ```java
 @Bean
@@ -208,18 +144,15 @@ AuditEventPublisher customAuditEventPublisher() {
 }
 ```
 
-Publishing happens once the exchange is over, whatever its outcome: an exchange that failed
-&mdash; an upstream that refused the connection or timed out &mdash; is audited too, and the
-failure is propagated afterwards. The `response` group of such an event only reports what
-the response carried when the exchange failed, which is before the error handler wrote the
-status. An `AuditEventPublisher` must not block the event loop; offload blocking backends
-to their own scheduler.
+Publishing happens once the exchange is over, whatever its outcome: an exchange that failed —
+an upstream that refused the connection or timed out — is audited too, and the failure is
+propagated afterwards. The `response` group of such an event reports what the response carried
+at that moment, which is before the error handler wrote the status.
 
-## SPI
+**An `AuditEventPublisher` must not block the event loop**; offload blocking backends to their
+own scheduler.
 
-- `AuditEventPublisher` - functional interface `void publish(AuditEvent event)`.
-- `AuditEvent` - `record(Instant timestamp, Map<String, String> attributes)`.
-- `AuditEventSerializer` - renders `AuditEvent` attributes to a JSON string; reused by the
-  provider modules.
-- `AuditApplicationEvent` - Spring event wrapping an `AuditEvent`, published by the
-  default publisher.
+## Sample
+
+[gateway-audit](../../spring-cloud-gateway-samples/gateway/gateway-audit/README.md) — port
+`8205`.

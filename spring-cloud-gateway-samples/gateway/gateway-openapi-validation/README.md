@@ -1,30 +1,29 @@
 # gateway-openapi-validation
 
-Exercises [spring-cloud-gateway-openapi-validation](../../../spring-cloud-gateway-openapi-validation/README.md):
-the `OpenapiValidation` filter holds the traffic of a route against the bookstore contract
-shipped in `src/main/resources/openapi/bookstore.yaml`.
+Exercises [spring-cloud-gateway-openapi-validation](../../../spring-cloud-gateway-openapi-validation/README.md)
+— port `8212`: the `OpenapiValidation` filter holds the traffic of a route against the
+bookstore contract shipped in `src/main/resources/openapi/bookstore.yaml`.
 
-```shell
+## Run it
+
+```console
 mvn spring-boot:run
 ```
 
-Runs on port **8212**. No backend is needed to see the request side: a request that breaks
-the contract is denied before it is ever forwarded.
+No backend is needed to see the request side: a request that breaks the contract is denied
+before it is ever forwarded.
 
-## What it shows
+## What to look at
 
 The gateway exposes the contract under `/book-service`, while the contract itself declares
 `/books` and `/books/{id}`. `pathPrefix` strips the prefix before a path is matched, and
-`StripPrefix=1` strips it again before the request is forwarded — so the backend still
-receives the path its own contract declares.
+`StripPrefix=1` strips it again before the request is forwarded — so the backend still receives
+the path its own contract declares. Requests are enforced and responses only reported on, which
+are the defaults.
 
-Requests are enforced and responses only reported on, which are the defaults.
+The first four calls never reach a backend, so they answer on their own:
 
-## Try it
-
-The first four never reach a backend, so they answer on their own:
-
-```shell
+```console
 # 400: 'page' is declared as an integer
 curl -i 'localhost:8212/book-service/books?page=first'
 
@@ -41,7 +40,7 @@ curl -i -XPOST localhost:8212/book-service/books \
 
 These honour the contract and are forwarded, so they need something listening on `:8080`:
 
-```shell
+```console
 curl -i 'localhost:8212/book-service/books?page=1&status=available'
 
 curl -i -XPOST localhost:8212/book-service/books \
@@ -52,7 +51,7 @@ curl -i -XPOST localhost:8212/book-service/books \
 
 Every outcome is counted, and the actuator exposes them:
 
-```shell
+```console
 curl -s localhost:8212/actuator/metrics/gateway.openapi.validations
 curl -s localhost:8212/actuator/metrics/gateway.openapi.validation.bodies.skipped
 ```

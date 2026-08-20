@@ -1,14 +1,14 @@
 # gateway-routes-all
 
-**A combination.** Every route source of
+**A combination** — port `8210`: every route source of
 [spring-cloud-gateway-routes](../../../spring-cloud-gateway-routes/README.md) at once —
 properties, files, database, Config Server and an OpenAPI contract — aggregated into a single
-route locator, on port `8210`.
+route locator.
 
 This is the sample that answers *what happens when several sources declare routes together*.
 For one source on its own, see [gateway-routes-files](../gateway-routes-files/README.md).
 
-## Running it
+## Run it
 
 ```console
 mvn spring-boot:run

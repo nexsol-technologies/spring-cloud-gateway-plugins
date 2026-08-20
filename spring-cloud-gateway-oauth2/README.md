@@ -1,204 +1,149 @@
 # spring-cloud-gateway-oauth2
 
-OAuth2 support for Spring Cloud Gateway: per-route access token validation, an exchange of
+OAuth2 support for Spring Cloud Gateway: per-route access token authorization, an exchange of
 Basic credentials for a Bearer token, JWT authority mapping and multi-tenant issuers.
 
+## Install
+
 ```xml
-    <dependencies>
-        <dependency>
-           <groupId>ch.nexsol-tech.gateway</groupId>
-           <artifactId>spring-cloud-gateway-oauth2</artifactId>
-           <version>${spring-cloud-gateway-plugins.version}</version>
-        </dependency>
-    </dependencies>
+<dependency>
+    <groupId>ch.nexsol-tech.gateway</groupId>
+    <artifactId>spring-cloud-gateway-oauth2</artifactId>
+    <version>${spring-cloud-gateway-plugins.version}</version>
+</dependency>
 ```
 
-## GatewayFilter Factories
+## AuthorizationToken (per-route filter)
 
-### AuthorizationToken
-
-The `AuthorizationToken` filter **authorizes** a request against the access token (JWT) it
-carries: the issuer, the client id and the granted accesses declared on the route are checked,
-and a token that does not meet them is answered with `403 Forbidden`.
-
-It does **not** authenticate. The only token it reads is the one Spring Security already
-authenticated — the `JwtAuthenticationToken` of the `Principal` — whose signature, expiry and
-issuer have therefore been verified by the resource server of the application, single-issuer or
-multi-tenant. The raw `Authorization` header is never parsed: the claims of a token nobody
-verified are attacker-controlled, and authorizing on them would let anyone forge the very
-issuer, client id and roles this filter checks.
-
-**A route declaring a rule must therefore sit behind a resource server filter chain.** Without
-one no request carries a principal, and every request is answered `401 Unauthorized`. See the
-resource server section above to configure the issuers.
-
-A request carrying no authenticated token is answered with `401 Unauthorized` as soon as the
-route declares at least one rule: the filter never lets an unauthenticated request through. Two
-cases are left untouched, as no rule applies to them: a filter declared without any argument,
-and a route flagged public through its `public` metadata (see
-`spring-cloud-gateway-routes-security`), which is served without authentication by design.
+**Authorizes** a request against the access token it carries: the issuer, the client id and the
+granted accesses declared on the route are checked, and a token that does not meet them is
+answered `403 Forbidden`.
 
 ```yaml
-spring.cloud.gateway.server.webflux:
-  routes:
+spring.cloud.gateway.server.webflux.routes:
   - id: test-authorization-token
     uri: http://localhost:8080
     predicates:
-    - Path=/test
+      - Path=/test
     filters:
-    - name: AuthorizationToken
-      args:
-        issuers: # (optional) List of issuers (iss) to validate
-        client-ids:  # (optional) List of client id (azp) to validate
-        grant-accesses-match: ALL # (optional) How the granted accesses are combined, ALL (default) or ANY
-        grant-accesses: # (optional) List of roles to validate
-        - jsonPath: '$.resource_access.*.roles'
-          match: ALL # (optional) How the roles are combined, ALL (default) or ANY
-          roles: "role-1,role-2"
+      - name: AuthorizationToken
+        args:
+          issuers: [https://keycloak/realms/test]   # accepted iss values
+          client-ids: [book-client]                 # accepted azp values
+          grant-accesses-match: ALL                 # between the granted accesses
+          grant-accesses:
+            - jsonPath: "$.realm_access.roles"
+              match: ANY                            # between the roles of this access
+              roles: [admin, service]
+            - jsonPath: "$.resource_access['book-service'].roles"
+              roles: [book_read]
 ```
 
-#### Combining the granted accesses
+| Argument | Default | What it does |
+| --- | --- | --- |
+| `issuers` | — | Issuers (`iss`) the token may come from |
+| `client-ids` | — | Client ids (`azp`) the token may have been issued to |
+| `grant-accesses` | — | Claim paths and the roles they must carry |
+| `grant-accesses-match` | `ALL` | Combines the granted accesses: `ALL` requires every one, `ANY` a single one |
+| `grant-accesses[].match` | `ALL` | Combines the roles of one granted access |
 
-Two independent match modes decide how the rules are combined, both defaulting to `ALL`:
+The example above reads as *(`admin` or `service`) **and** `book_read`*. The bracket notation is
+what addresses a client id holding a hyphen. A wildcard such as `$.resource_access.*.roles`
+flattens the roles of every client into one list, so a role granted by any client satisfies the
+rule — name the client explicitly when the rule is meant to be about one of them.
 
-* `grant-accesses-match` — between the granted accesses, so between the claims their JSON paths
-  point at: `ALL` requires every one of them, `ANY` a single one.
-* `match` — between the roles of a single granted access: `ALL` requires the claim to hold every
-  role, `ANY` a single one.
+**It does not authenticate.** The only token it reads is the one Spring Security already
+authenticated — the `JwtAuthenticationToken` of the `Principal` — whose signature, expiry and
+issuer have been verified by the resource server. The raw `Authorization` header is never
+parsed: the claims of a token nobody verified are attacker-controlled, and authorizing on them
+would let anyone forge the very issuer, client id and roles this filter checks.
 
-The default `ALL`/`ALL` is the most restrictive combination, so a configuration that does not
-declare a match mode keeps requiring every claim and every role.
+> **A route declaring a rule must sit behind a resource server filter chain.** Without one no
+> request carries a principal, and every request is answered `401`.
 
-The example below reads as *(`admin` or `service`) and `book_read`*: a realm role among
-two, plus one client role of `book-service`. The bracket notation is what addresses a client id
-holding a hyphen.
+Two cases are left untouched, no rule applying to them: a filter declared without any argument,
+and a route flagged public through its `public` metadata (see
+[routes-security](../spring-cloud-gateway-routes/spring-cloud-gateway-routes-security/README.md)).
+
+## BasicAuthExchangeToAccessToken (web filter)
+
+Intercepts a request carrying Basic credentials, exchanges them for an access token at an
+OAuth2 server through the Client Credentials grant, and replaces the header with the resulting
+Bearer token before forwarding. Downstream services see Bearer authentication, whatever the
+caller sent.
 
 ```yaml
-    - name: AuthorizationToken
-      args:
-        grant-accesses-match: ALL
-        grant-accesses:
-        - jsonPath: "$.realm_access.roles"
-          match: ANY
-          roles:
-          - admin
-          - service
-        - jsonPath: "$.resource_access['book-service'].roles"
-          roles:
-          - book_read
+spring.cloud.gateway.server.webflux.webfilter.basicauth-exchange-oauth2:
+  # One token endpoint per Basic user name.
+  token-uris:
+    user1: https://my-authorization-server/protocol/openid-connect/token
+    user2: https://keycloak/realms/test/protocol/openid-connect/token
+  # Set to false to keep the plugin from contributing its own security chain.
+  security-chain-enabled: true
 ```
 
-A wildcard such as `$.resource_access.*.roles` flattens the roles of every client into a single
-list, so a role granted by any client satisfies the rule. Name the client explicitly when the rule
-is meant to be about one of them.
+| Property | Default | What it does |
+| --- | --- | --- |
+| `...basicauth-exchange-oauth2.token-uris.<user>` | — | Token endpoint used for that Basic user; one entry is enough to activate the filter |
+| `...basicauth-exchange-oauth2.security-chain-enabled` | `true` | Whether the plugin contributes its own `SecurityWebFilterChain` |
 
-## WebFilter
+Tokens are cached in memory and evicted on their JWT `exp` claim, so an expired token is never
+reused and the authorization server is not called on every request. The application
+`CacheManager` is used when there is one, otherwise the filter falls back to its own cache —
+the host application needs no caching setup.
 
-### BasicAuthExchangeToAccessToken
+**Spring Security integration.** As soon as one `token-uris` entry exists, the plugin
+contributes the chain itself: it matches the requests carrying the Basic credentials of a
+configured client, disables standard HTTP Basic for them, and inserts the exchange filter
+before authentication. Nothing has to be declared in the application.
 
-Intercepts a request carrying a Basic authentication header, exchanges those credentials for an
-access token at an OAuth2 server, and replaces the header with the resulting Bearer token before
-the request is forwarded downstream. Tokens are cached until they expire, so the authorization
-server is not called on every request.
-
-* **Basic to Bearer** — downstream services see Bearer authentication, whatever the caller sent.
-* **Client Credentials** — the exchange uses the standard OAuth 2.0 Client Credentials grant.
-* **Caching** — the access token is cached in memory and evicted on its JWT `exp` claim, so an
-  expired token is never reused. The application `CacheManager` is used when there is one;
-  otherwise the filter falls back to its own in-memory cache, so the host application needs no
-  caching setup.
-
-```yaml
-spring.cloud.gateway.server.webflux:
-  webfilter:
-    basicauth-exchange-oauth2:
-      token-uris:
-        user1: https://my-authorization-server/protocol/openid-connect/token
-        user2: https://keycloak/realms/test/protocol/openid-connect/token
-        user3: https://keycloak/realms/test/protocol/openid-connect/token
-```
-
-#### Spring Security Integration
-
-The plugin contributes the security filter chain itself, as soon as at least one `token-uris`
-entry is configured: it matches the requests carrying the Basic credentials of a configured
-client, disables the standard HTTP Basic authentication for them, and inserts the exchange
-filter before authentication. Nothing has to be declared in the application.
-
-The chain is ordered at `BasicAuthExchangeSecurityAutoConfiguration.BASIC_AUTH_EXCHANGE_CHAIN_ORDER`
-(`Ordered.HIGHEST_PRECEDENCE + 200`), ahead of the chains an application usually declares from `@Order(1)`.
-
-Two escape hatches:
-
-* declare your own bean named `basicAuthExchangeSecurityWebFilterChain` — the plugin backs off;
-* or turn the chain off entirely:
-
-```yaml
-spring.cloud.gateway.server.webflux:
-  webfilter:
-    basicauth-exchange-oauth2:
-      security-chain-enabled: false
-```
+The chain is ordered at
+`BasicAuthExchangeSecurityAutoConfiguration.BASIC_AUTH_EXCHANGE_CHAIN_ORDER`
+(`Ordered.HIGHEST_PRECEDENCE + 200`), ahead of the chains an application usually declares from
+`@Order(1)`. Two escape hatches: declare your own bean named
+`basicAuthExchangeSecurityWebFilterChain`, or set `security-chain-enabled: false`.
 
 > As with any `SecurityWebFilterChain` bean, its presence makes Spring Boot back off from its
-> default "everything authenticated" chain. An application that was relying on that default
-> must declare its own chains.
+> default "everything authenticated" chain. An application relying on that default must declare
+> its own chains.
 
+## Mapping claims to authorities
 
-## GrantedAuthority converter
+The plugin parses the JWT and maps these claims to Spring Security `GrantedAuthority` entries:
 
-### Default converter
+| Claim path | What it holds |
+| --- | --- |
+| `$.realm_access.roles` | Keycloak: the global roles of the realm |
+| `$.resource_access.<client>.roles` | Keycloak: the client-specific roles. `<client>` defaults to `...webflux.oauth2.resource-name`, or `spring.application.name` |
+| `$.permissions` | Additional permissions |
+| `$.roles` | General roles |
 
-The plugin parses the JWT and maps its claims to Spring Security `GrantedAuthority` entries.
-
-The following claims are read from the access token:
-
-| Claim Path                  | Description                                                                 |
-|-----------------------------|-----------------------------------------------------------------------------|
-| `$.realm_access.roles`      | In Keycloak, contains the global roles of the realm.                        |
-| `$.resource_access.xxx.roles` | In Keycloak, contains client-specific roles for `xxx`. `xxx` defaults to the value of `spring.cloud.gateway.server.webflux.oauth2.resource-name`, or `spring.application.name` if undefined. |
-| `$.permissions`             | Additional permissions.                                                     |
-| `$.roles`                   | General roles.                                                              |
-
-### Configurable converter
-
-Declare your own claim paths to map further claims to `GrantedAuthority`:
+Declare further paths to map more claims:
 
 ```yaml
-spring:
-  security:
-    oauth2:
-      resourceserver:
-        granted-authorities-mapping:
-          json-path:
-          - '$.my-custom-roles'
+spring.security.oauth2.resourceserver.granted-authorities-mapping:
+  json-path:
+    - '$.my-custom-roles'
 ```
-
 
 ## Multitenancy
 
 A gateway can accept tokens from several identity providers at once: each request is validated
 against the settings of the tenant that issued its token, so every tenant keeps its own
-authorization server.
-
-### Tenant-specific configuration
-
-Declare one OIDC issuer URI per tenant. The issuer URI is the discovery endpoint returning the
-OpenID Connect or OAuth 2.0 metadata of that authorization server.
+authorization server. Declare one OIDC issuer URI per tenant — the discovery endpoint returning
+that server's metadata:
 
 ```yaml
-spring:
-  security:
-    oauth2:
-      resourceserver:
-        multitenant:
-          - id: keycloak
-            issuer-uri: https://keycloakhost:keycloakport/realms/{realm}
-          - id: okta
-            issuer-uri: https://{yourOktaOrg}
+spring.security.oauth2.resourceserver.multitenant:
+  - id: keycloak
+    issuer-uri: https://keycloakhost:keycloakport/realms/{realm}
+  - id: okta
+    issuer-uri: https://{yourOktaOrg}
 ```
 
-### Dynamic tenant identification *(not implemented)*
+> Resolving the tenant from the request itself — a header, a subdomain — is **not implemented**.
 
-Resolving the tenant from the request itself — a header, a subdomain — is not supported yet.
+## Sample
 
+[gateway-oauth2](../spring-cloud-gateway-samples/gateway/gateway-oauth2/README.md) — port
+`8202`, with the `auth-server` sample on `9090`.

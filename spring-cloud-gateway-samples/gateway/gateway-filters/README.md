@@ -1,25 +1,25 @@
 # gateway-filters
 
 Exercises [spring-cloud-gateway-filters](../../../spring-cloud-gateway-filters/README.md) on
-its own, on port `8201`.
+its own — port `8201`.
 
-## Running it
+## Run it
 
 ```console
 mvn spring-boot:run
 ```
 
-The `Authorization` routes forward to the `service-a` sample on `:8080`; start it too to see
-a granted call reach a backend. The other routes need nothing beyond an internet connection.
+The `Authorization` routes forward to the `service-a` sample on `:8080`; start it too to see a
+granted call reach a backend. The other routes need nothing beyond an internet connection.
 
-## What it shows
+## What to look at
 
 | Url | Filter | What happens |
 | --- | --- | --- |
 | http://localhost:8201/authorization/sample | `Authorization` | `user:user` holds `ROLE_READ` and is let through; `admin:admin` is answered `403` |
-| http://localhost:8201/authorization-ko/sample | `Authorization` | the route asks for an authority no account holds, so every request is answered `403` |
-| http://localhost:8201/convert-method/anything | `ConvertHttpMethod` | a `GET` reaches httpbin.org as a `POST` |
-| any response | `CorrelationId` | an `x-correlation-id` header carrying the traceId of the exchange |
+| http://localhost:8201/authorization-ko/sample | `Authorization` | The route asks for an authority no account holds, so every request is answered `403` |
+| http://localhost:8201/convert-method/anything | `ConvertHttpMethod` | A `GET` reaches httpbin.org as a `POST` |
+| any response | `CorrelationId` | An `x-correlation-id` header carrying the traceId of the exchange |
 
 ```console
 $ curl -u user:user http://localhost:8201/authorization/sample -i
@@ -35,20 +35,19 @@ $ curl http://localhost:8201/convert-method/anything | jq .method
 
 ## The authority prefix
 
-`Authorization` compares the configured values against `GrantedAuthority.getAuthority()`,
-**as they are**. An account built with `roles("READ")` carries the authority `ROLE_READ`, so
-the route asks for `ROLE_READ` and not `READ` — the prefix is part of the value being
-compared. Where the authorities come from a JWT instead, they carry whatever the token
-declared, with no prefix added; see the [gateway-secured](../gateway-secured/README.md)
-sample, whose route asks for a bare `READ`.
+`Authorization` compares the configured values against `GrantedAuthority.getAuthority()`, **as
+they are**. An account built with `roles("READ")` carries the authority `ROLE_READ`, so the
+route asks for `ROLE_READ` and not `READ` — the prefix is part of the value being compared.
+Where the authorities come from a JWT instead, they carry whatever the token declared, with no
+prefix added; see [gateway-secured](../gateway-secured/README.md), whose route asks for a bare
+`READ`.
 
 ## Recaptcha
 
-The fourth filter of the plugin needs a secret key issued by Google. Its route sits
-commented out in [`application.yml`](src/main/resources/application.yml): uncomment it and
-fill in your own key.
+The fourth filter needs a secret key issued by Google. Its route sits commented out in
+[`application.yml`](src/main/resources/application.yml): uncomment it and fill in your own key.
 
-Before enabling it, note that the filter denies with `403` on **every** outcome that is
-not a verified token — a missing token, a rejected one, a score below the threshold, and a
-verification endpoint that is unreachable or answers an error. It fails closed, and the
-reason goes to the log rather than to the caller.
+Before enabling it, note that the filter denies with `403` on **every** outcome that is not a
+verified token — a missing token, a rejected one, a score below the threshold, an unreachable
+verification endpoint. It fails closed, and the reason goes to the log rather than to the
+caller.
