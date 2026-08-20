@@ -17,12 +17,13 @@
 package ch.nexsol.gateway.ui.security;
 
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ServerWebExchange;
 
 /**
  * Serves the two pages of the console that sit outside the shell: the login page, and the
@@ -59,22 +60,28 @@ public class LoginController {
 	}
 
 	/**
-	 * Renders the login page.
-	 * @param error set by Spring Security when the credentials were rejected
-	 * @param oauth2Error set by the chain when the exchange with the provider failed
-	 * @param logout set by the chain when the session was just ended
+	 * Renders the login page, saying why it is being shown when something sent the
+	 * visitor here.
+	 * <p>
+	 * The markers are read off the query string rather than through
+	 * {@code @RequestParam}, and their presence is what counts, not their value. Every
+	 * one of them arrives as a bare flag &mdash; {@code ?error}, {@code ?logout} &mdash;
+	 * and WebFlux binds a query parameter carrying no {@code =} to {@code null}, so a
+	 * {@code String} parameter is indistinguishable from an absent one and none of these
+	 * messages would ever be shown.
+	 * @param exchange the exchange carrying the markers
 	 * @param model the view model
 	 * @return the login page view name
 	 */
 	@GetMapping("/login")
-	public String login(@RequestParam(name = "error", required = false) String error,
-			@RequestParam(name = "error_oauth2", required = false) String oauth2Error,
-			@RequestParam(name = "logout", required = false) String logout, Model model) {
+	public String login(ServerWebExchange exchange, Model model) {
+		Set<String> markers = exchange.getRequest().getQueryParams().keySet();
 		model.addAttribute("oauth2Providers", this.providers);
 		model.addAttribute("credentialsForm", this.credentialsForm);
-		model.addAttribute("loginError", error != null);
-		model.addAttribute("oauth2Error", oauth2Error != null);
-		model.addAttribute("loggedOut", logout != null);
+		model.addAttribute("loginError", markers.contains("error"));
+		model.addAttribute("oauth2Error", markers.contains("error_oauth2"));
+		model.addAttribute("loggedOut", markers.contains("logout"));
+		model.addAttribute("unauthorized", markers.contains(UiAuthenticationEntryPoint.UNAUTHORIZED_PARAMETER));
 		return "dashboard/login";
 	}
 

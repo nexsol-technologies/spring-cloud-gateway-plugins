@@ -650,6 +650,26 @@ spring.cloud.gateway.server.webflux:
 Every path the active views serve is then behind an authenticated principal; the login page
 and the static assets it paints with are the only ones left open.
 
+A visitor with no session who asked for a view is sent to the login page, which says why
+rather than standing there as if it were the page they wanted. It reads four markers:
+
+| Marker | Set by | What the page says |
+| --- | --- | --- |
+| `?unauthorized` | a **401**: no session, on a path that needs one | You need to be signed in to reach that page |
+| `?error` | the credentials form was rejected | Wrong user name or password |
+| `?error_oauth2` | the provider refused the exchange | The sign-in was refused, the logs say why |
+| `?logout` | the session was just ended | You are signed out |
+
+A **403** is deliberately not one of them: a visitor holding none of the `required-roles`
+is already signed in, so a login page would hand them back the same roles. They are sent to
+`/ui/forbidden`, which explains the refusal and carries the button that ends the session
+&mdash; see `required-roles` below.
+
+Only page navigations are redirected. An HTMX fragment answers its status with an
+`HX-Redirect` header the browser turns into a full page load; a subscription to an event
+stream and a request carrying an `Authorization` header keep their bare `401`/`403`, since
+an HTML page is no answer to either.
+
 ![The login page of the console](doc/login-light.png)
 
 > The two screenshots of this section come from the
@@ -689,6 +709,58 @@ What that gives you:
   provider, and the local user stays as the way in when the provider is unreachable. With a
   provider alone and no local user, the credentials form is left out rather than shown
   unable to succeed.
+
+  On a gateway, though, `spring.security.oauth2.client` rarely holds the console alone. It
+  is where the technical clients live &mdash; the ones the routes relay tokens with, one per
+  downstream realm &mdash; and a button per one of those is a list of internal plumbing
+  shown to whoever opens the console. Three things narrow it, from the one that always
+  applies to the one that takes over:
+
+  * A registration that is **not an authorization code client** is never offered. A button
+    starting a `client_credentials` grant is one no browser could complete, so it is dropped
+    whatever the configuration says.
+  * `use` names the registration ids the console keeps, out of the ones the application
+    declared:
+
+    ```yaml
+    spring.cloud.gateway.server.webflux.ui.security.spring.security.oauth2.client:
+      use: [console]
+    ```
+
+  * `registration` and `provider` declare the clients of the console itself, read exactly as
+    the Spring Security keys they spell out, and replace those of the application
+    altogether:
+
+    ```yaml
+    spring.cloud.gateway.server.webflux.ui.security.spring.security.oauth2.client:
+      registration.console:
+        client-id: gateway-console
+        client-secret: ${OIDC_CLIENT_SECRET}
+        client-name: Operators
+        scope: openid,profile,email
+      provider.console:
+        issuer-uri: https://your-idp.example.com/realms/operators
+    ```
+
+    The prefix spells out the Spring keys on purpose: whatever
+    `spring.security.oauth2.client` accepts, this accepts, so a registration is moved from
+    one to the other by moving the lines. Unlike the resource server issuer below, an
+    `issuer-uri` here is resolved at start-up &mdash; as Spring Boot resolves its own &mdash;
+    so the provider has to be answering for the gateway to come up.
+
+  Left out of the console's chain does not mean left out of the application: the
+  registrations of the gateway keep working for the routes that relay them. Only the login
+  page, and the logout that ends the provider session behind it, are narrowed. Narrowed to
+  nothing, the console offers no provider at all rather than falling back on the list it was
+  told to leave out &mdash; and a warning at start-up names how many registrations were
+  found and why none of them made it, since a login page silently short of its button is
+  otherwise hard to account for.
+
+  All three read the configuration through `spring-boot-security-oauth2-client`, the module
+  that maps `spring.security.oauth2.client` for the application in the first place. Any
+  gateway registering a client from properties already has it; one declaring a
+  `ReactiveClientRegistrationRepository` bean by hand, against Spring Security alone, gets
+  the previous behaviour &mdash; every registration of the repository offered.
 * **A Bearer token** &mdash; name an issuer and the endpoints of the console answer a token
   as well as a session, for a script or an external dashboard reading `/ui/metrics/data` and
   the like:
@@ -758,6 +830,8 @@ What that gives you:
 | `...ui.security.user.roles` | `[ADMIN]` | Roles the local user holds |
 | `...ui.security.roles-claim` | &mdash; | Dotted path the roles of a token are read from |
 | `...ui.security.required-roles` | `[]` | Roles a principal must hold; empty lets any authenticated principal through |
+| `...ui.security.spring.security.oauth2.client.use` | `[]` | Registration ids the login page offers, out of the ones the application declared; empty offers all of them |
+| `...ui.security.spring.security.oauth2.client.registration` / `.provider` | &mdash; | Client registrations of the console's own, read as the Spring Security keys they spell out; declared, they replace those of the application |
 
 Signing in resumes the navigation it interrupted: the page the visitor was heading for is
 saved and served once the session opens, falling back on `/ui`. The side menu then shows who

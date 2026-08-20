@@ -39,6 +39,13 @@
 					<p class="text-secondary mb-0 mt-3">Sign in to the gateway console.</p>
 				</div>
 
+				<!--
+					Shown when the entry point sent the visitor here from a page of the
+					console: without it the login form reads as the page that was asked for.
+				-->
+				<div class="alert alert-warning py-2" role="alert" th:if="${unauthorized}">
+					You need to be signed in to reach that page.
+				</div>
 				<div class="alert alert-danger py-2" role="alert" th:if="${loginError}">
 					Wrong user name or password.
 				</div>

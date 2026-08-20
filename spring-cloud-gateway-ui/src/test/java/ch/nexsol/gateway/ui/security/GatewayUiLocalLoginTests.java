@@ -50,7 +50,13 @@ class GatewayUiLocalLoginTests {
 
 	@Test
 	void shouldSendAnAnonymousVisitorToTheLoginPage() {
-		this.webTestClient.get().uri("/ui").exchange().expectStatus().isFound().expectHeader().location("/ui/login");
+		this.webTestClient.get()
+			.uri("/ui")
+			.exchange()
+			.expectStatus()
+			.isFound()
+			.expectHeader()
+			.location("/ui/login?unauthorized");
 	}
 
 	@Test
@@ -72,6 +78,44 @@ class GatewayUiLocalLoginTests {
 	}
 
 	@Test
+	void shouldSayWhyTheLoginPageIsBeingShown() {
+		this.webTestClient.get()
+			.uri("/ui/login?unauthorized")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("You need to be signed in to reach that page."));
+	}
+
+	@Test
+	void shouldSayThatTheCredentialsWereRejected() {
+		this.webTestClient.get()
+			.uri("/ui/login?error")
+			.exchange()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("Wrong user name or password."));
+	}
+
+	@Test
+	void shouldSayThatTheSessionWasEnded() {
+		this.webTestClient.get()
+			.uri("/ui/login?logout")
+			.exchange()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("You are signed out."));
+	}
+
+	@Test
+	void shouldSayNothingOfTheSortWhenTheLoginPageWasAskedForOutright() {
+		this.webTestClient.get()
+			.uri("/ui/login")
+			.exchange()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).doesNotContain("You need to be signed in to reach that page."));
+	}
+
+	@Test
 	void shouldServeTheAssetsTheLoginPagePaintsWith() {
 		for (String asset : new String[] { "/css/bootstrap.min.css", "/css/gateway-ui.css", "/img/logo.png",
 				"/img/icon.png" }) {
@@ -88,7 +132,7 @@ class GatewayUiLocalLoginTests {
 			.expectStatus()
 			.isUnauthorized()
 			.expectHeader()
-			.valueEquals("HX-Redirect", "/ui/login");
+			.valueEquals("HX-Redirect", "/ui/login?unauthorized");
 	}
 
 	@Test
