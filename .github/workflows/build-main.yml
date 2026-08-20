@@ -12,6 +12,9 @@ jobs:
         os: [ ubuntu-latest ]
 
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      packages: write
     steps:
 
       - uses: actions/checkout@v5
@@ -33,24 +36,11 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-  publish-snapshot:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up JDK 25
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: '25'
-          cache: 'maven'
-
-      - name: Publish SNAPSHOT version to GitHub Packages (we can skip tests, since we only deploy, if the build workflow succeeded)
-        run: mvn -B --no-transfer-progress deploy -DskipTests
+      # Deploys the artifacts the step above just built, in the same workspace: the
+      # lifecycle is re-run up to 'deploy' but everything is up to date, so nothing is
+      # recompiled and no test runs. Javadoc stays skipped, as it is for 'verify'.
+      - name: Publish SNAPSHOT version to GitHub Packages
+        run: mvn -B --no-transfer-progress deploy -DskipTests -D maven.javadoc.skip=true
         env:
           GITHUB_TOKEN: ${{ secrets.DEPLOY_GITHUB_PACKAGE_MAVEN }}
 
