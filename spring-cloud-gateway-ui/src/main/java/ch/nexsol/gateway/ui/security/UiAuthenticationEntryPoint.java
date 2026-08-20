@@ -20,7 +20,6 @@ import reactor.core.publisher.Mono;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.server.ServerAuthenticationEntryPoint;
@@ -33,11 +32,17 @@ import org.springframework.web.server.ServerWebExchange;
  * <p>
  * A page navigation is redirected. An HTMX fragment cannot be: the browser would swap the
  * login page into a corner of the shell, so it answers a {@code 401} carrying the
- * {@code HX-Redirect} header HTMX turns into a full page load. A subscription to an event
- * stream answers a plain {@code 401}, which is what an {@code EventSource} can act on
- * &mdash; served the login page instead, it would keep reconnecting to it. So does a
- * request that carried an {@code Authorization} header: a client presenting a token asked
- * an API a question, and an HTML login page is not an answer to it.
+ * {@code HX-Redirect} header HTMX turns into a full page load. A request that carried an
+ * {@code Authorization} header answers a plain {@code 401}: a client presenting a token
+ * asked an API a question, and an HTML login page is not an answer to it.
+ * <p>
+ * Neither is it an answer to anything else that did not ask for HTML. A script fetching
+ * JSON, and an {@code EventSource} subscribing to a stream, are both handed a redirect
+ * they cannot read: the browser follows it, the login page comes back under whatever
+ * content type was negotiated, and the caller sees a {@code 200} carrying a sign-in form
+ * where it expected its data. They answer a plain {@code 401}, which is what such a
+ * caller can act on. A request naming no media type, or {@code *&#47;*}, is still a
+ * navigation as far as this is concerned.
  * <p>
  * Both ways to the page carry {@code ?unauthorized}, so it can say why it is being shown.
  * A visitor who asked for a view of the console and was handed a login form instead is
@@ -77,13 +82,13 @@ public class UiAuthenticationEntryPoint implements ServerAuthenticationEntryPoin
 			exchange.getResponse().getHeaders().add(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
 			return exchange.getResponse().setComplete();
 		}
-		if (request.getHeaders().getAccept().contains(MediaType.TEXT_EVENT_STREAM)) {
-			exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-			return exchange.getResponse().setComplete();
-		}
 		if (request.getHeaders().getFirst(HTMX_REQUEST_HEADER) != null) {
 			exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
 			exchange.getResponse().getHeaders().add(HTMX_REDIRECT_HEADER, this.loginPage);
+			return exchange.getResponse().setComplete();
+		}
+		if (!AcceptedMediaTypes.acceptsHtml(request)) {
+			exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
 			return exchange.getResponse().setComplete();
 		}
 		return this.redirect.commence(exchange, exception);

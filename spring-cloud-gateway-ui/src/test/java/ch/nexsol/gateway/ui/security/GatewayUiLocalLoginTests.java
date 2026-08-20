@@ -148,6 +148,55 @@ class GatewayUiLocalLoginTests {
 	}
 
 	@Test
+	void shouldAnswerAJsonCallWithUnauthorizedRatherThanRedirectItToAPage() {
+		// A redirect is unreadable to a script: it follows it, the login page comes back
+		// under the negotiated content type, and the caller sees a 200 carrying a sign-in
+		// form where it expected its data.
+		this.webTestClient.get()
+			.uri("/ui")
+			.accept(MediaType.APPLICATION_JSON)
+			.exchange()
+			.expectStatus()
+			.isUnauthorized()
+			.expectHeader()
+			.doesNotExist(HttpHeaders.LOCATION);
+	}
+
+	@Test
+	void shouldStillRedirectARequestThatNamesNoMediaType() {
+		this.webTestClient.get()
+			.uri("/ui")
+			.accept(MediaType.ALL)
+			.exchange()
+			.expectStatus()
+			.isFound()
+			.expectHeader()
+			.location("/ui/login?unauthorized");
+	}
+
+	@Test
+	void shouldAcceptTheLocalUserOverBasicAuthentication() {
+		// A caller with no browser has no form to post: without Basic on this chain the
+		// local user is a way in through the page alone.
+		this.webTestClient.get()
+			.uri("/ui")
+			.headers((headers) -> headers.setBasicAuth("operator", "console-secret"))
+			.exchange()
+			.expectStatus()
+			.isOk();
+	}
+
+	@Test
+	void shouldRefuseWrongCredentialsOverBasicAuthentication() {
+		this.webTestClient.get()
+			.uri("/ui")
+			.headers((headers) -> headers.setBasicAuth("operator", "wrong"))
+			.exchange()
+			.expectStatus()
+			.isUnauthorized();
+	}
+
+	@Test
 	void shouldAnswerATokenBearingRequestWithUnauthorizedRatherThanAnHtmlPage() {
 		this.webTestClient.get()
 			.uri("/ui")

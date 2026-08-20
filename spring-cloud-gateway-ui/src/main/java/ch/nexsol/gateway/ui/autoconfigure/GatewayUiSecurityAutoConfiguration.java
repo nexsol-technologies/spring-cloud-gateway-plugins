@@ -95,6 +95,9 @@ import org.springframework.security.web.server.util.matcher.AndServerWebExchange
 import org.springframework.security.web.server.util.matcher.NegatedServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.util.StringUtils;
+import org.springframework.web.server.session.DefaultWebSessionManager;
+import org.springframework.web.server.session.InMemoryWebSessionStore;
+import org.springframework.web.server.session.WebSessionManager;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 
@@ -189,6 +192,8 @@ public class GatewayUiSecurityAutoConfiguration {
 	 * @param userDetailsService the user directory of the application, if it declared one
 	 * @param authenticationManager the authentication manager of the application, if it
 	 * declared one
+	 * @param sessionManager the session manager of the application, read to say whether
+	 * the sessions the console opens would survive a second instance
 	 * @return the gateway UI security filter chain
 	 */
 	@Bean
@@ -202,7 +207,8 @@ public class GatewayUiSecurityAutoConfiguration {
 			ObjectProvider<SecuredPathsContribution> securedPaths, GatewayUiSecurityProperties properties,
 			ObjectProvider<UiSecurityCustomizer> customizers,
 			ObjectProvider<ReactiveUserDetailsService> userDetailsService,
-			ObjectProvider<ReactiveAuthenticationManager> authenticationManager) {
+			ObjectProvider<ReactiveAuthenticationManager> authenticationManager,
+			ObjectProvider<WebSessionManager> sessionManager) {
 		List<SecuredPathsContribution> declared = securedPaths.orderedStream().toList();
 		List<String> paths = collect(declared, SecuredPathsContribution::paths);
 		List<String> open = collect(declared, SecuredPathsContribution::openPaths);
@@ -251,6 +257,7 @@ public class GatewayUiSecurityAutoConfiguration {
 			openContributions.forEach((contribution) -> contribution.customize(http));
 			return http.build();
 		}
+		warnInMemorySessions(sessionManager);
 		// The endpoints of an authentication exchange are reached before there is a
 		// principal, so they join the paths of the views rather than the other way round.
 		List<String> exchangePaths = contributions.stream()
@@ -287,6 +294,12 @@ public class GatewayUiSecurityAutoConfiguration {
 				form.loginPage(LOGIN_PATH);
 				form.authenticationSuccessHandler(successHandler());
 			});
+			// The same credentials over Basic, which is the only way a caller with no
+			// browser can present them: a script has no form to post and no session to
+			// hold, and the endpoints of the console answer it as they answer a Bearer
+			// token. Without this the local user is a way in through the page alone,
+			// and 'Authorization: Basic' is read by nobody on this chain.
+			http.httpBasic(withDefaults());
 			localUser(properties.getUser()).ifPresent(http::authenticationManager);
 		}
 		http.logout((logout) -> {
@@ -396,6 +409,33 @@ public class GatewayUiSecurityAutoConfiguration {
 			case PERMIT_ALL -> false;
 			case AUTO -> canAuthenticate;
 		};
+	}
+
+	/**
+	 * Says that the sessions the console is about to start live in the memory of this
+	 * instance alone.
+	 * <p>
+	 * A second instance is then a second console: the {@code SESSION} cookie means
+	 * nothing to whichever one did not issue it, so every request a load balancer sends
+	 * elsewhere finds no principal and goes back to the login page. Signing in through a
+	 * provider fails harder than that &mdash; the authorization request, its
+	 * {@code state} and the PKCE verifier are held in the same session, so a callback
+	 * landing on another instance is rejected outright.
+	 * <p>
+	 * Only the deployment knows how many instances there are, so this says what is true
+	 * of this one and leaves the conclusion to whoever reads it: a single-instance
+	 * gateway has nothing to do about it.
+	 */
+	private static void warnInMemorySessions(ObjectProvider<WebSessionManager> sessionManager) {
+		if (sessionManager.getIfAvailable() instanceof DefaultWebSessionManager manager
+				&& manager.getSessionStore() instanceof InMemoryWebSessionStore) {
+			LOG.warn("The console is behind a login page and this instance keeps the sessions it opens in its own "
+					+ "memory. Running more than one instance behind a load balancer then loses the session on "
+					+ "every request served by another one, and an OpenID Connect callback reaching another one is "
+					+ "rejected. Add a shared session store: the spring-boot-starter-session-data-redis "
+					+ "starter, not the spring-session-data-redis artifact on its own, which carries no "
+					+ "auto-configuration. A single gateway instance needs nothing.");
+		}
 	}
 
 	/**

@@ -856,10 +856,64 @@ usable rather than merely secured:
 
 | Request | Unauthenticated answer |
 | --- | --- |
-| A page navigation | `302` to `/ui/login` |
-| An HTMX fragment | `401` carrying `HX-Redirect: /ui/login`, so HTMX reloads the page instead of swapping the login form into a corner of the shell |
-| An event stream (`/ui/audit/events`) | `401`, which an `EventSource` can act on &mdash; served the login page, it would keep reconnecting to it |
-| A request carrying `Authorization` | `401` with `WWW-Authenticate: Bearer` rather than an HTML page |
+| A page navigation | `302` to `/ui/login?unauthorized` |
+| An HTMX fragment | `401` carrying `HX-Redirect: /ui/login?unauthorized`, so HTMX reloads the page instead of swapping the login form into a corner of the shell |
+| Anything not accepting `text/html` &mdash; a JSON `fetch`, an `EventSource` | `401`. A script cannot read a redirect: it would follow it and get a sign-in form instead of its data |
+| A request carrying `Authorization` | `401` with `WWW-Authenticate: Bearer` |
+
+No `Accept` header, or `*/*`, counts as a navigation, so `curl` still gets the redirect.
+
+### Running more than one instance
+
+WebFlux keeps sessions in memory, so the `SESSION` cookie means nothing to an instance that
+did not issue it: behind a load balancer, every request served by another one goes back to
+the login page. Signing in through a provider fails outright &mdash; the `state` and the PKCE
+verifier live in that session &mdash; and so does every form, whose CSRF token lives there
+too.
+
+The console warns about this at start-up whenever it is behind its login page and finds the
+sessions in memory. Give the instances a shared store rather than sticky sessions, which
+still sign out everyone on an instance when it restarts.
+
+**1. Add Spring Boot's starter**, not Spring Session's own artifact:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-session-data-redis</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+</dependency>
+```
+
+**2. Point it at Redis**, if the gateway does not already:
+
+```yaml
+spring.data.redis.host: ${REDIS_HOST:localhost}
+```
+
+**3. Set the timeout and a namespace:**
+
+```yaml
+spring.session:
+  timeout: 30m
+  data.redis.namespace: gateway:console
+```
+
+**4. Check it took.** The start-up warning is gone, and a key appears per session:
+
+```console
+redis-cli --scan --pattern 'gateway:console:*' | head
+```
+
+A key per session appears. From then on the `SESSION` cookie is worth the same on every
+instance, and the sign-in, the OpenID Connect callback and the CSRF token of the forms all
+survive a request landing anywhere.
+
+A single-instance gateway needs none of this, which is why the plugin asks for nothing and
+only warns.
 
 CSRF protection is on in this mode, since the console is then behind a session cookie. The
 forms carry the token as a hidden field, and `gateway-ui.js` puts it on every HTMX request

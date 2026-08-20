@@ -261,6 +261,11 @@ The two share what lives outside the JVM — the Redis keys, the Eureka registra
 nothing else: the database routes run on a private in-memory H2, so each has its own. Run
 both under `pgsql` to share those too.
 
+Console sessions are one of the things they do not share, and this sample never shows it:
+each instance is browsed on its own port, so nobody navigates the console across the two.
+Behind one address, every navigation served by the other one lands back on the login page —
+see [Running more than one instance](../../../spring-cloud-gateway-ui/README.md#running-more-than-one-instance).
+
 ## Who calls what
 
 The `service-a` and `service-b` routes exist to make the
