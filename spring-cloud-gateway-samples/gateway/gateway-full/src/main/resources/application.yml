@@ -240,14 +240,6 @@ spring:
         jwt:
           issuer-uri: http://localhost:9090
 
-spring.data.redis:
-  host: ${REDIS_HOST:localhost}
-  port: 6379
-  password: ${REDIS_PASSWORD:}
-spring.session:
-  timeout: 30m
-  data.redis.namespace: gateway:console
-          
 management:
   endpoints:
     web:
