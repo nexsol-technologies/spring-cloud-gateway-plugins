@@ -16,7 +16,6 @@
 
 package ch.nexsol.gateway.metrics;
 
-import ch.nexsol.gateway.commons.InstanceIdentity;
 import reactor.core.publisher.Mono;
 
 /**
@@ -27,12 +26,9 @@ import reactor.core.publisher.Mono;
  * instance of the gateway: the other instances themselves, a shared store, or a metrics
  * backend.
  * <p>
- * This is deliberately a separate contract from {@link RouteMetricsSource} rather than a
- * specialisation of it. Route figures are <em>merged</em> across instances &mdash; three
- * instances serving one route produce one number &mdash; while instance figures never
- * are: each instance is a row of its own, and the average heap of a cluster means
- * nothing. The two share the reading of {@link InstanceIdentity} and the vocabulary of
- * the coverage, which is all they have in common.
+ * Route figures are <em>merged</em> across instances &mdash; three instances serving one
+ * route produce one number &mdash; while instance figures never are: each instance is a
+ * row of its own, and the average heap of a cluster means nothing.
  * <p>
  * Implementations return a {@link Mono} because every source but the local one performs
  * I/O. A source that cannot answer reports an empty snapshot rather than failing.

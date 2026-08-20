@@ -22,10 +22,6 @@ import java.util.List;
 /**
  * What an {@link InstanceMetricsSource} returns: one row per instance together with the
  * coverage the rows were collected over.
- * <p>
- * The coverage is carried with the rows for the same reason it is on
- * {@link RouteMetricsSnapshot}: a list of one instance means something different
- * depending on whether the gateway runs alone or the source could only reach itself.
  *
  * @param coverage what the rows cover, ready to be shown to a human
  * @param instances the per-instance figures, ordered by instance id

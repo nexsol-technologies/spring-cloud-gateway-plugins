@@ -32,9 +32,8 @@ import org.springframework.web.server.ServerWebExchange;
  * the visitor may open.
  * <p>
  * The login page shows the credentials form, and a button per identity provider the
- * application registered. Both can be offered at once, which is the point: an operator
- * signs in through the provider, and the local user stays as the way in when the provider
- * is unreachable.
+ * application registered. Both can be offered at once: an operator signs in through the
+ * provider, and the local user stays as the way in when the provider is unreachable.
  * <p>
  * Only the auto-configuration puts this controller in a context, and only under the mode
  * that needs it: a console left open serves no login page.

@@ -66,8 +66,7 @@ import org.springframework.web.server.ServerWebExchange;
  * What the plugin publishes is its own decision, not this one. Under
  * {@code routes-database.access=read-only} the page renders without the affordances that
  * would change a route, and the two handlers that would have answered them refuse with a
- * {@code 405} &mdash; the same answer the REST API of the plugin gives, and for the same
- * reason: an operation that is not published is not a question of who is asking.
+ * {@code 405} &mdash; the same answer the REST API of the plugin gives.
  */
 @Controller
 @RequestMapping("/ui/routes/db")

@@ -152,8 +152,7 @@ public class MetricsProperties {
 		 * transport carries a metrics recorder, and the gateway never asks for one.
 		 * <p>
 		 * Off by default: the recorder adds a handler to the pipeline of every
-		 * connection, so it costs something on the data path of the gateway. Turning that
-		 * on is the operator's call, not an observation plugin's.
+		 * connection, so it costs something on the data path of the gateway.
 		 * <p>
 		 * The connection pool counters are governed separately by
 		 * {@code spring.cloud.gateway.server.webflux.httpclient.pool.metrics}, read too

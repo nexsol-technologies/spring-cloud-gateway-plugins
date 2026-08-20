@@ -29,9 +29,8 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
  * route requires, and {@code routes-security} exempts the routes that declare themselves
  * public.
  * <p>
- * The three run at different moments, which is the point of the combination: the public
- * route matcher decides before authentication, the resource server authenticates, and the
- * gateway filters authorize once the route is known.
+ * The public route matcher decides before authentication, the resource server
+ * authenticates, and the gateway filters authorize once the route is known.
  */
 @SpringBootApplication
 public class SecuredGatewayApplication {

@@ -40,8 +40,7 @@ import org.springframework.context.annotation.Bean;
  * the source reading the local meter registry.
  * <p>
  * A provider module declares its own {@link RouteMetricsSource} ordered {@code before}
- * this configuration, so its source wins over the local one exactly the way an audit
- * provider wins over the default publisher.
+ * this configuration, so its source wins over the local one.
  */
 @AutoConfiguration
 @ConditionalOnClass(MeterRegistry.class)

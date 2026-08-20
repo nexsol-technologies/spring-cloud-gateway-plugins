@@ -28,10 +28,6 @@ import org.springframework.cloud.gateway.config.HttpClientCustomizer;
  * client factory never calls {@code metrics(...)}, and no property exposes it. Without
  * this customizer the counters simply do not exist, however the meter registry is
  * queried.
- * <p>
- * This is the one place where the metrics plugin changes what the gateway does at runtime
- * rather than only reading what it already publishes, which is why it is guarded by an
- * explicit property that defaults to off.
  */
 public class GatewayHttpClientInstrumentation implements HttpClientCustomizer {
 
