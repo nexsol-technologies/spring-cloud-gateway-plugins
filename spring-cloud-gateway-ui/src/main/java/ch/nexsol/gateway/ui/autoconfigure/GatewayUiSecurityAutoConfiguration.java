@@ -37,6 +37,7 @@ import ch.nexsol.gateway.ui.security.UiLoginRegistrations;
 import ch.nexsol.gateway.ui.security.UiSecuredPaths;
 import ch.nexsol.gateway.ui.security.UiSecurityCustomizer;
 import ch.nexsol.gateway.ui.security.UiSecurityModelAttributes;
+import ch.nexsol.gateway.ui.security.UiSessionCookieName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -359,6 +360,20 @@ public class GatewayUiSecurityAutoConfiguration {
 		return StringUtils.hasText(properties.getUser().getPassword())
 				|| userDetailsService.stream().findAny().isPresent()
 				|| authenticationManager.stream().findAny().isPresent();
+	}
+
+	/**
+	 * Renames the session cookie of the console, so that a {@code Set-Cookie: SESSION=}
+	 * coming back from any service the gateway routes to cannot land on the browser as
+	 * the cookie of the console.
+	 * @param environment the environment the cookie settings of the application are read
+	 * from
+	 * @return the post-processor naming the cookie
+	 */
+	@Bean
+	@ConditionalOnProperty(prefix = SECURITY_PREFIX, name = "mode", havingValue = "authenticated")
+	static UiSessionCookieName gatewayUiSessionCookieName(Environment environment) {
+		return new UiSessionCookieName(environment.getProperty("server.reactive.session.cookie.name"));
 	}
 
 	/**

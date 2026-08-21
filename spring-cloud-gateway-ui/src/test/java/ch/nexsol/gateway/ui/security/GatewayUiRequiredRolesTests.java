@@ -56,7 +56,7 @@ class GatewayUiRequiredRolesTests {
 		String session = signIn();
 		this.webTestClient.get()
 			.uri("/ui")
-			.cookie("SESSION", session)
+			.cookie(UiSessionCookieName.COOKIE_NAME, session)
 			.exchange()
 			.expectStatus()
 			.isFound()
@@ -68,7 +68,7 @@ class GatewayUiRequiredRolesTests {
 	void shouldExplainTheRefusalAndOfferTheWayOut() {
 		this.webTestClient.get()
 			.uri("/ui/forbidden")
-			.cookie("SESSION", signIn())
+			.cookie(UiSessionCookieName.COOKIE_NAME, signIn())
 			.exchange()
 			.expectStatus()
 			.isOk()
@@ -83,7 +83,7 @@ class GatewayUiRequiredRolesTests {
 		String session = signIn();
 		EntityExchangeResult<String> page = this.webTestClient.get()
 			.uri("/ui/forbidden")
-			.cookie("SESSION", session)
+			.cookie(UiSessionCookieName.COOKIE_NAME, session)
 			.exchange()
 			.expectBody(String.class)
 			.returnResult();
@@ -92,7 +92,7 @@ class GatewayUiRequiredRolesTests {
 
 		this.webTestClient.post()
 			.uri("/ui/logout")
-			.cookie("SESSION", session)
+			.cookie(UiSessionCookieName.COOKIE_NAME, session)
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData("_csrf", token.group(1)))
 			.exchange()
@@ -106,7 +106,7 @@ class GatewayUiRequiredRolesTests {
 	void shouldTellHtmxToLeaveTheShellRatherThanSwapTheRefusalIn() {
 		this.webTestClient.get()
 			.uri("/ui")
-			.cookie("SESSION", signIn())
+			.cookie(UiSessionCookieName.COOKIE_NAME, signIn())
 			.header("HX-Request", "true")
 			.exchange()
 			.expectStatus()
@@ -119,7 +119,7 @@ class GatewayUiRequiredRolesTests {
 	void shouldAnswerATokenBearingRequestWithForbiddenRatherThanAnExplanationPage() {
 		this.webTestClient.get()
 			.uri("/ui")
-			.cookie("SESSION", signIn())
+			.cookie(UiSessionCookieName.COOKIE_NAME, signIn())
 			.header(HttpHeaders.AUTHORIZATION, "Bearer a-token")
 			.exchange()
 			.expectStatus()
@@ -140,7 +140,8 @@ class GatewayUiRequiredRolesTests {
 		assertThat(token.find()).as("the login page carries a CSRF token").isTrue();
 		return this.webTestClient.post()
 			.uri("/ui/login")
-			.cookie("SESSION", page.getResponseCookies().getFirst("SESSION").getValue())
+			.cookie(UiSessionCookieName.COOKIE_NAME,
+					page.getResponseCookies().getFirst(UiSessionCookieName.COOKIE_NAME).getValue())
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData("username", "visitor")
 				.with("password", "visitor-secret")
@@ -151,7 +152,7 @@ class GatewayUiRequiredRolesTests {
 			.expectBody()
 			.isEmpty()
 			.getResponseCookies()
-			.getFirst("SESSION")
+			.getFirst(UiSessionCookieName.COOKIE_NAME)
 			.getValue();
 	}
 
