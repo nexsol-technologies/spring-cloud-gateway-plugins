@@ -47,10 +47,20 @@ at once.
 [tools](tools/README.md) — scripts for the maintenance of this repository, such as re-capturing
 the screenshots of the console the READMEs embed.
 
-## Requirements
+## Compatibility
 
-Java 21, Spring Boot 4 (WebFlux), Spring Cloud 2025.1.2. See the
-[Spring Cloud Gateway reference documentation](https://docs.spring.io/spring-cloud-gateway/reference/).
+Java 21 and a Spring Boot (WebFlux) application. A release line is fixed to one Spring Boot
+line and is never moved to another one:
+
+| Line | Spring Boot | Spring Cloud | Status |
+| --- | --- | --- | --- |
+| `1.14.x` | 4.0.Y | 2025.1.x | Current, developed on `main` |
+| `1.5.x` – `1.13.x` | 4.0.Y | 2025.1.x | End of life |
+| `1.0.x` – `1.3.x` | 3.5.Y | 2025.0.x | End of life |
+
+## Reference documentation
+
+[Spring Cloud Gateway reference documentation](https://docs.spring.io/spring-cloud-gateway/reference/)
 
 ## Getting help
 
