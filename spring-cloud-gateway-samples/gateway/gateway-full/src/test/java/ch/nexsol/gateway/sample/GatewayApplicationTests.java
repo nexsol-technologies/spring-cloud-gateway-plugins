@@ -20,6 +20,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import ch.nexsol.gateway.ui.security.GatewayUiSecurityProperties;
+import ch.nexsol.gateway.ui.security.UiSessionCookieName;
 import org.junit.jupiter.api.Test;
 import reactor.test.StepVerifier;
 
@@ -109,7 +110,7 @@ class GatewayApplicationTests {
 			.location("/ui/login?unauthorized");
 		this.webTestClient.get()
 			.uri("/api/gateway/routes")
-			.cookie("SESSION", signIn())
+			.cookie(UiSessionCookieName.COOKIE_NAME, signIn())
 			.exchange()
 			.expectStatus()
 			.isOk();
@@ -137,7 +138,12 @@ class GatewayApplicationTests {
 	void shouldServeTheViewsEveryPluginLightsUpOnceSignedIn() {
 		String session = signIn();
 		for (String view : new String[] { "/ui", "/ui/routes", "/ui/routes/db", "/ui/metrics", "/ui/audit" }) {
-			this.webTestClient.get().uri(view).cookie("SESSION", session).exchange().expectStatus().isOk();
+			this.webTestClient.get()
+				.uri(view)
+				.cookie(UiSessionCookieName.COOKIE_NAME, session)
+				.exchange()
+				.expectStatus()
+				.isOk();
 		}
 	}
 
@@ -159,7 +165,8 @@ class GatewayApplicationTests {
 		assertThat(token.find()).as("the login page carries a CSRF token").isTrue();
 		return this.webTestClient.post()
 			.uri("/ui/login")
-			.cookie("SESSION", page.getResponseCookies().getFirst("SESSION").getValue())
+			.cookie(UiSessionCookieName.COOKIE_NAME,
+					page.getResponseCookies().getFirst(UiSessionCookieName.COOKIE_NAME).getValue())
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData("username", "superadmin")
 				.with("password", "superadmin")
@@ -172,7 +179,7 @@ class GatewayApplicationTests {
 			.expectBody()
 			.isEmpty()
 			.getResponseCookies()
-			.getFirst("SESSION")
+			.getFirst(UiSessionCookieName.COOKIE_NAME)
 			.getValue();
 	}
 

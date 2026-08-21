@@ -44,6 +44,7 @@ so several gateways can run side by side.
 | --- | --- | --- |
 | [service-a](service-a) | 8080 | The downstream backend: one controller, its OpenAPI contract, and the two flows towards `service-b` |
 | [service-b](service-b) | 8081 | A second backend, called by `service-a` — directly, and through the gateway |
+| [service-c](service-c) | 8082 | A backend that is a **resource server**: its contract is open, everything else asks for a token. What the other two are not, and what the services behind a real gateway usually are |
 | [eureka](eureka) | 8761 | The service registry |
 | [config-server](config-server) | 8888 | A Config Server serving route files from a classpath repository |
 | [auth-server](auth-server) | 9090 | An OAuth2 authorization server; accounts `user:user` (role `READ`) and `admin:admin` (role `ADMIN`), client `messaging-client:secret` |

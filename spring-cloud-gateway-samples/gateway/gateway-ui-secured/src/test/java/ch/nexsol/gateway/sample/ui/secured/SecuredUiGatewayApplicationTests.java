@@ -19,6 +19,7 @@ package ch.nexsol.gateway.sample.ui.secured;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import ch.nexsol.gateway.ui.security.UiSessionCookieName;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,13 +77,13 @@ class SecuredUiGatewayApplicationTests {
 			.isOk()
 			.expectBody(String.class)
 			.returnResult();
-		String session = page.getResponseCookies().getFirst("SESSION").getValue();
+		String session = page.getResponseCookies().getFirst(UiSessionCookieName.COOKIE_NAME).getValue();
 		Matcher token = CSRF.matcher(page.getResponseBody());
 		assertThat(token.find()).as("the login page carries a CSRF token").isTrue();
 
 		EntityExchangeResult<Void> signedIn = this.webTestClient.post()
 			.uri("/ui/login")
-			.cookie("SESSION", session)
+			.cookie(UiSessionCookieName.COOKIE_NAME, session)
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData("username", "superadmin")
 				.with("password", "superadmin")
@@ -96,11 +97,11 @@ class SecuredUiGatewayApplicationTests {
 			.isEmpty();
 		// Signing in changes the session id, so the console is opened with the one the
 		// authentication handed back rather than the one the login page was served under.
-		String authenticated = signedIn.getResponseCookies().getFirst("SESSION").getValue();
+		String authenticated = signedIn.getResponseCookies().getFirst(UiSessionCookieName.COOKIE_NAME).getValue();
 
 		this.webTestClient.get()
 			.uri("/ui/routes")
-			.cookie("SESSION", authenticated)
+			.cookie(UiSessionCookieName.COOKIE_NAME, authenticated)
 			.exchange()
 			.expectStatus()
 			.isOk()

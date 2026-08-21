@@ -64,7 +64,7 @@ class GatewayUiOidcLogoutTests {
 		String session = signIn();
 		EntityExchangeResult<String> shell = this.webTestClient.get()
 			.uri("/ui")
-			.cookie("SESSION", session)
+			.cookie(UiSessionCookieName.COOKIE_NAME, session)
 			.exchange()
 			.expectStatus()
 			.isOk()
@@ -75,7 +75,7 @@ class GatewayUiOidcLogoutTests {
 
 		this.webTestClient.post()
 			.uri("/ui/logout")
-			.cookie("SESSION", session)
+			.cookie(UiSessionCookieName.COOKIE_NAME, session)
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData("_csrf", token.group(1)))
 			.exchange()
@@ -97,7 +97,8 @@ class GatewayUiOidcLogoutTests {
 		assertThat(token.find()).as("the login page carries a CSRF token").isTrue();
 		return this.webTestClient.post()
 			.uri("/ui/login")
-			.cookie("SESSION", page.getResponseCookies().getFirst("SESSION").getValue())
+			.cookie(UiSessionCookieName.COOKIE_NAME,
+					page.getResponseCookies().getFirst(UiSessionCookieName.COOKIE_NAME).getValue())
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData("username", "superadmin")
 				.with("password", "console-secret")
@@ -108,7 +109,7 @@ class GatewayUiOidcLogoutTests {
 			.expectBody()
 			.isEmpty()
 			.getResponseCookies()
-			.getFirst("SESSION")
+			.getFirst(UiSessionCookieName.COOKIE_NAME)
 			.getValue();
 	}
 

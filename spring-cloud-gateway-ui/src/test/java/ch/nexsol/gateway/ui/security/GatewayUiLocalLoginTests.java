@@ -116,6 +116,14 @@ class GatewayUiLocalLoginTests {
 	}
 
 	@Test
+	void shouldNameItsSessionCookieAfterTheConsole() {
+		// Never 'SESSION': the gateway answers on the same origin as the services it
+		// routes to, and a Set-Cookie coming back from any of them under that name would
+		// land on the browser as the cookie of the console.
+		this.webTestClient.get().uri("/ui/login").exchange().expectCookie().exists(UiSessionCookieName.COOKIE_NAME);
+	}
+
+	@Test
 	void shouldServeTheAssetsTheLoginPagePaintsWith() {
 		for (String asset : new String[] { "/css/bootstrap.min.css", "/css/gateway-ui.css", "/img/logo.png",
 				"/img/icon.png" }) {
@@ -217,12 +225,12 @@ class GatewayUiLocalLoginTests {
 			.isOk()
 			.expectBody(String.class)
 			.returnResult();
-		String session = page.getResponseCookies().getFirst("SESSION").getValue();
+		String session = page.getResponseCookies().getFirst(UiSessionCookieName.COOKIE_NAME).getValue();
 		String token = csrfToken(page.getResponseBody());
 
 		this.webTestClient.post()
 			.uri("/ui/login")
-			.cookie("SESSION", session)
+			.cookie(UiSessionCookieName.COOKIE_NAME, session)
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData("username", "operator")
 				.with("password", "console-secret")
@@ -241,11 +249,11 @@ class GatewayUiLocalLoginTests {
 			.exchange()
 			.expectBody(String.class)
 			.returnResult();
-		String session = page.getResponseCookies().getFirst("SESSION").getValue();
+		String session = page.getResponseCookies().getFirst(UiSessionCookieName.COOKIE_NAME).getValue();
 
 		this.webTestClient.post()
 			.uri("/ui/login")
-			.cookie("SESSION", session)
+			.cookie(UiSessionCookieName.COOKIE_NAME, session)
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData("username", "operator")
 				.with("password", "wrong")

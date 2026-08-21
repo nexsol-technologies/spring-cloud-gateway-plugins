@@ -79,7 +79,8 @@ class GatewayUiLocalLoginWithPluginsTests {
 
 		this.webTestClient.post()
 			.uri("/ui/login")
-			.cookie("SESSION", page.getResponseCookies().getFirst("SESSION").getValue())
+			.cookie(UiSessionCookieName.COOKIE_NAME,
+					page.getResponseCookies().getFirst(UiSessionCookieName.COOKIE_NAME).getValue())
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData("username", "superadmin")
 				.with("password", "console-secret")
@@ -93,14 +94,19 @@ class GatewayUiLocalLoginWithPluginsTests {
 
 	@Test
 	void shouldOpenTheShellWithTheSessionTheLocalUserSignedInWith() {
-		this.webTestClient.get().uri("/ui").cookie("SESSION", signIn()).exchange().expectStatus().isOk();
+		this.webTestClient.get()
+			.uri("/ui")
+			.cookie(UiSessionCookieName.COOKIE_NAME, signIn())
+			.exchange()
+			.expectStatus()
+			.isOk();
 	}
 
 	@Test
 	void shouldServeThePathsOfTheOtherPluginsWithThatSameSession() {
 		this.webTestClient.get()
 			.uri("/plugin/browsed")
-			.cookie("SESSION", signIn())
+			.cookie(UiSessionCookieName.COOKIE_NAME, signIn())
 			.exchange()
 			.expectStatus()
 			.isNotFound();
@@ -116,7 +122,8 @@ class GatewayUiLocalLoginWithPluginsTests {
 		assertThat(token.find()).as("the login page carries a CSRF token").isTrue();
 		return this.webTestClient.post()
 			.uri("/ui/login")
-			.cookie("SESSION", page.getResponseCookies().getFirst("SESSION").getValue())
+			.cookie(UiSessionCookieName.COOKIE_NAME,
+					page.getResponseCookies().getFirst(UiSessionCookieName.COOKIE_NAME).getValue())
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData("username", "superadmin")
 				.with("password", "console-secret")
@@ -126,7 +133,7 @@ class GatewayUiLocalLoginWithPluginsTests {
 			.isFound()
 			.returnResult(String.class)
 			.getResponseCookies()
-			.getFirst("SESSION")
+			.getFirst(UiSessionCookieName.COOKIE_NAME)
 			.getValue();
 	}
 

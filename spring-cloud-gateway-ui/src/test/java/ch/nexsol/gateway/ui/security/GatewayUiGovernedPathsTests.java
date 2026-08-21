@@ -83,7 +83,7 @@ class GatewayUiGovernedPathsTests {
 		String session = signIn();
 		this.webTestClient.get()
 			.uri("/plugin/browsed")
-			.cookie("SESSION", session)
+			.cookie(UiSessionCookieName.COOKIE_NAME, session)
 			.exchange()
 			.expectStatus()
 			.isNotFound();
@@ -93,7 +93,7 @@ class GatewayUiGovernedPathsTests {
 	void shouldAskAFormForItsCsrfToken() {
 		this.webTestClient.post()
 			.uri("/plugin/browsed")
-			.cookie("SESSION", signIn())
+			.cookie(UiSessionCookieName.COOKIE_NAME, signIn())
 			.exchange()
 			.expectStatus()
 			.isForbidden();
@@ -105,7 +105,7 @@ class GatewayUiGovernedPathsTests {
 		// being turned away by the CSRF filter.
 		this.webTestClient.post()
 			.uri("/plugin/routes")
-			.cookie("SESSION", signIn())
+			.cookie(UiSessionCookieName.COOKIE_NAME, signIn())
 			.exchange()
 			.expectStatus()
 			.isNotFound();
@@ -121,12 +121,12 @@ class GatewayUiGovernedPathsTests {
 			.exchange()
 			.expectBody(String.class)
 			.returnResult();
-		String session = page.getResponseCookies().getFirst("SESSION").getValue();
+		String session = page.getResponseCookies().getFirst(UiSessionCookieName.COOKIE_NAME).getValue();
 		Matcher matcher = CSRF.matcher(page.getResponseBody());
 		assertThat(matcher.find()).as("the login page carries a CSRF token").isTrue();
 		return this.webTestClient.post()
 			.uri("/ui/login")
-			.cookie("SESSION", session)
+			.cookie(UiSessionCookieName.COOKIE_NAME, session)
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 			.body(BodyInserters.fromFormData("username", "operator")
 				.with("password", "console-secret")
@@ -136,7 +136,7 @@ class GatewayUiGovernedPathsTests {
 			.isFound()
 			.returnResult(String.class)
 			.getResponseCookies()
-			.getFirst("SESSION")
+			.getFirst(UiSessionCookieName.COOKIE_NAME)
 			.getValue();
 	}
 

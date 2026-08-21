@@ -1,0 +1,24 @@
+server.port: 8082
+spring.application.name: service-c
+eureka:
+  client:
+    enabled: false
+# The issuer this resource server validates its tokens against. It is asked for its keys on
+# the first token that arrives, so the service starts whether or not the provider answers.
+spring.security.oauth2.resourceserver.jwt.issuer-uri: ${ISSUER_URI:http://localhost:9090}
+springdoc:
+  swagger-ui:
+    show-extensions: true
+  api-docs:
+    resolve-extensions-properties: true
+---
+spring:
+  config:
+    activate:
+      on-profile:
+      - eureka
+eureka:
+  client:
+    enabled: true
+    fetch-registry: true
+    register-with-eureka: true
