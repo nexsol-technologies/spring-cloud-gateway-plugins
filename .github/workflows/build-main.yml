@@ -58,7 +58,7 @@ jobs:
           cache-dependency-path: '**/pom.xml'
 
       - name: Publish SNAPSHOT version to GitHub Packages (we can skip tests, since we only deploy, if the build workflow succeeded)
-        run: mvn-B deploy --no-transfer-progress -DskipTests
+        run: mvn -B deploy --no-transfer-progress -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.DEPLOY_GITHUB_PACKAGE_MAVEN }}
 
