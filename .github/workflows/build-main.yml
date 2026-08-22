@@ -22,7 +22,7 @@ jobs:
           cache-dependency-path: '**/pom.xml'
 
       - name: Build with Maven
-        run: ./mvnw -B --no-transfer-progress install -P coverage
+        run: mvn -B --no-transfer-progress install -P coverage
 
       - name: Upload surefire reports
         if: always()
@@ -58,12 +58,12 @@ jobs:
           cache-dependency-path: '**/pom.xml'
 
       - name: Publish SNAPSHOT version to GitHub Packages (we can skip tests, since we only deploy, if the build workflow succeeded)
-        run: ./mvnw -B deploy --no-transfer-progress -DskipTests
+        run: mvn-B deploy --no-transfer-progress -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.DEPLOY_GITHUB_PACKAGE_MAVEN }}
 
       - name: Extract Maven project version for Asciidoc GitHub Pages directory naming
-        run: echo ::set-output name=version::$(./mvnw -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec)
+        run: echo ::set-output name=version::$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec)
         id: project
 
       - name: Show extracted Maven project version
