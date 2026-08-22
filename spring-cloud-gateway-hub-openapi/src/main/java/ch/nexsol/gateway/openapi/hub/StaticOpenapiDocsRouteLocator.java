@@ -121,7 +121,8 @@ public class StaticOpenapiDocsRouteLocator implements RouteDefinitionLocator {
 		// advertised base carries the source path prefix: without it the console would
 		// call the contract paths, which is precisely what the prefix moved away.
 		route.setFilters(List.of(new FilterDefinition("RewritePath=" + docsPath + ", " + specPath),
-				new FilterDefinition("OpenapiModifyResponseBody=" + advertisedBase(source))));
+				new FilterDefinition("OpenapiModifyResponseBody=" + advertisedBase(source)),
+				new FilterDefinition(HubOpenapiPaths.REMOVE_COOKIE_FILTER)));
 		return route;
 	}
 

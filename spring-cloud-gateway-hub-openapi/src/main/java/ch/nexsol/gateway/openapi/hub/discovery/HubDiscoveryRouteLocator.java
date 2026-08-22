@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import ch.nexsol.gateway.openapi.HubOpenapiProperties;
+import ch.nexsol.gateway.openapi.hub.HubOpenapiPaths;
 import ch.nexsol.gateway.openapi.hub.OpenapiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,7 +137,8 @@ public class HubDiscoveryRouteLocator extends DiscoveryClientRouteDefinitionLoca
 				r.setUri(routeDefinition.getUri());
 				r.setMetadata(Map.of("name", name));
 				r.setFilters(List.of(new FilterDefinition("RewritePath=" + API_DOCS_URL + path + ", " + discoveredPath),
-						new FilterDefinition("OpenapiModifyResponseBody=" + path)));
+						new FilterDefinition("OpenapiModifyResponseBody=" + path),
+						new FilterDefinition(HubOpenapiPaths.REMOVE_COOKIE_FILTER)));
 				r.setPredicates(List.of(new PredicateDefinition("Path=" + API_DOCS_URL + path)));
 
 				LOG.debug("Create openapi route {} for existing discovery route {}", r.toString(),
