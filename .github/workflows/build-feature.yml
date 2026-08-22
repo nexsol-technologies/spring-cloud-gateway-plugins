@@ -1,12 +1,15 @@
 name: build feature branches
 
 on:
-  push:
-    branches-ignore:
-      - main
+  pull_request:
+
+concurrency:
+  group: build-feature-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    name: build-and-test-pull-request
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -24,7 +27,7 @@ jobs:
           docker rmi $(docker image ls -aq)
           df -h
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up JDK 25
         uses: actions/setup-java@v5
@@ -37,8 +40,16 @@ jobs:
         run: |
           mvn -B verify -P coverage --no-transfer-progress -D maven.javadoc.skip=true
 
-      - uses: codecov/codecov-action@v4
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          files: "*/jacoco.xml"
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          name: surefire-reports
+          path: |
+            **/target/surefire-reports/*.xml
+            **/target/surefire-reports/*.txt
+            **/target/surefire-reports/*.dump*
+            **/target/surefire-reports/*.out
+            **/target/surefire-reports/*.err
+          if-no-files-found: warn
+          retention-days: 14

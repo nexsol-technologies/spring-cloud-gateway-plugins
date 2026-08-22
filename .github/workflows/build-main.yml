@@ -1,53 +1,77 @@
-name: build main
+name: Build Main / Version Branch
 
 on:
   push:
     branches:
       - main
+      - spring_boot_*
 
 jobs:
   build:
-    strategy:
-      matrix:
-        os: [ ubuntu-latest ]
-
-    runs-on: ${{ matrix.os }}
-    permissions:
-      contents: read
-      packages: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
+      - uses: actions/checkout@v7
 
-      - uses: actions/checkout@v5
-
-      - name: Set up JDK 25
+      - name: Set up JDK
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '25'
           cache: 'maven'
+          cache-dependency-path: '**/pom.xml'
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
 
       - name: Build with Maven
-        run: |
-          mvn -B verify -P coverage --no-transfer-progress -D maven.javadoc.skip=true
+        run: ./mvnw -B --no-transfer-progress install -P coverage
 
-      - uses: codecov/codecov-action@v4
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          files: "*/jacoco.xml"
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          name: surefire-reports
+          path: |
+            **/target/surefire-reports/*.xml
+            **/target/surefire-reports/*.txt
+            **/target/surefire-reports/*.dump*
+            **/target/surefire-reports/*.out
+            **/target/surefire-reports/*.err
+          if-no-files-found: warn
+          retention-days: 14
 
-      # Deploys the artifacts the step above just built, in the same workspace: the
-      # lifecycle is re-run up to 'deploy' but everything is up to date, so nothing is
-      # recompiled and no test runs. Javadoc stays skipped, as it is for 'verify'.
-      - name: Publish SNAPSHOT version to GitHub Packages
-        run: mvn -B --no-transfer-progress deploy -DskipTests -D maven.javadoc.skip=true
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+
+  publish-snapshot:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'maven'
+          cache-dependency-path: '**/pom.xml'
+
+      - name: Publish SNAPSHOT version to GitHub Packages (we can skip tests, since we only deploy, if the build workflow succeeded)
+        run: ./mvnw -B deploy --no-transfer-progress -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.DEPLOY_GITHUB_PACKAGE_MAVEN }}
 
       - name: Extract Maven project version for Asciidoc GitHub Pages directory naming
-        run: echo "version=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec)" >> "$GITHUB_OUTPUT"
+        run: echo ::set-output name=version::$(./mvnw -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec)
         id: project
 
       - name: Show extracted Maven project version
         run: echo ${{ steps.project.outputs.version }}
-
