@@ -33,6 +33,8 @@
 	var signature = null;
 	var pollTimer = null;
 
+	var tryIt = mount.dataset.tryIt !== 'false';
+
 	/** The extensions to render, keyed by name, each with the label it reads under. */
 	var extensions = (function () {
 		try {
@@ -102,6 +104,13 @@
 			// On by default. The gateway this console documents may be the only host it is
 			// allowed to reach.
 			telemetry: false,
+			// Off by default. The token and the ticked scopes are kept in the local
+			// storage of the console origin, which outlives the console session: signing
+			// out of the console does not clear them.
+			persistAuth: true,
+			// The only entry into the request client from this layout, and the flag the
+			// bundle also gates the authentication panel on.
+			hideTestRequestButton: !tryIt,
 			// The search modal opens with its input focused but stays invisible: it carries
 			// the utility class `opacity-0`, and the animation revealing it is declared in
 			// a stylesheet the bundle does not inject in this integration. Remove once the

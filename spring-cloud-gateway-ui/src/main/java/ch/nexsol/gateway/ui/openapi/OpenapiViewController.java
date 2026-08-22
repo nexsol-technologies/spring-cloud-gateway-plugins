@@ -46,6 +46,8 @@ public class OpenapiViewController {
 
 	private final String extensionLabels;
 
+	private final boolean tryIt;
+
 	/**
 	 * Creates the controller from the configured SpringDoc documentation path.
 	 * <p>
@@ -59,8 +61,9 @@ public class OpenapiViewController {
 			ObjectProvider<OpenapiViewProperties> properties) {
 		this.documentUrl = apiDocsPath;
 		this.configUrl = apiDocsPath + "/swagger-config";
-		this.extensionLabels = MAPPER
-			.writeValueAsString(properties.getIfAvailable(OpenapiViewProperties::new).getExtensions());
+		OpenapiViewProperties resolved = properties.getIfAvailable(OpenapiViewProperties::new);
+		this.extensionLabels = MAPPER.writeValueAsString(resolved.getExtensions());
+		this.tryIt = resolved.isTryIt();
 	}
 
 	/**
@@ -74,6 +77,7 @@ public class OpenapiViewController {
 		model.addAttribute("openapiDocumentUrl", this.documentUrl);
 		model.addAttribute("openapiConfigUrl", this.configUrl);
 		model.addAttribute("openapiExtensionLabels", this.extensionLabels);
+		model.addAttribute("openapiTryIt", this.tryIt);
 		return "dashboard/openapi";
 	}
 
