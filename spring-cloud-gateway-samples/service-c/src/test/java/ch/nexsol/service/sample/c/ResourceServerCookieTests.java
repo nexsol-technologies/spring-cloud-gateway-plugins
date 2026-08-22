@@ -24,14 +24,17 @@ import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTest
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
- * What this service puts in the response the gateway hands back to a browser.
+ * What this service puts in the response the gateway hands back to a browser, and why the
+ * console cannot name its session cookie {@code SESSION}.
  * <p>
- * A browser opening the OpenAPI view of the console fetches the aggregated contracts
- * through the gateway, so these responses reach it on the same origin as the console. A
- * {@code Set-Cookie} here is therefore a cookie set on the console's origin, and one
- * named {@code SESSION} would replace the console's own if the console still used that
- * name.
+ * A browser opening the OpenAPI view fetches the aggregated contracts through the
+ * gateway, which forwards its cookies to the service and relays the response back on the
+ * same origin as the console. This service has no idea what the console's session id
+ * means, and WebFlux answers an id it cannot resolve by telling the browser to drop the
+ * cookie. The console is signed out by a call it made to read a contract.
  */
 @SpringBootTest
 @AutoConfigureWebTestClient(timeout = "300000")
@@ -47,26 +50,32 @@ class ResourceServerCookieTests {
 	}
 
 	@Test
-	void shouldSetNoCookieOnTheContractItPublishes() {
+	void shouldSetNoCookieOnACallThatCarriesNone() {
 		this.webTestClient.get().uri("/v3/api-docs").exchange().expectHeader().doesNotExist(HttpHeaders.SET_COOKIE);
 	}
 
 	@Test
-	void shouldSetNoCookieWhenItRefusesACallForLackOfAToken() {
+	void shouldExpireASessionCookieItCannotResolve() {
+		/*
+		 * The whole mechanism, in one response. WebFlux answers a session id it cannot
+		 * resolve by telling the browser to drop it, and the gateway relays that header
+		 * on the same origin as its console. A console naming its cookie SESSION is
+		 * therefore signed out by any service it routes a browser call to -- which is
+		 * every call the OpenAPI view makes to fetch the aggregated contracts.
+		 */
 		this.webTestClient.get()
-			.uri("/service-c/data")
+			.uri("/v3/api-docs")
+			.cookie("SESSION", "an-id-nobody-knows")
 			.exchange()
-			.expectStatus()
-			.isUnauthorized()
 			.expectHeader()
-			.doesNotExist(HttpHeaders.SET_COOKIE);
+			.value(HttpHeaders.SET_COOKIE,
+					(cookie) -> assertThat(cookie).startsWith("SESSION=;").contains("Max-Age=0"));
 	}
 
 	@Test
-	void shouldSetNoCookieWhenACallCarriesTheConsoleSessionCookie() {
-		// The gateway forwards the cookies of the browser to the services it routes to,
-		// so
-		// this service is handed the console's session cookie on every such call.
+	void shouldLeaveTheConsoleCookieAloneUnderItsOwnName() {
+		// The same call, with the console's cookie named after the console: there is
+		// nothing here that answers to that name, so nothing expires it.
 		this.webTestClient.get()
 			.uri("/v3/api-docs")
 			.cookie("GATEWAY_CONSOLE_SESSION", "a-console-session")
