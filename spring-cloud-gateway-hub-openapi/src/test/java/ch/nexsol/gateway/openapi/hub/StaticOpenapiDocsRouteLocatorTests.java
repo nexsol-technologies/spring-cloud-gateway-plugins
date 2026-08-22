@@ -69,8 +69,13 @@ class StaticOpenapiDocsRouteLocatorTests {
 			assertThat(route.getMetadata()).containsEntry("name", "petstore");
 			assertThat(route.getPredicates()).singleElement()
 				.satisfies((predicate) -> assertThat(predicate.getName()).isEqualTo("Path"));
+			// RemoveRequestHeader strips the cookies of the browser: a contract is read
+			// with none, and a service handed a session id it cannot resolve answers by
+			// telling the browser to drop the cookie -- which on this origin is the one
+			// the console signed the operator in with.
 			assertThat(route.getFilters()).extracting(FilterDefinition::getName)
-				.containsExactly("RewritePath", "OpenapiModifyResponseBody");
+				.containsExactly("RewritePath", "OpenapiModifyResponseBody", "RemoveRequestHeader");
+			assertThat(route.getFilters().get(2).getArgs().values()).containsExactly("Cookie");
 			// RewritePath maps the hub docs path to the upstream spec path.
 			assertThat(route.getFilters().get(0).getArgs().values()).contains("/v3/api-docs/petstore",
 					"/api/v3/openapi.json");

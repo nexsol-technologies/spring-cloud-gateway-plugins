@@ -37,6 +37,16 @@ import org.springframework.beans.factory.ObjectProvider;
  */
 public final class HubOpenapiPaths {
 
+	/**
+	 * Strips the cookies of the browser from the generated contract routes.
+	 * <p>
+	 * {@code CookieWebSessionIdResolver} answers a session id it cannot resolve with
+	 * {@code Set-Cookie: SESSION=; Max-Age=0}, so a service handed the session cookie of
+	 * the browser expires it. The gateway relays that header on the origin the console is
+	 * served from, where it names the cookie the console signed the operator in with.
+	 */
+	public static final String REMOVE_COOKIE_FILTER = "RemoveRequestHeader=Cookie";
+
 	private HubOpenapiPaths() {
 	}
 

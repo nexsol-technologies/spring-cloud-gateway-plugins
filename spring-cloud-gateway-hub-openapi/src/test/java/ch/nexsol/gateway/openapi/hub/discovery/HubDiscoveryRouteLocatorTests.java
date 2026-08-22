@@ -32,6 +32,7 @@ import reactor.test.StepVerifier;
 import org.springframework.cloud.client.DefaultServiceInstance;
 import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
 import org.springframework.cloud.gateway.discovery.DiscoveryLocatorProperties;
+import org.springframework.cloud.gateway.filter.FilterDefinition;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -77,6 +78,34 @@ class HubDiscoveryRouteLocatorTests {
 		// Without the bound, flatMap would probe all 60 services at once -- and 150 of
 		// them just as happily, which is what saturates the connection pool.
 		assertThat(highWaterMark).hasValueBetween(2, 4);
+	}
+
+	@Test
+	void stripsTheCookiesOfTheBrowserFromTheContractRouteAndNowhereElse() {
+		DefaultServiceInstance instance = new DefaultServiceInstance("chat-1", "chat", "chat.example", 8080, false);
+		given(this.discoveryClient.getServices()).willReturn(Flux.just("chat"));
+		given(this.discoveryClient.getInstances(anyString())).willReturn(Flux.just(instance));
+		given(this.openapiService.discoverOpenapiUrl(anyString(), any()))
+			.willAnswer((invocation) -> Mono.just(new OpenapiDiscover("/v3/api-docs", invocation.getArgument(1))));
+
+		HubDiscoveryRouteLocator locator = new HubDiscoveryRouteLocator(this.discoveryClient,
+				new DiscoveryLocatorProperties(), this.openapiService);
+
+		// A service handed a session id it cannot resolve answers Set-Cookie: SESSION=;
+		// Max-Age=0, which the gateway relays on the origin the console is served from.
+		StepVerifier.create(locator.getRouteDefinitions()).assertNext((route) -> {
+			assertThat(route.getId()).startsWith(HubDiscoveryRouteLocator.ROUTE_ID_PREFIX);
+			assertThat(route.getFilters()).extracting(FilterDefinition::getName)
+				.containsExactly("RewritePath", "OpenapiModifyResponseBody", "RemoveRequestHeader");
+			assertThat(route.getFilters().get(2).getArgs().values()).containsExactly("Cookie");
+		}).verifyComplete();
+
+		// This locator maps each discovery route to a contract route and returns nothing
+		// else; the traffic routes come from the locator of Spring Cloud Gateway.
+		StepVerifier
+			.create(locator.getRouteDefinitions()
+				.filter((route) -> !route.getId().startsWith(HubDiscoveryRouteLocator.ROUTE_ID_PREFIX)))
+			.verifyComplete();
 	}
 
 }
