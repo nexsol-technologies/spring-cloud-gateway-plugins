@@ -26,6 +26,41 @@
 	// per row: the same address means the same routes on every instance.
 	var routesByAddress = {};
 
+	/*
+	 * The instances whose pool table the reader unfolded: a table is folded away until it is
+	 * asked for, so what is kept is the exception rather than the rule.
+	 *
+	 * Kept across a refresh — the view redraws every five seconds and would otherwise fold
+	 * back what the reader just opened — and written down like the side menu and the theme.
+	 */
+	var EXPANDED_KEY = 'gw-instances-expanded';
+	var expanded = readExpanded();
+
+	// The last payload rendered, redrawn on its own when a table is folded or unfolded.
+	var snapshot = null;
+
+	function readExpanded() {
+		try {
+			return (localStorage.getItem(EXPANDED_KEY) || '').split(',').filter(Boolean);
+		}
+		catch (ignored) {
+			return [];
+		}
+	}
+
+	function writeExpanded() {
+		try {
+			localStorage.setItem(EXPANDED_KEY, expanded.join(','));
+		}
+		catch (ignored) {
+			// A browser refusing storage keeps the choice for this page and no further.
+		}
+	}
+
+	function isExpanded(instanceId) {
+		return expanded.indexOf(instanceId) >= 0;
+	}
+
 	// The property that publishes the connection pool counters. Named in full in the
 	// view, because a reader looking at an empty pool section needs the fix, not the
 	// observation that something is missing.
@@ -187,7 +222,15 @@
 		var pools = instance.pools.slice().sort(function (left, right) {
 			return (ratio(right.active, right.max) || 0) - (ratio(left.active, left.max) || 0);
 		});
-		return '<div class="table-responsive"><table class="table table-sm align-middle mb-0">'
+		// The count is stated on the fold: folded away, it is all that is left of the table,
+		// and a reader has to know whether what is behind it is three rows or a hundred.
+		var folded = !isExpanded(instance.instanceId);
+		return '<button type="button" class="btn btn-link btn-sm p-0 mb-2 text-secondary small'
+			+ ' text-decoration-none gw-pools-toggle" data-gi-toggle="' + escape(instance.instanceId) + '"'
+			+ ' aria-expanded="' + !folded + '">' + (folded ? '&#9656;' : '&#9662;') + ' '
+			+ pools.length + (pools.length === 1 ? ' pool' : ' pools') + ', fullest first.</button>'
+			+ '<div class="table-responsive gw-pools"' + (folded ? ' style="display: none"' : '') + '>'
+			+ '<table class="table table-sm align-middle mb-0">'
 			+ '<thead><tr class="text-secondary small">'
 			+ '<th>Route</th><th>Pool</th><th>Saturation</th><th class="text-end">Active / max</th>'
 			+ '<th class="text-end">Idle</th><th class="text-end">Pending</th><th class="text-end">Avg wait</th>'
@@ -220,13 +263,37 @@
 			+ '</div></div>';
 	}
 
-	function render(snapshot) {
-		coverageEl.textContent = snapshot.coverage || '';
-		routesByAddress = snapshot.routesByAddress || {};
-		var instances = snapshot.instances || [];
+	function render(payload) {
+		snapshot = payload;
+		coverageEl.textContent = payload.coverage || '';
+		routesByAddress = payload.routesByAddress || {};
+		var instances = payload.instances || [];
 		emptyEl.style.display = instances.length ? 'none' : '';
 		container.innerHTML = instances.map(card).join('');
 	}
+
+	/*
+	 * Folding is bound to the container rather than to the buttons: the cards are replaced
+	 * wholesale on every refresh, and a listener put on a button would go with it.
+	 */
+	container.addEventListener('click', function (event) {
+		var toggle = event.target.closest('[data-gi-toggle]');
+		if (!toggle) {
+			return;
+		}
+		var instanceId = toggle.getAttribute('data-gi-toggle');
+		var index = expanded.indexOf(instanceId);
+		if (index >= 0) {
+			expanded.splice(index, 1);
+		}
+		else {
+			expanded.push(instanceId);
+		}
+		writeExpanded();
+		if (snapshot) {
+			render(snapshot);
+		}
+	});
 
 	function load() {
 		fetch(url, { headers: { Accept: 'application/json' } })

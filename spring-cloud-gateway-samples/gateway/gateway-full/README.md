@@ -43,6 +43,8 @@ each name what they additionally need.
 | `metrics-redis` | `docker compose up -d redis` | Metrics consolidated through Redis |
 | `metrics-prometheus` | `docker compose up -d prometheus` | Metrics consolidated through Prometheus, on `:9091` |
 | `metrics-discovery` | The `eureka` sample | Metrics consolidated by polling every registered instance |
+| `graph-redis` | `docker compose up -d redis` | The service graph consolidated through Redis |
+| `sessions-redis` | `docker compose up -d redis` | The console's sessions in Redis, so two instances share them |
 | `instance2` | — | A second instance on `8191`, `instance-id` `gateway-full-2` |
 | `plugins-off` | — | Same jar, every plugin switched off |
 
@@ -184,9 +186,20 @@ Prometheus does — uncomment the `8191` target in [`prometheus.yml`](prometheus
 the container, or the second instance is never scraped and stays invisible.
 
 The two share what lives outside the JVM — the Redis keys, the Eureka registration — and
-nothing else: the database routes run on a private in-memory H2, so each has its own. Console
-sessions are not shared either, which this sample never shows since each instance is browsed on
-its own port — see
+nothing else: the database routes run on a private in-memory H2, so each has its own.
+
+Console sessions are one of those, and `sessions-redis` is the profile that shares them:
+
+```console
+mvn spring-boot:run -Dspring-boot.run.profiles=sessions-redis
+mvn spring-boot:run -Dspring-boot.run.profiles=sessions-redis,instance2
+```
+
+Ports do not scope cookies, so a browser signed in on `8181` sends that session to `8191` too.
+Without the profile the instance that did not issue the id answers `Set-Cookie: SESSION=;
+Max-Age=0` and the browser drops it, which reads as being signed out at random — sign in on
+`8181`, open `8191`, and go back. With it, both resolve the same id. The plugin says as much at
+start-up whenever it finds the sessions in memory; see
 [Running more than one instance](../../../spring-cloud-gateway-ui/README.md#running-more-than-one-instance).
 
 Under `metrics-discovery`, `/ui/metrics/local` belongs to the metrics plugin and not to the
@@ -225,6 +238,18 @@ Three things to notice while reading it:
   on one machine.
 * **The documentation routes are absent**, deliberately: `excluded-routes` leaves out
   `openapi-docs-.*`, since fetching a contract is not one service calling another.
+
+The graph runs with **no provider**, like the metrics: the view reports what this instance
+counted, under `this instance only`. `graph-redis` consolidates it through Redis. There is no
+discovery provider for the graph — its consolidating sources are `redis`, `prometheus` and
+`tempo`, compared in
+[the service graph README](../../../spring-cloud-gateway-service-graph/README.md#choosing-a-source).
+
+```console
+docker compose up -d redis
+mvn spring-boot:run -Dspring-boot.run.profiles=graph-redis
+mvn spring-boot:run -Dspring-boot.run.profiles=graph-redis,instance2
+```
 
 ## Turning the plugins off
 

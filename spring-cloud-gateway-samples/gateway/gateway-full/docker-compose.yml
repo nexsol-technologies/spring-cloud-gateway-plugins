@@ -1,6 +1,7 @@
-# Backends the consolidating metrics sources read through. Start only the one the profile
-# you run needs:
+# Backends the consolidating sources read through. Start only the one the profile you run
+# needs:
 #   docker compose up -d redis        # --spring.profiles.active=metrics-redis
+#                                     # --spring.profiles.active=graph-redis
 #   docker compose up -d prometheus   # --spring.profiles.active=metrics-prometheus
 # No profile and 'metrics-discovery' need neither: the first reads this JVM, the second the
 # service registry the 'eureka' sample provides.

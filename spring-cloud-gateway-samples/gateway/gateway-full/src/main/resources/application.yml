@@ -224,6 +224,13 @@ spring.cloud.gateway.server.webflux.ui:
 spring.r2dbc:
   url: r2dbc:h2:mem:///test_db?options=DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
 
+# SessionDataRedisAutoConfiguration wires the reactive session repository on the strength
+# of a ReactiveRedisConnectionFactory bean, which the redis sources above already put in the
+# context. Excluded here, the console keeps its sessions in memory and this sample needs no
+# Redis to run; the sessions-redis profile below drops the exclusion.
+spring.autoconfigure.exclude:
+- org.springframework.boot.session.data.redis.autoconfigure.SessionDataRedisAutoConfiguration
+
 spring:
   security:
     oauth2:
@@ -391,6 +398,67 @@ spring.cloud.gateway.server.webflux.metrics:
     instance-path: /ui/metrics/local/instance
     timeout: 3s
 ---
+# Each instance publishes the edges it counted into Redis; the view reads whatever every
+# instance left there. There is no discovery provider for the graph: 'redis', 'prometheus'
+# and 'tempo' are the three sources that cover more than one instance.
+#   docker compose up -d redis
+#   mvn spring-boot:run -Dspring-boot.run.profiles=graph-redis
+#   mvn spring-boot:run -Dspring-boot.run.profiles=graph-redis,instance2
+# It sets the provider of the graph only, so it composes with any of the metrics profiles
+# above: -Dspring-boot.run.profiles=metrics-discovery,graph-redis
+spring:
+  config:
+    activate:
+      on-profile:
+      - graph-redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+spring.cloud.gateway.server.webflux.service-graph:
+  provider: redis
+  redis:
+    # Each instance writes one key of its own, named after the identity of the instance.
+    # That identity comes from 'metrics.instance-id' whenever the metrics plugin is on the
+    # classpath, as it is here: both plugins declare the same InstanceIdentity bean and the
+    # metrics one is registered first, so the 'service-graph.instance-id' above is read by
+    # nobody. It is what the 'instance2' profile overrides, so the two instances do publish
+    # under two keys.
+    key-prefix: "gateway:service-graph:"
+    publish-interval: 10s
+    # Comfortably longer than the publish interval, or an instance disappears from the
+    # graph between two of its own writes.
+    time-to-live: 45s
+---
+# The console signs an operator in with a session, and WebFlux keeps sessions in the memory
+# of one instance. Two instances answering on the same host share the browser's cookie --
+# ports do not scope cookies -- so whichever one did not issue the session id answers
+# Set-Cookie: SESSION=; Max-Age=0 and the browser drops it. This profile puts the sessions
+# in Redis, where both instances resolve the same id.
+#   docker compose up -d redis
+#   mvn spring-boot:run -Dspring-boot.run.profiles=sessions-redis
+#   mvn spring-boot:run -Dspring-boot.run.profiles=sessions-redis,instance2
+# Then sign in on 8181 and browse 8191: the session follows.
+spring:
+  config:
+    activate:
+      on-profile:
+      - sessions-redis
+  # Empty, so the exclusion the default document carries does not apply here and
+  # SessionDataRedisAutoConfiguration wires the reactive session repository.
+  autoconfigure:
+    exclude:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+  session:
+    timeout: 30m
+    data.redis.namespace: "gateway:console"
+
+---
 # Every plugin off, from configuration alone: the same jar and the same classpath, and a
 # gateway that routes traffic and does nothing else.
 #   mvn spring-boot:run -Dspring-boot.run.profiles=plugins-off
@@ -410,6 +478,7 @@ spring:
     exclude:
     - ch.nexsol.gateway.ui.autoconfigure.GatewayUiAutoConfiguration
     - ch.nexsol.gateway.ui.autoconfigure.GatewayUiSecurityAutoConfiguration
+    - org.springframework.boot.session.data.redis.autoconfigure.SessionDataRedisAutoConfiguration
 spring.cloud.gateway.server.webflux:
   # routes-database: the whole plugin, the route source included. Its own 'access' would
   # only have closed the endpoints and left the database feeding the gateway, which is not

@@ -62,6 +62,8 @@ overwriting what is there, and prints each file as it goes.
 * **The collapsed menu.** `collapsed` writes the side-menu state the shell remembers and
   reloads, so the menu is already narrow rather than caught mid-animation. It is published light
   only: what it shows is the width of the menu, not the palette.
+* **The folded pool tables.** The instances view keeps the connection pools of an instance
+  folded away until they are asked for. Every fold is opened before the shot.
 * **The login page.** Shot without a session, which is the only way to see it.
 
 ## What it cannot take care of

@@ -4,6 +4,7 @@
 #   mvn spring-boot:run -Dspring-boot.run.profiles=metrics-redis,instance2
 #   mvn spring-boot:run -Dspring-boot.run.profiles=metrics-prometheus,instance2
 #   mvn spring-boot:run -Dspring-boot.run.profiles=metrics-discovery,instance2
+#   mvn spring-boot:run -Dspring-boot.run.profiles=graph-redis,instance2
 #
 # What each source needs from it:
 #   redis      - nothing else; the second instance publishes its own key and the coverage
@@ -11,10 +12,15 @@
 #   prometheus - uncomment the 8191 target in prometheus.yml and restart the container,
 #                or Prometheus never scrapes this instance.
 #   discovery  - nothing else; it registers under the same service id and is polled.
+#   graph      - nothing else; the second instance publishes the edges it counted under
+#                a key of its own and the graph reads both.
 #
 # The two instances share whatever is outside the JVM — the Redis keys, the Eureka
 # registration — and nothing else: the database routes run on a private in-memory H2 here,
 # so each has its own. Point both at the pgsql profile to share those too.
 server.port: 8191
 
+# Names this instance in every plugin, the service graph included: both declare the same
+# InstanceIdentity bean and the metrics one is registered first, so
+# 'service-graph.instance-id' is never read here.
 spring.cloud.gateway.server.webflux.metrics.instance-id: gateway-full-2

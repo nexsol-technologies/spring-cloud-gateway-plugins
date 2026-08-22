@@ -391,6 +391,40 @@
 	font-size: .8rem;
 }
 
+/* Instances view ---------------------------------------------------------- */
+
+/*
+ * The pool table of one instance is bounded and scrolls inside its own card. A contract
+ * turned into one route per operation puts a hundred pools on a single instance, and an
+ * unbounded table would push the next instance a screen and a half down: the fleet is what
+ * this view is read for, so no instance is allowed to cost more than a card.
+ */
+.gw-pools {
+	max-height: 24rem;
+	overflow-y: auto;
+}
+
+/*
+ * The header stays while the rows move under it. It carries the background of the card
+ * rather than a transparent one, or the rows show through it as they scroll under, and it
+ * keeps its labels on one line: a header that reflows while it is pinned is read twice.
+ */
+.gw-pools thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: var(--bs-card-bg, var(--bs-body-bg));
+	white-space: nowrap;
+}
+
+/*
+ * The fold is the only way into the pool table, so it has to read as a control rather than
+ * as the caption it looks like at rest.
+ */
+.gw-pools-toggle:hover {
+	text-decoration: underline;
+}
+
 /* Login ------------------------------------------------------------------- */
 
 /* The page has no shell to sit in: the card is centred on the viewport instead. */

@@ -44,7 +44,17 @@ const VIEWS = [
 	{ name: 'routes-db', path: '/ui/routes/db' },
 	{ name: 'route-tester', path: '/ui/routes/test' },
 	{ name: 'traffic', path: '/ui/metrics' },
-	{ name: 'instances', path: '/ui/metrics/instances' },
+	/*
+	 * The pool table of an instance is folded away until a reader asks for it, and it is
+	 * what this view is documented for: every fold is opened before the shot.
+	 *
+	 * One at a time, re-reading the page after each: opening a fold redraws every card, so
+	 * a list collected up front holds buttons that are no longer in the document, and a
+	 * detached button reaches none of the listeners the view binds on their container. The
+	 * bound is there to end the loop should a click ever stop opening anything.
+	 */
+	{ name: 'instances', path: '/ui/metrics/instances',
+		prepare: 'for (var i = 0; i < 100; i++) { var fold = document.querySelector("[data-gi-toggle][aria-expanded=false]"); if (!fold) { break; } fold.click(); }' },
 	{ name: 'service-graph', path: '/ui/service-graph' },
 	{ name: 'audit', path: '/ui/audit' },
 	{ name: 'openapi', path: '/ui/openapi' },
@@ -98,6 +108,13 @@ if (wanted.length && views.length !== wanted.length) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/*
+ * The cookie the console holds its session in. Not 'SESSION': the console names its own so
+ * that it never collides with the session of an application behind the gateway — the name
+ * is UiSessionCookieName.COOKIE_NAME, and moving it there moves it here.
+ */
+const SESSION_COOKIE = 'GATEWAY_CONSOLE_SESSION';
+
 function cookieValue(headers, name) {
 	for (const header of headers.getSetCookie()) {
 		const [pair] = header.split(';');
@@ -129,18 +146,18 @@ async function signIn() {
 	if (token) {
 		form.set('_csrf', token[1]);
 	}
-	const session = cookieValue(page.headers, 'SESSION');
+	const session = cookieValue(page.headers, SESSION_COOKIE);
 	const signedIn = await fetch(`${options.base}/ui/login`, {
 		method: 'POST',
 		redirect: 'manual',
-		headers: { cookie: `SESSION=${session}`, 'content-type': 'application/x-www-form-urlencoded' },
+		headers: { cookie: `${SESSION_COOKIE}=${session}`, 'content-type': 'application/x-www-form-urlencoded' },
 		body: form
 	});
 	const location = signedIn.headers.get('location');
 	if (signedIn.status !== 302 || location?.includes('error')) {
 		throw new Error(`Signing in as ${options.user} failed (${signedIn.status} ${location ?? ''}): check --user and --password.`);
 	}
-	return cookieValue(signedIn.headers, 'SESSION') ?? session;
+	return cookieValue(signedIn.headers, SESSION_COOKIE) ?? session;
 }
 
 function chromeCommand() {
@@ -246,7 +263,7 @@ try {
 			await cdp.send('Network.clearBrowserCookies', {}, sessionId);
 			if (session && !view.anonymous) {
 				await cdp.send('Network.setCookie',
-					{ name: 'SESSION', value: session, url: options.base }, sessionId);
+					{ name: SESSION_COOKIE, value: session, url: options.base }, sessionId);
 			}
 			const loaded = cdp.once('Page.loadEventFired', sessionId);
 			await cdp.send('Page.navigate', { url: `${options.base}${view.path}` }, sessionId);
@@ -260,6 +277,12 @@ try {
 				await again;
 			}
 			await sleep(Number(options.settle));
+			if (view.prepare) {
+				// After the settle, not before: what a prepare step reaches for is drawn
+				// from the payload the view fetches, and it is not in the page until then.
+				await cdp.send('Runtime.evaluate', { expression: view.prepare }, sessionId);
+				await sleep(250);
+			}
 			const { data } = await cdp.send('Page.captureScreenshot', { format: 'png' }, sessionId);
 			const file = join(options.out, `${view.name}-${theme}.png`);
 			writeFileSync(file, Buffer.from(data, 'base64'));
