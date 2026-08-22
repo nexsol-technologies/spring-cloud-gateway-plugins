@@ -391,6 +391,39 @@ spring.cloud.gateway.server.webflux.metrics:
     instance-path: /ui/metrics/local/instance
     timeout: 3s
 ---
+# Each instance publishes the edges it counted into Redis; the view reads whatever every
+# instance left there. There is no discovery provider for the graph: 'redis', 'prometheus'
+# and 'tempo' are the three sources that cover more than one instance.
+#   docker compose up -d redis
+#   mvn spring-boot:run -Dspring-boot.run.profiles=graph-redis
+#   mvn spring-boot:run -Dspring-boot.run.profiles=graph-redis,instance2
+# It sets the provider of the graph only, so it composes with any of the metrics profiles
+# above: -Dspring-boot.run.profiles=metrics-discovery,graph-redis
+spring:
+  config:
+    activate:
+      on-profile:
+      - graph-redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+spring.cloud.gateway.server.webflux.service-graph:
+  provider: redis
+  redis:
+    # Each instance writes one key of its own, named after the identity of the instance.
+    # That identity comes from 'metrics.instance-id' whenever the metrics plugin is on the
+    # classpath, as it is here: both plugins declare the same InstanceIdentity bean and the
+    # metrics one is registered first, so the 'service-graph.instance-id' above is read by
+    # nobody. It is what the 'instance2' profile overrides, so the two instances do publish
+    # under two keys.
+    key-prefix: "gateway:service-graph:"
+    publish-interval: 10s
+    # Comfortably longer than the publish interval, or an instance disappears from the
+    # graph between two of its own writes.
+    time-to-live: 45s
+---
 # Every plugin off, from configuration alone: the same jar and the same classpath, and a
 # gateway that routes traffic and does nothing else.
 #   mvn spring-boot:run -Dspring-boot.run.profiles=plugins-off

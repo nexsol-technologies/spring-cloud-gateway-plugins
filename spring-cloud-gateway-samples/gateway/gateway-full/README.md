@@ -43,6 +43,7 @@ each name what they additionally need.
 | `metrics-redis` | `docker compose up -d redis` | Metrics consolidated through Redis |
 | `metrics-prometheus` | `docker compose up -d prometheus` | Metrics consolidated through Prometheus, on `:9091` |
 | `metrics-discovery` | The `eureka` sample | Metrics consolidated by polling every registered instance |
+| `graph-redis` | `docker compose up -d redis` | The service graph consolidated through Redis |
 | `instance2` | — | A second instance on `8191`, `instance-id` `gateway-full-2` |
 | `plugins-off` | — | Same jar, every plugin switched off |
 
@@ -225,6 +226,18 @@ Three things to notice while reading it:
   on one machine.
 * **The documentation routes are absent**, deliberately: `excluded-routes` leaves out
   `openapi-docs-.*`, since fetching a contract is not one service calling another.
+
+The graph runs with **no provider**, like the metrics: the view reports what this instance
+counted, under `this instance only`. `graph-redis` consolidates it through Redis. There is no
+discovery provider for the graph — its consolidating sources are `redis`, `prometheus` and
+`tempo`, compared in
+[the service graph README](../../../spring-cloud-gateway-service-graph/README.md#choosing-a-source).
+
+```console
+docker compose up -d redis
+mvn spring-boot:run -Dspring-boot.run.profiles=graph-redis
+mvn spring-boot:run -Dspring-boot.run.profiles=graph-redis,instance2
+```
 
 ## Turning the plugins off
 
