@@ -26,7 +26,7 @@ each name what they additionally need.
 | `routes-configserver` | The `configserver` profile |
 | `routes-database` | `/ui/routes/db` |
 | `routes-security` | On the classpath; this gateway permits everything, so nothing here needs exempting — see [gateway-secured](../gateway-secured/README.md) |
-| `hub-openapi` | `/swagger-ui.html`, under the `eureka` profile |
+| `hub-openapi` | `/swagger-ui.html` and `/ui/openapi`, under the `eureka` profile |
 | `metrics` | `/ui/metrics` and `/ui/metrics/instances`, both instrumentation switches on |
 | `service-graph` | The `service-a` and `service-b` routes, and the two flows [below](#who-calls-what) |
 | `audit` | `/ui/audit`, with the global web filter on |
@@ -104,17 +104,34 @@ page, with Keycloak and roles behind it.
 
 ### OpenAPI hub
 
-> Run the gateway and `service-a` with the `eureka` profile, and the `eureka` sample.
+> Run the gateway, `service-a` and `service-c` with the `eureka` profile, and the `eureka`
+> sample.
 
-http://localhost:8181/swagger-ui.html serves the contracts of the discovered services,
-`SERVICE-A` among them, next to the statically configured petstore source.
+http://localhost:8181/swagger-ui.html and http://localhost:8181/ui/openapi serve the contracts
+of the discovered services, `SERVICE-A` and `SERVICE-C` among them, next to the statically
+configured petstore source.
 
-The profile also sets `hub-openapi.security.issuer: gateway`, worth a look here because this is
-where the two tenants are declared. A service names, in its contract, the issuer it validates
-its own traffic against — an address internal to the cluster, which resolves to nothing in the
-browser reading the contract. This advertises the issuers of the gateway instead: `local` and
-`local2` become two schemes and two alternatives, so the page offers them as the choice they
-are.
+The profile also sets `hub-openapi.security.issuer: gateway`, and
+[`service-c`](../../service-c) is the contract to read it on: it declares one `openIdConnect`
+scheme named `bearer-oidc`, pointing at the issuer it validates its own traffic against.
+
+```console
+$ curl -s localhost:8181/v3/api-docs/SERVICE-C     # sign in first, the console is authenticated
+security:
+- bearer-oidc-local:  ["openid", "profile", "email"]
+- bearer-oidc-local2: ["openid", "profile", "email"]
+- bearer-oidc-jwt:    ["openid", "profile", "email"]
+```
+
+The scheme becomes one scheme per issuer and its requirement one alternative per issuer. Three
+and not two: this `application.yml` declares `resourceserver.multitenant` **and**
+`resourceserver.jwt.issuer-uri`, and every issuer found is advertised — the tenants under their
+ids, the single issuer under `jwt`.
+
+The scopes come from the requirement; an `openIdConnect` scheme declares none of its own. The
+console shows only those the issuer advertises in `scopes_supported`, and the
+[`auth-server`](../../auth-server) sample advertises `openid` alone — Keycloak would show the
+three.
 
 <p align="center">
   <img src="../../doc/spring-cloud-gateway-openapi.png" alt="spring-cloud-gateway-openapi" width="50%"/>

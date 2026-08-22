@@ -108,6 +108,28 @@ class OpenapiViewConfigurationTests {
 			});
 	}
 
+	@Test
+	void tryItIsOfferedByDefault() {
+		this.runner.withPropertyValues("spring.cloud.gateway.server.webflux.hub-openapi.enabled=true")
+			.run((context) -> {
+				Model model = new ConcurrentModel();
+				context.getBean(OpenapiViewController.class).page(model);
+				assertThat(model.getAttribute("openapiTryIt")).isEqualTo(true);
+			});
+	}
+
+	@Test
+	void tryItIsWithheldWhenItIsTurnedOff() {
+		this.runner
+			.withPropertyValues("spring.cloud.gateway.server.webflux.hub-openapi.enabled=true",
+					"spring.cloud.gateway.server.webflux.ui.openapi.try-it=false")
+			.run((context) -> {
+				Model model = new ConcurrentModel();
+				context.getBean(OpenapiViewController.class).page(model);
+				assertThat(model.getAttribute("openapiTryIt")).isEqualTo(false);
+			});
+	}
+
 	private static List<String> navIds(AssertableApplicationContext context) {
 		return context.getBeansOfType(NavItem.class).values().stream().map(NavItem::id).toList();
 	}

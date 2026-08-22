@@ -54,8 +54,8 @@ spring.cloud.gateway.server.webflux.ui:
       roles: [ADMIN]
     roles-claim: realm_access.roles
     required-roles: [ADMIN]
-  # Vendor extensions the OpenAPI view renders, and the label each reads under.
   openapi:
+    try-it: false
     extensions:
       x-roles: Required roles
       x-from-application-version: Since
@@ -64,6 +64,7 @@ spring.cloud.gateway.server.webflux.ui:
 | Property | Default | What it does |
 | --- | --- | --- |
 | `...ui.security-chain-enabled` | `true` | Whether the plugin contributes its own `SecurityWebFilterChain` |
+| `...ui.openapi.try-it` | `true` | Whether the OpenAPI view offers to call the operations it documents |
 | `...ui.openapi.extensions.<x-name>` | — | Vendor extension rendered by the OpenAPI view, and the label it reads under |
 
 The security properties are described under [Signing in](#signing-in), which is where they
@@ -331,6 +332,26 @@ comma-separated, an object as JSON. An extension left out of the mapping is not 
 adding one takes a restart. Extensions are rendered on the document, on `info`, on a tag, on a
 schema and on an operation — a path item is not one of Scalar's rendering points, so an
 extension declared there does not reach the operations under it.
+
+**Calling the operations.** Every operation carries a *Test Request* button, which opens the
+request client against the gateway. To take it away:
+
+```yaml
+spring.cloud.gateway.server.webflux.ui.openapi.try-it: false
+```
+
+The authentication panel goes with it — the renderer gates that panel on the button. The routes
+are reached the same way with the button gone: what may be called is settled by the gateway's
+own security.
+
+**Authentication.** The scopes ticked and the token obtained are kept in the local storage of
+the console origin, so a reload does not throw them away. That storage outlives the console
+session: signing out of the console does not clear them.
+
+Which scopes come ticked is read from the `security` requirement of the document —
+`security: [{ bearer-oidc: [openid, profile, email] }]` ticks those three. Only the scopes the
+scheme offers are shown: those an `oauth2` scheme declares under its flow, and for an
+`openIdConnect` scheme the `scopes_supported` of its discovery document.
 
 The Scalar bundle ships with the plugin (`@scalar/api-reference` 1.63.0, 3.6 MB) and its
 default web fonts are switched off, so the view works on an isolated network.

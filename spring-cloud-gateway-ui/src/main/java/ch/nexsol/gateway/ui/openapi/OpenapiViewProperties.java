@@ -39,11 +39,36 @@ public class OpenapiViewProperties {
 	private final Map<String, String> extensions = new LinkedHashMap<>();
 
 	/**
+	 * Whether the OpenAPI view offers to call the documented operations.
+	 * <p>
+	 * Off takes the "Test Request" button off every operation, and with it the
+	 * authentication panel: the renderer gates that panel on the button. The routes are
+	 * reached the same way with the button gone.
+	 */
+	private boolean tryIt = true;
+
+	/**
 	 * Returns the extensions to show, keyed by extension name.
 	 * @return the extensions to show, keyed by extension name
 	 */
 	public Map<String, String> getExtensions() {
 		return this.extensions;
+	}
+
+	/**
+	 * Returns whether the OpenAPI view offers to call the documented operations.
+	 * @return whether the view offers to call the documented operations
+	 */
+	public boolean isTryIt() {
+		return this.tryIt;
+	}
+
+	/**
+	 * Sets whether the OpenAPI view offers to call the documented operations.
+	 * @param tryIt whether the view offers to call the documented operations
+	 */
+	public void setTryIt(boolean tryIt) {
+		this.tryIt = tryIt;
 	}
 
 }

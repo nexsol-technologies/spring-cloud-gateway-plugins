@@ -16,9 +16,16 @@
 
 package ch.nexsol.service.sample.c;
 
+import java.util.List;
+
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import reactor.core.publisher.Mono;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -60,6 +67,28 @@ public class ResourceServerApplication {
 	@Operation(summary = "Answers whoever presents a token this service accepts")
 	public Mono<String> data() {
 		return Mono.just("service-c");
+	}
+
+	/**
+	 * The contract of this service, carrying the {@code openIdConnect} scheme a caller
+	 * obtains the token from.
+	 * <p>
+	 * An {@code openIdConnect} scheme declares no scope of its own: the console ticks the
+	 * ones the {@code security} requirement lists, and offers only those the issuer
+	 * advertises in {@code scopes_supported} &mdash; the sample authorization server
+	 * advertises {@code openid} alone, Keycloak advertises the three.
+	 * <p>
+	 * Read through a gateway whose hub advertises its own issuers, this URL is replaced
+	 * by the gateway's and this scheme becomes one scheme per tenant.
+	 * @param issuerUri the issuer this service validates its tokens against
+	 * @return the contract of this service
+	 */
+	@Bean
+	OpenAPI openapi(@Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri) {
+		SecurityScheme scheme = new SecurityScheme().type(SecurityScheme.Type.OPENIDCONNECT)
+			.openIdConnectUrl(issuerUri + "/.well-known/openid-configuration");
+		return new OpenAPI().components(new Components().addSecuritySchemes("bearer-oidc", scheme))
+			.addSecurityItem(new SecurityRequirement().addList("bearer-oidc", List.of("openid", "profile", "email")));
 	}
 
 	/**
