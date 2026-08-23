@@ -718,3 +718,16 @@ shell alone.
 port `8213`, the console behind its login page.
 [gateway-full](../spring-cloud-gateway-samples/gateway/gateway-full/README.md) — port `8181`,
 every view lit up.
+
+## Bundled front-end assets
+
+The console serves its front-end libraries from `src/main/resources/static`; nothing is fetched
+from a CDN at runtime.
+
+| Library | Version | File |
+| --- | --- | --- |
+| [Bootstrap](https://getbootstrap.com/) | 5.3.8 | `css/bootstrap.min.css`, `js/bootstrap.bundle.min.js` |
+| [htmx](https://htmx.org/) | 2.0.10 | `js/htmx.min.js` |
+| [Apache ECharts](https://echarts.apache.org/) | 6.1.0 | `js/echarts.min.js` |
+| [ECharts GL](https://github.com/ecomfe/echarts-gl) | 2.1.0 | `js/echarts-gl.min.js` |
+| [Scalar API Reference](https://github.com/scalar/scalar) | 1.66.1 | `js/scalar.standalone.js` |

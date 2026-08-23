@@ -54,7 +54,8 @@ line and is never moved to another one:
 
 | Line | Spring Boot | Spring Cloud | Status |
 | --- | --- | --- | --- |
-| `1.14.x` | 4.0.Y | 2025.1.x | Current, developed on `main` |
+| `1.15.x` | 4.1.Y | 2025.1.x | Current, developed on `main` |
+| `1.14.x` | 4.0.Y | 2025.1.x | Maintained on `spring_boot_4.0.x` |
 | `1.5.x` – `1.13.x` | 4.0.Y | 2025.1.x | End of life |
 | `1.0.x` – `1.3.x` | 3.5.Y | 2025.0.x | End of life |
 
