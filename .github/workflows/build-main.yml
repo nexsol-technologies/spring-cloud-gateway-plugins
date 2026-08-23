@@ -40,6 +40,8 @@ jobs:
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   publish-snapshot:
     needs: build
