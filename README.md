@@ -8,6 +8,14 @@
 
 # Spring Cloud Gateway plugins by [neXsol technologies](https://nexsol.tech)
 
+[![Apache License 2](https://img.shields.io/badge/license-ASF2-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.txt)
+![Build Status](https://github.com/nexsol-technologies/spring-cloud-gateway-plugins/actions/workflows/build-main.yml/badge.svg?branch=main)
+[![codecov](https://codecov.io/github/nexsol-technologies/spring-cloud-gateway-plugins/graph/badge.svg?token=VF9UVFJKDC)](https://codecov.io/github/nexsol-technologies/spring-cloud-gateway-plugins)
+![Maven Central Version](https://img.shields.io/maven-central/v/ch.nexsol-tech.gateway/spring-cloud-gateway-plugins)
+
+
+
+
 Drop-in plugins for a Spring Cloud Gateway (WebFlux) application: route sources, security
 filters, auditing, observability, and a web console that lights up a view per plugin present on
 the classpath. Each one is activated by configuration alone.
