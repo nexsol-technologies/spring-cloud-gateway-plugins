@@ -9,12 +9,8 @@ concurrency:
 
 jobs:
   build:
-    name: build-and-test-pull-request
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-
-    runs-on: ${{ matrix.os }}
+    name: build-feature
+    runs-on: ubuntu-latest
     steps:
 
       - name: free disk space
