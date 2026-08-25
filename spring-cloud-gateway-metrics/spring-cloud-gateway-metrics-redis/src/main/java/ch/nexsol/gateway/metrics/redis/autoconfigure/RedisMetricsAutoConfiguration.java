@@ -30,6 +30,8 @@ import ch.nexsol.gateway.metrics.redis.RedisRouteMetricsPublisher;
 import ch.nexsol.gateway.metrics.redis.RedisRouteMetricsSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.binder.jvm.convention.JvmCpuMeterConventions;
+import io.micrometer.core.instrument.binder.jvm.convention.JvmMemoryMeterConventions;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -78,6 +80,8 @@ public class RedisMetricsAutoConfiguration {
 		 * meter registry, to publish it. The core would only have declared it as long as
 		 * no other source exists, and this module declares one.
 		 * @param meterRegistry the provider over the application meter registry
+		 * @param memoryConventions the provider over the memory meter conventions
+		 * @param cpuConventions the provider over the processor meter conventions
 		 * @param properties the shared metrics configuration
 		 * @param identity the identity of the running instance
 		 * @return the local route metrics source
@@ -130,6 +134,8 @@ public class RedisMetricsAutoConfiguration {
 		 * @param meterRegistry the provider over the application meter registry
 		 * @param httpClientProperties the provider over the gateway HTTP client
 		 * configuration
+		 * @param memoryConventions the provider over the memory meter conventions
+		 * @param cpuConventions the provider over the processor meter conventions
 		 * @param properties the shared metrics configuration
 		 * @param identity the identity of the running instance
 		 * @return the local instance metrics source
@@ -138,9 +144,12 @@ public class RedisMetricsAutoConfiguration {
 		@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.instance.enabled",
 				matchIfMissing = true)
 		LocalInstanceMetricsSource localInstanceMetricsSource(ObjectProvider<MeterRegistry> meterRegistry,
-				ObjectProvider<HttpClientProperties> httpClientProperties, MetricsProperties properties,
+				ObjectProvider<HttpClientProperties> httpClientProperties,
+				ObjectProvider<JvmMemoryMeterConventions> memoryConventions,
+				ObjectProvider<JvmCpuMeterConventions> cpuConventions, MetricsProperties properties,
 				InstanceIdentity identity) {
-			return new LocalInstanceMetricsSource(meterRegistry, httpClientProperties, properties, identity);
+			return new LocalInstanceMetricsSource(meterRegistry, httpClientProperties, memoryConventions,
+					cpuConventions, properties, identity);
 		}
 
 		/**

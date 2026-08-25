@@ -24,6 +24,8 @@ import ch.nexsol.gateway.metrics.LocalRouteMetricsSource;
 import ch.nexsol.gateway.metrics.MetricsProperties;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.binder.jvm.convention.JvmCpuMeterConventions;
+import io.micrometer.core.instrument.binder.jvm.convention.JvmMemoryMeterConventions;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -87,6 +89,8 @@ public class MetricsAutoConfiguration {
 	 * one.
 	 * @param meterRegistry the provider over the application meter registry
 	 * @param httpClientProperties the provider over the gateway HTTP client configuration
+	 * @param memoryConventions the provider over the memory meter conventions
+	 * @param cpuConventions the provider over the processor meter conventions
 	 * @param properties the metrics properties
 	 * @param identity the identity of the running instance
 	 * @return the local instance metrics source
@@ -95,9 +99,12 @@ public class MetricsAutoConfiguration {
 	@ConditionalOnMissingBean(InstanceMetricsSource.class)
 	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.metrics.instance.enabled", matchIfMissing = true)
 	public LocalInstanceMetricsSource localInstanceMetricsSource(ObjectProvider<MeterRegistry> meterRegistry,
-			ObjectProvider<HttpClientProperties> httpClientProperties, MetricsProperties properties,
+			ObjectProvider<HttpClientProperties> httpClientProperties,
+			ObjectProvider<JvmMemoryMeterConventions> memoryConventions,
+			ObjectProvider<JvmCpuMeterConventions> cpuConventions, MetricsProperties properties,
 			InstanceIdentity identity) {
-		return new LocalInstanceMetricsSource(meterRegistry, httpClientProperties, properties, identity);
+		return new LocalInstanceMetricsSource(meterRegistry, httpClientProperties, memoryConventions, cpuConventions,
+				properties, identity);
 	}
 
 	/**

@@ -16,23 +16,42 @@
 
 package ch.nexsol.gateway.metrics;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.MemoryType;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 import ch.nexsol.gateway.commons.InstanceIdentity;
 import ch.nexsol.gateway.metrics.InstanceMetric.PoolStats;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.TimeGauge;
 import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.binder.MeterConvention;
+import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
+import io.micrometer.core.instrument.binder.jvm.convention.JvmCpuMeterConventions;
+import io.micrometer.core.instrument.binder.jvm.convention.JvmMemoryMeterConventions;
+import io.micrometer.core.instrument.binder.jvm.convention.micrometer.MicrometerJvmCpuMeterConventions;
+import io.micrometer.core.instrument.binder.jvm.convention.micrometer.MicrometerJvmMemoryMeterConventions;
+import io.micrometer.core.instrument.binder.jvm.convention.otel.OpenTelemetryJvmCpuMeterConventions;
+import io.micrometer.core.instrument.binder.jvm.convention.otel.OpenTelemetryJvmMemoryMeterConventions;
+import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cloud.gateway.config.HttpClientProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.data.Offset.offset;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -41,23 +60,87 @@ import static org.mockito.Mockito.when;
  */
 class LocalInstanceMetricsSourceTests {
 
+	/**
+	 * The two conventions Micrometer ships. The Micrometer case declares no bean, which
+	 * is what makes the binders fall back to {@code MicrometerJvm*MeterConventions}; the
+	 * OpenTelemetry case declares both.
+	 */
+	static List<Conventions> conventions() {
+		return List.of(
+				new Conventions("micrometer", null, null, new MicrometerJvmMemoryMeterConventions(Tags.empty()),
+						new MicrometerJvmCpuMeterConventions(Tags.empty())),
+				new Conventions("opentelemetry", new OpenTelemetryJvmMemoryMeterConventions(Tags.empty()),
+						new OpenTelemetryJvmCpuMeterConventions(Tags.empty()),
+						new OpenTelemetryJvmMemoryMeterConventions(Tags.empty()),
+						new OpenTelemetryJvmCpuMeterConventions(Tags.empty())));
+	}
+
 	private LocalInstanceMetricsSource sourceFor(MeterRegistry registry) {
-		return sourceFor(registry, new MetricsProperties(), new HttpClientProperties());
+		return sourceFor(registry, new MetricsProperties(), new HttpClientProperties(), null, null);
+	}
+
+	private LocalInstanceMetricsSource sourceFor(MeterRegistry registry, Conventions conventions) {
+		return sourceFor(registry, new MetricsProperties(), new HttpClientProperties(), conventions.declaredMemory(),
+				conventions.declaredCpu());
+	}
+
+	private LocalInstanceMetricsSource sourceFor(MeterRegistry registry, MetricsProperties properties,
+			HttpClientProperties httpClientProperties) {
+		return sourceFor(registry, properties, httpClientProperties, null, null);
 	}
 
 	@SuppressWarnings("unchecked")
 	private LocalInstanceMetricsSource sourceFor(MeterRegistry registry, MetricsProperties properties,
-			HttpClientProperties httpClientProperties) {
+			HttpClientProperties httpClientProperties, JvmMemoryMeterConventions memory, JvmCpuMeterConventions cpu) {
 		ObjectProvider<MeterRegistry> registryProvider = mock(ObjectProvider.class);
 		when(registryProvider.getIfAvailable()).thenReturn(registry);
 		ObjectProvider<HttpClientProperties> httpClientProvider = mock(ObjectProvider.class);
 		when(httpClientProvider.getIfAvailable()).thenReturn(httpClientProperties);
-		return new LocalInstanceMetricsSource(registryProvider, httpClientProvider, properties,
-				new InstanceIdentity("gateway-1"));
+		return new LocalInstanceMetricsSource(registryProvider, httpClientProvider, provider(memory), provider(cpu),
+				properties, new InstanceIdentity("gateway-1"));
+	}
+
+	/** A provider over the declared bean, empty when the application declares none. */
+	@SuppressWarnings("unchecked")
+	private static <T> ObjectProvider<T> provider(T bean) {
+		ObjectProvider<T> provider = mock(ObjectProvider.class);
+		when(provider.getIfAvailable(any(Supplier.class)))
+			.thenAnswer((invocation) -> (bean != null) ? bean : invocation.getArgument(0, Supplier.class).get());
+		return provider;
 	}
 
 	private static Gauge gauge(MeterRegistry registry, String name, double value, String... tags) {
 		return Gauge.builder(name, () -> value).tags(tags).register(registry);
+	}
+
+	/** The pools of one area, in the order the binder walks them. */
+	private static List<MemoryPoolMXBean> pools(MemoryType type) {
+		List<MemoryPoolMXBean> pools = new ArrayList<>();
+		for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
+			if (pool.getType() == type) {
+				pools.add(pool);
+			}
+		}
+		return pools;
+	}
+
+	/**
+	 * Publishes one memory figure per pool the way the binder does: name and tags taken
+	 * from the convention. The values are handed out in order and the last one repeats,
+	 * so the expected total is known whatever number of pools the running collector has.
+	 */
+	private static double publishMemory(MeterRegistry registry, MeterConvention<MemoryPoolMXBean> convention,
+			MemoryType type, double... values) {
+		List<MemoryPoolMXBean> pools = pools(type);
+		double expected = 0;
+		for (int i = 0; i < pools.size(); i++) {
+			double value = values[Math.min(i, values.length - 1)];
+			Gauge.builder(convention.getName(), () -> value).tags(convention.getTags(pools.get(i))).register(registry);
+			if (value >= 0) {
+				expected += value;
+			}
+		}
+		return expected;
 	}
 
 	@Test
@@ -71,10 +154,6 @@ class LocalInstanceMetricsSourceTests {
 	@Test
 	void readsTheJvmFigures() {
 		SimpleMeterRegistry registry = new SimpleMeterRegistry();
-		gauge(registry, "jvm.memory.used", 300, "area", "heap", "id", "eden");
-		gauge(registry, "jvm.memory.used", 700, "area", "heap", "id", "old");
-		gauge(registry, "jvm.memory.used", 50, "area", "nonheap", "id", "metaspace");
-		gauge(registry, "jvm.memory.max", 2000, "area", "heap", "id", "old");
 		gauge(registry, "jvm.threads.live", 87);
 		gauge(registry, "jvm.threads.peak", 112);
 		gauge(registry, "jvm.threads.daemon", 40);
@@ -86,9 +165,6 @@ class LocalInstanceMetricsSourceTests {
 
 		InstanceMetric.JvmStats jvm = sourceFor(registry).read().jvm();
 
-		assertThat(jvm.heapUsedBytes()).isEqualTo(1000);
-		assertThat(jvm.heapMaxBytes()).isEqualTo(2000);
-		assertThat(jvm.nonHeapUsedBytes()).isEqualTo(50);
 		assertThat(jvm.threadsLive()).isEqualTo(87);
 		assertThat(jvm.threadsPeak()).isEqualTo(112);
 		assertThat(jvm.threadsDaemon()).isEqualTo(40);
@@ -110,43 +186,71 @@ class LocalInstanceMetricsSourceTests {
 		assertThat(metric.system().loadAverage1m()).isEqualTo(-1);
 	}
 
-	@Test
-	void leavesAnUnboundedMemoryPoolOutOfTheHeapCeiling() {
+	@ParameterizedTest
+	@MethodSource("conventions")
+	void readsTheMemoryAndProcessorFiguresUnderEitherConvention(Conventions conventions) {
 		SimpleMeterRegistry registry = new SimpleMeterRegistry();
-		gauge(registry, "jvm.memory.max", 2000, "area", "heap", "id", "old");
-		gauge(registry, "jvm.memory.max", -1, "area", "heap", "id", "eden");
+		double heap = publishMemory(registry, conventions.memory().getMemoryUsedConvention(), MemoryType.HEAP, 300,
+				700);
+		double nonHeap = publishMemory(registry, conventions.memory().getMemoryUsedConvention(), MemoryType.NON_HEAP,
+				50);
+		double max = publishMemory(registry, conventions.memory().getMemoryMaxConvention(), MemoryType.HEAP, 2000);
+		gauge(registry, conventions.cpu().processCpuLoadConvention().getName(), 0.34);
+		gauge(registry, conventions.cpu().cpuCountConvention().getName(), 8);
 
-		// Adding the -1 of the unbounded pool would silently shrink the ceiling.
-		assertThat(sourceFor(registry).read().jvm().heapMaxBytes()).isEqualTo(2000);
-	}
+		InstanceMetric metric = sourceFor(registry, conventions).read();
 
-	@Test
-	void readsTheMemoryAndProcessorFiguresUnderTheOpenTelemetryConventions() {
-		SimpleMeterRegistry registry = new SimpleMeterRegistry();
-		gauge(registry, "jvm.memory.used", 300, "jvm.memory.type", "heap", "jvm.memory.pool.name", "G1 Eden Space");
-		gauge(registry, "jvm.memory.used", 700, "jvm.memory.type", "heap", "jvm.memory.pool.name", "G1 Old Gen");
-		gauge(registry, "jvm.memory.used", 50, "jvm.memory.type", "non_heap", "jvm.memory.pool.name", "Metaspace");
-		gauge(registry, "jvm.memory.limit", 2000, "jvm.memory.type", "heap", "jvm.memory.pool.name", "G1 Old Gen");
-		gauge(registry, "jvm.cpu.recent_utilization", 0.34);
-		gauge(registry, "jvm.cpu.count", 8);
-
-		InstanceMetric metric = sourceFor(registry).read();
-
-		assertThat(metric.jvm().heapUsedBytes()).isEqualTo(1000);
-		assertThat(metric.jvm().heapMaxBytes()).isEqualTo(2000);
-		assertThat(metric.jvm().nonHeapUsedBytes()).isEqualTo(50);
+		assertThat(metric.jvm().heapUsedBytes()).isEqualTo((long) heap);
+		assertThat(metric.jvm().heapMaxBytes()).isEqualTo((long) max);
+		assertThat(metric.jvm().nonHeapUsedBytes()).isEqualTo((long) nonHeap);
 		assertThat(metric.system().processCpuUsage()).isEqualTo(0.34, offset(0.0001));
 		assertThat(metric.system().cpuCount()).isEqualTo(8);
 	}
 
-	@Test
-	void countsTheMemoryOnceWhenBothConventionsArePublished() {
+	@ParameterizedTest
+	@MethodSource("conventions")
+	void leavesAnUnboundedMemoryPoolOutOfTheHeapCeiling(Conventions conventions) {
 		SimpleMeterRegistry registry = new SimpleMeterRegistry();
-		gauge(registry, "jvm.memory.used", 1000, "area", "heap", "id", "old");
-		gauge(registry, "jvm.memory.used", 1000, "jvm.memory.type", "heap", "jvm.memory.pool.name", "G1 Old Gen");
+		double expected = publishMemory(registry, conventions.memory().getMemoryMaxConvention(), MemoryType.HEAP, 2000,
+				-1);
 
-		// The same pool published twice must not read as twice the memory.
-		assertThat(sourceFor(registry).read().jvm().heapUsedBytes()).isEqualTo(1000);
+		// Adding the -1 of the unbounded pool would silently shrink the ceiling.
+		assertThat(sourceFor(registry, conventions).read().jvm().heapMaxBytes()).isEqualTo((long) expected);
+	}
+
+	@ParameterizedTest
+	@MethodSource("conventions")
+	void readsOnlyTheConventionInForceWhenBothArePublished(Conventions conventions) {
+		SimpleMeterRegistry registry = new SimpleMeterRegistry();
+		Conventions other = conventions().stream()
+			.filter((candidate) -> !candidate.name().equals(conventions.name()))
+			.findFirst()
+			.orElseThrow();
+		double expected = publishMemory(registry, conventions.memory().getMemoryUsedConvention(), MemoryType.HEAP,
+				1000);
+		publishMemory(registry, other.memory().getMemoryUsedConvention(), MemoryType.HEAP, 1000);
+
+		// Both conventions name the figure 'jvm.memory.used' and differ only by their
+		// area
+		// tag, so a registry carrying the two sets holds two gauges per pool.
+		assertThat(sourceFor(registry, conventions).read().jvm().heapUsedBytes()).isEqualTo((long) expected);
+	}
+
+	@ParameterizedTest
+	@MethodSource("conventions")
+	void agreesWithTheBinderItReadsUnderEitherConvention(Conventions conventions) {
+		SimpleMeterRegistry registry = new SimpleMeterRegistry();
+		new JvmMemoryMetrics(Tags.empty(), conventions.memory()).bindTo(registry);
+		new ProcessorMetrics(Tags.empty(), conventions.cpu()).bindTo(registry);
+
+		InstanceMetric metric = sourceFor(registry, conventions).read();
+
+		// The gauges come from the binder itself, so the names and tags asserted here are
+		// the ones Micrometer actually publishes, not a copy of them.
+		assertThat(metric.jvm().heapUsedBytes()).isPositive();
+		assertThat(metric.jvm().nonHeapUsedBytes()).isPositive();
+		assertThat(metric.jvm().heapMaxBytes()).isPositive();
+		assertThat(metric.system().cpuCount()).isPositive();
 	}
 
 	@Test
@@ -257,7 +361,7 @@ class LocalInstanceMetricsSourceTests {
 		ObjectProvider<HttpClientProperties> httpClientProvider = mock(ObjectProvider.class);
 		when(httpClientProvider.getIfAvailable()).thenReturn(null);
 		LocalInstanceMetricsSource source = new LocalInstanceMetricsSource(registryProvider, httpClientProvider,
-				new MetricsProperties(), new InstanceIdentity("gateway-1"));
+				provider(null), provider(null), new MetricsProperties(), new InstanceIdentity("gateway-1"));
 
 		InstanceMetric metric = source.read();
 
@@ -265,6 +369,20 @@ class LocalInstanceMetricsSourceTests {
 		assertThat(metric.pools()).isEmpty();
 		assertThat(metric.jvm().heapUsedBytes()).isEqualTo(-1);
 		assertThat(metric.instrumentation().connectionPool()).isFalse();
+	}
+
+	/**
+	 * One convention case: what the application declares (null for the default) and what
+	 * the binder therefore publishes under.
+	 */
+	record Conventions(String name, JvmMemoryMeterConventions declaredMemory, JvmCpuMeterConventions declaredCpu,
+			JvmMemoryMeterConventions memory, JvmCpuMeterConventions cpu) {
+
+		@Override
+		public String toString() {
+			return this.name;
+		}
+
 	}
 
 }

@@ -89,8 +89,8 @@ and a zero file descriptor count would read as "no file open".
 
 ### Two Micrometer naming conventions
 
-Micrometer 1.16 ships two conventions for the JVM binders, and memory and processor figures
-are read under both:
+Micrometer ships two conventions for the JVM binders, which name memory and processor
+figures differently:
 
 | Figure | Micrometer convention | OpenTelemetry convention |
 | --- | --- | --- |
@@ -99,9 +99,24 @@ are read under both:
 | Process CPU | `process.cpu.usage` | `jvm.cpu.recent_utilization` |
 | Processors | `system.cpu.count` | `jvm.cpu.count` |
 
-Everything else is named identically under both. The registry is queried with the historical
-name first and the OpenTelemetry one only when that comes back empty, so nothing extra is
-looked up in the common case.
+Everything else is named identically under both.
+
+Spring Boot hands a `JvmMemoryMeterConventions` and a `JvmCpuMeterConventions` bean to
+`JvmMemoryMetrics` and `ProcessorMetrics`, which is what decides the column above; with no
+such bean the binders use the Micrometer ones. This plugin resolves the same two beans, with
+the same fallback, and reads the meters through them.
+
+```java
+@Bean
+JvmMemoryMeterConventions jvmMemoryMeterConventions() {
+    return new OpenTelemetryJvmMemoryMeterConventions(Tags.empty());
+}
+
+@Bean
+JvmCpuMeterConventions jvmCpuMeterConventions() {
+    return new OpenTelemetryJvmCpuMeterConventions(Tags.empty());
+}
+```
 
 ## Instrumentation
 
