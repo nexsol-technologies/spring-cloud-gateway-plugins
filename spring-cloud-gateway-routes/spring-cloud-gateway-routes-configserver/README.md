@@ -64,8 +64,11 @@ A source that is transiently unreachable is logged, and the previous route snaps
 Re-fetched at startup, on `update-interval` when set, and on `/actuator/refresh` /
 `/actuator/busrefresh` — see [Refreshing routes](../README.md#refreshing-routes).
 
-> `/refresh` re-fetches the **content** of the configured files. The list of URLs and the
-> Config Server coordinates are read at startup; changing that list needs a restart.
+> `/refresh` re-resolves the **list** of files as well as re-fetching their content: the
+> properties bean is re-bound in place, so a file added to `config-server.files` or a URL
+> added to `urls` is picked up without a restart. That only helps when the gateway reads
+> those properties from the Config Server itself — a list baked into its own
+> `application.yml` still needs a redeploy to change.
 
 ## File format
 

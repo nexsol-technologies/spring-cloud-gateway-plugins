@@ -134,6 +134,46 @@ class ConfigServerRouteDefinitionLoaderTests {
 		StepVerifier.create(loader.load()).expectError(RouteConfigServerException.class).verify();
 	}
 
+	@Test
+	void resolvesTheUrlsOnEveryLoadSoARefreshedFileListIsPickedUp() {
+		List<String> requested = new ArrayList<>();
+		RoutesConfigServerProperties properties = new RoutesConfigServerProperties();
+		ConfigServer configServer = properties.getConfigServer();
+		configServer.setUri("http://config:8888");
+		configServer.setName("gateway");
+		configServer.setLabel("prod");
+		configServer.setFiles(List.of("routes/orders.yaml"));
+
+		ConfigServerRouteDefinitionLoader loader = new ConfigServerRouteDefinitionLoader(webClient(requested),
+				new RouteDefinitionFileParser(), properties);
+
+		assertThat(loader.load().collectList().block()).extracting(RouteDefinition::getId)
+			.containsExactly("orders_route");
+
+		// What /actuator/refresh does: ConfigurationPropertiesRebinder re-binds the
+		// properties bean in place, while the loader bean itself is never recreated.
+		configServer.setFiles(List.of("routes/orders.yaml", "routes/billing.json"));
+
+		assertThat(loader.load().collectList().block()).extracting(RouteDefinition::getId)
+			.containsExactly("orders_route", "billing_route");
+		assertThat(requested).containsExactly("http://config:8888/gateway/default/prod/routes/orders.yaml",
+				"http://config:8888/gateway/default/prod/routes/orders.yaml",
+				"http://config:8888/gateway/default/prod/routes/billing.json");
+	}
+
+	@Test
+	void stillFailsAtConstructionWhenCoordinatesAreIncomplete() {
+		RoutesConfigServerProperties properties = new RoutesConfigServerProperties();
+		ConfigServer configServer = properties.getConfigServer();
+		configServer.setName("gateway");
+		configServer.setFiles(List.of("orders.yaml"));
+
+		assertThatExceptionOfType(RouteConfigServerException.class)
+			.isThrownBy(() -> new ConfigServerRouteDefinitionLoader(webClient(new ArrayList<>()),
+					new RouteDefinitionFileParser(), properties))
+			.withMessageContaining("config-server.uri");
+	}
+
 	private WebClient webClient(List<String> requested) {
 		ExchangeFunction exchange = (request) -> {
 			requested.add(request.url().toString());

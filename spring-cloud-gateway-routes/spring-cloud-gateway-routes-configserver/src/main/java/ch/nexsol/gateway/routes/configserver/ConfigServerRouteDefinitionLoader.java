@@ -49,7 +49,7 @@ public class ConfigServerRouteDefinitionLoader {
 
 	private final RouteDefinitionFileParser parser;
 
-	private final List<String> urls;
+	private final RoutesConfigServerProperties properties;
 
 	/**
 	 * Creates the loader.
@@ -61,19 +61,29 @@ public class ConfigServerRouteDefinitionLoader {
 			RoutesConfigServerProperties properties) {
 		this.webClient = webClient;
 		this.parser = parser;
-		this.urls = resolveUrls(properties);
+		this.properties = properties;
+		// Resolved once here for its validation alone: incomplete coordinates must keep
+		// failing the context at startup rather than silently at the first fetch.
+		resolveUrls(properties);
 	}
 
 	/**
 	 * Fetches and parses every configured route file, preserving the configured order.
+	 * <p>
+	 * The URLs are resolved on every subscription rather than once at construction:
+	 * {@code /actuator/refresh} re-binds the properties bean in place, so a file added to
+	 * {@code config-server.files} is picked up without restarting the gateway.
 	 * @return the aggregated route definitions
 	 */
 	public Flux<RouteDefinition> load() {
-		if (this.urls.isEmpty()) {
-			LOG.warn("No Config Server route file URLs configured");
-			return Flux.empty();
-		}
-		return Flux.fromIterable(this.urls).concatMap(this::fetch);
+		return Flux.defer(() -> {
+			List<String> urls = resolveUrls(this.properties);
+			if (urls.isEmpty()) {
+				LOG.warn("No Config Server route file URLs configured");
+				return Flux.<RouteDefinition>empty();
+			}
+			return Flux.fromIterable(urls).concatMap(this::fetch);
+		});
 	}
 
 	private Flux<RouteDefinition> fetch(String url) {
