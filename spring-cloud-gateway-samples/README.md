@@ -47,7 +47,7 @@ so several gateways can run side by side.
 | [service-c](service-c) | 8082 | A backend that is a **resource server**: its contract is open, everything else asks for a token, and that contract says so with an `openIdConnect` scheme. What the other two are not, and what the services behind a real gateway usually are |
 | [eureka](eureka) | 8761 | The service registry |
 | [config-server](config-server) | 8888 | A Config Server serving route files from a classpath repository |
-| [auth-server](auth-server) | 9090 | An OAuth2 authorization server; accounts `user:user` (role `READ`) and `admin:admin` (role `ADMIN`), client `messaging-client:secret` |
+| [auth-server](auth-server) | 9090 | An OAuth2 authorization server; accounts `user:user` (role `READ`) and `admin:admin` (role `ADMIN`), client `messaging-client:secret`. Answers CORS for any `http://localhost:*` and `http://127.0.0.1:*` origin, which is what lets a console on another port read its discovery document and exchange a code |
 
 ## Infrastructure
 
