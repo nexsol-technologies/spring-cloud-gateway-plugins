@@ -16,6 +16,9 @@
 
 package ch.nexsol.gateway.metrics;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.MemoryType;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,8 +34,14 @@ import ch.nexsol.gateway.metrics.InstanceMetric.SystemStats;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.TimeGauge;
 import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.binder.MeterConvention;
+import io.micrometer.core.instrument.binder.jvm.convention.JvmCpuMeterConventions;
+import io.micrometer.core.instrument.binder.jvm.convention.JvmMemoryMeterConventions;
+import io.micrometer.core.instrument.binder.jvm.convention.micrometer.MicrometerJvmCpuMeterConventions;
+import io.micrometer.core.instrument.binder.jvm.convention.micrometer.MicrometerJvmMemoryMeterConventions;
 import reactor.core.publisher.Mono;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -46,22 +55,16 @@ import org.springframework.cloud.gateway.config.HttpClientProperties;
  * &mdash; so what is missing is reported as such through {@link InstanceInstrumentation}
  * instead of being shown as an empty table.
  * <p>
- * Memory and processor are read under both meter conventions Micrometer ships: the
- * historical one ({@code area=heap}, {@code jvm.memory.max}, {@code process.cpu.usage})
- * and the OpenTelemetry one ({@code jvm.memory.type=heap}, {@code jvm.memory.limit},
- * {@code jvm.cpu.recent_utilization}). Neither Spring Boot nor the binders expose which
- * one is in use &mdash; the conventions are held in a private field &mdash; so the
- * registry itself is asked, and the second lookup only happens when the first finds
- * nothing. The other figures this class reads are named identically under both
- * conventions.
+ * The two meter conventions Micrometer ships name memory and processor differently
+ * ({@code jvm.memory.max} against {@code jvm.memory.limit}, {@code process.cpu.usage}
+ * against {@code jvm.cpu.recent_utilization}, the {@code area} tag against
+ * {@code jvm.memory.type}). {@code JvmMemoryMetrics} and {@code ProcessorMetrics} publish
+ * under the {@link JvmMemoryMeterConventions} / {@link JvmCpuMeterConventions} bean the
+ * application declares, and under the Micrometer ones when it declares none; both are
+ * resolved here the same way and the meters looked up through them. Every other figure
+ * this class reads is named by the binders themselves, not by a convention.
  */
 public class LocalInstanceMetricsSource implements InstanceMetricsSource {
-
-	/** Micrometer tag separating the heap pools from the rest of the memory. */
-	public static final String AREA_TAG = "area";
-
-	/** OpenTelemetry tag separating the heap pools from the rest of the memory. */
-	public static final String MEMORY_TYPE_TAG = "jvm.memory.type";
 
 	/** Reactor Netty tag naming the connection provider a pool counter belongs to. */
 	public static final String POOL_NAME_TAG = "name";
@@ -75,23 +78,15 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 	/** Counter of the tasks queued on a Reactor Netty event loop. */
 	public static final String EVENT_LOOP_PENDING_TASKS = "reactor.netty.eventloop.pending.tasks";
 
-	private static final String MEMORY_USED = "jvm.memory.used";
-
-	private static final String MEMORY_MAX = "jvm.memory.max";
-
-	private static final String MEMORY_LIMIT = "jvm.memory.limit";
-
-	private static final String HEAP = "heap";
-
-	private static final String NON_HEAP = "nonheap";
-
-	private static final String OTEL_NON_HEAP = "non_heap";
-
 	private static final long MISSING = -1L;
 
 	private final ObjectProvider<MeterRegistry> meterRegistry;
 
 	private final ObjectProvider<HttpClientProperties> httpClientProperties;
+
+	private final JvmMemoryMeterConventions memoryConventions;
+
+	private final JvmCpuMeterConventions cpuConventions;
 
 	private final boolean httpClientInstrumented;
 
@@ -104,14 +99,24 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 	 * @param meterRegistry the provider over the application meter registry
 	 * @param httpClientProperties the provider over the gateway HTTP client
 	 * configuration, read to tell whether the pool counters are collected
+	 * @param memoryConventions the memory meter conventions declared by the application;
+	 * absent, {@code JvmMemoryMetrics} binds under the Micrometer ones and so does this
+	 * source
+	 * @param cpuConventions the processor meter conventions declared by the application;
+	 * absent, {@code ProcessorMetrics} binds under the Micrometer ones
 	 * @param properties the metrics configuration
 	 * @param identity the identity of the running instance
 	 */
 	public LocalInstanceMetricsSource(ObjectProvider<MeterRegistry> meterRegistry,
-			ObjectProvider<HttpClientProperties> httpClientProperties, MetricsProperties properties,
+			ObjectProvider<HttpClientProperties> httpClientProperties,
+			ObjectProvider<JvmMemoryMeterConventions> memoryConventions,
+			ObjectProvider<JvmCpuMeterConventions> cpuConventions, MetricsProperties properties,
 			InstanceIdentity identity) {
 		this.meterRegistry = meterRegistry;
 		this.httpClientProperties = httpClientProperties;
+		this.memoryConventions = memoryConventions
+			.getIfAvailable(() -> new MicrometerJvmMemoryMeterConventions(Tags.empty()));
+		this.cpuConventions = cpuConventions.getIfAvailable(() -> new MicrometerJvmCpuMeterConventions(Tags.empty()));
 		this.httpClientInstrumented = properties.getInstance().isInstrumentHttpClient();
 		this.instanceId = identity.id();
 		this.coverage = "this instance only (" + identity.id() + ")";
@@ -148,43 +153,53 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 		return (uptime != null) ? (long) uptime.value(TimeUnit.SECONDS) : 0;
 	}
 
-	private static JvmStats jvm(MeterRegistry registry) {
+	private JvmStats jvm(MeterRegistry registry) {
 		double pauseTotalMs = 0.0;
 		long pauseCount = 0;
 		for (Timer timer : registry.find("jvm.gc.pause").timers()) {
 			pauseTotalMs += timer.totalTime(TimeUnit.MILLISECONDS);
 			pauseCount += timer.count();
 		}
-		return new JvmStats(bytes(memoryUsed(registry, HEAP, HEAP)), bytes(heapMax(registry)),
-				bytes(memoryUsed(registry, NON_HEAP, OTEL_NON_HEAP)), orZero(gauge(registry, "jvm.gc.overhead")),
-				pauseTotalMs, pauseCount, (int) orZero(gauge(registry, "jvm.threads.live")),
-				(int) orZero(gauge(registry, "jvm.threads.peak")), (int) orZero(gauge(registry, "jvm.threads.daemon")));
+		return new JvmStats(bytes(memory(registry, this.memoryConventions.getMemoryUsedConvention(), MemoryType.HEAP)),
+				bytes(memory(registry, this.memoryConventions.getMemoryMaxConvention(), MemoryType.HEAP)),
+				bytes(memory(registry, this.memoryConventions.getMemoryUsedConvention(), MemoryType.NON_HEAP)),
+				orZero(gauge(registry, "jvm.gc.overhead")), pauseTotalMs, pauseCount,
+				(int) orZero(gauge(registry, "jvm.threads.live")), (int) orZero(gauge(registry, "jvm.threads.peak")),
+				(int) orZero(gauge(registry, "jvm.threads.daemon")));
 	}
 
-	private static SystemStats system(MeterRegistry registry) {
-		return new SystemStats(orZero(gauge(registry, "process.cpu.usage", "jvm.cpu.recent_utilization")),
+	private SystemStats system(MeterRegistry registry) {
+		return new SystemStats(orZero(gauge(registry, this.cpuConventions.processCpuLoadConvention().getName())),
 				orZero(gauge(registry, "system.cpu.usage")), orMissing(gauge(registry, "system.load.average.1m")),
-				(int) orZero(gauge(registry, "system.cpu.count", "jvm.cpu.count")),
+				(int) orZero(gauge(registry, this.cpuConventions.cpuCountConvention().getName())),
 				bytes(gauge(registry, "process.files.open")), bytes(gauge(registry, "process.files.max")));
 	}
 
 	/**
-	 * Sums the used memory of one area, under whichever convention the JVM binder was
-	 * built with.
+	 * Sums one memory figure over the pools of an area.
+	 * <p>
+	 * The binder registers one gauge per {@link MemoryPoolMXBean}, named
+	 * {@code convention.getName()} and tagged {@code convention.getTags(pool)}; the same
+	 * pools and the same convention produce the lookup key here. A pool without a ceiling
+	 * reports {@code -1}, which must not be added to the pools that have one.
 	 * @param registry the registry to read
-	 * @param area the value of the Micrometer {@code area} tag
-	 * @param memoryType the value of the OpenTelemetry {@code jvm.memory.type} tag
-	 * @return the used bytes, or {@code NaN} when neither convention published them
+	 * @param convention the convention the binder published the figure under
+	 * @param type the memory area to sum over
+	 * @return the total bytes, or {@code NaN} when no pool published the figure
 	 */
-	private static double memoryUsed(MeterRegistry registry, String area, String memoryType) {
-		double used = sumGauges(registry, MEMORY_USED, AREA_TAG, area);
-		return Double.isNaN(used) ? sumGauges(registry, MEMORY_USED, MEMORY_TYPE_TAG, memoryType) : used;
-	}
-
-	/** Reads the heap ceiling, which the two conventions do not even name alike. */
-	private static double heapMax(MeterRegistry registry) {
-		double max = sumGauges(registry, MEMORY_MAX, AREA_TAG, HEAP);
-		return Double.isNaN(max) ? sumGauges(registry, MEMORY_LIMIT, MEMORY_TYPE_TAG, HEAP) : max;
+	private static double memory(MeterRegistry registry, MeterConvention<MemoryPoolMXBean> convention,
+			MemoryType type) {
+		double total = Double.NaN;
+		for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
+			if (pool.getType() != type) {
+				continue;
+			}
+			Gauge gauge = registry.find(convention.getName()).tags(convention.getTags(pool)).gauge();
+			if (gauge != null && gauge.value() >= 0) {
+				total = Double.isNaN(total) ? gauge.value() : total + gauge.value();
+			}
+		}
+		return total;
 	}
 
 	private static NettyStats netty(MeterRegistry registry) {
@@ -249,26 +264,6 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 	private static double gauge(MeterRegistry registry, String name) {
 		Gauge gauge = registry.find(name).gauge();
 		return (gauge != null) ? gauge.value() : Double.NaN;
-	}
-
-	/** Reads a gauge the two conventions name differently, the historical name first. */
-	private static double gauge(MeterRegistry registry, String name, String openTelemetryName) {
-		double value = gauge(registry, name);
-		return Double.isNaN(value) ? gauge(registry, openTelemetryName) : value;
-	}
-
-	/**
-	 * Sums the gauges published per memory pool. A pool without a ceiling reports
-	 * {@code -1}, which must not be added to the pools that have one.
-	 */
-	private static double sumGauges(MeterRegistry registry, String name, String tag, String value) {
-		double total = Double.NaN;
-		for (Gauge gauge : registry.find(name).tag(tag, value).gauges()) {
-			if (gauge.value() >= 0) {
-				total = Double.isNaN(total) ? gauge.value() : total + gauge.value();
-			}
-		}
-		return total;
 	}
 
 	private static long bytes(double value) {

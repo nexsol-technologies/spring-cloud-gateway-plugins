@@ -101,6 +101,10 @@
 			// Its control is a form next to the search box, and it captures the clicks of
 			// its own area.
 			agent: { disabled: true },
+			// Same trigger for the 'Generate MCP' entry at the foot of the sidebar: the
+			// bundle shows it on a localhost, '.test', '.example', '.invalid' or
+			// '.localhost' address, and on any address it fails to parse.
+			mcp: { disabled: true },
 			// On by default. The gateway this console documents may be the only host it is
 			// allowed to reach.
 			telemetry: false,

@@ -135,6 +135,12 @@ console shows only those the issuer advertises in `scopes_supported`, and the
 [`auth-server`](../../auth-server) sample advertises `openid` alone — Keycloak would show the
 three.
 
+That `scopes_supported` is read by the browser, from this gateway's origin to the issuer's own
+`:9090`, and so is the token exchange that follows. Both are cross-origin: an issuer that
+sends no `Access-Control-Allow-Origin` returns the document and the browser drops it. The
+`auth-server` sample allows every `http://localhost:*` origin for that reason; point
+`issuer-uri` at your own server and it has to do the same.
+
 <p align="center">
   <img src="../../doc/spring-cloud-gateway-openapi.png" alt="spring-cloud-gateway-openapi" width="50%"/>
 </p>

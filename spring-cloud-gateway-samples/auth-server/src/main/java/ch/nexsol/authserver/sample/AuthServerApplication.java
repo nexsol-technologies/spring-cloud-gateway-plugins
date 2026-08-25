@@ -23,7 +23,9 @@ import java.util.stream.Collectors;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.Ordered;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -32,6 +34,9 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 @SpringBootApplication
 public class AuthServerApplication {
@@ -62,6 +67,33 @@ public class AuthServerApplication {
 
 		InMemoryUserDetailsManager userDetailsManager = new InMemoryUserDetailsManager(users);
 		return userDetailsManager;
+	}
+
+	/**
+	 * Answers the CORS preflight of the samples' consoles, which read
+	 * {@code /.well-known/openid-configuration} and exchange the code at
+	 * {@code /oauth2/token} from their own origin.
+	 * <p>
+	 * Registered ahead of {@code springSecurityFilterChain} rather than through
+	 * {@code HttpSecurity#cors}: this server declares no {@code SecurityFilterChain} of
+	 * its own, and the chains the authorization server auto-configures answer the
+	 * preflight {@code OPTIONS} with a redirect to the login page, before any CORS header
+	 * is written.
+	 * @return the CORS filter registration
+	 */
+	@Bean
+	FilterRegistrationBean<CorsFilter> corsFilter() {
+		CorsConfiguration configuration = new CorsConfiguration();
+		// Every sample gateway runs on a localhost port of its own, and the port is what
+		// makes it a different origin from this server.
+		configuration.setAllowedOriginPatterns(List.of("http://localhost:[*]", "http://127.0.0.1:[*]"));
+		configuration.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+		configuration.setAllowedHeaders(List.of("*"));
+		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+		source.registerCorsConfiguration("/**", configuration);
+		FilterRegistrationBean<CorsFilter> registration = new FilterRegistrationBean<>(new CorsFilter(source));
+		registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
+		return registration;
 	}
 
 	@Bean
