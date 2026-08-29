@@ -34,7 +34,7 @@
 					</div>
 				</div>
 			</div>
-			<div class="col-6 col-lg gm-4xx">
+			<div class="col-6 col-lg">
 				<div class="card border-0 shadow-sm h-100">
 					<div class="card-body py-3">
 						<div class="text-secondary small">Client errors (4xx)</div>
@@ -61,7 +61,7 @@
 						<select id="gm-preset" class="form-select form-select-sm" style="min-width: 14rem">
 							<option value="optimise" selected>Where should I optimise?</option>
 							<option value="failing">Where does it break?</option>
-							<option value="rejected" class="gm-4xx">Who gets rejected?</option>
+							<option value="rejected">Who gets rejected?</option>
 							<option value="spikes">Which routes spike?</option>
 							<option value="custom">Custom&hellip;</option>
 						</select>
@@ -73,8 +73,8 @@
 								<option value="count">Calls</option>
 								<option value="avgMs">Avg latency (ms)</option>
 								<option value="maxMs">Max latency (ms)</option>
-								<option value="clientErrorCount" class="gm-4xx">Client errors (4xx)</option>
-								<option value="clientErrorRate" class="gm-4xx">Client error rate (%)</option>
+								<option value="clientErrorCount">Client errors (4xx)</option>
+								<option value="clientErrorRate">Client error rate (%)</option>
 								<option value="errorCount">Server errors (5xx)</option>
 								<option value="errorRate">Server error rate (%)</option>
 							</select>
@@ -85,8 +85,8 @@
 								<option value="count">Calls</option>
 								<option value="avgMs">Avg latency (ms)</option>
 								<option value="maxMs">Max latency (ms)</option>
-								<option value="clientErrorCount" class="gm-4xx">Client errors (4xx)</option>
-								<option value="clientErrorRate" class="gm-4xx">Client error rate (%)</option>
+								<option value="clientErrorCount">Client errors (4xx)</option>
+								<option value="clientErrorRate">Client error rate (%)</option>
 								<option value="errorCount">Server errors (5xx)</option>
 								<option value="errorRate">Server error rate (%)</option>
 							</select>
@@ -97,40 +97,49 @@
 								<option value="count">Calls</option>
 								<option value="avgMs">Avg latency (ms)</option>
 								<option value="maxMs">Max latency (ms)</option>
-								<option value="clientErrorCount" class="gm-4xx">Client errors (4xx)</option>
-								<option value="clientErrorRate" class="gm-4xx">Client error rate (%)</option>
+								<option value="clientErrorCount">Client errors (4xx)</option>
+								<option value="clientErrorRate">Client error rate (%)</option>
 								<option value="errorCount">Server errors (5xx)</option>
 								<option value="errorRate">Server error rate (%)</option>
 							</select>
 						</div>
 					</div>
-					<div id="gm-z-wrap" style="display: none">
-						<label class="form-label small text-secondary mb-1" for="gm-z">Z axis (3D)</label>
-						<select id="gm-z" class="form-select form-select-sm">
-							<option value="count">Calls</option>
-							<option value="avgMs">Avg latency (ms)</option>
-							<option value="maxMs">Max latency (ms)</option>
-							<option value="clientErrorCount" class="gm-4xx">Client errors (4xx)</option>
-							<option value="clientErrorRate" class="gm-4xx">Client error rate (%)</option>
-							<option value="errorCount" selected>Server errors (5xx)</option>
-							<option value="errorRate">Server error rate (%)</option>
-						</select>
-					</div>
 					<div class="ms-auto d-flex align-items-center gap-3">
-						<div class="form-check form-switch mb-0">
-							<input class="form-check-input" type="checkbox" role="switch" id="gm-show-4xx" checked>
-							<label class="form-check-label small" for="gm-show-4xx">4xx</label>
-						</div>
-						<div class="form-check form-switch mb-0">
-							<input class="form-check-input" type="checkbox" role="switch" id="gm-3d">
-							<label class="form-check-label small" for="gm-3d">3D</label>
-						</div>
 						<div class="form-check form-switch mb-0">
 							<input class="form-check-input" type="checkbox" role="switch" id="gm-auto">
 							<label class="form-check-label small" for="gm-auto">Auto</label>
 						</div>
 						<button type="button" id="gm-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
 					</div>
+				</div>
+
+				<!-- What gets drawn. A gateway that discovers its routes has hundreds of
+				     them, and a plot of all of them at once is a plot of nothing. -->
+				<div class="d-flex flex-wrap gap-3 align-items-end mb-3">
+					<div>
+						<label class="form-label small text-secondary mb-1" for="gm-filter">Route filter</label>
+						<input type="text" id="gm-filter" class="form-control form-control-sm"
+								style="min-width: 16rem" placeholder="part of a route id, -term to exclude">
+					</div>
+					<div>
+						<label class="form-label small text-secondary mb-1" for="gm-top">Show</label>
+						<select id="gm-top" class="form-select form-select-sm">
+							<option value="25">Top 25 by calls</option>
+							<option value="50">Top 50 by calls</option>
+							<option value="100" selected>Top 100 by calls</option>
+							<option value="250">Top 250 by calls</option>
+							<option value="0">All routes</option>
+						</select>
+					</div>
+					<div>
+						<label class="form-label small text-secondary mb-1" for="gm-scale">Scale</label>
+						<select id="gm-scale" class="form-select form-select-sm">
+							<option value="auto" selected>Auto</option>
+							<option value="linear">Linear</option>
+							<option value="log">Logarithmic</option>
+						</select>
+					</div>
+					<button type="button" id="gm-reset-zoom" class="btn btn-sm btn-outline-secondary">Reset zoom</button>
 				</div>
 
 				<!-- Plain-language reading guide, rewritten for the selected question. -->
@@ -149,11 +158,22 @@
 			</div>
 		</div>
 
+		<!-- Ranking: the one thing the map cannot show, since what it ranks is the product
+		     of both axes rather than a position on either. -->
+		<div class="card border-0 shadow-sm mb-3" id="gm-bars-card">
+			<div class="card-body">
+				<h2 class="h6 fw-semibold mb-1" id="gm-bars-title">Top 20</h2>
+				<p class="text-secondary small mb-3" id="gm-bars-help"></p>
+				<div id="gm-bars" style="width: 100%" data-gw-theme-reload></div>
+			</div>
+		</div>
+
 		<!-- Detail: the same data, sortable, for the exact numbers. -->
 		<div class="card border-0 shadow-sm">
 			<div class="card-body">
-				<h2 class="h6 fw-semibold mb-3">All routes
+				<h2 class="h6 fw-semibold mb-3">Routes
 					<span class="text-secondary fw-normal small">(click a column to sort)</span>
+					<span class="text-secondary fw-normal small" id="gm-table-note"></span>
 				</h2>
 				<div class="table-responsive">
 					<table class="table table-sm align-middle mb-0">
@@ -164,7 +184,7 @@
 								<th class="gw-sortable text-end" data-sort="count">Calls</th>
 								<th class="gw-sortable text-end" data-sort="avgMs">Avg (ms)</th>
 								<th class="gw-sortable text-end" data-sort="maxMs">Max (ms)</th>
-								<th class="gw-sortable text-end gm-4xx" data-sort="clientErrorCount">4xx</th>
+								<th class="gw-sortable text-end" data-sort="clientErrorCount">4xx</th>
 								<th class="gw-sortable text-end" data-sort="errorCount">5xx</th>
 								<th class="gw-sortable text-end" data-sort="errorRate">Error rate</th>
 							</tr>
@@ -181,7 +201,6 @@
 
 	<div id="metrics-scripts">
 		<script th:src="@{/js/echarts.min.js}" src="/js/echarts.min.js"></script>
-		<script th:src="@{/js/echarts-gl.min.js}" src="/js/echarts-gl.min.js"></script>
 		<script th:src="@{/js/gateway-metrics.js}" src="/js/gateway-metrics.js"></script>
 	</div>
 </body>

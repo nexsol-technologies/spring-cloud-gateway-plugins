@@ -201,16 +201,15 @@ the whole test.
 
 Calls, average and max latency, errors and error rate per route, read through the
 [metrics plugin](../spring-cloud-gateway-metrics/README.md). The page reads top to bottom —
-summary, then map, then the exact numbers — and is headed by the coverage the figures were
-computed over.
+summary, then map, then ranking, then the exact numbers — and is headed by the coverage the
+figures were computed over.
 
 ![The traffic view](doc/traffic-light.png)
 
 **4xx and 5xx are counted apart.** A 4xx is the caller being turned away (unknown path,
 missing rights, malformed request); a 5xx is the gateway or the backend failing. Summing them
 would make a scanner hitting unknown paths look like an outage, so each has its own tile,
-column and axis, and the bubble colour stays on the 5xx. The **4xx** switch removes the client
-errors from the view entirely, for reading the traffic as pure server-side health.
+column and axis, and the bubble colour stays on the 5xx.
 
 **Map** — one bubble per route (ECharts, vendored locally), driven by a named question that
 picks the metrics of both axes:
@@ -224,10 +223,38 @@ picks the metrics of both axes:
 | Custom… | re-opens the raw X / Y / bubble-size pickers |
 
 Dashed lines mark the median of both axes and the quadrants are labelled in place, so a
-bubble's position is readable without a legend. The **3D** switch adds a third metric on a
-rotatable Z axis (echarts-gl); **Auto** polls every 5 seconds.
+bubble's position is readable without a legend. **Auto** polls every 5 seconds.
 
-**All routes** — the same data as a sortable table, with the error rate as a colour-coded
+**A gateway with hundreds of routes** — one that discovers its routes plots a bubble per
+discovered service, and they all pile up in the same corner. Three controls take that apart:
+
+| Control | What it does |
+| --- | --- |
+| Route filter | space-separated terms on the route id, all of which must match; a term written `-term` excludes what it matches, so `-discoveryclient` drops the discovery-locator routes |
+| Show | caps the plot and the table to the busiest N routes by calls; Top 100 by default |
+| Scale | `Auto` turns an axis logarithmic as soon as its largest value is fifty times the median one, which is what un-stacks the cloud; `Linear` and `Logarithmic` force it either way |
+
+Only a dozen routes are named on the plot — the tooltip names any other one. Scroll to zoom, drag to pan, **Reset zoom** puts the axes back.
+The filter and the cap drive the plot and the table together; the tiles at the top stay on
+the whole gateway, and the line under the plot says so whenever the two differ.
+
+**Top 20** — the ranking the map cannot draw. A position shows both factors of a question;
+what has to be acted on is their product, and a product is a diagonal the eye does not read.
+Each question ranks on its own grandeur:
+
+| Question | Ranked by |
+| --- | --- |
+| Where should I optimise? | calls × average latency — the time the gateway actually spends in a route |
+| Where does it break? | the absolute number of 5xx |
+| Who gets rejected? | the absolute number of 4xx |
+| Which routes spike? | max − average latency, the worst case above the typical one |
+| Custom… | both chosen axes multiplied |
+
+Same routes, same colours and same tooltips as the map, over the same filtered set, and the
+caption says what the twenty add up to — *these 20 carry 87% of the time spent of the 100
+routes above*. The dozen names the map carries are the head of that same ranking.
+
+**Routes** — the same data as a sortable table, with the error rate as a colour-coded
 badge. The view is fed by `GET /ui/metrics/data` (JSON).
 
 Routes carrying no traffic worth reading are left out through
@@ -729,5 +756,4 @@ from a CDN at runtime.
 | [Bootstrap](https://getbootstrap.com/) | 5.3.8 | `css/bootstrap.min.css`, `js/bootstrap.bundle.min.js` |
 | [htmx](https://htmx.org/) | 2.0.10 | `js/htmx.min.js` |
 | [Apache ECharts](https://echarts.apache.org/) | 6.1.0 | `js/echarts.min.js` |
-| [ECharts GL](https://github.com/ecomfe/echarts-gl) | 2.1.0 | `js/echarts-gl.min.js` |
 | [Scalar API Reference](https://github.com/scalar/scalar) | 1.66.1 | `js/scalar.standalone.js` |

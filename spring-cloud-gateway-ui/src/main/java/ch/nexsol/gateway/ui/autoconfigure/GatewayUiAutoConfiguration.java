@@ -329,7 +329,7 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		UiSecuredPaths routeMetricsSecuredPaths() {
-			return new UiSecuredPaths("/ui/metrics", "/ui/metrics/data", "/js/echarts.min.js", "/js/echarts-gl.min.js",
+			return new UiSecuredPaths("/ui/metrics", "/ui/metrics/data", "/js/echarts.min.js",
 					"/js/gateway-metrics.js");
 		}
 
