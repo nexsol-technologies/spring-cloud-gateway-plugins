@@ -1,9 +1,18 @@
 /*
- * Traffic view. The chart answers a named question rather than exposing raw axes: each
- * preset picks the metrics, splits the plot on the median of both axes and labels the
- * four quadrants, so a bubble's position reads on its own. The table below carries the
- * exact numbers. A "Custom" preset re-opens the raw axis pickers, and a 3D switch adds a
- * third metric via echarts-gl.
+ * Traffic view, read top to bottom: the map, then the ranking, then the numbers.
+ *
+ * The map answers a named question rather than exposing raw axes: each preset picks the
+ * metrics, splits the plot on the median of both axes and labels the four quadrants, so a
+ * bubble's position reads on its own. A "Custom" preset re-opens the raw axis pickers.
+ *
+ * The ranking below it carries what a position cannot: the product of both axes, which is
+ * the grandeur the question is really about — the time a route costs, the errors it
+ * accounts for. The table at the bottom carries the exact numbers.
+ *
+ * A gateway with hundreds of routes is what the rest of the controls answer: the plot is
+ * restricted to the routes a filter keeps, capped to the busiest N, drawn on axes that
+ * turn logarithmic when the spread calls for it, and only the routes the question is about
+ * are named. Any of them can be zoomed into.
  */
 (function () {
 	var chartEl = document.getElementById('gm-chart');
@@ -21,14 +30,26 @@
 		errorRate: 'Server error rate (%)'
 	};
 
-	// 4xx and 5xx answer different questions, so the view can be read without the client
-	// errors: the switch hides their tile, their column and their axes.
-	var CLIENT_ERROR_KEYS = ['clientErrorCount', 'clientErrorRate'];
+	// Bubbles carrying their route id. Past a dozen the names cover the plot they describe.
+	var LABELLED = 12;
+
+	// Bars in the ranking. Twenty routes is a page that can be acted on.
+	var RANKED = 20;
 
 	// Each preset frames a question, then says how to read the resulting picture.
 	var PRESETS = {
 		optimise: {
-			x: 'count', y: 'avgMs', size: 'errorCount', z: 'errorCount',
+			x: 'count', y: 'avgMs', size: 'errorCount',
+			rank: {
+				label: 'time spent',
+				of: function (row) {
+					return row.count * row.avgMs;
+				},
+				format: duration,
+				help: 'Calls × average latency: the time the gateway actually spends in a route. '
+					+ 'One called 100 000 times at 10 ms costs more than one called twice at 10 s, '
+					+ 'which is what the map cannot show — it is a product of both of its axes.'
+			},
 			help: 'Right = called often, up = slow. The dashed lines are the median route, '
 				+ 'so anything in the top-right is both busier and slower than half your routes: '
 				+ 'that is where an optimisation pays off the most.',
@@ -40,7 +61,16 @@
 			}
 		},
 		failing: {
-			x: 'count', y: 'errorRate', size: 'errorCount', z: 'errorCount',
+			x: 'count', y: 'errorRate', size: 'errorCount',
+			rank: {
+				label: 'server errors',
+				of: function (row) {
+					return row.errorCount;
+				},
+				format: suffixed(' errors'),
+				help: 'The absolute number of 5xx rather than the rate: half of four calls failing '
+					+ 'is not an outage.'
+			},
 			help: 'Right = called often, up = fails often. Top-right routes fail on traffic that '
 				+ 'actually matters — fix those first. Bubble size is the absolute number of 5xx.',
 			quadrants: {
@@ -51,7 +81,15 @@
 			}
 		},
 		rejected: {
-			x: 'count', y: 'clientErrorRate', size: 'clientErrorCount', z: 'clientErrorCount',
+			x: 'count', y: 'clientErrorRate', size: 'clientErrorCount',
+			rank: {
+				label: 'rejected calls',
+				of: function (row) {
+					return row.clientErrorCount;
+				},
+				format: suffixed(' rejected'),
+				help: 'The absolute number of 4xx: how many callers were actually turned away.'
+			},
 			help: 'Right = called often, up = rejected often. These are 4xx: the caller was turned '
 				+ 'away, not the backend failing. A route high on this chart usually means a wrong '
 				+ 'path, a missing permission or a client calling it wrong — bubble size is the '
@@ -64,7 +102,15 @@
 			}
 		},
 		spikes: {
-			x: 'avgMs', y: 'maxMs', size: 'count', z: 'errorCount',
+			x: 'avgMs', y: 'maxMs', size: 'count',
+			rank: {
+				label: 'worst-case overshoot',
+				of: function (row) {
+					return row.maxMs - row.avgMs;
+				},
+				format: suffixed(' ms'),
+				help: 'How far the worst response sits above the typical one.'
+			},
 			help: 'Compares the typical response time (right) with the worst one seen (up). '
 				+ 'A bubble far above the others is a route whose worst case is much worse than '
 				+ 'its average: look for timeouts, cold starts or a slow dependency.',
@@ -74,45 +120,18 @@
 	};
 
 	var dataUrl = chartEl.getAttribute('data-url') || '/ui/metrics/data';
-	var chart = echarts.init(chartEl, window.gatewayUi.theme() === 'dark' ? 'dark' : null);
+	var theme = window.gatewayUi.theme() === 'dark' ? 'dark' : null;
+	var chart = echarts.init(chartEl, theme);
+	var barsEl = document.getElementById('gm-bars');
+	var bars = echarts.init(barsEl, theme);
 	var rows = [];
+	var drawn = [];
 	var sortKey = 'count';
 	var sortDir = -1;
 	var pollTimer = null;
 
 	function sel(id) {
 		return document.getElementById(id);
-	}
-
-	function showClientErrors() {
-		var toggle = sel('gm-show-4xx');
-		return !toggle || toggle.checked;
-	}
-
-	// Hides everything the client errors feed: their tile, their table column, their axis
-	// options and the question built on them. A selection left pointing at a hidden metric
-	// falls back rather than plotting a column the reader just asked to remove.
-	function applyClientErrorFilter() {
-		var shown = showClientErrors();
-		Array.prototype.forEach.call(document.querySelectorAll('.gm-4xx'), function (element) {
-			if (element.tagName === 'OPTION') {
-				element.hidden = !shown;
-				element.disabled = !shown;
-			}
-			else {
-				element.style.display = shown ? '' : 'none';
-			}
-		});
-		if (!shown) {
-			if (sel('gm-preset').value === 'rejected') {
-				sel('gm-preset').value = 'optimise';
-			}
-			['gm-x', 'gm-y', 'gm-size', 'gm-z'].forEach(function (id) {
-				if (CLIENT_ERROR_KEYS.indexOf(sel(id).value) >= 0) {
-					sel(id).value = (id === 'gm-x') ? 'count' : 'errorCount';
-				}
-			});
-		}
 	}
 
 	function preset() {
@@ -151,10 +170,16 @@
 		return (sorted.length % 2) ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 	}
 
-	// Padded axis bounds; keeps the quadrant areas aligned with the visible range.
-	function bounds(values) {
+	// Padded axis bounds; keeps the quadrant areas aligned with the visible range. A zoom
+	// picks its window inside them rather than replacing them, so they hold at every zoom
+	// level.
+	function bounds(values, log) {
 		var min = Math.min.apply(null, values);
 		var max = Math.max.apply(null, values);
+		if (log) {
+			// Already logged: a whole number is a decade, which is where the axis is cut.
+			return { min: Math.floor(min), max: Math.max(Math.ceil(max), Math.floor(min) + 1) };
+		}
 		if (max === min) {
 			return { min: min - 1, max: max + 1 };
 		}
@@ -169,7 +194,7 @@
 	}
 
 	function sizer(key) {
-		var values = rows.map(function (row) {
+		var values = drawn.map(function (row) {
 			return value(row, key);
 		});
 		var min = Math.min.apply(null, values);
@@ -180,6 +205,163 @@
 			}
 			return 10 + 32 * ((v - min) / (max - min));
 		};
+	}
+
+	// Free-text filter over route ids: space-separated terms, all of which must match, a
+	// term prefixed with '-' excluding what it matches. A gateway that discovers its routes
+	// carries hundreds of them named after the client that found them, and typing
+	// '-discoveryclient' is what takes those out of the picture.
+	function accepts(routeId) {
+		var text = (sel('gm-filter').value || '').trim().toLowerCase();
+		if (!text) {
+			return true;
+		}
+		var id = routeId.toLowerCase();
+		return text.split(/\s+/).every(function (term) {
+			if (term.charAt(0) === '-') {
+				return term.length === 1 || id.indexOf(term.substring(1)) < 0;
+			}
+			return id.indexOf(term) >= 0;
+		});
+	}
+
+	// The routes actually drawn: what the filter keeps, capped to the busiest N. The chart
+	// and the table below both read from this; the tiles above stay on the whole payload.
+	function visible() {
+		var kept = rows.filter(function (row) {
+			return accepts(row.routeId);
+		});
+		var top = parseInt(sel('gm-top').value, 10);
+		if (!top || kept.length <= top) {
+			return kept;
+		}
+		return kept.slice().sort(function (a, b) {
+			return b.count - a.count;
+		}).slice(0, top);
+	}
+
+	function positives(values) {
+		return values.filter(function (v) {
+			return v > 0;
+		});
+	}
+
+	// Whether an axis is drawn logarithmic. On 'auto' it is as soon as the largest value
+	// dwarfs the median one: a linear axis then stacks most of the routes on one pixel.
+	function logarithmic(values) {
+		var mode = sel('gm-scale').value;
+		if (mode !== 'auto') {
+			return mode === 'log';
+		}
+		var positive = positives(values);
+		return positive.length >= 3 && Math.max.apply(null, positive) >= 50 * median(positive);
+	}
+
+	// The values are logged here and drawn on a plain axis rather than handed to a log
+	// axis, which ECharts zooms linearly in value space: nine tenths of the slider would
+	// then cover the top decade. Logged, a zoom covers the same span of decades wherever
+	// it lands, and the axis labels are turned back into the real numbers.
+	//
+	// Nothing can be logged at zero, and most routes have none of whatever the axis
+	// carries. Those are drawn on a floor just under the smallest real value, where they
+	// read as "none" without breaking the scale.
+	function plot(values, log) {
+		if (!log) {
+			return values;
+		}
+		var positive = positives(values);
+		var floor = positive.length ? Math.min.apply(null, positive) / 2 : 0.1;
+		return values.map(function (v) {
+			return Math.log(Math.max(v, floor)) / Math.LN10;
+		});
+	}
+
+	// A time budget reads in the unit it is worth: a route can cost milliseconds or hours.
+	function duration(ms) {
+		if (ms >= 3600000) {
+			return (ms / 3600000).toFixed(1) + ' h';
+		}
+		if (ms >= 60000) {
+			return (ms / 60000).toFixed(1) + ' min';
+		}
+		if (ms >= 1000) {
+			return (ms / 1000).toFixed(1) + ' s';
+		}
+		return Math.round(ms) + ' ms';
+	}
+
+	function suffixed(suffix) {
+		return function (v) {
+			return Math.round(v).toLocaleString('en-US') + suffix;
+		};
+	}
+
+	// What "top" means for the question being asked. A preset carries its own; Custom
+	// multiplies the two axes it was given, which is the distance from the origin the map
+	// is read on.
+	function ranking() {
+		var config = preset();
+		if (config.rank) {
+			return config.rank;
+		}
+		var xk = sel('gm-x').value;
+		var yk = sel('gm-y').value;
+		return {
+			label: LABELS[xk] + ' × ' + LABELS[yk],
+			of: function (row) {
+				return value(row, xk) * value(row, yk);
+			},
+			format: suffixed(''),
+			help: 'Both axes multiplied: the routes furthest from the origin of the map.'
+		};
+	}
+
+	// Axis label of a logged value: the number the reader knows, not its exponent. Grouped
+	// the way echarts groups the labels of a plain axis, rather than the way the browser of
+	// whoever is reading happens to.
+	function unlog(logged) {
+		var raw = Math.pow(10, logged);
+		if (raw >= 1000) {
+			return Math.round(raw).toLocaleString('en-US');
+		}
+		return String(raw >= 10 ? Math.round(raw) : Math.round(raw * 10) / 10);
+	}
+
+	// The routes the question is actually about: the head of the ranking the bars below
+	// draw. Naming every bubble is what makes the plot unreadable, so only these carry a
+	// label -- the tooltip names any other one on hover.
+	function named(rank) {
+		var top = {};
+		drawn.map(function (row, index) {
+			return { index: index, score: rank.of(row) };
+		}).sort(function (a, b) {
+			return b.score - a.score;
+		}).slice(0, LABELLED).forEach(function (entry) {
+			top[entry.index] = true;
+		});
+		return top;
+	}
+
+	// Said out loud whenever the plot and the table are not showing every route, since the
+	// tiles above are left on the whole gateway and their totals would otherwise read as
+	// the totals of what is drawn.
+	function scope() {
+		if (drawn.length === rows.length) {
+			return '';
+		}
+		return ' · ' + drawn.length + ' of ' + rows.length
+			+ ' routes shown — the tiles above cover the whole gateway.';
+	}
+
+	function axis(key, log, range) {
+		var spec = {
+			name: LABELS[key] + (log ? ' — log scale' : ''), type: 'value',
+			min: range.min, max: range.max
+		};
+		if (log) {
+			spec.axisLabel = { formatter: unlog };
+		}
+		return spec;
 	}
 
 	function findRoute(routeId) {
@@ -200,8 +382,7 @@
 			+ '<br>Calls: ' + row.count
 			+ '<br>Avg: ' + row.avgMs.toFixed(1) + ' ms'
 			+ '<br>Max: ' + row.maxMs.toFixed(1) + ' ms'
-			+ (showClientErrors()
-				? '<br>4xx: ' + row.clientErrorCount + ' (' + (row.clientErrorRate * 100).toFixed(1) + '%)' : '')
+			+ '<br>4xx: ' + row.clientErrorCount + ' (' + (row.clientErrorRate * 100).toFixed(1) + '%)'
 			+ '<br>5xx: ' + row.errorCount + ' (' + (row.errorRate * 100).toFixed(1) + '%)';
 	}
 
@@ -227,7 +408,7 @@
 			label: { show: false },
 			data: [{ xAxis: mx }, { yAxis: my }]
 		};
-		if (!quadrants || rows.length < 3) {
+		if (!quadrants || drawn.length < 3) {
 			return { markLine: markLine };
 		}
 		function area(x0, y0, x1, y1, text, tint) {
@@ -257,64 +438,67 @@
 
 	function renderChart() {
 		var config = preset();
-		var is3d = sel('gm-3d').checked;
 		var xk = sel('gm-x').value;
 		var yk = sel('gm-y').value;
 		var sk = sel('gm-size').value;
-		var zk = sel('gm-z').value;
 		var sizeFn = sizer(sk);
 
 		sel('gm-legend').textContent = 'Bubble size = ' + LABELS[sk]
-			+ ' · colour = error rate (green none, amber some, red heavy) · hover a bubble for details.';
+			+ ' · colour = error rate (green none, amber some, red heavy) · hover a bubble for '
+			+ 'details · scroll to zoom, drag to pan.' + scope();
 
-		if (is3d) {
-			chart.setOption({
-				// The bundled dark theme paints a canvas of its own, dropped so the chart
-				// keeps sitting on the card that hosts it. Both calls replace the option
-				// rather than merging into it, so each one carries it.
-				backgroundColor: 'transparent',
-				tooltip: { formatter: tooltip },
-				xAxis3D: { name: LABELS[xk], type: 'value' },
-				yAxis3D: { name: LABELS[yk], type: 'value' },
-				zAxis3D: { name: LABELS[zk], type: 'value' },
-				grid3D: { viewControl: { autoRotate: false, rotateSensitivity: 2 } },
-				series: [{
-					type: 'scatter3D',
-					data: rows.map(function (row) {
-						return point(row, [xk, yk, zk], sizeFn, sk);
-					})
-				}]
-			}, true);
-			return;
-		}
-
-		var xs = rows.map(function (row) {
+		var xs = drawn.map(function (row) {
 			return value(row, xk);
 		});
-		var ys = rows.map(function (row) {
+		var ys = drawn.map(function (row) {
 			return value(row, yk);
 		});
-		var xb = bounds(xs);
-		var yb = bounds(ys);
-		var guide = guides(xs, ys, xb, yb, config.quadrants);
+		var xLog = logarithmic(xs);
+		var yLog = logarithmic(ys);
+		var px = plot(xs, xLog);
+		var py = plot(ys, yLog);
+		var xb = bounds(px, xLog);
+		var yb = bounds(py, yLog);
+		var guide = guides(px, py, xb, yb, config.quadrants);
+		var labelled = named(ranking());
+		var xAxis = axis(xk, xLog, xb);
+		xAxis.nameLocation = 'middle';
+		xAxis.nameGap = 32;
 
 		chart.setOption({
+			// The bundled dark theme paints a canvas of its own, dropped so the chart keeps
+			// sitting on the card that hosts it.
 			backgroundColor: 'transparent',
 			tooltip: { formatter: tooltip },
-			grid: { left: 70, right: 30, top: 24, bottom: 56 },
-			xAxis: {
-				name: LABELS[xk], type: 'value', nameLocation: 'middle', nameGap: 32,
-				min: xb.min, max: xb.max
-			},
-			yAxis: { name: LABELS[yk], type: 'value', min: yb.min, max: yb.max },
+			grid: { left: 70, right: 58, top: 24, bottom: 78 },
+			xAxis: xAxis,
+			yAxis: axis(yk, yLog, yb),
+			// Wheel on the plot and a slider per axis: a corner of the cloud is read by
+			// zooming into it. 'none' keeps the points outside the window in the series,
+			// so the median cross and the quadrants stay where they were computed.
+			dataZoom: [
+				{ type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+				{ type: 'inside', yAxisIndex: 0, filterMode: 'none' },
+				{ type: 'slider', xAxisIndex: 0, filterMode: 'none', bottom: 10, height: 18 },
+				{
+					type: 'slider', yAxisIndex: 0, filterMode: 'none', right: 10, width: 18,
+					top: 24, bottom: 78
+				}
+			],
 			series: [{
 				type: 'scatter',
-				data: rows.map(function (row) {
-					return point(row, [xk, yk], sizeFn, sk);
+				data: drawn.map(function (row, index) {
+					var item = point(row, [xk, yk], sizeFn, sk);
+					item.value = [px[index], py[index]];
+					item.label = { show: labelled[index] === true };
+					return item;
 				}),
 				label: {
 					show: true, formatter: '{b}', position: 'top', fontSize: 10, color: '#64748b'
 				},
+				// Even a dozen labels collide once the bubbles pile up: the ones that
+				// cannot be placed are dropped rather than drawn over their neighbour.
+				labelLayout: { hideOverlap: true },
 				markLine: guide.markLine,
 				markArea: guide.markArea
 			}]
@@ -351,8 +535,9 @@
 	function renderTable() {
 		var body = sel('gm-tbody');
 		body.innerHTML = '';
-		sel('gm-table-empty').style.display = rows.length ? 'none' : '';
-		rows.slice().sort(function (a, b) {
+		sel('gm-table-empty').style.display = drawn.length ? 'none' : '';
+		sel('gm-table-note').textContent = scope();
+		drawn.slice().sort(function (a, b) {
 			var va = a[sortKey];
 			var vb = b[sortKey];
 			if (typeof va === 'string' || typeof vb === 'string') {
@@ -366,9 +551,7 @@
 			tr.appendChild(cell(row.count, true));
 			tr.appendChild(cell(row.avgMs.toFixed(1), true));
 			tr.appendChild(cell(row.maxMs.toFixed(1), true));
-			if (showClientErrors()) {
-				tr.appendChild(cell(row.clientErrorCount, true));
-			}
+			tr.appendChild(cell(row.clientErrorCount, true));
 			tr.appendChild(cell(row.errorCount, true));
 			var rate = document.createElement('td');
 			rate.className = 'text-end';
@@ -383,11 +566,87 @@
 		});
 	}
 
+	// A rounded 100% would claim the bars carry everything while routes are left out of
+	// them, so a remainder that rounds away is spelled out as one.
+	function share(carried, total, truncated) {
+		var percent = 100 * carried / total;
+		if (truncated && percent > 99.5) {
+			return '>99%';
+		}
+		return Math.round(percent) + '%';
+	}
+
+	// The ranking the map cannot draw: the routes that carry the most of whatever the
+	// question is about, biggest first, with what the twenty of them add up to.
+	function renderBars() {
+		var rank = ranking();
+		var scored = drawn.map(function (row) {
+			return { row: row, score: rank.of(row) };
+		}).filter(function (entry) {
+			return entry.score > 0;
+		}).sort(function (a, b) {
+			return b.score - a.score;
+		});
+		if (!scored.length) {
+			sel('gm-bars-card').style.display = 'none';
+			return;
+		}
+		sel('gm-bars-card').style.display = '';
+
+		var top = scored.slice(0, RANKED);
+		var total = 0;
+		var carried = 0;
+		scored.forEach(function (entry, index) {
+			total += entry.score;
+			if (index < RANKED) {
+				carried += entry.score;
+			}
+		});
+		sel('gm-bars-title').textContent = 'Top ' + top.length + ' by ' + rank.label;
+		sel('gm-bars-help').textContent = rank.help + ' These ' + top.length + ' carry '
+			+ share(carried, total, top.length < scored.length) + ' of the ' + rank.label
+			+ ' of the ' + drawn.length + (drawn.length > 1 ? ' routes' : ' route') + ' above.';
+
+		// One row per bar: the chart is exactly as tall as it has routes to name, rather
+		// than squeezing twenty of them into a fixed height.
+		barsEl.style.height = (top.length * 26 + 40) + 'px';
+		bars.setOption({
+			backgroundColor: 'transparent',
+			tooltip: { formatter: tooltip },
+			grid: { left: 8, right: 110, top: 8, bottom: 8, containLabel: true },
+			xAxis: { type: 'value', show: false },
+			yAxis: {
+				type: 'category', inverse: true,
+				data: top.map(function (entry) {
+					return entry.row.routeId;
+				}),
+				axisTick: { show: false },
+				axisLine: { show: false },
+				axisLabel: { fontSize: 11, width: 280, overflow: 'truncate' }
+			},
+			series: [{
+				type: 'bar',
+				barMaxWidth: 16,
+				data: top.map(function (entry) {
+					return {
+						name: entry.row.routeId, value: entry.score,
+						itemStyle: { color: colourFor(entry.row.errorRate) }
+					};
+				}),
+				label: {
+					show: true, position: 'right', fontSize: 11, color: '#64748b',
+					formatter: function (params) {
+						return rank.format(params.value);
+					}
+				}
+			}]
+		}, true);
+		bars.resize();
+	}
+
 	function render() {
-		applyClientErrorFilter();
 		var config = preset();
 		var isCustom = sel('gm-preset').value === 'custom';
-		var is3d = sel('gm-3d').checked;
 
 		// A preset drives the axes; Custom hands them back to the user.
 		if (!isCustom) {
@@ -396,21 +655,31 @@
 			sel('gm-size').value = config.size;
 		}
 		sel('gm-custom').style.display = isCustom ? 'flex' : 'none';
-		sel('gm-z-wrap').style.display = is3d ? '' : 'none';
 		sel('gm-help').style.display = config.help ? '' : 'none';
 		sel('gm-help').textContent = config.help;
 
+		drawn = visible();
 		renderKpis();
 		renderTable();
 
-		if (!rows.length) {
+		if (!drawn.length) {
+			// Hidden rather than cleared: an empty plot of the height of a full one would
+			// push the message that explains it off the screen.
 			chart.clear();
+			chartEl.style.display = 'none';
+			bars.clear();
+			sel('gm-bars-card').style.display = 'none';
+			sel('gm-empty').textContent = rows.length
+				? 'No route matches this filter.'
+				: 'No route metrics yet — send some traffic through the gateway, then refresh.';
 			sel('gm-empty').style.display = '';
 			sel('gm-legend').textContent = '';
 			return;
 		}
 		sel('gm-empty').style.display = 'none';
+		chartEl.style.display = '';
 		renderChart();
+		renderBars();
 	}
 
 	function load() {
@@ -435,18 +704,15 @@
 			});
 	}
 
-	sel('gm-preset').addEventListener('change', function () {
-		var config = preset();
-		if (config.z) {
-			sel('gm-z').value = config.z;
-		}
-		render();
-	});
-	['gm-x', 'gm-y', 'gm-size', 'gm-z', 'gm-3d'].forEach(function (id) {
+	['gm-preset', 'gm-x', 'gm-y', 'gm-size', 'gm-top', 'gm-scale'].forEach(function (id) {
 		sel(id).addEventListener('change', render);
 	});
+	// On input rather than on change: the plot follows what is being typed.
+	sel('gm-filter').addEventListener('input', render);
+	// A render replaces the option rather than merging into it, which is what puts the axes
+	// back to the range they were computed with.
+	sel('gm-reset-zoom').addEventListener('click', render);
 	sel('gm-refresh').addEventListener('click', load);
-	sel('gm-show-4xx').addEventListener('change', render);
 	sel('gm-auto').addEventListener('change', function () {
 		if (sel('gm-auto').checked) {
 			pollTimer = setInterval(load, 5000);
@@ -466,11 +732,12 @@
 	});
 	window.addEventListener('resize', function () {
 		chart.resize();
+		bars.resize();
 	});
 
 	// Restored before the first render, so the view draws the chart it was left on rather
 	// than the default one.
-	['gm-preset', 'gm-x', 'gm-y', 'gm-size', 'gm-z', 'gm-show-4xx', 'gm-3d', 'gm-auto']
+	['gm-preset', 'gm-x', 'gm-y', 'gm-size', 'gm-auto', 'gm-filter', 'gm-top', 'gm-scale']
 		.forEach(function (id) {
 			window.gatewayUi.remember(sel(id));
 		});
