@@ -103,8 +103,11 @@ Everything else is named identically under both.
 
 Spring Boot hands a `JvmMemoryMeterConventions` and a `JvmCpuMeterConventions` bean to
 `JvmMemoryMetrics` and `ProcessorMetrics`, which is what decides the column above; with no
-such bean the binders use the Micrometer ones. This plugin resolves the same two beans, with
-the same fallback, and reads the meters through them.
+such bean the binders use the Micrometer ones. This plugin resolves the same two beans and
+reads the meters through them, then falls back to the other convention when a figure is not
+found: the beans describe the binders this application configures, and a registry can also be
+filled by an OpenTelemetry agent or an OTLP bridge, which declare none. The second lookup only
+runs when the first comes back empty.
 
 ```java
 @Bean

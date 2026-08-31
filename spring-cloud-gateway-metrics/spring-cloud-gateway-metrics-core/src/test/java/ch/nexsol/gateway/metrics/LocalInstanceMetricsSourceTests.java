@@ -236,6 +236,26 @@ class LocalInstanceMetricsSourceTests {
 		assertThat(sourceFor(registry, conventions).read().jvm().heapUsedBytes()).isEqualTo((long) expected);
 	}
 
+	@Test
+	void readsMeterPublishedUnderAConventionTheApplicationDeclaresNoBeanFor() {
+		SimpleMeterRegistry registry = new SimpleMeterRegistry();
+		Conventions otel = conventions().get(1);
+		double heap = publishMemory(registry, otel.memory().getMemoryUsedConvention(), MemoryType.HEAP, 300, 700);
+		double nonHeap = publishMemory(registry, otel.memory().getMemoryUsedConvention(), MemoryType.NON_HEAP, 50);
+		double max = publishMemory(registry, otel.memory().getMemoryMaxConvention(), MemoryType.HEAP, 2000);
+		gauge(registry, otel.cpu().processCpuLoadConvention().getName(), 0.34);
+
+		// The registry can be filled by something other than the binders this application
+		// configures - an OpenTelemetry agent, an OTLP bridge - and then no convention
+		// bean says so.
+		InstanceMetric metric = sourceFor(registry).read();
+
+		assertThat(metric.jvm().heapUsedBytes()).isEqualTo((long) heap);
+		assertThat(metric.jvm().heapMaxBytes()).isEqualTo((long) max);
+		assertThat(metric.jvm().nonHeapUsedBytes()).isEqualTo((long) nonHeap);
+		assertThat(metric.system().processCpuUsage()).isEqualTo(0.34, offset(0.0001));
+	}
+
 	@ParameterizedTest
 	@MethodSource("conventions")
 	void agreesWithTheBinderItReadsUnderEitherConvention(Conventions conventions) {
