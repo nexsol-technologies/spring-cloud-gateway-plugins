@@ -20,7 +20,7 @@ so several gateways can run side by side.
 
 | Sample | Port | Plugin | Also needs |
 | --- | --- | --- | --- |
-| [gateway-filters](gateway/gateway-filters/README.md) | 8201 | [filters](../spring-cloud-gateway-filters/README.md) — `Authorization`, `ConvertHttpMethod`, `CorrelationId` | `service-a` |
+| [gateway-filters](gateway/gateway-filters/README.md) | 8201 | [filters](../spring-cloud-gateway-filters/README.md) — `Authorization`, `ConvertHttpMethod`, `Maintenance`, `CorrelationId` | `service-a` |
 | [gateway-oauth2](gateway/gateway-oauth2/README.md) | 8202 | [oauth2](../spring-cloud-gateway-oauth2/README.md) — `AuthorizationToken`, Basic-to-Bearer, multitenancy | `auth-server` |
 | [gateway-hub-openapi](gateway/gateway-hub-openapi/README.md) | 8203 | [hub-openapi](../spring-cloud-gateway-hub-openapi/README.md) — the aggregated Swagger UI | `eureka`, `service-a` |
 | [gateway-ui](gateway/gateway-ui/README.md) | 8204 | [ui](../spring-cloud-gateway-ui/README.md) — the console, alone | — |

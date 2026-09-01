@@ -21,6 +21,7 @@ import ch.nexsol.gateway.filter.IdentityPropagationFilter;
 import ch.nexsol.gateway.filter.IdentityPropagationProperties;
 import ch.nexsol.gateway.filter.factory.AuthorizationGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.ConvertHttpMethodGatewayFilterFactory;
+import ch.nexsol.gateway.filter.factory.MaintenanceGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.RecaptchaGatewayFilterFactory;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -55,6 +56,15 @@ public class FiltersAutoConfiguration {
 	@Bean
 	ConvertHttpMethodGatewayFilterFactory convertHttpMethodGatewayFilter() {
 		return new ConvertHttpMethodGatewayFilterFactory();
+	}
+
+	/**
+	 * Registers the maintenance gateway filter factory.
+	 * @return the maintenance filter factory bean
+	 */
+	@Bean
+	MaintenanceGatewayFilterFactory maintenanceGatewayFilterFactory() {
+		return new MaintenanceGatewayFilterFactory();
 	}
 
 	/**

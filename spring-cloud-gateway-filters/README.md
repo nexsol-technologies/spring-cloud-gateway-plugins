@@ -6,6 +6,7 @@ Custom gateway and web filters.
 | --- | --- | --- |
 | [`Authorization`](#authorization) | per route | Denies a request whose principal holds none of the required authorities |
 | [`ConvertHttpMethod`](#converthttpmethod) | per route | Rewrites the HTTP method of the forwarded request |
+| [`Maintenance`](#maintenance) | per route | Takes the route out of service for the duration of a maintenance window |
 | [`Recaptcha`](#recaptcha) | per route | Verifies a CAPTCHA score before forwarding |
 | [`IdentityPropagation`](#identitypropagation) | global | Writes who is calling, and who started the chain, onto the forwarded request |
 | [`CorrelationId`](#correlationid) | global | Adds `x-correlation-id` to the response, carrying the current trace id |
@@ -59,6 +60,120 @@ spring.cloud.gateway.server.webflux.routes:
     filters:
       - ConvertHttpMethod=POST
 ```
+
+## Maintenance
+
+Takes a route out of service for the duration of a maintenance window. While the window is
+open the route is not forwarded at all: the gateway answers on its own with the configured
+status and a JSON body a front end can display.
+
+```yaml
+spring.cloud.gateway.server.webflux.routes:
+  - id: test-maintenance
+    uri: http://localhost:8080
+    predicates:
+      - Path=/test
+    filters:
+      - name: Maintenance
+        args:
+          message: The shop is closed until 4am.
+          start: 2126-09-01T22:00:00Z
+          end: 2126-09-02T02:00:00+02:00
+          status: 593
+          allowed-authorities: [ROLE_ADMIN]
+          allowed-claims-match: ANY
+          allowed-claims:
+            - json-path: $.resource_access.*.roles
+              values: [maintenance-bypass]
+```
+
+| Argument | Default | What it does |
+| --- | --- | --- |
+| `message` | `This service is temporarily unavailable for maintenance.` | The text the body carries |
+| `start` | — | When the window opens, inclusive; unset means it is already open |
+| `end` | — | When the window closes, exclusive; unset means it lasts until the configuration says otherwise |
+| `status` | `593` | The status answered while the window is open, from 400 to 599 |
+| `allowed-authorities` | `[]` | Authorities lifting the maintenance for their holder; holding any one is enough |
+| `allowed-claims` | `[]` | Claims lifting the maintenance for their holder |
+| `allowed-claims-match` | `ANY` | How the claims are combined: `ANY` for a caller satisfying one of them, `ALL` for every one |
+| `allowed-claims[].json-path` | — | JSON path locating the claim in the token |
+| `allowed-claims[].values` | — | Values that claim may hold |
+| `allowed-claims[].match` | `ANY` | How the values of that claim are combined: `ANY` for one of them, `ALL` for every one |
+
+The whole thing is optional: `- Maintenance` on its own closes the route to everyone, right
+away and until the route is changed back.
+
+### The response
+
+```console
+HTTP/1.1 593 Server Error (593)
+content-type: application/json
+retry-after: Mon, 02 Sep 2126 00:00:00 GMT
+
+{
+  "message": "The shop is closed until 4am.",
+  "start": "2126-09-01T22:00:00Z",
+  "end": "2126-09-02T02:00:00+02:00"
+}
+```
+
+Both bounds are rendered as they were written, offset included, and are `null` when unset.
+`Retry-After` carries the end of the window, which is exclusive and therefore the first
+moment a retry can succeed. A window with no end carries no header at all: any value there
+would be a return date the gateway invented.
+
+`593` is not a status HTTP defines, which is the point &mdash; it separates a planned
+outage from the `503` an overloaded or unreachable backend produces. Any status from 400 to
+599 is accepted.
+
+### The window
+
+`start` and `end` are ISO-8601 date and time values **carrying their offset**:
+`2025-09-01T22:00:00Z` or `2025-09-02T00:00:00+02:00`. A value without one is rejected when
+the route is built &mdash; a gateway and its operator rarely sit in the same zone, and a
+window opening at a local time nobody named is a window opening an hour off.
+
+The bounds are compared as instants, so the two forms above are the same moment. `start` is
+inclusive, `end` exclusive, and either can be left out: no `start` is a maintenance already
+on, no `end` one that lasts until the configuration says otherwise.
+
+### Letting a population through
+
+An authority or a claim lifts the maintenance for whoever holds it, and holding any one of
+the configured authorities is enough. The claims are combined by `allowed-claims-match`, so
+a population defined by several claims at once is `ALL`, and one defined by any of them
+`ANY`; the same choice applies inside a single claim through its own `match`. An authority
+and a claim are never required together: satisfying either is enough.
+
+A claim value is matched against what its JSON path resolves to &mdash; a list of roles, a
+list of lists for a path carrying a wildcard, or a scalar compared as it prints, so
+`maintenance_bypass: true` is matched by the value `true`. A claim holding a single string
+is matched whole **and** token by token, splitting on commas and whitespace: the standard
+`scope` claim is space separated, vendors write role lists with commas, and a claim naming
+one value that contains a space still matches it.
+
+> **The exemption is only as good as the filter chain in front of it.** The claims read
+> here are those of the token Spring Security authenticated upstream, whose signature,
+> expiry and issuer have therefore already been verified. The filter never reads the
+> `Authorization` header itself, so a route exempting on claims has to sit behind a
+> resource server filter chain &mdash; without one no request carries a principal, and the
+> maintenance applies to everyone.
+
+### Putting the whole gateway in maintenance
+
+`default-filters` applies to every route the gateway serves:
+
+```yaml
+spring.cloud.gateway.server.webflux.default-filters:
+  - name: Maintenance
+    args:
+      message: The platform is under maintenance.
+      allowed-authorities: [ROLE_ADMIN]
+```
+
+Declare it **first** among the filters of a route: filters run in the order they are
+written, so anything declared before it still runs on a request the maintenance is about to
+refuse.
 
 ## Recaptcha
 

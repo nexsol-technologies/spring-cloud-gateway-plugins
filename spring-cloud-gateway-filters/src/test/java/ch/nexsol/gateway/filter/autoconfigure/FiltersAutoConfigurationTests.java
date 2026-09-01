@@ -17,6 +17,7 @@
 package ch.nexsol.gateway.filter.autoconfigure;
 
 import ch.nexsol.gateway.filter.CorrelationIdFilter;
+import ch.nexsol.gateway.filter.factory.MaintenanceGatewayFilterFactory;
 import ch.nexsol.gateway.filter.factory.RecaptchaGatewayFilterFactory;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
@@ -46,6 +47,7 @@ class FiltersAutoConfigurationTests {
 			assertThat(context).hasNotFailed();
 			assertThat(context).hasSingleBean(WebClient.class);
 			assertThat(context).hasSingleBean(RecaptchaGatewayFilterFactory.class);
+			assertThat(context).hasSingleBean(MaintenanceGatewayFilterFactory.class);
 			assertThat(context).hasSingleBean(CorrelationIdFilter.class);
 		});
 	}
