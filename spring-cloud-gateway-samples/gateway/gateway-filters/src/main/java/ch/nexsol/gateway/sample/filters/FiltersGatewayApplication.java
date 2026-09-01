@@ -32,7 +32,8 @@ import static org.springframework.security.config.Customizer.withDefaults;
 
 /**
  * Gateway sample exercising the {@code spring-cloud-gateway-filters} plugin: the
- * {@code Authorization}, {@code ConvertHttpMethod} and {@code CorrelationId} filters.
+ * {@code Authorization}, {@code ConvertHttpMethod}, {@code Maintenance} and
+ * {@code CorrelationId} filters.
  */
 @SpringBootApplication
 public class FiltersGatewayApplication {
@@ -46,6 +47,10 @@ public class FiltersGatewayApplication {
 	 * principal, so the sample authenticates the caller with Basic credentials first.
 	 * Every other path is left open, so the {@code ConvertHttpMethod} and
 	 * {@code CorrelationId} routes are reachable without credentials.
+	 * <p>
+	 * The maintenance paths are left open too, and still recognise {@code admin:admin}:
+	 * Basic authentication runs on every path, so credentials sent to a permitted path
+	 * populate the principal the {@code Maintenance} exemption is read from.
 	 * @param http the security configuration to build the chain from
 	 * @return the security filter chain
 	 */

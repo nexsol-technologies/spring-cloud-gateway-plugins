@@ -45,6 +45,60 @@ spring.cloud.gateway.server.webflux:
     - ConvertHttpMethod=POST
     - StripPrefix=1
 
+  # Maintenance: the window has no bounds, so the route is closed right away and stays
+  # closed. Nothing is forwarded — the 593 and its body come from the gateway itself.
+  - id: maintenance
+    uri: http://localhost:8080
+    predicates:
+    - Path=/maintenance/**
+    filters:
+    - name: Maintenance
+      args:
+        message: The shop is closed until 4am.
+        status: 593
+    - StripPrefix=1
+
+  # The same maintenance, lifted for whoever holds ROLE_ADMIN: 'admin:admin' reaches
+  # service-a, everyone else is answered 593. Basic authentication runs on every path of
+  # this sample, so the credentials are enough to be recognised here.
+  - id: maintenance_admin
+    uri: http://localhost:8080
+    predicates:
+    - Path=/maintenance-admin/**
+    filters:
+    - name: Maintenance
+      args:
+        message: The shop is closed until 4am.
+        allowed-authorities: [ROLE_ADMIN]
+    - StripPrefix=1
+
+  # A window with a known end: the answer carries a Retry-After naming it. The end is
+  # exclusive, so it is the first moment a retry can succeed.
+  - id: maintenance_bounded
+    uri: http://localhost:8080
+    predicates:
+    - Path=/maintenance-bounded/**
+    filters:
+    - name: Maintenance
+      args:
+        message: The shop is closed until 4am.
+        end: 2125-09-02T04:00:00+02:00
+    - StripPrefix=1
+
+  # A planned maintenance: the window opens in 2125, so the route is served normally until
+  # then. Both bounds carry their offset — a value without one is rejected on startup.
+  - id: maintenance_planned
+    uri: http://localhost:8080
+    predicates:
+    - Path=/maintenance-planned/**
+    filters:
+    - name: Maintenance
+      args:
+        message: The shop will close for the night.
+        start: 2125-09-01T22:00:00Z
+        end: 2125-09-02T02:00:00+02:00
+    - StripPrefix=1
+
   # Recaptcha: verifies a CAPTCHA score against Google reCAPTCHA. It needs a secret key
   # issued by Google, so the sample declares it commented out rather than shipping a
   # route that cannot answer.

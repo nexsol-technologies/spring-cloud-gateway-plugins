@@ -34,7 +34,7 @@ the classpath. Each one is activated by configuration alone.
 | --- | --- |
 | [ui](spring-cloud-gateway-ui/README.md) | A Spring Boot Admin-like console under `/ui`: the resolved routes and the source each came from, a route tester, a traffic chart, the health of every instance, a service graph and a live audit tail. Also where the HTTP endpoints of the other plugins are governed |
 | [routes](spring-cloud-gateway-routes/README.md) | Route definitions from pluggable sources aggregated into one locator: a database (with a management view), JSON/YAML files, a Config Server, OpenAPI contracts |
-| [filters](spring-cloud-gateway-filters/README.md) | `Authorization`, `ConvertHttpMethod`, `CorrelationId`, `IdentityPropagation` and `Recaptcha` |
+| [filters](spring-cloud-gateway-filters/README.md) | `Authorization`, `ConvertHttpMethod`, `CorrelationId`, `IdentityPropagation`, `Maintenance` and `Recaptcha` |
 | [oauth2](spring-cloud-gateway-oauth2/README.md) | Multi-tenant authentication, JWT validation, Basic-to-Bearer exchange, and the `AuthorizationToken` filter validating an access token per route |
 | [audit](spring-cloud-gateway-audit/README.md) | Audits requests and responses — JWT, request, response, trace and route attributes, toggled by group — and pushes them to a pluggable provider (Redis, Kafka, database) |
 | [metrics](spring-cloud-gateway-metrics/README.md) | The figures the console plots: traffic per route, health per instance. Local by default, consolidated across instances through Prometheus, Redis or the service registry |
