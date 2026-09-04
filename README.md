@@ -67,6 +67,20 @@ line and is never moved to another one:
 | `1.5.x` – `1.13.x` | 4.0.Y | 2025.1.x | End of life |
 | `1.0.x` – `1.3.x` | 3.5.Y | 2025.0.x | End of life |
 
+## AOT and native image
+
+Since `1.15.2`, every plugin ships the reachability metadata its own classes need, so an
+application carrying them builds with Spring ahead-of-time processing, against a JDK AOT cache,
+and as a GraalVM native image. One sample stands for each build:
+[gateway-full-cache-aot](spring-cloud-gateway-samples/gateway/gateway-full-cache-aot/README.md),
+[gateway-full-aot-jvm](spring-cloud-gateway-samples/gateway/gateway-full-aot-jvm/README.md) and
+[gateway-full-native](spring-cloud-gateway-samples/gateway/gateway-full-native/README.md).
+
+Ahead-of-time processing evaluates the `@Conditional` annotations at build time, and every
+plugin here is gated on a property: build with the profile and the properties the application
+will run with. A class data sharing archive and an AOT cache are not concerned — they record
+the classes a run loaded and nothing else.
+
 ## Reference documentation
 
 [Spring Cloud Gateway reference documentation](https://docs.spring.io/spring-cloud-gateway/reference/)

@@ -1,0 +1,124 @@
+server.port: 8223
+spring.application.name: sample-gateway-full-native
+
+# Every plugin this sample carries runs offline: no registry, no Redis, no Kafka, no
+# authorization server. What matters for an ahead-of-time build is that the route
+# definitions below are *built* at startup, since that is what needs the reflection the
+# plugins register — a missing hint shows up here, as a route that will not bind.
+spring.cloud.gateway.server.webflux:
+  webfilter:
+    correlation-id.enabled: true
+  routes:
+
+  # spring-cloud-gateway-filters
+  - id: authorization
+    uri: http://localhost:8080
+    predicates:
+    - Path=/authorization/**
+    filters:
+    - name: Authorization
+      args:
+        authorities: ROLE_READ
+    - StripPrefix=1
+
+  - id: convert-http-method
+    uri: http://localhost:8080
+    predicates:
+    - Path=/convert-method/**
+    - Method=GET
+    filters:
+    - ConvertHttpMethod=POST
+    - StripPrefix=1
+
+  # The maintenance config is the deepest one to bind: a list of nested claim objects and
+  # two enums, all of it read reflectively.
+  - id: maintenance
+    uri: http://localhost:8080
+    predicates:
+    - Path=/maintenance/**
+    filters:
+    - name: Maintenance
+      args:
+        message: The shop is closed until 4am.
+        status: 593
+        allowed-authorities: [ROLE_ADMIN]
+        allowed-claims:
+        - json-path: '$.roles'
+          values: [ADMIN]
+          match: ANY
+        allowed-claims-match: ANY
+    - StripPrefix=1
+
+  # spring-cloud-gateway-oauth2
+  - id: authorization-token
+    uri: http://localhost:8080
+    predicates:
+    - Path=/authorization-token/**
+    filters:
+    - name: AuthorizationToken
+      args:
+        issuers: ''
+        client-ids:
+        grant-accesses:
+        - jsonPath: '$.roles'
+          roles: 'READ'
+    - StripPrefix=1
+
+  # spring-cloud-gateway-audit
+  - id: audited
+    uri: http://localhost:8080
+    predicates:
+    - Path=/audited/**
+    filters:
+    - Audit
+    - StripPrefix=1
+
+  # spring-cloud-gateway-openapi-validation: the contract is on the classpath, so the
+  # whole OpenAPI model is parsed at startup with no network.
+  - id: bookstore
+    uri: http://localhost:8080
+    predicates:
+    - Path=/bookstore/**
+    filters:
+    - name: OpenapiValidation
+      args:
+        specUrl: classpath:openapi/bookstore.yaml
+        pathPrefix: /bookstore
+    - StripPrefix=1
+
+# spring-cloud-gateway-routes-files
+spring.cloud.gateway.server.webflux.routes-files:
+  enabled: true
+  watch: false
+  locations:
+  - classpath:gateway-routes/*.yaml
+
+# spring-cloud-gateway-routes-openapi is left off: it reads its contract over the network
+# at startup, which this sample must not need. spring-cloud-gateway-hub-openapi is opt-in
+# and needs a service registry to aggregate anything, so it is left off too. Both are on
+# the classpath, so both contribute their hints to the build either way.
+spring.cloud.gateway.server.webflux.routes-openapi.enabled: false
+
+# spring-cloud-gateway-metrics and spring-cloud-gateway-service-graph, both reporting
+# this instance only — no Redis, no registry to consolidate over.
+spring.cloud.gateway.server.webflux.metrics.enabled: true
+spring.cloud.gateway.server.webflux.service-graph.enabled: true
+
+# spring-cloud-gateway-ui needs no property: carrying the dependency serves the console.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+        - prometheus
+  endpoint:
+    gateway:
+      access: read-only
+
+logging:
+  level:
+    '[ch.nexsol]': info

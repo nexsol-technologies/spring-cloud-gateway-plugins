@@ -1,0 +1,81 @@
+name: build native image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-native-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: build-native
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: free disk space
+        continue-on-error: true
+        run: |
+          df -h
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
+
+      - uses: actions/checkout@v7
+
+      - name: Set up GraalVM 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'graalvm'
+          java-version: '25'
+          cache: 'maven'
+
+      - name: Install the plugins
+        run: |
+          mvn -B -DskipTests install --no-transfer-progress -D maven.javadoc.skip=true
+
+      - name: Build the native image
+        run: |
+          mvn -B -Pnative -DskipTests --no-transfer-progress \
+              -pl spring-cloud-gateway-samples/gateway/gateway-full-native native:compile
+
+      - name: Start it and check the routes it built
+        run: |
+          BIN=spring-cloud-gateway-samples/gateway/gateway-full-native/target/sample-gateway-full-native
+          "$BIN" > native.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+
+          up=
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8223/actuator/health > /dev/null; then up=yes; break; fi
+            sleep 1
+          done
+          if [ -z "$up" ]; then echo "the image never became healthy"; cat native.log; exit 1; fi
+
+          # Every route of the sample carries a filter whose arguments are bound
+          # reflectively: a missing hint shows up as a route the gateway never built.
+          ROUTES=$(curl -sf http://localhost:8223/actuator/gateway/routes) || {
+            echo "the routes endpoint did not answer"; cat native.log; exit 1;
+          }
+          echo "$ROUTES" | tr ',' '\n' | grep route_id || true
+          for id in authorization convert-http-method maintenance authorization-token audited bookstore; do
+            echo "$ROUTES" | grep -q "\"$id\"" || { echo "route $id was not built"; cat native.log; exit 1; }
+          done
+
+      - name: Upload the native build log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-image-build
+          path: |
+            spring-cloud-gateway-samples/gateway/gateway-full-native/target/native/**/*.txt
+            native.log
+          if-no-files-found: warn
+          retention-days: 14

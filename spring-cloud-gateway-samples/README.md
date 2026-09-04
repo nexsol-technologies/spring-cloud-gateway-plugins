@@ -2,7 +2,7 @@
 
 Runnable applications exercising the plugins. Each gateway sample runs **one plugin**, so its
 configuration reads as that plugin and nothing else; four combinations then show what the
-plugins do together.
+plugins do together, and three more build the same set of plugins ahead of time.
 
 ## Build first
 
@@ -37,6 +37,18 @@ so several gateways can run side by side.
 | [gateway-secured](gateway/gateway-secured/README.md) | 8211 | `oauth2` + `filters` + `routes-security`: the three moments a secured gateway decides at |
 | [gateway-ui-secured](gateway/gateway-ui-secured/README.md) | 8213 | `ui` behind its own login page: a local user, Keycloak, and a Bearer token on its endpoints |
 | [gateway-full](gateway/gateway-full/README.md) | 8181 | Every plugin, the integrated demo |
+
+### Ahead-of-time builds
+
+The same set of plugins, built three ways. The application is the same in all three — what
+differs is how it is built and started — and it runs offline, with no registry, Redis, Kafka or
+authorization server.
+
+| Sample | Port | How it is built |
+| --- | --- | --- |
+| [gateway-full-cache-aot](gateway/gateway-full-cache-aot/README.md) | 8221 | A JDK AOT cache, recorded by a training run (`-XX:AOTCacheOutput`, JDK 24+) |
+| [gateway-full-aot-jvm](gateway/gateway-full-aot-jvm/README.md) | 8222 | Spring ahead-of-time processing on the JVM (`spring-boot:process-aot`, `-Dspring.aot.enabled=true`) |
+| [gateway-full-native](gateway/gateway-full-native/README.md) | 8223 | A GraalVM native image (`mvn -Pnative native:compile`) |
 
 ## The supporting modules
 
