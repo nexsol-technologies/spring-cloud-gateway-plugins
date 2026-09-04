@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.metrics.discovery.autoconfigure;
 
+import ch.nexsol.gateway.commons.CodecLimits;
 import ch.nexsol.gateway.commons.InstanceIdentity;
 import ch.nexsol.gateway.commons.security.SecuredPaths;
 import ch.nexsol.gateway.metrics.InstanceMetricsSource;
@@ -47,6 +48,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.util.StringUtils;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -147,7 +149,7 @@ public class DiscoveryMetricsAutoConfiguration {
 				WebClient.Builder builder, DiscoveryMetricsProperties properties, Environment environment) {
 			String serviceId = StringUtils.hasText(properties.getServiceId()) ? properties.getServiceId()
 					: environment.getProperty("spring.application.name", "");
-			return new DiscoveryRouteMetricsSource(discoveryClient, builder.build(), properties, serviceId);
+			return new DiscoveryRouteMetricsSource(discoveryClient, client(builder, properties), properties, serviceId);
 		}
 
 		/**
@@ -194,7 +196,28 @@ public class DiscoveryMetricsAutoConfiguration {
 				DiscoveryMetricsProperties properties, Environment environment) {
 			String serviceId = StringUtils.hasText(properties.getServiceId()) ? properties.getServiceId()
 					: environment.getProperty("spring.application.name", "");
-			return new DiscoveryInstanceMetricsSource(discoveryClient, builder.build(), properties, serviceId);
+			return new DiscoveryInstanceMetricsSource(discoveryClient, client(builder, properties), properties,
+					serviceId);
+		}
+
+		/**
+		 * The client the siblings are polled with. Their answer carries one entry per
+		 * route, so it outgrows the 256&nbsp;KB the codecs stop at by default long before
+		 * the gateway itself is in trouble; {@code max-response-size} raises that ceiling
+		 * for these polls alone, and leaves the client as the application configured it
+		 * when it is unset.
+		 * @param builder the application web client builder
+		 * @param properties the discovery metrics configuration
+		 * @return the client the siblings are polled with
+		 */
+		private static WebClient client(WebClient.Builder builder, DiscoveryMetricsProperties properties) {
+			DataSize maxResponseSize = properties.getMaxResponseSize();
+			if (maxResponseSize == null) {
+				return builder.build();
+			}
+			return builder.codecs(
+					(codecs) -> codecs.defaultCodecs().maxInMemorySize(CodecLimits.maxInMemoryBytes(maxResponseSize)))
+				.build();
 		}
 
 	}

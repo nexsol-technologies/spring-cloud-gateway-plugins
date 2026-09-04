@@ -19,6 +19,7 @@ package ch.nexsol.gateway.openapi;
 import java.time.Duration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.util.unit.DataSize;
 
 /**
  * Configuration properties for the OpenAPI hub.
@@ -30,12 +31,32 @@ public class HubOpenapiProperties {
 
 	private final Security security = new Security();
 
+	/**
+	 * Largest aggregated document the hub holds in memory while it rewrites it.
+	 * <p>
+	 * Pointing the {@code servers} section and the security schemes at the gateway means
+	 * parsing the whole document, so it is buffered whole. The reactive codecs stop at
+	 * 256&nbsp;KB by default, and a document past that ceiling is answered with a
+	 * {@code DataBufferLimitException} and a 500. This ceiling is the hub's own: raising
+	 * it leaves what the gateway buffers of its routed traffic
+	 * ({@code spring.http.codecs.max-in-memory-size}) untouched.
+	 */
+	private DataSize maxDocumentSize = DataSize.ofMegabytes(2);
+
 	public Discovery getDiscovery() {
 		return this.discovery;
 	}
 
 	public Security getSecurity() {
 		return this.security;
+	}
+
+	public DataSize getMaxDocumentSize() {
+		return this.maxDocumentSize;
+	}
+
+	public void setMaxDocumentSize(DataSize maxDocumentSize) {
+		this.maxDocumentSize = maxDocumentSize;
 	}
 
 	/**

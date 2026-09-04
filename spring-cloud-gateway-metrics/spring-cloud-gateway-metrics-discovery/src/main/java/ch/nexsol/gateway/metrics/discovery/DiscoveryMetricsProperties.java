@@ -18,6 +18,8 @@ package ch.nexsol.gateway.metrics.discovery;
 
 import java.time.Duration;
 
+import org.springframework.util.unit.DataSize;
+
 /**
  * Configuration properties for the service discovery metrics source, bound under
  * {@code spring.cloud.gateway.server.webflux.metrics.discovery}.
@@ -57,6 +59,28 @@ public class DiscoveryMetricsProperties {
 	 * How long to wait for a sibling before leaving it out of the figures.
 	 */
 	private Duration timeout = Duration.ofSeconds(3);
+
+	/**
+	 * Largest answer read from a sibling instance. It is deserialized whole, so it is
+	 * buffered whole, and this is the ceiling the reactive codecs enforce while it is
+	 * read. When unset the client keeps the one the application configured through
+	 * {@code spring.http.codecs.max-in-memory-size}, 256&nbsp;KB by default.
+	 */
+	private DataSize maxResponseSize;
+
+	/**
+	 * @return the largest answer read from a sibling instance
+	 */
+	public DataSize getMaxResponseSize() {
+		return this.maxResponseSize;
+	}
+
+	/**
+	 * @param maxResponseSize the largest answer read from a sibling instance
+	 */
+	public void setMaxResponseSize(DataSize maxResponseSize) {
+		this.maxResponseSize = maxResponseSize;
+	}
 
 	/**
 	 * @return the service id of this gateway

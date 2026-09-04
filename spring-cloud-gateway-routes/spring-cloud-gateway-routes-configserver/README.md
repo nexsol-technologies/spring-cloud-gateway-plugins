@@ -41,6 +41,8 @@ spring.cloud.gateway.server.webflux.routes-configserver:
     files:                            # each resolved as /{name}/{profile}/{label}/{file}
       - routes/orders.yaml
       - routes/billing.yaml
+  # Optional: raises the buffering ceiling for these fetches alone.
+  max-response-size: 2MB
 ```
 
 | Property | Default | What it does |
@@ -53,6 +55,7 @@ spring.cloud.gateway.server.webflux.routes-configserver:
 | `...routes-configserver.config-server.profile` | `default` | The `{profile}` coordinate |
 | `...routes-configserver.config-server.label` | — | The `{label}` coordinate (git branch or tag) |
 | `...routes-configserver.config-server.files` | — | Files fetched under that coordinate, one request each |
+| `...routes-configserver.max-response-size` | — | Largest route file read; unset keeps the ceiling of `spring.http.codecs.max-in-memory-size` |
 
 > The Config Server has **no directory-listing API** — its plain-text endpoint serves one file
 > per request. A "directory" is therefore the coordinate above plus an explicit `files` list.

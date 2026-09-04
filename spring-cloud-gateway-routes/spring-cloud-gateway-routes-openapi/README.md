@@ -176,6 +176,12 @@ declared.
 Besides `update-interval`, the routes are regenerated on `/actuator/refresh` and
 `/actuator/busrefresh` — see [Refreshing routes](../README.md#refreshing-routes).
 
+A contract is read the way a resource is, not the way routed traffic is: the resource resolver
+and the OpenAPI parser fetch it with a blocking call, off the event loop, and no size limit
+applies. A contract of any size is therefore accepted, the memory it takes while it is parsed being the
+only bound, and the reactive codec ceiling (`spring.http.codecs.max-in-memory-size`, and the
+OpenAPI hub's `max-document-size`) governs neither the read nor the reload.
+
 ## Sample
 
 [gateway-routes-all](../../spring-cloud-gateway-samples/gateway/gateway-routes-all/README.md)

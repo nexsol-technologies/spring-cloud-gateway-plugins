@@ -32,6 +32,7 @@ spring.cloud.gateway.server.webflux.hub-openapi:
     cache-ttl: 5m            # how long a probe result is remembered
   security:
     issuer: GATEWAY          # DOCUMENT (default) | GATEWAY
+  max-document-size: 2MB     # largest contract the rewriting may hold in memory
   security-chain-enabled: true
 ```
 
@@ -44,6 +45,7 @@ spring.cloud.gateway.server.webflux.hub-openapi:
 | `...hub-openapi.discovery.max-connections` | `50` | Connection pool dedicated to the probes, so they never compete with routed traffic |
 | `...hub-openapi.discovery.cache-ttl` | `5m` | How long a probe result is remembered; `0` probes on every refresh |
 | `...hub-openapi.security.issuer` | `DOCUMENT` | Which issuer the documents advertise: `DOCUMENT` or `GATEWAY` |
+| `...hub-openapi.max-document-size` | `2MB` | Largest contract the rewriting holds in memory; see [A contract too large to be rewritten](#a-contract-too-large-to-be-rewritten) |
 | `...hub-openapi.security-chain-enabled` | `true` | Whether the plugin contributes its own `SecurityWebFilterChain` |
 
 ## Discovering contracts through the discovery client
@@ -144,6 +146,32 @@ the **service**, which is routed as usual — only its contract is missing from 
 
 A service missing from the dropdown without a word at all is a different matter — see
 [below](#a-service-routed-without-the-discovery-client).
+
+### A contract too large to be rewritten
+
+Pointing a contract at the gateway means parsing it, so it is held in memory whole while it is
+rewritten. A contract past `max-document-size` is answered with a `500`:
+
+```
+ERROR 500 Server Error for HTTP GET "/v3/api-docs/MEDICAL-DEVICE-SERVICE"
+org.springframework.core.io.buffer.DataBufferLimitException: Exceeded limit on max bytes to buffer : 2097152
+```
+
+Raise `max-document-size` to the size of the largest contract served —
+`curl -s http://<service>/v3/api-docs | wc -c` gives it. The limit is the hub's own: it costs
+that much memory per contract being read at that moment, and it leaves
+`spring.http.codecs.max-in-memory-size`, which bounds every request body the gateway buffers,
+where the application set it.
+
+The figure in that message names the ceiling that was exceeded, and therefore which property
+raises it: `2097152` is the `2MB` default of `max-document-size`, while `262144` is the
+256&nbsp;KB of the server codecs, which `spring.http.codecs.max-in-memory-size` governs. The
+rewriting no longer reads with those, so a `262144` on this path comes from something else
+reading the request.
+
+A gateway that had raised `spring.http.codecs.max-in-memory-size` to serve a large contract
+must set `max-document-size` instead: the rewriting no longer reads with the server codecs, so
+the global setting no longer reaches it.
 
 ## Aggregating statically configured contracts
 

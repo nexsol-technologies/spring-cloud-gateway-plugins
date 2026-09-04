@@ -36,6 +36,8 @@ spring.cloud.gateway.server.webflux.metrics:
     path: /ui/metrics/local
     instance-path: /ui/metrics/local/instance
     timeout: 3s
+    # Optional: raises the buffering ceiling for these polls alone.
+    max-response-size: 2MB
 ```
 
 | Property | Default | What it does |
@@ -44,6 +46,7 @@ spring.cloud.gateway.server.webflux.metrics:
 | `...discovery.path` | `/ui/metrics/local` | Path the siblings are polled on for their route figures |
 | `...discovery.instance-path` | `/ui/metrics/local/instance` | Path the siblings are polled on for their instance figures |
 | `...discovery.timeout` | `3s` | How long to wait for a sibling before leaving it out |
+| `...discovery.max-response-size` | — | Largest answer read from a sibling; unset keeps the ceiling of `spring.http.codecs.max-in-memory-size` |
 
 ## The endpoints the siblings poll
 

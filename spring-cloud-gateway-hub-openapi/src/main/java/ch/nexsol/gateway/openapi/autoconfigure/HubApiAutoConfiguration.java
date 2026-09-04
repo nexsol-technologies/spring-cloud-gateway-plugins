@@ -17,10 +17,12 @@
 package ch.nexsol.gateway.openapi.autoconfigure;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import ch.nexsol.gateway.audit.AuditProperties;
+import ch.nexsol.gateway.commons.CodecLimits;
 import ch.nexsol.gateway.openapi.HubOpenapiProperties;
 import ch.nexsol.gateway.openapi.hub.AuditExclusionBeanPostProcessor;
 import ch.nexsol.gateway.openapi.hub.GatewayIssuers;
@@ -53,7 +55,9 @@ import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.http.codec.HttpMessageReader;
 import org.springframework.http.codec.ServerCodecConfigurer;
+import org.springframework.util.unit.DataSize;
 
 /**
  * Auto-configuration that wires up the OpenAPI hub, aggregating the OpenAPI documentation
@@ -115,24 +119,37 @@ public class HubApiAutoConfiguration {
 	/**
 	 * Registers the filter factory that rewrites the {@code servers} section of the
 	 * proxied OpenAPI documents so they point at the gateway.
-	 * @param codecConfigurer the server codec configurer providing the message readers
 	 * @param bodyDecoders the available message body decoders
 	 * @param bodyEncoders the available message body encoders
 	 * @param apiGatewayUri the public gateway URI to advertise in the OpenAPI servers
 	 * @param hubProperties the hub configuration, naming where the advertised OpenID
-	 * Connect issuer comes from
+	 * Connect issuer comes from and how large a document may be
 	 * @param environment the environment the gateway issuers are read from
 	 * @return the {@link OpenapiModifyResponseBodyGatewayFilterFactory} bean
 	 */
 	@Bean
 	@ConditionalOnEnabledFilter
 	OpenapiModifyResponseBodyGatewayFilterFactory customModifyResponseBodyGatewayFilterFactory(
-			ServerCodecConfigurer codecConfigurer, Set<MessageBodyDecoder> bodyDecoders,
-			Set<MessageBodyEncoder> bodyEncoders,
+			Set<MessageBodyDecoder> bodyDecoders, Set<MessageBodyEncoder> bodyEncoders,
 			@Value("${spring.cloud.gateway.server.webflux.hub-openapi.gateway-uri}") URI apiGatewayUri,
 			HubOpenapiProperties hubProperties, Environment environment) {
-		return new OpenapiModifyResponseBodyGatewayFilterFactory(codecConfigurer.getReaders(), bodyDecoders,
-				bodyEncoders, apiGatewayUri, advertisedIssuers(hubProperties, environment));
+		return new OpenapiModifyResponseBodyGatewayFilterFactory(documentReaders(hubProperties.getMaxDocumentSize()),
+				bodyDecoders, bodyEncoders, apiGatewayUri, advertisedIssuers(hubProperties, environment));
+	}
+
+	/**
+	 * The readers the rewriting decodes a document with. They are the hub's own, not the
+	 * ones of the {@link ServerCodecConfigurer} bean: that bean is what the gateway reads
+	 * every routed request with, and raising its ceiling to fit an OpenAPI document
+	 * raises it for all of them. Nothing is lost by not sharing it &mdash; the filter
+	 * decodes to {@code byte[]}, which every default codec set can do.
+	 * @param maxDocumentSize the largest document the rewriting may buffer
+	 * @return the message readers, bounded by that size
+	 */
+	private static List<HttpMessageReader<?>> documentReaders(DataSize maxDocumentSize) {
+		ServerCodecConfigurer configurer = ServerCodecConfigurer.create();
+		configurer.defaultCodecs().maxInMemorySize(CodecLimits.maxInMemoryBytes(maxDocumentSize));
+		return configurer.getReaders();
 	}
 
 	/**

@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.servicegraph.tempo.autoconfigure;
 
+import ch.nexsol.gateway.commons.CodecLimits;
 import ch.nexsol.gateway.servicegraph.ServiceGraphSource;
 import ch.nexsol.gateway.servicegraph.autoconfigure.ServiceGraphAutoConfiguration;
 import ch.nexsol.gateway.servicegraph.tempo.TempoServiceGraphProperties;
@@ -29,6 +30,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -72,6 +74,11 @@ public class TempoServiceGraphAutoConfiguration {
 		@ConditionalOnMissingBean(name = "tempoServiceGraphWebClient")
 		WebClient tempoServiceGraphWebClient(WebClient.Builder builder, TempoServiceGraphProperties properties) {
 			WebClient.Builder tempo = builder.baseUrl(properties.getUrl());
+			DataSize maxResponseSize = properties.getMaxResponseSize();
+			if (maxResponseSize != null) {
+				tempo = tempo.codecs((codecs) -> codecs.defaultCodecs()
+					.maxInMemorySize(CodecLimits.maxInMemoryBytes(maxResponseSize)));
+			}
 			if (StringUtils.hasText(properties.getUsername())) {
 				tempo = tempo.defaultHeaders((headers) -> headers.setBasicAuth(properties.getUsername(),
 						(properties.getPassword() != null) ? properties.getPassword() : ""));

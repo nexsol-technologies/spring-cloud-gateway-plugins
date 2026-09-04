@@ -15,6 +15,11 @@
 	<dependencies>
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-commons</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-metrics-core</artifactId>
 			<version>${revision}</version>
 		</dependency>

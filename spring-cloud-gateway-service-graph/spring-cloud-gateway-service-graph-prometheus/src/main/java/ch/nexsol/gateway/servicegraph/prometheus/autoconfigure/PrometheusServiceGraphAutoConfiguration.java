@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.servicegraph.prometheus.autoconfigure;
 
+import ch.nexsol.gateway.commons.CodecLimits;
 import ch.nexsol.gateway.servicegraph.ServiceGraphSource;
 import ch.nexsol.gateway.servicegraph.autoconfigure.ServiceGraphAutoConfiguration;
 import ch.nexsol.gateway.servicegraph.prometheus.PrometheusServiceGraphProperties;
@@ -29,6 +30,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -80,6 +82,11 @@ public class PrometheusServiceGraphAutoConfiguration {
 		WebClient prometheusServiceGraphWebClient(WebClient.Builder builder,
 				PrometheusServiceGraphProperties properties) {
 			WebClient.Builder prometheus = builder.baseUrl(properties.getUrl());
+			DataSize maxResponseSize = properties.getMaxResponseSize();
+			if (maxResponseSize != null) {
+				prometheus = prometheus.codecs((codecs) -> codecs.defaultCodecs()
+					.maxInMemorySize(CodecLimits.maxInMemoryBytes(maxResponseSize)));
+			}
 			if (StringUtils.hasText(properties.getUsername())) {
 				prometheus = prometheus.defaultHeaders((headers) -> headers.setBasicAuth(properties.getUsername(),
 						(properties.getPassword() != null) ? properties.getPassword() : ""));
