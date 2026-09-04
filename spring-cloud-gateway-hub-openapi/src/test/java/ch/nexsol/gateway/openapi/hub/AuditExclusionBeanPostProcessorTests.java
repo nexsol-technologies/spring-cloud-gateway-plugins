@@ -34,7 +34,6 @@ import org.springframework.cloud.gateway.filter.factory.rewrite.GzipMessageBodyR
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.codec.ServerCodecConfigurer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -105,11 +104,6 @@ class AuditExclusionBeanPostProcessorTests {
 		@Bean
 		SpringDocConfigProperties springDocConfigProperties() {
 			return new SpringDocConfigProperties();
-		}
-
-		@Bean
-		ServerCodecConfigurer serverCodecConfigurer() {
-			return ServerCodecConfigurer.create();
 		}
 
 		@Bean

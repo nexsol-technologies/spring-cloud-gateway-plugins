@@ -30,6 +30,8 @@ spring.cloud.gateway.server.webflux.service-graph:
     url: http://mimir:9009/prometheus
     selector: 'namespace="prod"'
     timeout: 5s
+    # Optional: raises the buffering ceiling for these calls alone.
+    max-response-size: 2MB
 ```
 
 | Property | Default | What it does |
@@ -40,6 +42,7 @@ spring.cloud.gateway.server.webflux.service-graph:
 | `...service-graph.tempo.failed-metric` | `traces_service_graph_request_failed_total` | Series carrying the failures |
 | `...service-graph.tempo.client-label` / `.server-label` | `client` / `server` | Labels naming the two ends of an edge |
 | `...service-graph.tempo.timeout` | `5s` | How long to wait before reporting no data |
+| `...service-graph.tempo.max-response-size` | — | Largest answer read; unset keeps the ceiling of `spring.http.codecs.max-in-memory-size` |
 | `...service-graph.tempo.username` / `.password` / `.token` | — | Credentials, as for the Prometheus source |
 
 > **`url` is not Tempo's.** Tempo serves traces, not a service graph. What builds one is its

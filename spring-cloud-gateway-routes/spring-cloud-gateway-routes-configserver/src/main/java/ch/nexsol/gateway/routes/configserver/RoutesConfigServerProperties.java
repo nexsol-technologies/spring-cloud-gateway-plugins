@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.util.unit.DataSize;
 
 /**
  * Configuration properties for the route definition locator sourcing JSON/YAML route
@@ -53,6 +54,14 @@ public class RoutesConfigServerProperties {
 	 */
 	private ConfigServer configServer = new ConfigServer();
 
+	/**
+	 * Largest route file the loader reads. A file is parsed whole, so it is buffered
+	 * whole, and this is the ceiling the reactive codecs enforce while it is read. When
+	 * unset the client keeps the one the application configured through
+	 * {@code spring.http.codecs.max-in-memory-size}, 256&nbsp;KB by default.
+	 */
+	private DataSize maxResponseSize;
+
 	public boolean isEnabled() {
 		return this.enabled;
 	}
@@ -75,6 +84,14 @@ public class RoutesConfigServerProperties {
 
 	public void setUrls(List<String> urls) {
 		this.urls = urls;
+	}
+
+	public DataSize getMaxResponseSize() {
+		return this.maxResponseSize;
+	}
+
+	public void setMaxResponseSize(DataSize maxResponseSize) {
+		this.maxResponseSize = maxResponseSize;
 	}
 
 	public ConfigServer getConfigServer() {

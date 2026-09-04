@@ -29,6 +29,8 @@ spring.cloud.gateway.server.webflux.service-graph:
     url: http://prometheus:9090
     selector: 'job="gateway"'    # restrict the series to this gateway
     timeout: 5s
+    # Optional: raises the buffering ceiling for these calls alone.
+    max-response-size: 2MB
 ```
 
 | Property | Default | What it does |
@@ -37,6 +39,7 @@ spring.cloud.gateway.server.webflux.service-graph:
 | `...service-graph.prometheus.selector` | — | Extra label matchers, written without the braces |
 | `...service-graph.prometheus.meter` | `gateway_service_graph_calls_total` | Name of the counter to read |
 | `...service-graph.prometheus.timeout` | `5s` | How long to wait before reporting no data |
+| `...service-graph.prometheus.max-response-size` | — | Largest answer read; unset keeps the ceiling of `spring.http.codecs.max-in-memory-size` |
 | `...service-graph.prometheus.username` / `.password` | — | Basic credentials |
 | `...service-graph.prometheus.token` | — | Bearer token (Thanos, Mimir, OpenShift monitoring) |
 

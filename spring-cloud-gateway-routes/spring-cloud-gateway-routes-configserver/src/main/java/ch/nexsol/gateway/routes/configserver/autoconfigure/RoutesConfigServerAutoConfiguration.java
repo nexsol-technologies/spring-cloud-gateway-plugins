@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.routes.configserver.autoconfigure;
 
+import ch.nexsol.gateway.commons.CodecLimits;
 import ch.nexsol.gateway.routes.configserver.ConfigServerRouteDefinitionLoader;
 import ch.nexsol.gateway.routes.configserver.ConfigServerRouteDefinitionLocator;
 import ch.nexsol.gateway.routes.configserver.RouteConfigServerLifecycle;
@@ -29,6 +30,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -54,7 +56,10 @@ public class RoutesConfigServerAutoConfiguration {
 
 	/**
 	 * Registers the loader fetching the configured route files. The client is derived
-	 * from the application {@link WebClient.Builder} when one is available.
+	 * from the application {@link WebClient.Builder} when one is available, so it reads
+	 * under the ceiling the application configured; {@code max-response-size} raises that
+	 * ceiling for these fetches alone, which a route file larger than it would otherwise
+	 * answer with a {@code DataBufferLimitException} rather than with its routes.
 	 * @param parser the route file parser
 	 * @param properties the Config Server locator properties
 	 * @param webClientBuilder the optional application web client builder
@@ -63,8 +68,13 @@ public class RoutesConfigServerAutoConfiguration {
 	@Bean
 	ConfigServerRouteDefinitionLoader configServerRouteDefinitionLoader(RouteDefinitionFileParser parser,
 			RoutesConfigServerProperties properties, ObjectProvider<WebClient.Builder> webClientBuilder) {
-		WebClient webClient = webClientBuilder.getIfAvailable(WebClient::builder).build();
-		return new ConfigServerRouteDefinitionLoader(webClient, parser, properties);
+		WebClient.Builder client = webClientBuilder.getIfAvailable(WebClient::builder);
+		DataSize maxResponseSize = properties.getMaxResponseSize();
+		if (maxResponseSize != null) {
+			client = client.codecs(
+					(codecs) -> codecs.defaultCodecs().maxInMemorySize(CodecLimits.maxInMemoryBytes(maxResponseSize)));
+		}
+		return new ConfigServerRouteDefinitionLoader(client.build(), parser, properties);
 	}
 
 	/**

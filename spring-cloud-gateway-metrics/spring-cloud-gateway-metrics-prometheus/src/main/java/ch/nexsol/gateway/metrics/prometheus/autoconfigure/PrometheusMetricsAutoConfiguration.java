@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.metrics.prometheus.autoconfigure;
 
+import ch.nexsol.gateway.commons.CodecLimits;
 import ch.nexsol.gateway.metrics.InstanceMetricsSource;
 import ch.nexsol.gateway.metrics.MetricsProperties;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
@@ -32,6 +33,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -85,6 +87,11 @@ public class PrometheusMetricsAutoConfiguration {
 		@ConditionalOnMissingBean(name = "prometheusMetricsWebClient")
 		WebClient prometheusMetricsWebClient(WebClient.Builder builder, PrometheusMetricsProperties properties) {
 			WebClient.Builder prometheus = builder.baseUrl(properties.getUrl());
+			DataSize maxResponseSize = properties.getMaxResponseSize();
+			if (maxResponseSize != null) {
+				prometheus = prometheus.codecs((codecs) -> codecs.defaultCodecs()
+					.maxInMemorySize(CodecLimits.maxInMemoryBytes(maxResponseSize)));
+			}
 			if (StringUtils.hasText(properties.getUsername())) {
 				prometheus = prometheus.defaultHeaders((headers) -> headers.setBasicAuth(properties.getUsername(),
 						(properties.getPassword() != null) ? properties.getPassword() : ""));
