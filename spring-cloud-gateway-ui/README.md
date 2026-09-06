@@ -33,7 +33,7 @@ what the application actually runs.
 | [Database routes](#database-routes-view) | `/ui/routes/db` | `spring-cloud-gateway-routes-database` is present |
 | [Route tester](#route-tester) | `/ui/routes/test` | the gateway route table type is present |
 | [Traffic](#traffic) | `/ui/metrics` | Micrometer is present |
-| [Instances](#instances) | `/ui/metrics/instances` | Micrometer is present and `...metrics.instance.enabled` is not `false` |
+| [Runtime](#runtime) | `/ui/metrics/instances` | Micrometer is present and `...metrics.instance.enabled` is not `false` |
 | [Service graph](#service-graph) | `/ui/service-graph` | `spring-cloud-gateway-service-graph-core` is present |
 | [OpenAPI](#openapi) | `/ui/openapi` | `spring-cloud-gateway-hub-openapi` is present and enabled |
 | [Audit](#audit) | `/ui/audit` | `spring-cloud-gateway-audit-core` is present and `...audit.enabled` is not `false` |
@@ -97,7 +97,7 @@ only start to matter.
 ![The database routes view in the dark theme](doc/routes-db-dark.png)
 ![The route tester in the dark theme](doc/route-tester-dark.png)
 ![The traffic view in the dark theme](doc/traffic-dark.png)
-![The instances view in the dark theme](doc/instances-dark.png)
+![The runtime view in the dark theme](doc/instances-dark.png)
 ![The service graph in the dark theme](doc/service-graph-dark.png)
 ![The OpenAPI view in the dark theme](doc/openapi-dark.png)
 ![The audit view in the dark theme](doc/audit-dark.png)
@@ -264,30 +264,48 @@ Routes carrying no traffic worth reading are left out through
 see [the metrics README](../spring-cloud-gateway-metrics/README.md#configuration). The
 exclusion applies to the summary, the map, the table and the home page tiles alike.
 
-## Instances
+## Runtime
 
 The other half of the metrics plugin: not which route carries the load, but **which instance
-is in trouble**. One card per running gateway, read from the same provider as the traffic view
-and headed by the same coverage line.
+is in trouble**. Served at `/ui/metrics/instances`, from the same provider as the traffic view
+and under the same coverage line — which is stated in the band, next to how old the figures on
+screen are. That age keeps counting between two refreshes: a poll that stopped answering must
+not leave a view looking live.
 
-![The instances view](doc/instances-light.png)
+![The runtime view](doc/instances-light.png)
+
+**One table, one row per instance, and no summary above it.** Behind a load balancer every
+instance carries traffic and the question is always comparative — which of them is closest to a
+ceiling. A figure aggregated over the fleet answers that for nobody: the highest heap and the
+highest processor reading rarely belong to the same instance, so a row of maxima would describe
+an instance that does not exist. Read down a column instead, the same figure on every instance
+is one glance, and it stays one glance at twenty of them.
 
 ```
-gateway-7f9c4   http://10.0.3.21:8080                          up 4d 02h
-Heap ▓▓▓▓▓▓▓░░░ 71%  1.4 / 2.0 GB   CPU 34%   Threads 87 (peak 112)   GC 0.4%
-
-Pools
-  Route                             Pool
-  service-a-route                   proxy → 323d64b065a5:8080   ▓▓▓▓▓▓▓▓▓░   47 / 50   340 ms
-  petstore_updatePet, …addPet +17   proxy → c2b76b2d36a1:8443   ▓░░░░░░░░░    2 / 50     0 ms
-Event loop — 0 pending task(s) across 8 loop(s).
+Instance            Up      Heap           CPU          Threads       GC     Files  Pools  Queue
+▸ ● gateway-7f9c4   4d 2h   1.4 / 2.0 GB   34%          87 peak 112   0.4%   399    7      0
+                            ▓▓▓▓▓▓▓░░░     ▓▓▓░░░░░░░                        ░░░    ▓▓▓▓▓▓▓▓▓░
+▾ ● gateway-2b18d   4d 2h   0.9 / 2.0 GB   11%          81 peak 104   0.2%   377    7      0
+    Route                             Pool
+    service-a-route                   proxy → 323d64b065a5:8080   ▓▓▓▓▓▓▓▓▓░   47 / 50   340 ms
+    petstore_updatePet, …addPet +17   proxy → c2b76b2d36a1:8443   ▓░░░░░░░░░    2 / 50     0 ms
 ```
+
+`CPU`, `GC`, `Files` and `Queue` are abbreviated in the header and named in full in its
+tooltip: spelled out they are wider than the figures under them, and the table stops fitting
+the page.
+
+Every share is drawn against its own ceiling, and the dot at the head of a row is the colour of
+the fullest bar on it — amber past 70%, red past 90%. The dots sit in one column, so the
+instance to open is found without reading the twenty. Rows are ordered by name, which is the
+order they keep from one refresh to the next.
 
 **The connection pools are why this view exists.** A pool filling up towards a slow backend
 takes down every route pointing at that address at once, while the JVM itself still looks
 perfectly healthy — nothing in the traffic view separates that from the backend being slow, and
-nothing in a generic JVM dashboard shows it at all. Rows are sorted fullest first and folded
-per connection provider and downstream address.
+nothing in a generic JVM dashboard shows it at all. The `Pools` column carries how many
+downstream addresses an instance talks to over the saturation of its busiest one; opening the
+row lists them all, one per connection provider and downstream address, fullest first.
 
 **The route column** turns that address into something a reader knows. Behind Docker Swarm or
 Kubernetes a pool is keyed on a container identity (`323d64b065a5:8080`), so

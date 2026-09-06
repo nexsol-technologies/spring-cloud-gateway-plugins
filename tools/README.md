@@ -62,8 +62,10 @@ overwriting what is there, and prints each file as it goes.
 * **The collapsed menu.** `collapsed` writes the side-menu state the shell remembers and
   reloads, so the menu is already narrow rather than caught mid-animation. It is published light
   only: what it shows is the width of the menu, not the palette.
-* **The folded pool tables.** The instances view keeps the connection pools of an instance
-  folded away until they are asked for. Every fold is opened before the shot.
+* **The two states of the runtime view.** An unfolded row pushes the instances below it a
+  screenful down, so the fleet and the pools of one instance cannot be in one frame. The light
+  shot keeps every row closed, which is the fleet table; the dark one opens them all, for the
+  pool tables.
 * **The login page.** Shot without a session, which is the only way to see it.
 
 ## What it cannot take care of

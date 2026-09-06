@@ -37,7 +37,7 @@ class InstanceMetricsControllerTests {
 	WebTestClient webTestClient;
 
 	@Test
-	void shouldRenderInstancesPageWithinTheShell() {
+	void shouldRenderRuntimePageWithinTheShell() {
 		this.webTestClient.get()
 			.uri("/ui/metrics/instances")
 			.exchange()
@@ -49,7 +49,7 @@ class InstanceMetricsControllerTests {
 			.value((body) -> assertThat(body).contains("gw-sidebar")
 				.contains("id=\"gi-instances\"")
 				.contains("id=\"gi-coverage\"")
-				.contains(">Instances</span>"));
+				.contains(">Runtime</span>"));
 	}
 
 	@Test

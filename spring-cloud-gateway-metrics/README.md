@@ -6,7 +6,7 @@ a source you choose:
 * **Per route** — how much traffic each route carries, how slow it is, how often it fails.
   Plotted by the traffic view.
 * **Per instance** — memory, processor, threads and connection pools of each running
-  gateway. Listed by the instances view.
+  gateway. Listed by the runtime view.
 
 The default source is the meter registry of the running instance. Behind a load balancer
 that is only its own share of the traffic, and successive refreshes land on different
@@ -108,7 +108,7 @@ instance, rather than shown as an empty table.
 
 Every source reports what its figures cover — `this instance only (gateway-7f9c4)`,
 `every instance, from Prometheus`, `2 of 3 instances (the others did not answer)` — shown
-under the chart, above the instance cards and on the home page tiles. A count means
+under the chart, in the band of the runtime view and on the home page tiles. A count means
 something different depending on which of these produced it, so it travels with the count.
 
 ## Sample
