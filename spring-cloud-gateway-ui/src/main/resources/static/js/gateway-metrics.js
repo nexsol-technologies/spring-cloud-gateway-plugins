@@ -126,6 +126,7 @@
 	var bars = echarts.init(barsEl, theme);
 	var rows = [];
 	var drawn = [];
+	var extents = null;
 	var sortKey = 'count';
 	var sortDir = -1;
 	var pollTimer = null;
@@ -445,7 +446,7 @@
 
 		sel('gm-legend').textContent = 'Bubble size = ' + LABELS[sk]
 			+ ' · colour = error rate (green none, amber some, red heavy) · hover a bubble for '
-			+ 'details · scroll to zoom, drag to pan.' + scope();
+			+ 'details · ctrl + scroll to zoom, drag to pan.' + scope();
 
 		var xs = drawn.map(function (row) {
 			return value(row, xk);
@@ -459,6 +460,9 @@
 		var py = plot(ys, yLog);
 		var xb = bounds(px, xLog);
 		var yb = bounds(py, yLog);
+		// The wheel zooms around the cursor, which it can only place in a window once it
+		// knows what the axis spans.
+		extents = { x: xb, y: yb };
 		var guide = guides(px, py, xb, yb, config.quadrants);
 		var labelled = named(ranking());
 		var xAxis = axis(xk, xLog, xb);
@@ -473,12 +477,19 @@
 			grid: { left: 70, right: 58, top: 24, bottom: 78 },
 			xAxis: xAxis,
 			yAxis: axis(yk, yLog, yb),
-			// Wheel on the plot and a slider per axis: a corner of the cloud is read by
+			// Drag on the plot and a slider per axis: a corner of the cloud is read by
 			// zooming into it. 'none' keeps the points outside the window in the series,
 			// so the median cross and the quadrants stay where they were computed.
+			//
+			// 'zoomLock' is what takes the wheel out of the hands of echarts, and it is
+			// the only thing that does: bound to a modifier or not, its inside zoom
+			// consumes every wheel it is registered for before looking at the modifier,
+			// and a plot this tall would then trap the scroll of the page it sits in.
+			// Locked, the controller only registers the drag that pans; the wheel is read
+			// below instead.
 			dataZoom: [
-				{ type: 'inside', xAxisIndex: 0, filterMode: 'none' },
-				{ type: 'inside', yAxisIndex: 0, filterMode: 'none' },
+				{ type: 'inside', xAxisIndex: 0, filterMode: 'none', zoomLock: true },
+				{ type: 'inside', yAxisIndex: 0, filterMode: 'none', zoomLock: true },
 				{ type: 'slider', xAxisIndex: 0, filterMode: 'none', bottom: 10, height: 18 },
 				{
 					type: 'slider', yAxisIndex: 0, filterMode: 'none', right: 10, width: 18,
@@ -578,6 +589,37 @@
 
 	// The ranking the map cannot draw: the routes that carry the most of whatever the
 	// question is about, biggest first, with what the twenty of them add up to.
+	// Where the cursor sits on an axis, as the percentage a zoom window is expressed in.
+	function percent(value, extent) {
+		return 100 * (value - extent.min) / (extent.max - extent.min);
+	}
+
+	// The window a wheel notch leaves behind: the span scaled, anchored on the cursor so
+	// the bubble under it stays under it, and kept inside the axis.
+	function windowed(zoom, anchor, ratio, index) {
+		var span = Math.min(100, (zoom.end - zoom.start) * ratio);
+		var start = Math.max(0, Math.min(100 - span, anchor - (anchor - zoom.start) * ratio));
+		return { type: 'dataZoom', dataZoomIndex: index, start: start, end: start + span };
+	}
+
+	// Ctrl + wheel zooms the map; a wheel alone is left to the page it sits in. Ctrl is
+	// also what a browser zooms its own page with, hence the preventDefault.
+	function zoomOnCtrlWheel(event) {
+		if (!event.ctrlKey || !extents || !drawn.length) {
+			return;
+		}
+		event.preventDefault();
+		var box = chartEl.getBoundingClientRect();
+		var at = chart.convertFromPixel({ gridIndex: 0 }, [event.clientX - box.left, event.clientY - box.top]);
+		if (!at) {
+			return;
+		}
+		var ratio = event.deltaY < 0 ? 1 / 1.25 : 1.25;
+		var zooms = chart.getOption().dataZoom;
+		chart.dispatchAction(windowed(zooms[0], percent(at[0], extents.x), ratio, 0));
+		chart.dispatchAction(windowed(zooms[1], percent(at[1], extents.y), ratio, 1));
+	}
+
 	function renderBars() {
 		var rank = ranking();
 		var scored = drawn.map(function (row) {
@@ -707,6 +749,8 @@
 	['gm-preset', 'gm-x', 'gm-y', 'gm-size', 'gm-top', 'gm-scale'].forEach(function (id) {
 		sel(id).addEventListener('change', render);
 	});
+	// Not passive: a ctrl + wheel that zooms the map must not also zoom the browser.
+	chartEl.addEventListener('wheel', zoomOnCtrlWheel, { passive: false });
 	// On input rather than on change: the plot follows what is being typed.
 	sel('gm-filter').addEventListener('input', render);
 	// A render replaces the option rather than merging into it, which is what puts the axes

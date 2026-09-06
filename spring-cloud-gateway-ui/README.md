@@ -234,7 +234,9 @@ discovered service, and they all pile up in the same corner. Three controls take
 | Show | caps the plot and the table to the busiest N routes by calls; Top 100 by default |
 | Scale | `Auto` turns an axis logarithmic as soon as its largest value is fifty times the median one, which is what un-stacks the cloud; `Linear` and `Logarithmic` force it either way |
 
-Only a dozen routes are named on the plot — the tooltip names any other one. Scroll to zoom, drag to pan, **Reset zoom** puts the axes back.
+Only a dozen routes are named on the plot — the tooltip names any other one. **Ctrl + scroll**
+zooms, drag pans, **Reset zoom** puts the axes back; a wheel without ctrl is left to the page,
+which is what keeps a plot this tall from trapping the scroll.
 The filter and the cap drive the plot and the table together; the tiles at the top stay on
 the whole gateway, and the line under the plot says so whenever the two differ.
 
@@ -310,8 +312,9 @@ route, read through the
 ![The service graph view](doc/service-graph-light.png)
 
 An arrow goes from the caller to what it reached: it thickens with the number of calls and
-reddens with the share that failed, and node size is the calls the node took part in. Scroll
-to zoom, drag to pan, drag a node to move it.
+reddens with the share that failed, and node size is the calls the node took part in. **Ctrl +
+scroll** zooms, drag pans, a node is dragged to move it; a wheel without ctrl is left to the
+page, which is what keeps a picture this tall from trapping the scroll.
 
 Four ways to narrow what is drawn, all applied in the browser on the payload already fetched:
 
