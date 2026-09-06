@@ -118,23 +118,31 @@ credentials, and the parameter is dropped from the request forwarded downstream.
 turning it on: a credential in a URL is written to access logs, proxy logs, browser history and
 `Referer` headers, none of which the gateway controls.
 
-**Spring Security integration.** As soon as one client is configured, the plugin contributes the
-chain itself: it matches the requests carrying the Basic credentials of a configured client,
-disables standard HTTP Basic for them, and inserts the exchange filter before authentication.
-Nothing has to be declared in the application.
+**Spring Security integration.** As soon as one client is configured, the plugin contributes
+the chain itself, and nothing has to be declared in the application. A request whose
+credentials were exchanged is let through it, rather than refused by an application that
+demands a principal and finds no Basic credentials left to authenticate — the filter replaced
+them with a bearer token before Spring Security ever looked.
 
-That chain declares no authorization rule — the exchange is what authorizes — so it only ever
-matches what the exchange filter actually handles. Requests under `/actuator`, which the filter
-leaves alone, are never matched and stay with the chains of the application. The exchange
-authenticates nobody either: it swaps credentials for a bearer token and forwards, and an
-application demanding an authenticated principal still needs something wired to authenticate
-that token.
+The chain permits what it matches, the exchange being what authorizes: a request only reaches
+it once the authorization server has accepted the client secret and issued the token it now
+carries. Wrong secret, unreachable server, refused grant — the filter answers `401` and nothing
+is forwarded.
+
+It matches on an attribute the filter sets, never on the `Authorization` header. The header
+cannot serve: the filter is a `WebFilter` bean, registered globally at
+`HIGHEST_PRECEDENCE + 5`, far ahead of the `WebFilterChainProxy` at `-100`, so by the time
+matchers run the header is already a bearer one. Matching what was actually exchanged also
+means a caller cannot select this chain with a client id alone — client ids sit in the
+configuration and are not secrets.
 
 The chain is ordered at
 `BasicAuthExchangeSecurityAutoConfiguration.BASIC_AUTH_EXCHANGE_CHAIN_ORDER`
 (`Ordered.HIGHEST_PRECEDENCE + 200`), ahead of the chains an application usually declares from
-`@Order(1)`. Two escape hatches: declare your own bean named
-`basicAuthExchangeSecurityWebFilterChain`, or set `security-chain-enabled: false`.
+`@Order(1)`. Two escape hatches, for a gateway that would rather validate the resulting token
+itself or keep its own rules over these requests: declare your own bean named
+`basicAuthExchangeSecurityWebFilterChain`, or set `security-chain-enabled: false` — the
+exchange still happens, only the letting through is gone.
 
 > As with any `SecurityWebFilterChain` bean, its presence makes Spring Boot back off from its
 > default "everything authenticated" chain. An application relying on that default must declare

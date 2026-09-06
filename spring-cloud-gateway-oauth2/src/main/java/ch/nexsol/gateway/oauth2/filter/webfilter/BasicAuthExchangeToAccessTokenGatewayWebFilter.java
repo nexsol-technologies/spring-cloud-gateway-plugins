@@ -72,6 +72,22 @@ import static ch.nexsol.gateway.oauth2.utils.SecurityUtils.HEADER_AUTHORIZATION_
  */
 public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter, Ordered {
 
+	/**
+	 * Attribute set on an exchange whose Basic credentials were exchanged for an access
+	 * token, holding the client id they named.
+	 * <p>
+	 * This is what the security chain of the plugin matches on. Matching the Basic
+	 * {@code Authorization} header instead cannot work: this filter is a
+	 * {@link WebFilter} bean, so it is registered globally and runs at
+	 * {@link Ordered#HIGHEST_PRECEDENCE} {@code + 5}, well ahead of the
+	 * {@code WebFilterChainProxy} at {@code -100}. By the time Spring Security evaluates
+	 * its matchers the header is already a bearer one. Matching the attribute also means
+	 * the chain accepts only what this filter actually authorized, never a request that
+	 * merely names a configured client.
+	 */
+	public static final String EXCHANGED_CLIENT_ATTRIBUTE = BasicAuthExchangeToAccessTokenGatewayWebFilter.class
+		.getName() + ".exchangedClient";
+
 	private static final Logger LOG = LoggerFactory.getLogger(BasicAuthExchangeToAccessTokenGatewayWebFilter.class);
 
 	private final BasicAuthExchangeToAccessTokenProperties properties;
@@ -154,9 +170,9 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 					return this.exchangeBasicToJwt(basicValue)
 						.doOnError((error) -> LOG.error(
 								"Exchange basicAuth to access token : error when initate the OAuth 2.0 client credentials flow",
-								error));
+								error))
+						.map((token) -> withBearerAuth(exchange, basicValue, token));
 				})
-				.map((token) -> withBearerAuth(exchange, token))
 				.defaultIfEmpty(exchange)
 				.doOnSuccess((result) -> observation.stop())
 				.doOnCancel(observation::stop)
@@ -223,7 +239,12 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 		return tokenResponse;
 	}
 
-	private ServerWebExchange withBearerAuth(ServerWebExchange exchange, String accessToken) {
+	private ServerWebExchange withBearerAuth(ServerWebExchange exchange, BasicValue basicValue, String accessToken) {
+		// Read by the security chain of the plugin, which lets an exchanged request
+		// through. Set on the exchange rather than the mutated one on purpose: a mutated
+		// exchange shares the attributes of the exchange it wraps, and this must be
+		// visible to whatever runs next.
+		exchange.getAttributes().put(EXCHANGED_CLIENT_ATTRIBUTE, basicValue.getClientId());
 		return exchange.mutate().request((builder) -> {
 			builder.headers((headers) -> headers.setBearerAuth(accessToken));
 			stripCredentialsQueryParam(exchange.getRequest(), builder);

@@ -119,28 +119,26 @@ class BasicAuthExchangeSecurityChainScopeTests {
 	}
 
 	@Test
-	void exchangedRequestIsStillSubjectToTheAuthorizationRulesOfTheApplication() {
-		// The exchange authenticates nobody: it swaps credentials for a bearer token and
-		// forwards. An application demanding an authenticated principal, with nothing
-		// wired to authenticate that token, refuses the request all the same.
+	void exchangedRequestIsLetThroughTheChainsOfTheApplication() {
+		// The point of the contributed chain: the application would have refused this
+		// request for want of a principal, and the successful exchange is what lets it
+		// through, carrying the token the authorization server issued.
 		String accessToken = plainJwt(Instant.now().plus(Duration.ofHours(1)));
 		this.mockOAuthServer.enqueue(new MockResponse().setResponseCode(200)
 			.setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
 			.setBody("""
 					{"access_token": "%s", "token_type": "Bearer", "expires_in": 3600}
 					""".formatted(accessToken)));
-		int before = this.mockOAuthServer.getRequestCount();
 
 		client().get()
 			.uri("/api/resource")
 			.header(HttpHeaders.AUTHORIZATION, GOOD_CREDENTIALS)
 			.exchange()
 			.expectStatus()
-			.isUnauthorized();
-
-		// The exchange did run, so the refusal comes from the application, not from a
-		// request the plugin failed to handle
-		assertThat(this.mockOAuthServer.getRequestCount() - before).isEqualTo(1);
+			.isOk()
+			.expectBody(Map.class)
+			.consumeWith((result) -> assertThat(result.getResponseBody().get("authorization").toString())
+				.isEqualTo("Bearer " + accessToken));
 	}
 
 	private static String basic(String pair) {

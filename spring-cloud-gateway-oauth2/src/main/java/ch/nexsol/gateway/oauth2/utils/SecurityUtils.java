@@ -28,6 +28,8 @@ import org.springframework.security.web.server.util.matcher.ServerWebExchangeMat
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher.MatchResult;
 import org.springframework.util.StringUtils;
 
+import static ch.nexsol.gateway.oauth2.filter.webfilter.BasicAuthExchangeToAccessTokenGatewayWebFilter.EXCHANGED_CLIENT_ATTRIBUTE;
+
 /**
  * Security-related helper methods shared across the OAuth 2.0 gateway plugins.
  */
@@ -96,20 +98,21 @@ public final class SecurityUtils {
 	}
 
 	/**
-	 * Build a matcher that matches an exchange whose Basic credentials name a client
-	 * configured for token exchange.
-	 * @param properties the Basic-auth exchange properties used to check the user
-	 * @return a matcher accepting configured Basic-auth requests
+	 * Build a matcher that matches an exchange the Basic-auth filter has already
+	 * exchanged for an access token.
+	 * <p>
+	 * It reads the attribute the filter leaves behind rather than the {@code
+	 * Authorization} header, for two reasons. The header is a bearer one by the time
+	 * Spring Security evaluates matchers, the filter being registered globally and
+	 * running far ahead of the chain proxy; and matching what was actually exchanged,
+	 * rather than what merely names a configured client, means a caller cannot select
+	 * this chain with a client id and a secret the authorization server would have
+	 * refused.
+	 * @return a matcher accepting the requests the exchange authorized
 	 */
-	public static ServerWebExchangeMatcher basicCredentialsMatcher(
-			BasicAuthExchangeToAccessTokenProperties properties) {
-		return (exchange) -> {
-			ServerHttpRequest request = exchange.getRequest();
-			boolean result = isCandidateForExchange(request) && resolveBasicValue(request, properties)
-				.map((basic) -> properties.isUserConfigured(basic.getClientId()))
-				.orElse(false);
-			return result ? MatchResult.match() : MatchResult.notMatch();
-		};
+	public static ServerWebExchangeMatcher exchangedCredentialsMatcher() {
+		return (exchange) -> exchange.getAttributes().containsKey(EXCHANGED_CLIENT_ATTRIBUTE) ? MatchResult.match()
+				: MatchResult.notMatch();
 	}
 
 	private static Optional<BasicValue> fromAuthorizationHeader(ServerHttpRequest request) {

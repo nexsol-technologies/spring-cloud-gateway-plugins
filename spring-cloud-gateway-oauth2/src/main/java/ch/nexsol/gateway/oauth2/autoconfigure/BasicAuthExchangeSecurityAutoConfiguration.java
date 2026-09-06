@@ -18,7 +18,6 @@ package ch.nexsol.gateway.oauth2.autoconfigure;
 
 import ch.nexsol.gateway.oauth2.filter.webfilter.BasicAuthExchangeToAccessTokenGatewayWebFilter;
 import ch.nexsol.gateway.oauth2.filter.webfilter.condition.BasicAuthExchangeConfiguredCondition;
-import ch.nexsol.gateway.oauth2.properties.BasicAuthExchangeToAccessTokenProperties;
 import ch.nexsol.gateway.oauth2.utils.SecurityUtils;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -30,7 +29,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 
@@ -38,14 +36,18 @@ import static org.springframework.security.config.Customizer.withDefaults;
 
 /**
  * Auto-configuration contributing the security filter chain the Basic-auth to
- * access-token exchange needs: requests carrying the Basic credentials of a configured
- * client must reach the exchange filter instead of being challenged by the standard HTTP
- * Basic authentication of the application.
+ * access-token exchange needs: a request whose Basic credentials were exchanged for an
+ * access token is let through, rather than challenged by the authentication of the
+ * application, which has no Basic credentials left to look at.
  * <p>
- * The chain declares no authorization rule, the exchange being what authorizes, so
- * everything its matcher accepts is served unchecked until the exchange filter has run.
- * Its matcher must therefore accept nothing the filter would skip &mdash; see
- * {@link ch.nexsol.gateway.oauth2.utils.SecurityUtils#isCandidateForExchange}.
+ * The chain permits what it matches, the exchange being what authorizes: the
+ * authorization server refused the credentials or the filter answered {@code 401}, so a
+ * request reaching this chain carries a token that server issued. It matches on the
+ * attribute the filter sets, never on the {@code Authorization} header &mdash; see
+ * {@link ch.nexsol.gateway.oauth2.utils.SecurityUtils#exchangedCredentialsMatcher()}.
+ * <p>
+ * A gateway that would rather validate the resulting token itself, or keep its own rules
+ * over these requests, turns the chain off and lets them fall through to its chains.
  * <p>
  * The chain is only contributed when at least one client is configured, and it can be
  * turned off with
@@ -71,27 +73,22 @@ public class BasicAuthExchangeSecurityAutoConfiguration {
 	public static final int BASIC_AUTH_EXCHANGE_CHAIN_ORDER = Ordered.HIGHEST_PRECEDENCE + 200;
 
 	/**
-	 * Registers the chain matching the Basic-auth requests of the configured clients,
-	 * with the exchange filter placed before authentication.
+	 * Registers the chain letting the requests the exchange authorized through.
 	 * @param http the reactive security builder
-	 * @param properties the Basic-auth exchange configuration
-	 * @param basicAuthExchangeFilter the filter performing the token exchange
 	 * @return the Basic-auth exchange security filter chain
 	 */
 	@Bean
 	@Order(BASIC_AUTH_EXCHANGE_CHAIN_ORDER)
-	@ConditionalOnBean(ServerHttpSecurity.class)
+	@ConditionalOnBean({ ServerHttpSecurity.class, BasicAuthExchangeToAccessTokenGatewayWebFilter.class })
 	@ConditionalOnMissingBean(name = "basicAuthExchangeSecurityWebFilterChain")
-	SecurityWebFilterChain basicAuthExchangeSecurityWebFilterChain(ServerHttpSecurity http,
-			BasicAuthExchangeToAccessTokenProperties properties,
-			BasicAuthExchangeToAccessTokenGatewayWebFilter basicAuthExchangeFilter) {
+	SecurityWebFilterChain basicAuthExchangeSecurityWebFilterChain(ServerHttpSecurity http) {
 		http.cors(withDefaults());
 		http.csrf(ServerHttpSecurity.CsrfSpec::disable);
-		http.securityMatcher(SecurityUtils.basicCredentialsMatcher(properties));
+		http.securityMatcher(SecurityUtils.exchangedCredentialsMatcher());
+		http.authorizeExchange((spec) -> spec.anyExchange().permitAll());
 		http.httpBasic(ServerHttpSecurity.HttpBasicSpec::disable);
 		http.formLogin(ServerHttpSecurity.FormLoginSpec::disable);
 		http.logout(ServerHttpSecurity.LogoutSpec::disable);
-		http.addFilterBefore(basicAuthExchangeFilter, SecurityWebFiltersOrder.AUTHENTICATION);
 		return http.build();
 	}
 
