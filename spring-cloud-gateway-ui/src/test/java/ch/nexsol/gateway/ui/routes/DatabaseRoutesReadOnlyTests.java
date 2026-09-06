@@ -18,6 +18,7 @@ package ch.nexsol.gateway.ui.routes;
 
 import ch.nexsol.gateway.database.entity.RouteEntity;
 import ch.nexsol.gateway.database.repository.RouteRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -49,6 +50,18 @@ class DatabaseRoutesReadOnlyTests {
 		route.setRouteId("read-only-route");
 		route.setUri("http://service-a");
 		this.routeRepository.save(route).block();
+	}
+
+	/**
+	 * The test database is in-memory but declared with {@code DB_CLOSE_DELAY=-1}, so it
+	 * outlives this context and is shared with every other test class of the module. A
+	 * class that seeds routes must therefore leave it as it found it: a route left behind
+	 * is matched by whatever runs next, and one carrying a {@code Method} predicate alone
+	 * matches every path.
+	 */
+	@AfterEach
+	void tearDown() {
+		this.routeRepository.deleteAll().block();
 	}
 
 	@Test

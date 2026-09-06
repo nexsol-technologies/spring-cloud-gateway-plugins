@@ -18,6 +18,8 @@ package ch.nexsol.gateway.servicegraph.prometheus;
 
 import java.time.Duration;
 
+import org.springframework.util.unit.DataSize;
+
 /**
  * Configuration properties for the Prometheus service graph source, bound under
  * {@code spring.cloud.gateway.server.webflux.service-graph.prometheus}.
@@ -50,6 +52,14 @@ public class PrometheusServiceGraphProperties {
 	 * How long to wait for Prometheus before reporting no graph.
 	 */
 	private Duration timeout = Duration.ofSeconds(5);
+
+	/**
+	 * Largest answer read from Prometheus. It is deserialized whole, so it is buffered
+	 * whole, and this is the ceiling the reactive codecs enforce while it is read. When
+	 * unset the client keeps the one the application configured through
+	 * {@code spring.http.codecs.max-in-memory-size}, 256&nbsp;KB by default.
+	 */
+	private DataSize maxResponseSize;
 
 	/**
 	 * User name of the Basic credentials sent to Prometheus. Set it together with the
@@ -126,6 +136,20 @@ public class PrometheusServiceGraphProperties {
 	 */
 	public void setTimeout(Duration timeout) {
 		this.timeout = timeout;
+	}
+
+	/**
+	 * @return the largest answer read from Prometheus
+	 */
+	public DataSize getMaxResponseSize() {
+		return this.maxResponseSize;
+	}
+
+	/**
+	 * @param maxResponseSize the largest answer read from Prometheus
+	 */
+	public void setMaxResponseSize(DataSize maxResponseSize) {
+		this.maxResponseSize = maxResponseSize;
 	}
 
 	/**

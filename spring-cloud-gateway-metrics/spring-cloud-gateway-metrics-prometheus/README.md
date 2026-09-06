@@ -37,6 +37,8 @@ spring.cloud.gateway.server.webflux.metrics:
     # How far back an instance must have reported to still be listed.
     stale-after: 2m
     timeout: 5s
+    # Optional: raises the buffering ceiling for these calls alone.
+    max-response-size: 2MB
 ```
 
 | Property | Default | What it does |
@@ -47,6 +49,7 @@ spring.cloud.gateway.server.webflux.metrics:
 | `...prometheus.instance-label` | `instance` | Label identifying a gateway instance |
 | `...prometheus.stale-after` | `2m` | How far back an instance must have reported to still be listed |
 | `...prometheus.timeout` | `5s` | How long to wait before reporting no data |
+| `...prometheus.max-response-size` | — | Largest answer read; unset keeps the ceiling of `spring.http.codecs.max-in-memory-size` |
 | `...prometheus.username` / `.password` | — | Basic credentials, when the server asks for them |
 | `...prometheus.token` | — | Bearer token, ignored when Basic credentials are set |
 
