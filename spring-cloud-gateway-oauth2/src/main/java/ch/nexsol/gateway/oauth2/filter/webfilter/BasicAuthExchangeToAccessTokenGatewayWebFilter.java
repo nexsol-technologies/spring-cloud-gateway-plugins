@@ -28,6 +28,8 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import ch.nexsol.gateway.oauth2.properties.BasicAuthExchangeToAccessTokenProperties;
+import ch.nexsol.gateway.oauth2.properties.BasicAuthExchangeToAccessTokenProperties.Client;
+import ch.nexsol.gateway.oauth2.utils.SecurityUtils;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
@@ -58,6 +60,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import static ch.nexsol.gateway.oauth2.utils.SecurityUtils.HEADER_AUTHORIZATION_BASIC;
 
@@ -70,10 +73,6 @@ import static ch.nexsol.gateway.oauth2.utils.SecurityUtils.HEADER_AUTHORIZATION_
 public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter, Ordered {
 
 	private static final Logger LOG = LoggerFactory.getLogger(BasicAuthExchangeToAccessTokenGatewayWebFilter.class);
-
-	private static final String HTTPS_SCHEME = "https";
-
-	private static final String HTTP_SCHEME = "http";
 
 	private final BasicAuthExchangeToAccessTokenProperties properties;
 
@@ -133,12 +132,7 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 		return Mono.deferContextual((contextView) -> {
 
 			ServerHttpRequest request = exchange.getRequest();
-			String scheme = request.getURI().getScheme();
-			if ((!HTTP_SCHEME.equalsIgnoreCase(scheme) && !HTTPS_SCHEME.equals(scheme))) {
-				return chain.filter(exchange);
-			}
-			String path = request.getPath().value();
-			if (path.startsWith("/actuator")) {
+			if (!SecurityUtils.isCandidateForExchange(request)) {
 				return chain.filter(exchange);
 			}
 
@@ -149,23 +143,19 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 			// An exchange that fails is denied, never forwarded: letting the request
 			// through would send the raw Basic credentials to a downstream service that
 			// expects a bearer token, and would turn a refused credential or an
-			// unreachable
-			// authorization server into a request served as if it had been authorized.
-			// Requests this filter has nothing to do with — no Basic header, or a client
-			// id
-			// it is not configured for — complete empty and are forwarded untouched.
-			return Mono.just(request)
-				.map((r) -> r.getHeaders())
-				.filter((headers) -> this.containsAuthorizationBasic(headers))
-				.flatMap((headers) -> Mono.justOrEmpty(this.extractAuthorizationBasic(headers))
-					.filter((basicValue) -> this.properties.isUserConfigured(basicValue.getClientId()))
-					.flatMap((basicValue) -> {
-						LOG.debug("BasicAuth exchange is starting");
-						return this.exchangeBasicToJwt(request, headers, basicValue)
-							.doOnError((error) -> LOG.error(
-									"Exchange basicAuth to access token : error when initate the OAuth 2.0 client credentials flow",
-									error));
-					}))
+			// unreachable authorization server into a request served as if it had been
+			// authorized. Requests this filter has nothing to do with — no Basic
+			// credentials, or a client id it is not configured for — complete empty and
+			// are forwarded untouched.
+			return Mono.justOrEmpty(SecurityUtils.resolveBasicValue(request, this.properties))
+				.filter((basicValue) -> this.properties.isUserConfigured(basicValue.getClientId()))
+				.flatMap((basicValue) -> {
+					LOG.debug("BasicAuth exchange is starting");
+					return this.exchangeBasicToJwt(basicValue)
+						.doOnError((error) -> LOG.error(
+								"Exchange basicAuth to access token : error when initate the OAuth 2.0 client credentials flow",
+								error));
+				})
 				.map((token) -> withBearerAuth(exchange, token))
 				.defaultIfEmpty(exchange)
 				.doOnSuccess((result) -> observation.stop())
@@ -179,38 +169,11 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 
 	}
 
-	private boolean containsAuthorizationBasic(HttpHeaders headers) {
-		if (headers.containsHeader(HttpHeaders.AUTHORIZATION) && headers.get(HttpHeaders.AUTHORIZATION) != null
-				&& !headers.get(HttpHeaders.AUTHORIZATION).isEmpty()) {
-			LOG.trace("contains AUTHORIZATION header");
-			return headers.get(HttpHeaders.AUTHORIZATION).stream().anyMatch(BasicValue::isBasic);
-		}
-		LOG.trace("NOT contains AUTHORIZATION header");
-		return false;
-	}
-
-	private Optional<BasicValue> extractAuthorizationBasic(HttpHeaders headers) {
-		if (headers.containsHeader(HttpHeaders.AUTHORIZATION) && headers.get(HttpHeaders.AUTHORIZATION) != null
-				&& !headers.get(HttpHeaders.AUTHORIZATION).isEmpty()) {
-
-			return headers.get(HttpHeaders.AUTHORIZATION)
-				.stream()
-				.filter(BasicValue::isBasic)
-				.findFirst()
-				.flatMap(BasicValue::parse)
-				.map((value) -> {
-					LOG.trace("BasicValue is {}", value.getKey());
-					return value;
-				});
-		}
-		return Optional.empty();
-	}
-
-	private Mono<String> exchangeBasicToJwt(ServerHttpRequest request, HttpHeaders headers, BasicValue basicValue) {
+	private Mono<String> exchangeBasicToJwt(BasicValue basicValue) {
 		String key = basicValue.getKey();
 		return this.getFromCache(key)
 			.switchIfEmpty(Mono.defer(() -> this.inFlightExchanges.computeIfAbsent(key,
-					(k) -> this.getToken(request, basicValue).doOnNext((newAuthToken) -> {
+					(k) -> this.getToken(basicValue).doOnNext((newAuthToken) -> {
 						if (this.tokenCache != null && newAuthToken != null) {
 							try {
 								this.tokenCache.put(k, newAuthToken);
@@ -225,21 +188,32 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 	private BodyExtractor<Mono<OAuth2AccessTokenResponse>, ReactiveHttpInputMessage> bodyExtractor = OAuth2BodyExtractors
 		.oauth2AccessTokenResponse();
 
-	private Mono<String> getToken(ServerHttpRequest request, BasicValue basicValue) {
-		return Mono.justOrEmpty(this.properties.getTokenUris().get(basicValue.getClientId()))
-			.doOnNext((uri) -> LOG.trace("Call token uri {} ", uri))
-			.flatMap((tokenUri) -> this.webClient.post()
-				.uri(tokenUri)
-				.body(BodyInserters.fromFormData("client_id", basicValue.getClientId())
-					.with("client_secret", basicValue.getClientSecret())
-					.with("grant_type", AuthorizationGrantType.CLIENT_CREDENTIALS.getValue()))
+	private Mono<String> getToken(BasicValue basicValue) {
+		return Mono.justOrEmpty(this.properties.resolveClient(basicValue.getClientId()))
+			.doOnNext((client) -> LOG.trace("Call token uri {} ", client.getTokenUri()))
+			.flatMap((client) -> this.webClient.post()
+				.uri(client.getTokenUri())
+				.body(tokenRequest(basicValue, client))
 				.exchangeToMono((response) -> response.body(this.bodyExtractor)
 					.map((tokenResponse) -> populateTokenResponse(tokenResponse)))
 				.map((accessToken) -> accessToken.getAccessToken().getTokenValue())
-				.doOnError((error) -> LOG.error("error when calling token uri {} for client {}", tokenUri,
+				.doOnError((error) -> LOG.error("error when calling token uri {} for client {}", client.getTokenUri(),
 						basicValue.getClientId(), error)))
 			.onErrorResume((ex) -> Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED)));
 
+	}
+
+	private BodyInserters.FormInserter<String> tokenRequest(BasicValue basicValue, Client client) {
+		BodyInserters.FormInserter<String> form = BodyInserters.fromFormData("client_id", basicValue.getClientId())
+			.with("client_secret", basicValue.getClientSecret())
+			.with("grant_type", AuthorizationGrantType.CLIENT_CREDENTIALS.getValue());
+		// An empty `scope` is not the same as no `scope` at all: an authorization server
+		// answers the former with invalid_scope where it would have granted the client
+		// its default scopes for the latter.
+		if (!client.getScopes().isEmpty()) {
+			form = form.with("scope", String.join(" ", client.getScopes()));
+		}
+		return form;
 	}
 
 	private OAuth2AccessTokenResponse populateTokenResponse(OAuth2AccessTokenResponse tokenResponse) {
@@ -250,7 +224,26 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 	}
 
 	private ServerWebExchange withBearerAuth(ServerWebExchange exchange, String accessToken) {
-		return exchange.mutate().request((r) -> r.headers((headers) -> headers.setBearerAuth(accessToken))).build();
+		return exchange.mutate().request((builder) -> {
+			builder.headers((headers) -> headers.setBearerAuth(accessToken));
+			stripCredentialsQueryParam(exchange.getRequest(), builder);
+		}).build();
+	}
+
+	/**
+	 * Drop the credentials query parameter from the request forwarded downstream. The
+	 * whole point of the exchange is that the credentials stop here; leaving them in the
+	 * URL would hand them to the downstream service, its access log and its {@code
+	 * Referer} headers.
+	 * @param request the incoming request
+	 * @param builder the builder of the forwarded request
+	 */
+	private void stripCredentialsQueryParam(ServerHttpRequest request, ServerHttpRequest.Builder builder) {
+		String name = this.properties.getCredentialsQueryParamName();
+		if (!this.properties.isCredentialsInQueryParam() || !request.getQueryParams().containsKey(name)) {
+			return;
+		}
+		builder.uri(UriComponentsBuilder.fromUri(request.getURI()).replaceQueryParam(name).build(true).toUri());
 	}
 
 	private Mono<String> getFromCache(String cacheKey) {
@@ -349,18 +342,29 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 		 * @return the decoded pair, or empty when the header is not a usable one
 		 */
 		public static Optional<BasicValue> parse(String header) {
+			return parseCredentials(header.substring(HEADER_AUTHORIZATION_BASIC.length()));
+		}
+
+		/**
+		 * Decodes the Base64 {@code client-id:client-secret} pair a Basic
+		 * {@code Authorization} header or a credentials query parameter carries, without
+		 * its scheme prefix. Same defensive contract as {@link #parse(String)}.
+		 * @param credentials the Base64 encoded pair
+		 * @return the decoded pair, or empty when the value is not a usable one
+		 */
+		public static Optional<BasicValue> parseCredentials(String credentials) {
 			byte[] decoded;
 			try {
-				decoded = Base64.getDecoder().decode(header.substring(HEADER_AUTHORIZATION_BASIC.length()));
+				decoded = Base64.getDecoder().decode(credentials);
 			}
 			catch (IllegalArgumentException ex) {
-				LOG.debug("Ignoring an Authorization header whose Basic credentials are not valid Base64");
+				LOG.debug("Ignoring Basic credentials that are not valid Base64");
 				return Optional.empty();
 			}
 			String pair = new String(decoded, StandardCharsets.UTF_8);
 			int separator = pair.indexOf(':');
 			if (separator < 0) {
-				LOG.debug("Ignoring an Authorization header whose Basic credentials carry no ':' separator");
+				LOG.debug("Ignoring Basic credentials carrying no ':' separator");
 				return Optional.empty();
 			}
 			return Optional.of(new BasicValue(pair.substring(0, separator), pair.substring(separator + 1)));

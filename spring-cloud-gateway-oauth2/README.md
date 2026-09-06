@@ -78,24 +78,57 @@ spring.cloud.gateway.server.webflux.webfilter.basicauth-exchange-oauth2:
   token-uris:
     user1: https://my-authorization-server/protocol/openid-connect/token
     user2: https://keycloak/realms/test/protocol/openid-connect/token
+  # Same thing, for a user whose exchange needs more than an endpoint.
+  clients:
+    user3:
+      token-uri: https://my-authorization-server/connect/token
+      scopes:
+        - read
+        - write
   # Set to false to keep the plugin from contributing its own security chain.
   security-chain-enabled: true
 ```
 
 | Property | Default | What it does |
 | --- | --- | --- |
+| `...basicauth-exchange-oauth2.enabled` | `true` | Master switch; `false` registers neither the filter nor its security chain |
 | `...basicauth-exchange-oauth2.token-uris.<user>` | — | Token endpoint used for that Basic user; one entry is enough to activate the filter |
+| `...basicauth-exchange-oauth2.clients.<user>.token-uri` | — | Token endpoint used for that Basic user; one entry is enough to activate the filter |
+| `...basicauth-exchange-oauth2.clients.<user>.scopes` | — | Scopes requested for that user; when empty no `scope` parameter is sent at all |
+| `...basicauth-exchange-oauth2.credentials-in-query-param` | `false` | Whether Basic credentials are also read from a query parameter |
+| `...basicauth-exchange-oauth2.credentials-query-param-name` | `_auth` | Name of that query parameter |
 | `...basicauth-exchange-oauth2.security-chain-enabled` | `true` | Whether the plugin contributes its own `SecurityWebFilterChain` |
+
+Declare a user under `token-uris` or under `clients`, not both; `clients` wins over `token-uris`
+for a user that ends up in the two. The forms are equivalent for a user needing no scope. Both
+are validated at startup: a client declared without its token endpoint fails the context rather
+than every one of its requests. An empty `scopes` list is not an empty
+`scope` parameter: the exchange sends none, where an authorization server would answer
+`invalid_scope` instead of granting the client its default scopes.
 
 Tokens are cached in memory and evicted on their JWT `exp` claim, so an expired token is never
 reused and the authorization server is not called on every request. The application
 `CacheManager` is used when there is one, otherwise the filter falls back to its own cache —
 the host application needs no caching setup.
 
-**Spring Security integration.** As soon as one `token-uris` entry exists, the plugin
-contributes the chain itself: it matches the requests carrying the Basic credentials of a
-configured client, disables standard HTTP Basic for them, and inserts the exchange filter
-before authentication. Nothing has to be declared in the application.
+**Credentials in a query parameter.** A caller that cannot set an `Authorization` header can
+carry the same Base64 `client-id:client-secret` pair in a query parameter, once
+`credentials-in-query-param` is on. The header still wins whenever it carries usable
+credentials, and the parameter is dropped from the request forwarded downstream. Weigh it before
+turning it on: a credential in a URL is written to access logs, proxy logs, browser history and
+`Referer` headers, none of which the gateway controls.
+
+**Spring Security integration.** As soon as one client is configured, the plugin contributes the
+chain itself: it matches the requests carrying the Basic credentials of a configured client,
+disables standard HTTP Basic for them, and inserts the exchange filter before authentication.
+Nothing has to be declared in the application.
+
+That chain declares no authorization rule — the exchange is what authorizes — so it only ever
+matches what the exchange filter actually handles. Requests under `/actuator`, which the filter
+leaves alone, are never matched and stay with the chains of the application. The exchange
+authenticates nobody either: it swaps credentials for a bearer token and forwards, and an
+application demanding an authenticated principal still needs something wired to authenticate
+that token.
 
 The chain is ordered at
 `BasicAuthExchangeSecurityAutoConfiguration.BASIC_AUTH_EXCHANGE_CHAIN_ORDER`

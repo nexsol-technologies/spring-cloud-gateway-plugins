@@ -134,15 +134,12 @@ class BasicAuthExchangeToAccessTokenGatewayWebFilterIntegrationTests extends Bas
 		// Verify that the OAuth server was called
 		assertThat(this.mockOAuthServer.getRequestCount() - this.initialRequestCount).isEqualTo(1);
 
-		// Verify that the request to the OAuth server was correct
-		try {
-			assertThat(this.mockOAuthServer.takeRequest().getBody().readUtf8()).contains("client_id=" + CLIENT_ID,
-					"client_secret=" + CLIENT_SECRET,
-					"grant_type=" + AuthorizationGrantType.CLIENT_CREDENTIALS.getValue());
-		}
-		catch (InterruptedException ex) {
-			throw new RuntimeException("MockWebServer request analysis interrupted", ex);
-		}
+		// Verify that the request to the OAuth server was correct. A client declaring no
+		// scope sends no scope parameter at all, which is not the same as an empty one.
+		assertThat(takeTokenRequestBody())
+			.contains("client_id=" + CLIENT_ID, "client_secret=" + CLIENT_SECRET,
+					"grant_type=" + AuthorizationGrantType.CLIENT_CREDENTIALS.getValue())
+			.doesNotContain("scope=");
 	}
 
 	@Test
@@ -265,6 +262,67 @@ class BasicAuthExchangeToAccessTokenGatewayWebFilterIntegrationTests extends Bas
 		try {
 			this.mockOAuthServer.takeRequest(2, TimeUnit.SECONDS);
 			this.mockOAuthServer.takeRequest(2, TimeUnit.SECONDS);
+		}
+		catch (InterruptedException ex) {
+			throw new RuntimeException("MockWebServer request analysis interrupted", ex);
+		}
+	}
+
+	@Test
+	void should_request_the_configured_scopes_when_the_client_declares_them() {
+		// Arrange
+		this.mockOAuthServer.enqueue(new MockResponse().setResponseCode(200)
+			.setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+			.setBody(createTokenResponse(VALID_ACCESS_TOKEN.get())));
+
+		// Act & Assert
+		this.testClient.get()
+			.uri(DOWNSTREAM_URI)
+			.header(HttpHeaders.AUTHORIZATION, basicHeader("scoped-client", "scoped-secret"))
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(Map.class)
+			.consumeWith((result) -> {
+				Map<String, ?> body = result.getResponseBody();
+				assertThat(body.get("headers").toString()).contains("Bearer " + VALID_ACCESS_TOKEN.get());
+			});
+
+		// The scopes are joined by a space, which form encoding turns into a '+'
+		assertThat(takeTokenRequestBody()).contains("client_id=scoped-client", "client_secret=scoped-secret",
+				"grant_type=" + AuthorizationGrantType.CLIENT_CREDENTIALS.getValue(), "scope=read+write");
+	}
+
+	@Test
+	void should_ignore_credentials_in_query_param_when_the_option_is_off() {
+		// Arrange: credentials of a configured client, but carried by the query parameter
+		String credentials = Base64.getEncoder().encodeToString((CLIENT_ID + ":" + CLIENT_SECRET).getBytes());
+
+		// Act & Assert
+		this.testClient.get()
+			.uri((builder) -> builder.path(DOWNSTREAM_URI).queryParam("_auth", credentials).build())
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(Map.class)
+			.consumeWith((result) -> {
+				Map<String, ?> body = result.getResponseBody();
+				assertThat(body.get("headers").toString()).doesNotContain("Bearer");
+				// The request is none of the filter's business, so it is forwarded intact
+				assertThat(body.get("query").toString()).contains(credentials);
+			});
+
+		// Verify that the OAuth server was NOT called
+		assertThat(this.mockOAuthServer.getRequestCount() - this.initialRequestCount).isEqualTo(0);
+	}
+
+	private static String basicHeader(String clientId, String clientSecret) {
+		return "Basic " + Base64.getEncoder().encodeToString((clientId + ":" + clientSecret).getBytes());
+	}
+
+	private String takeTokenRequestBody() {
+		try {
+			return this.mockOAuthServer.takeRequest(2, TimeUnit.SECONDS).getBody().readUtf8();
 		}
 		catch (InterruptedException ex) {
 			throw new RuntimeException("MockWebServer request analysis interrupted", ex);

@@ -150,6 +150,7 @@ public class SpringAppConfiguration {
 		public Map<String, Object> basicAuthToAccessToken(ServerWebExchange exchange) {
 			Map<String, Object> result = new HashMap<>();
 			result.put("headers", toMap(exchange));
+			result.put("query", exchange.getRequest().getQueryParams());
 			return result;
 		}
 

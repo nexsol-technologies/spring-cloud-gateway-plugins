@@ -21,6 +21,7 @@ import ch.nexsol.gateway.oauth2.filter.webfilter.BasicAuthExchangeToAccessTokenG
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.webclient.autoconfigure.WebClientAutoConfiguration;
 import org.springframework.cache.CacheManager;
@@ -39,8 +40,18 @@ class FiltersAutoConfigurationTests {
 	private static final String TOKEN_URIS = "spring.cloud.gateway.server.webflux.webfilter."
 			+ "basicauth-exchange-oauth2.token-uris.alice=http://auth.example/token";
 
+	private static final String CLIENTS = "spring.cloud.gateway.server.webflux.webfilter."
+			+ "basicauth-exchange-oauth2.clients.alice.token-uri=http://auth.example/token";
+
+	private static final String DISABLED = "spring.cloud.gateway.server.webflux.webfilter."
+			+ "basicauth-exchange-oauth2.enabled=false";
+
+	// ConfigurationPropertiesAutoConfiguration brings the binding post-processor: without
+	// it the @ConfigurationProperties bean is created but never bound, and neither its
+	// values nor its validation are exercised.
 	private final ApplicationContextRunner runner = new ApplicationContextRunner()
-		.withConfiguration(AutoConfigurations.of(WebClientAutoConfiguration.class, FiltersAutoConfiguration.class));
+		.withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class,
+				WebClientAutoConfiguration.class, FiltersAutoConfiguration.class));
 
 	@Test
 	void authorizationTokenFilterFactoryIsAlwaysRegistered() {
@@ -56,6 +67,32 @@ class FiltersAutoConfigurationTests {
 			assertThat(context).hasNotFailed();
 			assertThat(context).hasSingleBean(BasicAuthExchangeToAccessTokenGatewayWebFilter.class);
 		});
+	}
+
+	@Test
+	void basicAuthExchangeFilterIsRegisteredFromTheClientsForm() {
+		this.runner.withPropertyValues(CLIENTS).run((context) -> {
+			assertThat(context).hasNotFailed();
+			assertThat(context).hasSingleBean(BasicAuthExchangeToAccessTokenGatewayWebFilter.class);
+		});
+	}
+
+	@Test
+	void basicAuthExchangeFilterBacksOffWhenTheExchangeIsDisabled() {
+		this.runner.withPropertyValues(TOKEN_URIS, DISABLED)
+			.run((context) -> assertThat(context)
+				.doesNotHaveBean(BasicAuthExchangeToAccessTokenGatewayWebFilter.class));
+	}
+
+	@Test
+	void clientDeclaredWithoutATokenUriFailsTheContext() {
+		this.runner
+			.withPropertyValues("spring.cloud.gateway.server.webflux.webfilter."
+					+ "basicauth-exchange-oauth2.clients.broken.scopes=read")
+			.run((context) -> {
+				assertThat(context).hasFailed();
+				assertThat(context).getFailure().hasStackTraceContaining("clients[broken].tokenUri");
+			});
 	}
 
 	@Test

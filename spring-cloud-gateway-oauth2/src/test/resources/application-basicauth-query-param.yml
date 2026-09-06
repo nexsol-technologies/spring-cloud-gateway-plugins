@@ -1,14 +1,9 @@
 spring.cloud.gateway.server.webflux:
   webfilter:
     basicauth-exchange-oauth2:
+      credentials-in-query-param: true
       token-uris:
         my-client: http://localhost:${custom.port}
-      clients:
-        scoped-client:
-          token-uri: http://localhost:${custom.port}
-          scopes:
-            - read
-            - write
 
 logging:
   level:

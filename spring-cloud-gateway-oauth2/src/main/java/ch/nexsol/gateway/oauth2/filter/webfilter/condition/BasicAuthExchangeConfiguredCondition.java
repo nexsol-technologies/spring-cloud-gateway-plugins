@@ -28,8 +28,9 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 
 /**
- * Condition that matches when at least one Basic-auth to access-token exchange token URI
- * is configured, enabling the related beans.
+ * Condition that matches when the Basic-auth to access-token exchange is enabled and at
+ * least one client is configured for it, under either declaration form, enabling the
+ * related beans.
  */
 public class BasicAuthExchangeConfiguredCondition extends SpringBootCondition {
 
@@ -43,7 +44,14 @@ public class BasicAuthExchangeConfiguredCondition extends SpringBootCondition {
 	public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
 		ConditionMessage.Builder message = ConditionMessage.forCondition("Basic Auth to OAUTH2 Configured Condition");
 		BasicAuthExchangeToAccessTokenProperties properties = getProperties(context.getEnvironment());
-		if (properties != null && !properties.getTokenUris().isEmpty()) {
+		if (properties == null) {
+			return ConditionOutcome
+				.noMatch(message.notAvailable("registered basic auth configuration exchange to oauth2 "));
+		}
+		if (!properties.isEnabled()) {
+			return ConditionOutcome.noMatch(message.because("the exchange is disabled"));
+		}
+		if (!properties.getTokenUris().isEmpty() || !properties.getClients().isEmpty()) {
 			return ConditionOutcome
 				.match(message.foundExactly("registered basic auth configuration exchange to oauth2 " + properties));
 		}

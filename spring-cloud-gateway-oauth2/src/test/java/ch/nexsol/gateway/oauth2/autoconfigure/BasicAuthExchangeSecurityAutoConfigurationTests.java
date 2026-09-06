@@ -41,6 +41,9 @@ class BasicAuthExchangeSecurityAutoConfigurationTests {
 	private static final String TOKEN_URIS = "spring.cloud.gateway.server.webflux.webfilter."
 			+ "basicauth-exchange-oauth2.token-uris.alice=http://auth.example/token";
 
+	private static final String CLIENTS = "spring.cloud.gateway.server.webflux.webfilter."
+			+ "basicauth-exchange-oauth2.clients.alice.token-uri=http://auth.example/token";
+
 	private final ReactiveWebApplicationContextRunner runner = new ReactiveWebApplicationContextRunner()
 		.withConfiguration(AutoConfigurations.of(WebClientAutoConfiguration.class, FiltersAutoConfiguration.class,
 				BasicAuthExchangeSecurityAutoConfiguration.class))
@@ -59,6 +62,22 @@ class BasicAuthExchangeSecurityAutoConfigurationTests {
 			assertThat(context).getBean("basicAuthExchangeSecurityWebFilterChain")
 				.isInstanceOf(SecurityWebFilterChain.class);
 		});
+	}
+
+	@Test
+	void chainIsContributedFromTheClientsForm() {
+		this.runner.withPropertyValues(CLIENTS).run((context) -> {
+			assertThat(context).hasNotFailed();
+			assertThat(context).hasBean("basicAuthExchangeSecurityWebFilterChain");
+		});
+	}
+
+	@Test
+	void chainBacksOffWhenTheExchangeIsDisabled() {
+		this.runner
+			.withPropertyValues(TOKEN_URIS,
+					"spring.cloud.gateway.server.webflux.webfilter.basicauth-exchange-oauth2.enabled=false")
+			.run((context) -> assertThat(context).doesNotHaveBean("basicAuthExchangeSecurityWebFilterChain"));
 	}
 
 	@Test

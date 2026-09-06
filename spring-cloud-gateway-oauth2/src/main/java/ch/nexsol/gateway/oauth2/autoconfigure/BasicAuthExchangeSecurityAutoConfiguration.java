@@ -42,7 +42,12 @@ import static org.springframework.security.config.Customizer.withDefaults;
  * client must reach the exchange filter instead of being challenged by the standard HTTP
  * Basic authentication of the application.
  * <p>
- * The chain is only contributed when at least one token URI is configured, and it can be
+ * The chain declares no authorization rule, the exchange being what authorizes, so
+ * everything its matcher accepts is served unchecked until the exchange filter has run.
+ * Its matcher must therefore accept nothing the filter would skip &mdash; see
+ * {@link ch.nexsol.gateway.oauth2.utils.SecurityUtils#isCandidateForExchange}.
+ * <p>
+ * The chain is only contributed when at least one client is configured, and it can be
  * turned off with
  * {@code spring.cloud.gateway.server.webflux.webfilter.basicauth-exchange-oauth2.security-chain-enabled=false}
  * or replaced by declaring a bean named {@code basicAuthExchangeSecurityWebFilterChain}.
@@ -82,7 +87,7 @@ public class BasicAuthExchangeSecurityAutoConfiguration {
 			BasicAuthExchangeToAccessTokenGatewayWebFilter basicAuthExchangeFilter) {
 		http.cors(withDefaults());
 		http.csrf(ServerHttpSecurity.CsrfSpec::disable);
-		http.securityMatcher(SecurityUtils.authorizationHeaderBasicMatcher(properties));
+		http.securityMatcher(SecurityUtils.basicCredentialsMatcher(properties));
 		http.httpBasic(ServerHttpSecurity.HttpBasicSpec::disable);
 		http.formLogin(ServerHttpSecurity.FormLoginSpec::disable);
 		http.logout(ServerHttpSecurity.LogoutSpec::disable);
