@@ -115,6 +115,9 @@
 			// The only entry into the request client from this layout, and the flag the
 			// bundle also gates the authentication panel on.
 			hideTestRequestButton: !tryIt,
+			// The 'Open API Client' link at the foot of the sidebar, which leaves the
+			// console for https://client.scalar.com carrying the document URL.
+			hideClientButton: true,
 			// The search modal opens with its input focused but stays invisible: it carries
 			// the utility class `opacity-0`, and the animation revealing it is declared in
 			// a stylesheet the bundle does not inject in this integration. Remove once the
