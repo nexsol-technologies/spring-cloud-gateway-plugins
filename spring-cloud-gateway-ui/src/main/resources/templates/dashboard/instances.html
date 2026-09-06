@@ -1,34 +1,46 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org"
-		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Instances', ~{:: #instances-content}, ~{:: #instances-scripts})}">
+		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Runtime', ~{:: #instances-content}, ~{:: #instances-scripts})}">
 <body>
 	<div id="instances-content">
-		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1">Instances</h1>
-			<p class="text-secondary mb-0">
-				The technical health of each gateway instance: memory, processor, threads and the
-				connection pools towards the downstream services.
-			</p>
-		</header>
-
+		<!--
+			The name of the view, what the figures cover and how old they are, all in one
+			band: a reader deciding whether to trust a number asks those three things at
+			once, and the coverage is not a fact about the page but about the reading.
+		-->
 		<div class="card border-0 shadow-sm mb-3">
-			<div class="card-body py-3">
-				<div class="d-flex flex-wrap gap-3 align-items-center justify-content-between">
-					<!-- Whose figures these are: this instance alone, or every instance reached
-					     by a metrics provider. Filled from the payload on every refresh. -->
-					<p class="text-secondary small mb-0" id="gi-coverage">&mdash;</p>
-					<div class="d-flex gap-3 align-items-center">
-						<div class="form-check form-switch mb-0">
-							<input class="form-check-input" type="checkbox" id="gi-auto" checked>
-							<label class="form-check-label small" for="gi-auto">Auto</label>
-						</div>
-						<button type="button" id="gi-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
+			<div class="card-body d-flex flex-wrap gap-3 align-items-center justify-content-between">
+				<div class="d-flex align-items-center gap-3">
+					<span class="gw-band-badge">
+						<svg class="gw-icon"><use href="#icon-server"></use></svg>
+					</span>
+					<div>
+						<h1 class="h4 fw-bold mb-0">Runtime</h1>
+						<!-- Whose figures these are: this instance alone, or every instance
+						     reached by a metrics provider. Filled on every refresh. -->
+						<p class="text-secondary small mb-0" id="gi-coverage">&mdash;</p>
 					</div>
+				</div>
+				<div class="d-flex gap-3 align-items-center">
+					<!-- How long ago the figures were read, ticking on its own between two
+					     refreshes: a view left open on a dead poll must not look live. -->
+					<span class="text-secondary small" id="gi-age"></span>
+					<div class="form-check form-switch mb-0">
+						<input class="form-check-input" type="checkbox" id="gi-auto" checked>
+						<label class="form-check-label small" for="gi-auto">Auto</label>
+					</div>
+					<button type="button" id="gi-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
 				</div>
 			</div>
 		</div>
 
-		<!-- One card per instance, rendered from the payload. -->
+		<p class="text-secondary small mb-2">
+			The technical health of each gateway instance &mdash; memory, processor, threads and the
+			connection pools towards the downstream services. One row per instance, so a figure is
+			read down its column across the whole fleet; open a row for the pools of that instance.
+		</p>
+
+		<!-- The fleet table, rendered from the payload. -->
 		<div id="gi-instances" th:attr="data-url=@{/ui/metrics/instances/data}"
 				data-url="/ui/metrics/instances/data"></div>
 

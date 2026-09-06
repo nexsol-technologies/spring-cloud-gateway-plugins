@@ -391,13 +391,81 @@
 	font-size: .8rem;
 }
 
-/* Instances view ---------------------------------------------------------- */
+/* Runtime view ------------------------------------------------------------ */
+
+/* The icon of a view, in the band carrying its name, its coverage and its controls. */
+.gw-band-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 2.75rem;
+	height: 2.75rem;
+	border-radius: 50%;
+	background: rgba(37, 99, 235, .1);
+	color: var(--gw-sidebar-active-bg);
+}
+
+/* The tint has to sit on a card the theme darkened, not on the white one it was mixed for. */
+[data-bs-theme="dark"] .gw-band-badge {
+	background: rgba(37, 99, 235, .2);
+}
 
 /*
- * The pool table of one instance is bounded and scrolls inside its own card. A contract
+ * The state of one instance, at the head of its row: the colour of the fullest bar on that
+ * row. It takes its colour from the same .bg-* classes as the bars themselves, so the two
+ * can never disagree, and every dot sits in one column — which is what makes the instance
+ * to open findable without reading the twenty.
+ */
+.gw-dot {
+	flex: 0 0 auto;
+	width: .55rem;
+	height: .55rem;
+	border-radius: 50%;
+}
+
+/*
+ * The fleet table would rather scroll than squeeze: below these floors the numbers start
+ * wrapping over two lines, and a figure read down its column across every instance is the
+ * whole point of the table. Floors rather than one width on the table itself, so it only
+ * ever asks for what its widest column actually needs.
+ */
+
+/*
+ * The headings stay on one line. Wrapped, "Process CPU" and "GC overhead" set the height
+ * of the whole header and leave the row ragged, for two columns that have the width.
+ */
+.gw-fleet thead th {
+	white-space: nowrap;
+}
+
+/* Room for the identifier, the fold and the address under them. */
+.gw-fleet .gw-col-instance {
+	min-width: 12rem;
+}
+
+/* A floor under every figure, so the bars stay comparable from one row to the next. */
+.gw-fleet .gw-col-figure {
+	min-width: 5rem;
+}
+
+/*
+ * The address of an instance, under its name. Cut with an ellipsis rather than wrapped
+ * (the full value is in the title attribute): behind a container platform it is a hostname
+ * nobody reads in full, and a wrapped one doubles the height of every row.
+ */
+.gw-instance-uri {
+	max-width: 14rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/*
+ * The pool table of one instance is bounded and scrolls inside its own row. A contract
  * turned into one route per operation puts a hundred pools on a single instance, and an
  * unbounded table would push the next instance a screen and a half down: the fleet is what
- * this view is read for, so no instance is allowed to cost more than a card.
+ * this view is read for, so no instance is allowed to cost more than a screenful.
  */
 .gw-pools {
 	max-height: 24rem;
@@ -405,21 +473,22 @@
 }
 
 /*
- * The header stays while the rows move under it. It carries the background of the card
- * rather than a transparent one, or the rows show through it as they scroll under, and it
- * keeps its labels on one line: a header that reflows while it is pinned is read twice.
+ * The header stays while the rows move under it. It carries the background of the row it
+ * is drawn in rather than a transparent one, or the pools show through it as they scroll
+ * under, and it keeps its labels on one line: a header that reflows while it is pinned is
+ * read twice.
  */
 .gw-pools thead th {
 	position: sticky;
 	top: 0;
 	z-index: 1;
-	background: var(--bs-card-bg, var(--bs-body-bg));
+	background: var(--bs-tertiary-bg);
 	white-space: nowrap;
 }
 
 /*
  * The fold is the only way into the pool table, so it has to read as a control rather than
- * as the caption it looks like at rest.
+ * as the plain name it looks like at rest.
  */
 .gw-pools-toggle:hover {
 	text-decoration: underline;

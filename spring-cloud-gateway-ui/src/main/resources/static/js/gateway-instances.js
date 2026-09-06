@@ -1,10 +1,17 @@
 /*
- * Instances view. One card per gateway instance: the JVM figures on top, the connection
- * pools towards the downstream services below, sorted by how full they are.
+ * Runtime view: one table, one row per gateway instance.
  *
- * The pools come first among equals on purpose. A pool filling up towards a slow backend
- * takes down every route pointing at that address while the JVM itself still looks
- * healthy, so it is the one thing here that no per-route figure can reveal.
+ * A table rather than a card each, and no summary above it, because behind a load balancer
+ * every instance carries traffic and the question is always comparative — which of them is
+ * closest to a ceiling. A figure aggregated over the fleet answers that for nobody: the
+ * highest heap and the highest processor reading rarely belong to the same instance, so a
+ * row of maxima describes an instance that does not exist. Down a column, the same figure
+ * on every instance is one glance, and it stays one glance at twenty of them.
+ *
+ * The pools of an instance are folded away behind its row. They come first among equals on
+ * purpose: a pool filling up towards a slow backend takes down every route pointing at that
+ * address while the JVM itself still looks healthy, so it is the one thing here that no
+ * per-route figure can reveal.
  *
  * Plain markup and CSS rather than a charting library: these are bars, and the view
  * already costs a poll.
@@ -16,6 +23,7 @@
 	}
 
 	var coverageEl = document.getElementById('gi-coverage');
+	var ageEl = document.getElementById('gi-age');
 	var emptyEl = document.getElementById('gi-empty');
 	var autoEl = document.getElementById('gi-auto');
 	var refreshEl = document.getElementById('gi-refresh');
@@ -36,8 +44,11 @@
 	var EXPANDED_KEY = 'gw-instances-expanded';
 	var expanded = readExpanded();
 
-	// The last payload rendered, redrawn on its own when a table is folded or unfolded.
+	// The last payload rendered, redrawn on its own when a row is folded or unfolded.
 	var snapshot = null;
+
+	// When the payload on screen was read, for the age shown in the band.
+	var readAt = null;
 
 	function readExpanded() {
 		try {
@@ -83,7 +94,7 @@
 
 	function bytes(value) {
 		if (missing(value)) {
-			return '&mdash;';
+			return '—';
 		}
 		var units = ['B', 'KB', 'MB', 'GB', 'TB'];
 		var index = 0;
@@ -97,27 +108,28 @@
 
 	function percent(ratio) {
 		if (ratio === null || ratio === undefined || isNaN(ratio)) {
-			return '&mdash;';
+			return '—';
 		}
 		return Math.round(ratio * 1000) / 10 + '%';
 	}
 
 	function count(value) {
-		return missing(value) ? '&mdash;' : Math.round(value);
+		return missing(value) ? '—' : Math.round(value);
 	}
 
-	function uptime(value) {
+	/** How long an instance has been running, for a column already headed "Up". */
+	function since(value) {
 		var total = Math.floor(value || 0);
 		var days = Math.floor(total / 86400);
 		var hours = Math.floor((total % 86400) / 3600);
 		var minutes = Math.floor((total % 3600) / 60);
 		if (days > 0) {
-			return 'up ' + days + 'd ' + hours + 'h';
+			return days + 'd ' + hours + 'h';
 		}
 		if (hours > 0) {
-			return 'up ' + hours + 'h ' + minutes + 'm';
+			return hours + 'h ' + minutes + 'm';
 		}
-		return 'up ' + minutes + 'm';
+		return minutes + 'm';
 	}
 
 	/** A ratio, or null when the ceiling is unknown and a share cannot be computed. */
@@ -144,32 +156,64 @@
 			+ '<div class="progress-bar ' + barClass(share) + '" style="width: ' + width + '%"></div></div>';
 	}
 
-	function figure(label, value, share) {
-		return '<div class="col-6 col-md-4 col-xl-2">'
-			+ '<div class="text-secondary small">' + label + '</div>'
-			+ '<div class="fw-semibold">' + value + '</div>'
-			+ (share === undefined ? '' : bar(share))
-			+ '</div>';
+	/* The shares of a ceiling ------------------------------------------------------- */
+
+	/*
+	 * Each of these answers "how close to its ceiling", or null when the instance does not
+	 * publish enough to say. Null rather than zero: a JVM that reports no file descriptor
+	 * figure has not got zero file descriptors open, and a bar drawn from a zero would
+	 * report a healthy instance.
+	 */
+
+	function heapShare(instance) {
+		return missing(instance.jvm.heapUsedBytes) ? null
+			: ratio(instance.jvm.heapUsedBytes, instance.jvm.heapMaxBytes);
 	}
 
-	function jvmFigures(instance) {
-		var jvm = instance.jvm;
-		var system = instance.system;
-		var heapShare = ratio(jvm.heapUsedBytes, jvm.heapMaxBytes);
-		var heap = missing(jvm.heapUsedBytes) ? '&mdash;'
-			: bytes(jvm.heapUsedBytes) + ' / ' + bytes(jvm.heapMaxBytes);
-		var files = missing(system.openFiles) ? '&mdash;'
-			: count(system.openFiles) + ' / ' + count(system.maxFiles);
-		return '<div class="row g-3">'
-			+ figure('Heap', heap, heapShare)
-			+ figure('Process CPU', percent(system.processCpuUsage), system.processCpuUsage)
-			+ figure('Threads', count(jvm.threadsLive) + ' <span class="text-secondary fw-normal small">peak '
-				+ count(jvm.threadsPeak) + '</span>')
-			+ figure('GC overhead', percent(jvm.gcOverhead), jvm.gcOverhead)
-			+ figure('Non-heap', bytes(jvm.nonHeapUsedBytes))
-			+ figure('Open files', files, ratio(system.openFiles, system.maxFiles))
-			+ '</div>';
+	function cpuShare(instance) {
+		return missing(instance.system.processCpuUsage) ? null : instance.system.processCpuUsage;
 	}
+
+	function gcShare(instance) {
+		return missing(instance.jvm.gcOverhead) ? null : instance.jvm.gcOverhead;
+	}
+
+	function filesShare(instance) {
+		return missing(instance.system.openFiles) ? null
+			: ratio(instance.system.openFiles, instance.system.maxFiles);
+	}
+
+	function poolShare(instance) {
+		var highest = null;
+		(instance.pools || []).forEach(function (pool) {
+			var share = ratio(pool.active, pool.max);
+			if (share !== null && (highest === null || share > highest)) {
+				highest = share;
+			}
+		});
+		return highest;
+	}
+
+	/**
+	 * The figure of an instance closest to its ceiling, named, or null when the instance
+	 * publishes no ceiling at all. It is what the dot at the head of a row is drawn from,
+	 * so the dot is always the colour of the fullest bar on that row.
+	 */
+	function fullest(instance) {
+		var found = null;
+		[{ name: 'heap', share: heapShare(instance) },
+			{ name: 'processor', share: cpuShare(instance) },
+			{ name: 'GC overhead', share: gcShare(instance) },
+			{ name: 'open files', share: filesShare(instance) },
+			{ name: 'pool saturation', share: poolShare(instance) }].forEach(function (entry) {
+				if (entry.share !== null && (!found || entry.share > found.share)) {
+					found = entry;
+				}
+			});
+		return found;
+	}
+
+	/* The pools of one instance ----------------------------------------------------- */
 
 	// How many route ids a cell spells out before counting the rest. A contract turned
 	// into one route per operation puts twenty of them on a single address, and the
@@ -184,7 +228,7 @@
 	function routeCell(address) {
 		var routes = routesByAddress[address] || [];
 		if (!routes.length) {
-			return '&mdash;';
+			return '—';
 		}
 		var shown = routes.slice(0, ROUTES_SHOWN).map(escape).join(', ');
 		return (routes.length > ROUTES_SHOWN)
@@ -222,15 +266,7 @@
 		var pools = instance.pools.slice().sort(function (left, right) {
 			return (ratio(right.active, right.max) || 0) - (ratio(left.active, left.max) || 0);
 		});
-		// The count is stated on the fold: folded away, it is all that is left of the table,
-		// and a reader has to know whether what is behind it is three rows or a hundred.
-		var folded = !isExpanded(instance.instanceId);
-		return '<button type="button" class="btn btn-link btn-sm p-0 mb-2 text-secondary small'
-			+ ' text-decoration-none gw-pools-toggle" data-gi-toggle="' + escape(instance.instanceId) + '"'
-			+ ' aria-expanded="' + !folded + '">' + (folded ? '&#9656;' : '&#9662;') + ' '
-			+ pools.length + (pools.length === 1 ? ' pool' : ' pools') + ', fullest first.</button>'
-			+ '<div class="table-responsive gw-pools"' + (folded ? ' style="display: none"' : '') + '>'
-			+ '<table class="table table-sm align-middle mb-0">'
+		return '<div class="gw-pools"><table class="table table-sm align-middle mb-0">'
 			+ '<thead><tr class="text-secondary small">'
 			+ '<th>Route</th><th>Pool</th><th>Saturation</th><th class="text-end">Active / max</th>'
 			+ '<th class="text-end">Idle</th><th class="text-end">Pending</th><th class="text-end">Avg wait</th>'
@@ -239,41 +275,157 @@
 			+ '</tbody></table></div>';
 	}
 
-	function eventLoopLine(instance) {
-		if (!instance.instrumentation || !instance.instrumentation.httpClient) {
-			return '<p class="text-secondary small mb-0 mt-3">Event loop counters are off. Set <code>'
-				+ CLIENT_PROPERTY + '=true</code> to collect them.</p>';
+	/**
+	 * Said under the pools rather than in the loop queue column, which has room for a
+	 * figure and not for the property that would produce one.
+	 */
+	function eventLoopNote(instance) {
+		if (instance.instrumentation && instance.instrumentation.httpClient) {
+			return '';
 		}
-		var netty = instance.netty;
-		return '<p class="text-secondary small mb-0 mt-3">Event loop &mdash; ' + count(netty.eventLoopPendingTasks)
-			+ ' pending task(s) across ' + count(netty.eventLoops) + ' loop(s).</p>';
+		return '<p class="text-secondary small mb-0 mt-3">Event loop counters are off. Set <code>'
+			+ CLIENT_PROPERTY + '=true</code> to collect them.</p>';
 	}
 
-	function card(instance) {
-		var target = instance.uri ? '<span class="text-secondary small">' + escape(instance.uri) + '</span>' : '';
-		return '<div class="card border-0 shadow-sm mb-3"><div class="card-body">'
-			+ '<div class="d-flex flex-wrap gap-2 align-items-baseline justify-content-between mb-3">'
-			+ '<h2 class="h6 fw-semibold mb-0">' + escape(instance.instanceId) + ' ' + target + '</h2>'
-			+ '<span class="text-secondary small">' + uptime(instance.uptimeSeconds) + '</span>'
-			+ '</div>'
-			+ jvmFigures(instance)
-			+ '<hr class="my-3">'
-			+ poolSection(instance)
-			+ eventLoopLine(instance)
-			+ '</div></div>';
+	/* The fleet table --------------------------------------------------------------- */
+
+	// The columns an unfolded row has to span.
+	var COLUMNS = 9;
+
+	/** One figure of a row: the reading, over the bar of its share when there is one. */
+	function cell(value, share) {
+		return '<td class="gw-col-figure"><div class="fw-semibold text-nowrap">' + value + '</div>'
+			+ (share === undefined ? '' : bar(share)) + '</td>';
 	}
+
+	function instanceCell(instance, open) {
+		var worst = fullest(instance);
+		var title = worst ? worst.name + ' at ' + percent(worst.share) + ' of its ceiling'
+			: 'no ceiling reported';
+		var uri = instance.uri ? '<div class="text-secondary small gw-instance-uri" title="'
+			+ escape(instance.uri) + '">' + escape(instance.uri) + '</div>' : '';
+		return '<td class="gw-col-instance">'
+			+ '<div class="d-flex align-items-center gap-2">'
+			+ '<span class="gw-dot ' + barClass(worst ? worst.share : null) + '" title="'
+			+ escape(title) + '"></span>'
+			+ '<button type="button" class="btn btn-link btn-sm p-0 fw-semibold text-body'
+			+ ' text-decoration-none gw-pools-toggle" data-gi-toggle="' + escape(instance.instanceId) + '"'
+			+ ' aria-expanded="' + open + '">' + (open ? '&#9662;' : '&#9656;') + ' '
+			+ escape(instance.instanceId) + '</button>'
+			+ '</div>' + uri + '</td>';
+	}
+
+	/**
+	 * The pool count of an instance, over the saturation of its fullest pool: the column
+	 * says both how many downstream addresses this instance talks to and how close the
+	 * busiest of them is to running out of connections.
+	 */
+	function poolsCell(instance) {
+		if (!instance.instrumentation || !instance.instrumentation.connectionPool) {
+			return cell('—');
+		}
+		var pools = instance.pools || [];
+		return pools.length ? cell(String(pools.length), poolShare(instance)) : cell('0');
+	}
+
+	function queueCell(instance) {
+		if (!instance.instrumentation || !instance.instrumentation.httpClient) {
+			return cell('—');
+		}
+		return cell(count(instance.netty.eventLoopPendingTasks)
+			+ ' <span class="text-secondary fw-normal small">' + count(instance.netty.eventLoops)
+			+ ' loop(s)</span>');
+	}
+
+	function row(instance) {
+		var open = isExpanded(instance.instanceId);
+		var jvm = instance.jvm;
+		var system = instance.system;
+		var heap = missing(jvm.heapUsedBytes) ? '—'
+			: bytes(jvm.heapUsedBytes) + ' / ' + bytes(jvm.heapMaxBytes);
+		// The ceiling is seven digits on Linux and read by nobody: the bar carries the
+		// share and the cell keeps the count. Both are in the tooltip.
+		var files = missing(system.openFiles) ? '—'
+			: '<span title="' + count(system.openFiles) + ' of ' + count(system.maxFiles)
+				+ ' file descriptor(s)">' + count(system.openFiles) + '</span>';
+		return '<tr>'
+			+ instanceCell(instance, open)
+			+ cell(since(instance.uptimeSeconds))
+			+ cell(heap, heapShare(instance))
+			+ cell(percent(system.processCpuUsage), cpuShare(instance))
+			+ cell(count(jvm.threadsLive) + ' <span class="text-secondary fw-normal small">peak '
+				+ count(jvm.threadsPeak) + '</span>')
+			+ cell(percent(jvm.gcOverhead), gcShare(instance))
+			+ cell(files, filesShare(instance))
+			+ poolsCell(instance)
+			+ queueCell(instance)
+			+ '</tr>'
+			+ (open ? detailRow(instance) : '');
+	}
+
+	function detailRow(instance) {
+		return '<tr><td colspan="' + COLUMNS + '" class="bg-body-tertiary">'
+			+ poolSection(instance) + eventLoopNote(instance) + '</td></tr>';
+	}
+
+	function table(instances) {
+		return '<div class="card border-0 shadow-sm"><div class="card-body">'
+			+ '<div class="table-responsive"><table class="table table-sm align-middle mb-0 gw-fleet">'
+			// Abbreviated, with the full name in the tooltip: spelled out, four of these
+			// headings are wider than the figures under them, and the table stops fitting
+			// the page — which is the one thing it is here to do.
+			+ '<thead><tr class="text-secondary small">'
+			+ '<th>Instance</th><th>Up</th><th>Heap</th>'
+			+ '<th title="Processor used by this JVM">CPU</th><th>Threads</th>'
+			+ '<th title="Share of uptime spent collecting">GC</th>'
+			+ '<th title="Open file descriptors">Files</th>'
+			+ '<th title="Connection pools, over the saturation of the busiest">Pools</th>'
+			+ '<th title="Tasks queued across the event loops">Queue</th>'
+			+ '</tr></thead><tbody>'
+			+ instances.map(row).join('')
+			+ '</tbody></table></div></div></div>';
+	}
+
+	/* Rendering and polling --------------------------------------------------------- */
 
 	function render(payload) {
 		snapshot = payload;
 		coverageEl.textContent = payload.coverage || '';
 		routesByAddress = payload.routesByAddress || {};
-		var instances = payload.instances || [];
+		// A stable order, by name. The table is replaced wholesale on every refresh, and a
+		// source free to answer in any order would otherwise shuffle the rows under a
+		// reader every five seconds.
+		var instances = (payload.instances || []).slice().sort(function (left, right) {
+			return String(left.instanceId).localeCompare(String(right.instanceId));
+		});
 		emptyEl.style.display = instances.length ? 'none' : '';
-		container.innerHTML = instances.map(card).join('');
+		container.innerHTML = instances.length ? table(instances) : '';
 	}
 
 	/*
-	 * Folding is bound to the container rather than to the buttons: the cards are replaced
+	 * How old the figures on screen are. It ticks on its own rather than being written on
+	 * each refresh: what it is there to reveal is a poll that stopped answering, and a
+	 * label only written by a successful load would then stay reassuringly at "just now".
+	 */
+	function renderAge() {
+		if (readAt === null) {
+			ageEl.textContent = '';
+			return;
+		}
+		var seconds = Math.round((Date.now() - readAt) / 1000);
+		if (seconds < 5) {
+			ageEl.textContent = 'just now';
+			return;
+		}
+		if (seconds < 90) {
+			ageEl.textContent = seconds + 's ago';
+			return;
+		}
+		ageEl.textContent = Math.round(seconds / 60) + 'm ago';
+	}
+
+	/*
+	 * Folding is bound to the container rather than to the buttons: the table is replaced
 	 * wholesale on every refresh, and a listener put on a button would go with it.
 	 */
 	container.addEventListener('click', function (event) {
@@ -300,8 +452,14 @@
 			.then(function (response) {
 				return response.ok ? response.json() : Promise.reject(response.status);
 			})
-			.then(render)
+			.then(function (payload) {
+				render(payload);
+				readAt = Date.now();
+				renderAge();
+			})
 			.catch(function () {
+				// The age is left where it was: a failed poll makes the figures on screen
+				// older, it does not make them younger.
 				coverageEl.textContent = 'Could not read the instance figures.';
 			});
 	}
@@ -327,4 +485,5 @@
 	}
 	load();
 	schedule();
+	setInterval(renderAge, 1000);
 })();

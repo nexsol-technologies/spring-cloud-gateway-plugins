@@ -20,8 +20,8 @@ curl http://localhost:8206/errors/status/404
 ## What to look at
 
 http://localhost:8206/ui/metrics answers *which route carries the load*.
-http://localhost:8206/ui/metrics/instances answers *which instance is in trouble*: heap,
-processor, threads, and the connection pools towards the downstream services.
+http://localhost:8206/ui/metrics/instances, the runtime view, answers *which instance is in
+trouble*: heap, processor, threads, and the connection pools towards the downstream services.
 
 This sample turns both instrumentation switches on, which is what makes the pool and event loop
 sections appear at all:

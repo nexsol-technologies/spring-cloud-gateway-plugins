@@ -45,15 +45,20 @@ const VIEWS = [
 	{ name: 'route-tester', path: '/ui/routes/test' },
 	{ name: 'traffic', path: '/ui/metrics' },
 	/*
-	 * The pool table of an instance is folded away until a reader asks for it, and it is
-	 * what this view is documented for: every fold is opened before the shot.
+	 * The runtime view is shot twice, because its two states cannot be in one frame: an
+	 * unfolded row pushes the instances below it a screenful down, and the fleet table is
+	 * then no longer a table anyone can read across.
 	 *
-	 * One at a time, re-reading the page after each: opening a fold redraws every card, so
-	 * a list collected up front holds buttons that are no longer in the document, and a
+	 * Light keeps every row closed, which is the fleet the README describes. Dark opens
+	 * them, for the pool table this view exists for.
+	 *
+	 * One fold at a time, re-reading the page after each: opening one redraws every card,
+	 * so a list collected up front holds buttons that are no longer in the document, and a
 	 * detached button reaches none of the listeners the view binds on their container. The
 	 * bound is there to end the loop should a click ever stop opening anything.
 	 */
-	{ name: 'instances', path: '/ui/metrics/instances',
+	{ name: 'instances', path: '/ui/metrics/instances', themes: ['light'] },
+	{ name: 'instances', path: '/ui/metrics/instances', themes: ['dark'],
 		prepare: 'for (var i = 0; i < 100; i++) { var fold = document.querySelector("[data-gi-toggle][aria-expanded=false]"); if (!fold) { break; } fold.click(); }' },
 	{ name: 'service-graph', path: '/ui/service-graph' },
 	{ name: 'audit', path: '/ui/audit' },
@@ -100,9 +105,12 @@ for (const argument of process.argv.slice(2)) {
 const themes = options.themes.split(',').filter(Boolean);
 const wanted = options.views.split(',').filter(Boolean);
 const views = wanted.length ? VIEWS.filter((view) => wanted.includes(view.name)) : VIEWS;
-if (wanted.length && views.length !== wanted.length) {
-	const missing = wanted.filter((name) => !VIEWS.some((view) => view.name === name));
-	console.error(`Unknown view(s): ${missing.join(', ')}. Known: ${VIEWS.map((view) => view.name).join(', ')}`);
+// A name, not a count: a view shot in more than one state is more than one entry under
+// the same name, and comparing the two lengths would reject every run naming it.
+const missing = wanted.filter((name) => !VIEWS.some((view) => view.name === name));
+if (missing.length) {
+	const known = [...new Set(VIEWS.map((view) => view.name))];
+	console.error(`Unknown view(s): ${missing.join(', ')}. Known: ${known.join(', ')}`);
 	process.exit(2);
 }
 

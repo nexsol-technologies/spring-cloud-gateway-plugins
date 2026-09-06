@@ -376,13 +376,13 @@ public class GatewayUiAutoConfiguration {
 			}
 
 			/**
-			 * Contributes the instances entry to the side menu, right after the traffic
+			 * Contributes the runtime entry to the side menu, right after the traffic
 			 * one: the same figures seen per instance rather than per route.
-			 * @return the instances menu entry
+			 * @return the runtime menu entry
 			 */
 			@Bean
 			NavItem instancesNavItem() {
-				return new NavItem("instances", "Instances", "icon-server", "/ui/metrics/instances", 21);
+				return new NavItem("instances", "Runtime", "icon-server", "/ui/metrics/instances", 21);
 			}
 
 			/**
