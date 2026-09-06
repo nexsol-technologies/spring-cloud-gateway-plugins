@@ -133,8 +133,12 @@
 			},
 			series: [{
 				type: 'graph',
-				// Scroll to zoom, drag to pan. Nodes stay draggable either way.
-				roam: true,
+				// Drag to pan, ctrl and the wheel to zoom; nodes stay draggable either way.
+				// 'move' rather than true is what leaves the wheel to the page: a roam that
+				// zooms registers a wheel handler consuming every notch it is given, and a
+				// picture this tall would then trap the scroll of the page it sits in. The
+				// zoom is dispatched below instead.
+				roam: 'move',
 				draggable: true,
 				layout: frozen() && hasPositions(drawn) ? 'none' : 'force',
 				force: { repulsion: 320, edgeLength: [90, 220], gravity: 0.08 },
@@ -174,7 +178,8 @@
 		}, true);
 		sel('gg-legend').textContent = drawn.length + ' node' + (drawn.length > 1 ? 's' : '') + ', '
 			+ shown.length + ' edge' + (shown.length > 1 ? 's' : '')
-			+ ' — node size and arrow width are the number of calls, red is the share that failed.';
+			+ ' — node size and arrow width are the number of calls, red is the share that failed'
+			+ ' · ctrl + scroll to zoom, drag to pan.';
 	}
 
 	function hasPositions(drawn) {
@@ -335,6 +340,21 @@
 			renderTable();
 		});
 	});
+	// Ctrl + wheel zooms the picture; a wheel alone is left to the page it sits in. Ctrl is
+	// also what a browser zooms its own page with, hence the preventDefault.
+	chartEl.addEventListener('wheel', function (event) {
+		if (!event.ctrlKey) {
+			return;
+		}
+		event.preventDefault();
+		var box = chartEl.getBoundingClientRect();
+		chart.dispatchAction({
+			type: 'graphRoam', seriesIndex: 0,
+			zoom: event.deltaY < 0 ? 1.25 : 1 / 1.25,
+			originX: event.clientX - box.left,
+			originY: event.clientY - box.top
+		});
+	}, { passive: false });
 	window.addEventListener('resize', function () {
 		chart.resize();
 	});
