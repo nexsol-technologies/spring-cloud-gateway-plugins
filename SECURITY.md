@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Fixes go to the line marked Current in [Compatibility](README.md#compatibility) — `1.14.x`
+Fixes go to the line marked Current in [Compatibility](README.md#compatibility) — `1.16.x`
 today. When a new line opens, the one it replaces stays supported for six months, then goes to
 end of life.
 
