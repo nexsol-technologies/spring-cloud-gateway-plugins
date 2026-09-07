@@ -36,6 +36,7 @@ what the application actually runs.
 | [Runtime](#runtime) | `/ui/metrics/instances` | Micrometer is present and `...metrics.instance.enabled` is not `false` |
 | [Service graph](#service-graph) | `/ui/service-graph` | `spring-cloud-gateway-service-graph-core` is present |
 | [Flow](#flow) | `/ui/service-graph/flow` | `spring-cloud-gateway-service-graph-core` is present |
+| [Configuration, and five others](#introspection) | `/ui/insights/*` | Actuator is on the classpath |
 | [OpenAPI](#openapi) | `/ui/openapi` | `spring-cloud-gateway-hub-openapi` is present and enabled |
 | [Audit](#audit) | `/ui/audit` | `spring-cloud-gateway-audit-core` is present and `...audit.enabled` is not `false` |
 
@@ -334,8 +335,8 @@ route, read through the
 An arrow goes from the caller to what it reached: it thickens with the number of calls and
 reddens with the share answered with a 5xx. A node is sized by the calls it took part in and
 coloured by how they came back — green when every one was answered, amber once some came back
-4xx, red on a 5xx — the same three colours the flow view draws with. What a node stands for, a
-caller or a service, is left to its label and its tooltip.
+4xx, red on a 5xx. What a node stands for, a caller or a service, is in its label and its
+tooltip.
 **Ctrl + scroll** zooms, drag pans, a node is dragged to move it; a wheel without ctrl is left
 to the page, which is what keeps a picture this tall from trapping the scroll.
 
@@ -373,49 +374,96 @@ middle, the services it reached on the right.
 
 ![The flow view](doc/service-flow-light.png)
 
-**A dot travels a hop when calls arrive on it**, coloured by how *those* calls came back
-rather than by what the hop has seen since it started: a hop that failed an hour ago and is
-answering now sends green. It is the traffic since the last poll, not a replay of one request,
-and it is capped at three dots however big the burst was. A quiet hop stays still, which is the
-point — the picture only moves when the gateway is carrying something.
+**A dot travels a hop when calls arrive on it**, coloured by how those calls came back. It is
+the traffic since the last poll, capped at three dots however large. A hop that carried nothing
+stays still.
 
-**A hop carries two colours, and they answer different questions.** Its *line* is how its last
-calls came back: amber or red when they came back 4xx or 5xx, and green again as soon as a batch
-comes back clean. The *dot resting at its end* is everything the hop has carried since the
-gateway started — it only ever gets worse, so a hop that has misbehaved stays recognisable once
-its line has gone green again.
+**A hop carries two colours.** Its *line* is how its last calls came back: amber or red on a 4xx
+or a 5xx, green again as soon as a batch comes back clean. The *dot resting at its end* is
+everything the hop has carried since the gateway started, and only ever gets worse — the figures
+behind it are Micrometer counters, which never go down. The dot rests at the endpoint end; every
+hop meets the gateway at the same point.
 
-Both are needed because the figures behind them are Micrometer counters, which never go down: a
-colour taken from the totals alone turns amber on the first 4xx and stays amber for the life of
-the process, and after an hour every line says the same thing. The line is the state, the dot is
-the memory.
+**Auto** polls every three seconds and can be turned off; the age beside it says how old the
+figures are. Under `prefers-reduced-motion`, the resting dots are drawn and nothing travels.
 
-The resting dot sits at the endpoint end rather than at the gateway end, where every hop meets
-at the same point and the dots would be one dot with the rest underneath it.
-
-**This is the one view of the console that polls a picture.** The graph view refuses to, and
-should: what moved under its reader was the force layout, not the refresh. Here the layout is
-three columns computed from the data, so a redraw puts every box back exactly where it was.
-*Auto* polls every three seconds and can be turned off; the age next to it says how old the
-figures on screen are, so a flow left open on a dead poll does not look live. A reader who has
-asked for no motion — `prefers-reduced-motion` — gets the resting dots and no travel.
-
-**The gateway is a node here, and only here.** The graph view leaves it out on purpose: it sits
-on every edge, which is what lets it count them. Drawn in the middle, it is what makes this a
-flow rather than a second graph, and it is where the totals of the whole picture read.
+**The gateway is a node here**, and carries the totals of the picture. The [graph](#service-graph)
+leaves it out: it sits on every edge, which is what lets it count them.
 
 **An endpoint that both calls and is called appears on both sides** — once as what it reached,
-once as what reached through the gateway. The graph view merges the two into one node so a
-service's traffic is not split in half; here they are the two ends of a flow, which is what the
-two columns are for.
+once as what reached through the gateway. The graph view merges the two into one node.
+
+**Show** keeps the busiest endpoints of each column and says in the legend how many quieter ones
+were left out; the cut is by calls. *Everything* puts them back.
 
 **Keep only** narrows on either endpoint, and the **4xx** and **5xx** switches behave as they do
-on the graph view. **Show** keeps the busiest endpoints of each column and says in the legend how
-many quieter ones were left out: a gateway fronting a hundred services would otherwise stack a
-hundred boxes down the page, which is no more readable than no picture at all. The cut is by
-calls, so what goes is always the quiet end of the column, and *Everything* puts it back.
+on the graph view.
 
 Both views are fed by the same `GET /ui/service-graph/data` and state the same coverage.
+
+## Introspection
+
+Six views over what this gateway is *made of*, folded under **Configuration** in the menu.
+Each one is an Actuator endpoint, read and drawn as a table:
+
+| View | Path | Endpoint | Shows |
+| --- | --- | --- | --- |
+| Configuration | `/ui/insights/configuration` | `configprops` | The properties the gateway bound, as a folding group per prefix |
+| Profile Diff | `/ui/insights/profile-diff` | `env` | Which source a value came from, and how many others declared it |
+| Loggers | `/ui/insights/loggers` | `loggers` | Every logger and the level it records at |
+| Beans | `/ui/insights/beans` | `beans` | Every bean, its type and what it was wired from |
+| Conditions | `/ui/insights/conditions` | `conditions` | Why each auto-configuration was applied, or was not — narrowable to either outcome |
+| Mappings | `/ui/insights/mappings` | `mappings` | The routes and handlers the gateway answers on |
+
+![The configuration view](doc/insights-configuration-light.png)
+![The loggers view](doc/insights-loggers-light.png)
+
+The views read the Actuator endpoints over HTTP, so they show what Actuator serves and no
+more. A masked value arrives masked: `configprops` and `env` answer `******` until
+`management.endpoint.configprops.show-values` and `management.endpoint.env.show-values` say
+otherwise. An endpoint that is not exposed is reported as unreadable, with the property that
+exposes it.
+
+**Keep only** narrows on the names each view lists, and on the message for **Conditions**.
+**Conditions** also narrows on the outcome: matched, not matched, or both.
+
+**The instance selector** appears once more than one instance is known, and lists what the
+[runtime](#runtime) view lists — whichever provider the metrics plugin resolved. A view names an
+instance by id; an id that is not in that list reads this instance instead.
+
+## Setting a logging level
+
+**Loggers** is the only view that writes. Each row carries the six levels as buttons, the one in
+force pressed, and a last one restoring the level the application declared.
+
+That last one re-posts the level the console first read on that instance, and clears the logger
+only when it had none. Posting no level to Actuator drops a logger to what its parent says, so a
+logger declared `debug` would come back `info`. The button names which of the two it does, and is
+disabled on a logger already at its declared level. What the console remembers is what its first
+read saw, and it is lost when the console restarts.
+
+The write asks for an authenticated principal holding `ADMIN`, configurable through
+`loggers-role`; `loggers-writable: false` closes it for everyone. An anonymous caller is refused
+whatever role it carries. The buttons are drawn only for a principal allowed to use them, and
+the write is checked again when it arrives.
+
+Unless one instance is picked, the level is set on **every instance** the selector lists, and the
+table reports what they agree on — a logger they disagree on reads `mixed` and no level is
+pressed. An instance that cannot be reached is skipped; the others are still set.
+
+Setting a level re-reads the table, since it changes the effective level of every logger under
+the one that was set. The page keeps its place.
+
+All properties are under `spring.cloud.gateway.server.webflux.ui.insights`.
+
+| Property | Default | What it does |
+| --- | --- | --- |
+| `...insights.enabled` | `true` | Master switch for the six views |
+| `...insights.base-path` | `/actuator` | Where the endpoints are exposed |
+| `...insights.timeout` | `5s` | How long an endpoint is given to answer |
+| `...insights.loggers-writable` | `true` | Master switch over the write; `false` closes it for everyone |
+| `...insights.loggers-role` | `ADMIN` | The role a principal must hold to change a level, without its `ROLE_` prefix. Empty, any authenticated principal may |
+| `...insights.max-payload` | `8MB` | Payload ceiling — the condition and bean reports of a full gateway run past a megabyte, where the web client stops at 256 KB |
 
 ## OpenAPI
 
@@ -824,17 +872,16 @@ NavItem quotaNavItem() {
 }
 ```
 
-The five-argument form is the same entry with no group, and still compiles and links against
-this class unchanged. The console ships two groups:
+The five-argument form is the same entry with no group. The console ships two groups:
 
 | Group | Holds | What it gathers |
 | --- | --- | --- |
 | **Routing** | [Routes](#routes), [Database routes](#database-routes-view), [Route tester](#route-tester) | What the gateway is configured to do |
 | **Activity** | [Flow](#flow), [Traffic](#traffic), [Service graph](#service-graph), [Audit](#audit) | What it has carried, and what it kept of it |
+| **Configuration** | [The six introspection views](#introspection) | What it is made of |
 
-A group folds, remembers whether it was folded, and is always rendered open when the page being
-read is one of its own — a fold never hides the page under the reader. Collapsed, the menu drops
-the headings and shows the icons on their own.
+A group folds and remembers whether it was folded, and is rendered open when the page being read
+is one of its own. Collapsed, the menu drops the headings and shows the icons on their own.
 
 **A page inside the shell** — target the layout fragment and supply a content and a scripts
 slot. The sidebar is populated automatically by `GatewayUiModelAttributes`; the controller only
@@ -869,3 +916,14 @@ from a CDN at runtime.
 | [htmx](https://htmx.org/) | 2.0.10 | `js/htmx.min.js` |
 | [Apache ECharts](https://echarts.apache.org/) | 6.1.0 | `js/echarts.min.js` |
 | [Scalar API Reference](https://github.com/scalar/scalar) | 1.66.1 | `js/scalar.standalone.js` |
+
+## Credits
+
+The second version of this console takes its visual language from
+[BootUI](https://github.com/jdubois/boot-ui), by Julien Dubois: the palette and its light and
+dark tokens, the folding menu sections, the flow of callers through the application, and the
+introspection views gathered under **Configuration**.
+
+BootUI is a development-time console for any Spring Boot application. This one is the console of
+a gateway, and adds what a gateway carries: its routes, the traffic through them, and who called
+what. Both can run in the same application.

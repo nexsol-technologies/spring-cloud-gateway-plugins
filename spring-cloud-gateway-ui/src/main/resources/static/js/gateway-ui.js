@@ -104,6 +104,61 @@ window.gatewayUi = (function () {
 })();
 
 /*
+ * The progress bar of a navigation.
+ *
+ * Every view of this console is a page load, so between the click and the new page nothing
+ * on screen moves and the click reads as ignored. The bar goes up the moment a navigation
+ * starts and comes down when the next page paints — including on a page restored from the
+ * back-forward cache, which paints without loading anything and would otherwise keep the
+ * bar of the navigation that left it.
+ */
+(function () {
+	var bar = document.getElementById('gw-progress');
+	if (!bar) {
+		return;
+	}
+
+	function start(link) {
+		bar.hidden = false;
+		if (link && link.classList.contains('gw-nav-link')) {
+			link.classList.add('gw-nav-link-busy');
+		}
+	}
+
+	function stop() {
+		bar.hidden = true;
+		Array.prototype.forEach.call(document.querySelectorAll('.gw-nav-link-busy'), function (link) {
+			link.classList.remove('gw-nav-link-busy');
+		});
+	}
+
+	document.addEventListener('click', function (event) {
+		// A modified click opens elsewhere, and this page is not going anywhere.
+		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey
+				|| event.shiftKey || event.altKey) {
+			return;
+		}
+		var link = event.target.closest ? event.target.closest('a[href]') : null;
+		var href = link && link.getAttribute('href');
+		if (!href || href.charAt(0) === '#' || link.target === '_blank' || link.hasAttribute('download')
+				|| link.href.indexOf(window.location.origin) !== 0) {
+			return;
+		}
+		start(link);
+	});
+
+	// A form that navigates: signing out, and the login form of the console.
+	document.addEventListener('submit', function (event) {
+		if (!event.defaultPrevented) {
+			start(null);
+		}
+	});
+
+	window.addEventListener('pageshow', stop);
+	window.addEventListener('pagehide', stop);
+})();
+
+/*
  * Folding menu sections. The state is remembered per section, and the shell renders a
  * section open when the page being read is one of its own — so the fold is only ever
  * restored over a section the reader is not currently inside.

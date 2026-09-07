@@ -62,6 +62,13 @@ const VIEWS = [
 		prepare: 'for (var i = 0; i < 100; i++) { var fold = document.querySelector("[data-gi-toggle][aria-expanded=false]"); if (!fold) { break; } fold.click(); }' },
 	{ name: 'service-graph', path: '/ui/service-graph' },
 	{ name: 'service-flow', path: '/ui/service-graph/flow' },
+	{ name: 'insights-configuration', path: '/ui/insights/configuration', themes: ['light'] },
+	{ name: 'insights-profile-diff', path: '/ui/insights/profile-diff', themes: ['light'] },
+	{ name: 'insights-loggers', path: '/ui/insights/loggers', themes: ['light'] },
+	{ name: 'insights-beans', path: '/ui/insights/beans', themes: ['light'] },
+	{ name: 'insights-conditions', path: '/ui/insights/conditions', themes: ['light'] },
+	{ name: 'insights-mappings', path: '/ui/insights/mappings', themes: ['light'] },
+
 	{ name: 'audit', path: '/ui/audit' },
 	{ name: 'openapi', path: '/ui/openapi' },
 	// Shown to a signed-in visitor holding none of the required roles. It renders for any

@@ -34,10 +34,16 @@ import org.springframework.context.annotation.FilterType;
  * holds is contributed by the auto-configuration, and only under the mode that asks for
  * it. Scanning it here would give every test a login page the console was not configured
  * to serve.
+ * <p>
+ * The insights package is excluded for the same reason, and one more: its controller is
+ * declared under a condition on Actuator being present, which a component scan does not
+ * evaluate. Scanned, it would be built in every test and ask for the client its own
+ * configuration was never applied to create.
  */
 @SpringBootConfiguration
 @ComponentScan(excludeFilters = { @ComponentScan.Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
-		@ComponentScan.Filter(type = FilterType.REGEX, pattern = "ch\\.nexsol\\.gateway\\.ui\\.security\\..*") })
+		@ComponentScan.Filter(type = FilterType.REGEX,
+				pattern = "ch\\.nexsol\\.gateway\\.ui\\.(security|insights)\\..*") })
 @EnableAutoConfiguration
 public class SpringAppConfiguration {
 
