@@ -49,7 +49,7 @@ class InstanceMetricsControllerTests {
 			.value((body) -> assertThat(body).contains("gw-sidebar")
 				.contains("id=\"gi-instances\"")
 				.contains("id=\"gi-coverage\"")
-				.contains(">Runtime</span>"));
+				.contains(">Metrics</span>"));
 	}
 
 	@Test

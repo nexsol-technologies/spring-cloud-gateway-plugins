@@ -33,11 +33,11 @@ what the application actually runs.
 | [Database routes](#database-routes-view) | `/ui/routes/db` | `spring-cloud-gateway-routes-database` is present |
 | [Route tester](#route-tester) | `/ui/routes/test` | the gateway route table type is present |
 | [Traffic](#traffic) | `/ui/metrics` | Micrometer is present |
-| [Runtime](#runtime) | `/ui/metrics/instances` | Micrometer is present and `...metrics.instance.enabled` is not `false` |
+| [Runtime](#runtime) — *Metrics* in the menu | `/ui/metrics/instances` | Micrometer is present and `...metrics.instance.enabled` is not `false` |
 | [Service graph](#service-graph) | `/ui/service-graph` | `spring-cloud-gateway-service-graph-core` is present |
 | [Flow](#flow) | `/ui/service-graph/flow` | `spring-cloud-gateway-service-graph-core` is present |
 | [Configuration, and five others](#introspection) | `/ui/insights/*` | Actuator is on the classpath |
-| [OpenAPI](#openapi) | `/ui/openapi` | `spring-cloud-gateway-hub-openapi` is present and enabled |
+| [OpenAPI](#openapi) — *Hub* in the menu | `/ui/openapi` | `spring-cloud-gateway-hub-openapi` is present and enabled |
 | [Audit](#audit) | `/ui/audit` | `spring-cloud-gateway-audit-core` is present and `...audit.enabled` is not `false` |
 
 ## Configuration
@@ -857,7 +857,7 @@ Icons reference the SVG sprite declared in `templates/dashboard/fragments/layout
 (`icon-home`, `icon-plugin`, `icon-route`, `icon-target`, `icon-chart`, `icon-book`,
 `icon-list`, `icon-graph`, `icon-flow`, `icon-server`). The built-in entries are ordered
 `home` (0), `Routes` (5), `Database routes` (10), `Route tester` (15), `Flow` (19), `Traffic`
-(20), `Runtime` (21), `Service graph` (22), `OpenAPI` (25) and `Audit` (30), leaving room for
+(20), `Metrics` (21), `Service graph` (22), `Hub` (25) and `Audit` (30), leaving room for
 your own in between. A group sits where its first entry would have sat, so `Routing` opens at 5
 and `Activity` at 19.
 
@@ -878,6 +878,8 @@ The five-argument form is the same entry with no group. The console ships two gr
 | --- | --- | --- |
 | **Routing** | [Routes](#routes), [Database routes](#database-routes-view), [Route tester](#route-tester) | What the gateway is configured to do |
 | **Activity** | [Flow](#flow), [Traffic](#traffic), [Service graph](#service-graph), [Audit](#audit) | What it has carried, and what it kept of it |
+| **Runtime** | [Metrics](#runtime) | The technical health of each instance |
+| **OpenAPI** | [Hub](#openapi) | The contracts served through the gateway |
 | **Configuration** | [The six introspection views](#introspection) | What it is made of |
 
 A group folds and remembers whether it was folded, and is rendered open when the page being read

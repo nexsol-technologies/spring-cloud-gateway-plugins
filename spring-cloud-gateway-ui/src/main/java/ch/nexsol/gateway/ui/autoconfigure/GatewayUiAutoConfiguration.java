@@ -127,6 +127,16 @@ public class GatewayUiAutoConfiguration {
 	static final String CONFIGURATION = "Configuration";
 
 	/**
+	 * Heading the technical health of the instances folds under.
+	 */
+	static final String RUNTIME = "Runtime";
+
+	/**
+	 * Heading the API contracts fold under.
+	 */
+	static final String OPENAPI = "OpenAPI";
+
+	/**
 	 * Registers the side-menu registry aggregating every contributed {@link NavItem}.
 	 * @param navItems the provider over every {@link NavItem} bean in the context
 	 * @return the menu registry
@@ -420,7 +430,7 @@ public class GatewayUiAutoConfiguration {
 			 */
 			@Bean
 			NavItem instancesNavItem() {
-				return new NavItem("instances", "Runtime", "icon-server", "/ui/metrics/instances", 21);
+				return new NavItem("instances", "Metrics", "icon-server", "/ui/metrics/instances", 21, RUNTIME);
 			}
 
 			/**
@@ -672,7 +682,7 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem openapiNavItem() {
-			return new NavItem("openapi", "OpenAPI", "icon-book", "/ui/openapi", 25);
+			return new NavItem("openapi", "Hub", "icon-book", "/ui/openapi", 25, OPENAPI);
 		}
 
 		/**
