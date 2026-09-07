@@ -78,6 +78,22 @@ class ServiceGraphFilterTests {
 		assertThat(counter("partner-a", "orders-route", ServiceGraphFilter.SERVER_ERROR)).isEqualTo(1.0);
 	}
 
+	/*
+	 * The chain is what writes the status in production, and the filter is assembled
+	 * before it runs. A status read at assembly time is the one the response carries
+	 * before anything wrote to it, so every call would be counted as a success.
+	 */
+	@Test
+	void readsTheOutcomeTheChainWroteRatherThanTheOneItStartedWith() {
+		MockServerWebExchange exchange = routed("orders-route", null);
+		GatewayFilterChain answering = (answered) -> Mono
+			.fromRunnable(() -> answered.getResponse().setStatusCode(HttpStatus.NOT_FOUND));
+
+		this.filter.filter(exchange, answering).block();
+
+		assertThat(counter("partner-a", "orders-route", ServiceGraphFilter.CLIENT_ERROR)).isEqualTo(1.0);
+	}
+
 	@Test
 	void reportsAnUnknownOutcomeWhenNoStatusWasWritten() {
 		MockServerWebExchange exchange = routed("orders-route", null);

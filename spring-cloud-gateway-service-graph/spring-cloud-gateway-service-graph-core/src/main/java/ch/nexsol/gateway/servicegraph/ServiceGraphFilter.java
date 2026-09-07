@@ -117,30 +117,39 @@ public class ServiceGraphFilter implements GlobalFilter, Ordered {
 		return chain.filter(exchange).then(count(exchange)).onErrorResume((ex) -> count(exchange).then(Mono.error(ex)));
 	}
 
+	/*
+	 * Deferred, and it has to stay that way: this method is called while the filter chain
+	 * is being assembled, so anything read outside the defer is read before the chain has
+	 * run. The status is exactly that — read eagerly it is the one the response carries
+	 * before anything wrote to it, which is 200, and every call is then counted as a
+	 * success whatever it answered.
+	 */
 	private Mono<Void> count(ServerWebExchange exchange) {
-		MeterRegistry registry = this.meterRegistry.getIfAvailable();
-		Route route = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
-		// An excluded route is dropped here rather than when the graph is read, so it
-		// never becomes a series at all. A route with no id is excluded by the same
-		// check: an edge has to name what it reached.
-		if (registry == null || route == null || this.excludedRoutes.excludes(route.getId())) {
-			return Mono.empty();
-		}
-		String routeId = route.getId();
-		String service = targetService(route);
-		String outcome = outcome(exchange);
-		return this.callerResolver.resolve(exchange)
-			.doOnNext((caller) -> registry
-				.counter(CALLS_METER, CALLER_TAG, caller, SERVICE_TAG, service, ROUTE_TAG, routeId, OUTCOME_TAG,
-						outcome)
-				.increment())
-			.onErrorResume((ex) -> {
-				// The graph is an observation: losing an edge must never cost the
-				// response the gateway is about to return.
-				LOG.debug("Could not count a call for the service graph", ex);
+		return Mono.defer(() -> {
+			MeterRegistry registry = this.meterRegistry.getIfAvailable();
+			Route route = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
+			// An excluded route is dropped here rather than when the graph is read, so it
+			// never becomes a series at all. A route with no id is excluded by the same
+			// check: an edge has to name what it reached.
+			if (registry == null || route == null || this.excludedRoutes.excludes(route.getId())) {
 				return Mono.empty();
-			})
-			.then();
+			}
+			String routeId = route.getId();
+			String service = targetService(route);
+			String outcome = outcome(exchange);
+			return this.callerResolver.resolve(exchange)
+				.doOnNext((caller) -> registry
+					.counter(CALLS_METER, CALLER_TAG, caller, SERVICE_TAG, service, ROUTE_TAG, routeId, OUTCOME_TAG,
+							outcome)
+					.increment())
+				.onErrorResume((ex) -> {
+					// The graph is an observation: losing an edge must never cost the
+					// response the gateway is about to return.
+					LOG.debug("Could not count a call for the service graph", ex);
+					return Mono.empty();
+				})
+				.then();
+		});
 	}
 
 	/**
