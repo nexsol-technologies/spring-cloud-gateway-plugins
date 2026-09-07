@@ -60,18 +60,18 @@ class RedisServiceGraphSourceTests {
 
 	@Test
 	void sumsWhatEveryInstancePublished() throws Exception {
-		publish("pod-a", new GraphEdge("web", "orders", "orders-route", 3, 1));
-		publish("pod-b", new GraphEdge("web", "orders", "orders-route", 4, 0));
+		publish("pod-a", new GraphEdge("web", "orders", "orders-route", 3, 0, 1));
+		publish("pod-b", new GraphEdge("web", "orders", "orders-route", 4, 0, 0));
 
 		ServiceGraphSnapshot snapshot = source().collect().block();
 
-		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 7, 1));
+		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 7, 0, 1));
 	}
 
 	@Test
 	void namesHowManyInstancesTheGraphCovers() throws Exception {
-		publish("pod-a", new GraphEdge("web", "orders", "orders-route", 1, 0));
-		publish("pod-b", new GraphEdge("web", "orders", "orders-route", 1, 0));
+		publish("pod-a", new GraphEdge("web", "orders", "orders-route", 1, 0, 0));
+		publish("pod-b", new GraphEdge("web", "orders", "orders-route", 1, 0, 0));
 
 		assertThat(source().collect().block().coverage()).isEqualTo("2 instances, via Redis");
 	}
@@ -83,12 +83,12 @@ class RedisServiceGraphSourceTests {
 
 	@Test
 	void ignoresAnUnreadableEntryRatherThanTheWholeGraph() throws Exception {
-		publish("pod-a", new GraphEdge("web", "orders", "orders-route", 3, 0));
+		publish("pod-a", new GraphEdge("web", "orders", "orders-route", 3, 0, 0));
 		this.keyspace.put("gateway:service-graph:pod-b", "not json at all");
 
 		ServiceGraphSnapshot snapshot = source().collect().block();
 
-		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 3, 0));
+		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 3, 0, 0));
 		assertThat(snapshot.coverage()).isEqualTo("1 instance, via Redis");
 	}
 

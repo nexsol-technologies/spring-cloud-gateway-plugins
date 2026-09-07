@@ -48,20 +48,30 @@ class LocalServiceGraphSourceTests {
 	@Test
 	void readsOneEdgePerCounterAndMergesTheOutcomes() {
 		count("web", "orders", "orders-route", ServiceGraphFilter.SUCCESS, 7);
+		count("web", "orders", "orders-route", ServiceGraphFilter.CLIENT_ERROR, 2);
 		count("web", "orders", "orders-route", ServiceGraphFilter.SERVER_ERROR, 3);
 
 		ServiceGraphSnapshot snapshot = source(this.registry).collect().block();
 
-		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 10, 3));
+		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 12, 2, 3));
 	}
 
 	@Test
-	void countsOnlyTheServerErrorsAsFailures() {
+	void keepsTheClientErrorsApartFromTheServerErrors() {
 		count("web", "orders", "orders-route", ServiceGraphFilter.CLIENT_ERROR, 4);
 
 		ServiceGraphSnapshot snapshot = source(this.registry).collect().block();
 
-		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 4, 0));
+		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 4, 4, 0));
+	}
+
+	@Test
+	void countsAnUnreadableOutcomeAsNeitherKindOfError() {
+		count("web", "orders", "orders-route", ServiceGraphFilter.UNKNOWN_OUTCOME, 5);
+
+		ServiceGraphSnapshot snapshot = source(this.registry).collect().block();
+
+		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 5, 0, 0));
 	}
 
 	@Test

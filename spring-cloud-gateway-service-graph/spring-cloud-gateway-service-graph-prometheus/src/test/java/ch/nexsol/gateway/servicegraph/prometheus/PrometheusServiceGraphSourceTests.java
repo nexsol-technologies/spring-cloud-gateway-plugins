@@ -43,21 +43,22 @@ class PrometheusServiceGraphSourceTests {
 	@Test
 	void readsAnEdgePerSampleAndMergesTheOutcomes() {
 		String body = vector(sample("web", "orders", "orders-route", "success", 7),
+				sample("web", "orders", "orders-route", "client-error", 2),
 				sample("web", "orders", "orders-route", "server-error", 3));
 
 		ServiceGraphSnapshot snapshot = source(answering(body)).collect().block();
 
-		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 10, 3));
+		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 12, 2, 3));
 		assertThat(snapshot.coverage()).isEqualTo("every instance, from Prometheus");
 	}
 
 	@Test
-	void countsOnlyTheServerErrorsAsFailures() {
+	void keepsTheClientErrorsApartFromTheServerErrors() {
 		String body = vector(sample("web", "orders", "orders-route", "client-error", 4));
 
 		ServiceGraphSnapshot snapshot = source(answering(body)).collect().block();
 
-		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 4, 0));
+		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders", "orders-route", 4, 4, 0));
 	}
 
 	@Test

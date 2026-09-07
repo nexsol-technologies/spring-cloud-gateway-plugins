@@ -2,7 +2,8 @@
 
 Draws **who calls what**: one edge per caller, target service and route, weighted by the
 number of calls and coloured by the number of failures, read through a source you choose.
-Rendered by the service graph view of the [console](../spring-cloud-gateway-ui/README.md).
+Rendered by the [console](../spring-cloud-gateway-ui/README.md), which draws the same snapshot
+twice: as a graph, and as a flow from the callers through the gateway to the services.
 
 The gateway counts the calls that transit it. Where services reach each other *through* the
 gateway, that is the service graph itself; calls going straight from one service to another
@@ -71,6 +72,7 @@ not the same question.
 | Sees calls that avoided the gateway | no | no | no | **yes** |
 | Survives a restart | no | no | **yes** | yes |
 | Carries the route of an edge | yes | yes | yes | no |
+| Tells the 4xx from the 5xx | yes | yes | yes | no |
 | Cost per refresh | none | 1 scan | 1 query | 2 queries |
 | Freshness | live | publish interval | scrape interval | generator interval |
 
@@ -122,6 +124,15 @@ service calling another.
 
 The route is part of what makes an edge rather than a label on it, so two routes between the
 same pair stay two edges.
+
+An edge carries its 4xx and its 5xx as two separate counts, read back from the `outcome` tag.
+They answer different questions — a caller asking for what it may not have, against a service
+failing to answer — so an edge with a hundred 404 and no 500 is not an edge in trouble. The
+console tiles, tables and colours them accordingly.
+
+**Tempo reports no 4xx.** The metrics-generator publishes one failed series and no more: a
+span is failed or it is not, and the status class it carried is not in what it writes. An
+edge from that source counts every failure as a 5xx rather than inventing a split.
 
 ## Sample
 

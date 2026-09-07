@@ -28,6 +28,7 @@ import org.springframework.beans.factory.ObjectProvider;
 
 import static ch.nexsol.gateway.servicegraph.ServiceGraphFilter.CALLER_TAG;
 import static ch.nexsol.gateway.servicegraph.ServiceGraphFilter.CALLS_METER;
+import static ch.nexsol.gateway.servicegraph.ServiceGraphFilter.CLIENT_ERROR;
 import static ch.nexsol.gateway.servicegraph.ServiceGraphFilter.OUTCOME_TAG;
 import static ch.nexsol.gateway.servicegraph.ServiceGraphFilter.ROUTE_TAG;
 import static ch.nexsol.gateway.servicegraph.ServiceGraphFilter.SERVER_ERROR;
@@ -85,8 +86,14 @@ public class LocalServiceGraphSource implements ServiceGraphSource {
 				continue;
 			}
 			long calls = (long) counter.count();
-			boolean failed = SERVER_ERROR.equals(counter.getId().getTag(OUTCOME_TAG));
-			edges.add(new GraphEdge(caller, service, route, calls, failed ? calls : 0));
+			// One counter carries one outcome, so its whole count lands in the column
+			// that
+			// outcome names and nowhere else. The snapshot sums the counters of a pair
+			// back
+			// together.
+			String outcome = counter.getId().getTag(OUTCOME_TAG);
+			edges.add(new GraphEdge(caller, service, route, calls, CLIENT_ERROR.equals(outcome) ? calls : 0,
+					SERVER_ERROR.equals(outcome) ? calls : 0));
 		}
 		return edges;
 	}

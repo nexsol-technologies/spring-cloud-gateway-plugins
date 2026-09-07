@@ -79,8 +79,8 @@ public class PrometheusServiceGraphSource implements ServiceGraphSource {
 
 	/**
 	 * Turns each sample into a partial edge. The outcome stays out of the edge and is
-	 * only read to tell the failures apart, so the samples of one pair are summed back
-	 * together by the snapshot.
+	 * only read to tell the 4xx and the 5xx apart, so the samples of one pair are summed
+	 * back together by the snapshot.
 	 */
 	private static List<GraphEdge> toEdges(List<Sample> samples) {
 		List<GraphEdge> edges = new ArrayList<>();
@@ -91,9 +91,10 @@ public class PrometheusServiceGraphSource implements ServiceGraphSource {
 				continue;
 			}
 			long calls = Math.round(sample.doubleValue());
-			boolean failed = ServiceGraphFilter.SERVER_ERROR.equals(sample.label(ServiceGraphFilter.OUTCOME_TAG));
+			String outcome = sample.label(ServiceGraphFilter.OUTCOME_TAG);
 			edges.add(new GraphEdge(caller, service, sample.label(ServiceGraphFilter.ROUTE_TAG), calls,
-					failed ? calls : 0));
+					ServiceGraphFilter.CLIENT_ERROR.equals(outcome) ? calls : 0,
+					ServiceGraphFilter.SERVER_ERROR.equals(outcome) ? calls : 0));
 		}
 		return edges;
 	}
