@@ -44,6 +44,12 @@ spring.cloud.gateway.server.webflux.metrics:
     instance-key-prefix: "gateway:instances:"
     publish-interval: 10s
     time-to-live: 45s
+    # Where this instance is reachable. Leave it unset: the address is guessed, and the
+    # guess holds on a compose network, a pod network and a flat network alike. A literal
+    # here would be published by every instance, which is worse than not setting it — see
+    # below. Where the guess really is wrong, inject it per instance instead:
+    #   instance-uri: ${GATEWAY_INSTANCE_URI:}
+    instance-scheme: http
 ```
 
 | Property | Default | What it does |
@@ -52,13 +58,41 @@ spring.cloud.gateway.server.webflux.metrics:
 | `...redis.instance-key-prefix` | `gateway:instances:` | Prefix of the instance figures key each instance writes under |
 | `...redis.publish-interval` | `10s` | How often an instance publishes its figures |
 | `...redis.time-to-live` | `45s` | How long a published key survives |
+| `...redis.instance-uri` | — | Where this instance is reachable, published with its figures; guessed when unset |
+| `...redis.instance-scheme` | `http` | Scheme the guessed address is built with; ignored when `instance-uri` is set |
 
 > **The two prefixes must not nest.** The route source scans `key-prefix` with a wildcard, so
 > an instance prefix placed under it — `gateway:metrics:instance:` — comes back in that scan
 > and is discarded as unreadable, one warning per entry, on every refresh.
 
-> **`time-to-live` must comfortably outlive `publish-interval`.** Set too close, an instance
-> disappears from the figures between two of its own writes and the totals dip for no reason.
+## The address an instance publishes
+
+The figures carry the address the instance is reachable at. The
+[console](../../spring-cloud-gateway-ui/README.md) reads that instance's Actuator endpoints
+there — its loggers among them.
+
+Unset, the address is built from the host this machine reports and the port the server bound,
+which is the port in use rather than the port requested: on `server.port: 0` it is the one
+taken. `instance-scheme` supplies its scheme.
+
+Set, `instance-uri` is published as it is and `instance-scheme` is ignored.
+
+**Leave it unset under Docker and Kubernetes.** A container is reachable from the other
+containers of its network at the address it binds, and that address changes at every restart.
+
+> **A literal here is published by every instance.** One value in an image, a ConfigMap or a
+> shared `application.yml` makes the whole fleet report the same address: the console then lists
+> one instance, and a logging level set on all instances reaches that one several times. Inject
+> it per instance instead:
+>
+> ```yaml
+> instance-uri: ${GATEWAY_INSTANCE_URI:}   # empty falls back to the built address
+> ```
+>
+> from a per-container variable, or from the Kubernetes downward API (`status.podIP`).
+
+An instance that publishes no address is listed by the console but cannot be read: its Actuator
+endpoints are unreachable, and a level set across the fleet skips it.
 
 ## How it works
 

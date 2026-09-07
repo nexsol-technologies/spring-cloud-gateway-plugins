@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -179,7 +180,7 @@ public class PrometheusInstanceMetricsSource implements InstanceMetricsSource {
 		}
 		List<InstanceMetric> instances = byInstance.entrySet()
 			.stream()
-			.map((entry) -> toInstance(entry.getKey(), entry.getValue()))
+			.map((entry) -> toInstance(entry.getKey(), addressOf(entry.getKey()), entry.getValue()))
 			.sorted(Comparator.comparing(InstanceMetric::instanceId))
 			.toList();
 		return new InstanceMetricsSnapshot(coverage(instances.size()), instances);
@@ -192,7 +193,31 @@ public class PrometheusInstanceMetricsSource implements InstanceMetricsSource {
 		return instances + ((instances == 1) ? " instance" : " instances") + ", from Prometheus";
 	}
 
-	private static InstanceMetric toInstance(String instanceId, List<Sample> samples) {
+	/**
+	 * The address of an instance, from the id Prometheus knows it by.
+	 * <p>
+	 * The {@code instance} label is the address Prometheus scraped &mdash;
+	 * {@code host:port} — so it is the one thing here that names where an instance can be
+	 * reached. It carries no scheme, which is why one is configured; and it is only a
+	 * guess where the label was relabelled into something that is not an address at all,
+	 * so anything that does not look like {@code host:port} yields none.
+	 */
+	private String addressOf(String instanceId) {
+		String scheme = this.properties.getInstanceScheme();
+		if (!StringUtils.hasText(scheme) || !StringUtils.hasText(instanceId)) {
+			return null;
+		}
+		if (instanceId.startsWith("http://") || instanceId.startsWith("https://")) {
+			return instanceId;
+		}
+		int port = instanceId.lastIndexOf(':');
+		if (port <= 0 || port == instanceId.length() - 1) {
+			return null;
+		}
+		return instanceId.substring(port + 1).chars().allMatch(Character::isDigit) ? scheme + "://" + instanceId : null;
+	}
+
+	private static InstanceMetric toInstance(String instanceId, String uri, List<Sample> samples) {
 		List<PoolStats> pools = pools(samples);
 		JvmStats jvm = new JvmStats(bytes(sum(samples, MEMORY_USED, AREA, HEAP)),
 				bytes(sum(samples, MEMORY_MAX, AREA, HEAP)), bytes(sum(samples, MEMORY_USED, AREA, NON_HEAP)),
@@ -210,7 +235,7 @@ public class PrometheusInstanceMetricsSource implements InstanceMetricsSource {
 		// and the same situation from here.
 		InstanceInstrumentation instrumentation = new InstanceInstrumentation(!pools.isEmpty(),
 				count(samples, EVENT_LOOP_PENDING) > 0);
-		return new InstanceMetric(instanceId, null, (long) orZero(sum(samples, UPTIME)), jvm, system, netty, pools,
+		return new InstanceMetric(instanceId, uri, (long) orZero(sum(samples, UPTIME)), jvm, system, netty, pools,
 				instrumentation);
 	}
 

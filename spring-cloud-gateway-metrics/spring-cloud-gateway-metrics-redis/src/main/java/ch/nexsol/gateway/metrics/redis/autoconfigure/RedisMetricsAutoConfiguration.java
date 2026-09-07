@@ -23,6 +23,7 @@ import ch.nexsol.gateway.metrics.LocalRouteMetricsSource;
 import ch.nexsol.gateway.metrics.MetricsProperties;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
+import ch.nexsol.gateway.metrics.redis.InstanceUri;
 import ch.nexsol.gateway.metrics.redis.RedisInstanceMetricsPublisher;
 import ch.nexsol.gateway.metrics.redis.RedisInstanceMetricsSource;
 import ch.nexsol.gateway.metrics.redis.RedisMetricsProperties;
@@ -167,8 +168,20 @@ public class RedisMetricsAutoConfiguration {
 				matchIfMissing = true)
 		RedisInstanceMetricsPublisher redisInstanceMetricsPublisher(ReactiveStringRedisTemplate redisTemplate,
 				LocalInstanceMetricsSource localSource, RedisMetricsProperties properties, ObjectMapper objectMapper,
-				InstanceIdentity identity) {
-			return new RedisInstanceMetricsPublisher(redisTemplate, localSource, properties, objectMapper, identity);
+				InstanceIdentity identity, InstanceUri instanceUri) {
+			return new RedisInstanceMetricsPublisher(redisTemplate, localSource, properties, objectMapper, identity,
+					instanceUri);
+		}
+
+		/**
+		 * Registers the resolver naming where this instance is reachable, published with
+		 * its figures so the console can read its Actuator endpoints.
+		 * @param properties the Redis configuration
+		 * @return the address resolver
+		 */
+		@Bean
+		InstanceUri redisInstanceUri(RedisMetricsProperties properties) {
+			return new InstanceUri(properties.getInstanceUri(), properties.getInstanceScheme());
 		}
 
 		/**
