@@ -40,6 +40,7 @@ import ch.nexsol.gateway.ui.insights.ActuatorClient;
 import ch.nexsol.gateway.ui.insights.ActuatorInstances;
 import ch.nexsol.gateway.ui.insights.InsightsController;
 import ch.nexsol.gateway.ui.insights.InsightsProperties;
+import ch.nexsol.gateway.ui.insights.LocalActuator;
 import ch.nexsol.gateway.ui.insights.LoggerBaseline;
 import ch.nexsol.gateway.ui.insights.LoggerWriteAccess;
 import ch.nexsol.gateway.ui.insights.RoleLoggerWriteAccess;
@@ -66,6 +67,7 @@ import ch.nexsol.gateway.ui.servicegraph.ServiceGraphOverviewContribution;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -569,10 +571,26 @@ public class GatewayUiAutoConfiguration {
 			return LoggerWriteAccess.denied();
 		}
 
+		/**
+		 * Where this instance serves its own Actuator endpoints, read from its management
+		 * configuration rather than assumed to be the port the console answers on.
+		 * @param port the management port, absent when the endpoints share the
+		 * application port
+		 * @param serverBasePath the management server base path
+		 * @param webBasePath the web endpoints base path
+		 * @return the resolver
+		 */
 		@Bean
-		ActuatorClient actuatorClient(ObjectProvider<WebClient.Builder> webClientBuilder,
-				InsightsProperties properties) {
-			return new ActuatorClient(webClientBuilder.getIfAvailable(WebClient::builder), properties);
+		LocalActuator localActuator(@Value("${management.server.port:#{null}}") Integer port,
+				@Value("${management.server.base-path:}") String serverBasePath,
+				@Value("${management.endpoints.web.base-path:/actuator}") String webBasePath) {
+			return new LocalActuator(port, serverBasePath, webBasePath);
+		}
+
+		@Bean
+		ActuatorClient actuatorClient(ObjectProvider<WebClient.Builder> webClientBuilder, InsightsProperties properties,
+				LocalActuator local) {
+			return new ActuatorClient(webClientBuilder.getIfAvailable(WebClient::builder), properties, local);
 		}
 
 		/*

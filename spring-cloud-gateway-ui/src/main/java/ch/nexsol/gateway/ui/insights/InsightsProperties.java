@@ -19,6 +19,7 @@ package ch.nexsol.gateway.ui.insights;
 import java.time.Duration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.util.StringUtils;
 import org.springframework.util.unit.DataSize;
 
 /**
@@ -39,9 +40,12 @@ public class InsightsProperties {
 	private boolean enabled = true;
 
 	/**
-	 * Base path the Actuator endpoints are exposed under.
+	 * Base path the Actuator endpoints are exposed under. Empty, the management
+	 * configuration of this instance decides, which is what makes a separate management
+	 * port or a moved base path work without saying so twice. Set, it applies to every
+	 * instance, including the ones read over the network.
 	 */
-	private String basePath = "/actuator";
+	private String basePath = "";
 
 	/**
 	 * How long an endpoint is given to answer before the view reports it unreachable.
@@ -82,6 +86,15 @@ public class InsightsProperties {
 
 	public void setBasePath(String basePath) {
 		this.basePath = basePath;
+	}
+
+	/**
+	 * The base path to use: the configured one when set, the given fallback otherwise.
+	 * @param fallback the path the management configuration resolved to
+	 * @return the base path
+	 */
+	public String basePathOr(String fallback) {
+		return StringUtils.hasText(this.basePath) ? this.basePath : fallback;
 	}
 
 	public Duration getTimeout() {

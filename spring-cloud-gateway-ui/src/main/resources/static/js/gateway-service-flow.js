@@ -298,7 +298,38 @@
 		return (limit > 0 && list.length > limit) ? list.slice(0, limit) : list;
 	}
 
+	/*
+	 * Where the reader is, across the redraw that is about to replace the picture.
+	 *
+	 * The whole SVG is rebuilt on every poll, and emptying it collapses the height of the
+	 * page: the browser then clamps the scroll position to what is left, which lands the
+	 * reader back at the top three seconds after they scrolled away. The horizontal offset
+	 * goes with it — a wide flow scrolls inside its own container.
+	 */
+	function placeOnScreen() {
+		return { inner: flowEl.scrollLeft, outer: window.pageYOffset };
+	}
+
+	/*
+	 * Put back, and put back at once. Bootstrap sets `scroll-behavior: smooth` on the root,
+	 * which turns this correction into an animated glide — three seconds later the next
+	 * poll starts another one, and the page never settles. The behaviour is suspended for
+	 * the length of the correction rather than fought with.
+	 */
+	function restore(place) {
+		flowEl.scrollLeft = place.inner;
+		if (window.pageYOffset === place.outer) {
+			return;
+		}
+		var root = document.documentElement;
+		var behaviour = root.style.scrollBehavior;
+		root.style.scrollBehavior = 'auto';
+		window.scrollTo(0, place.outer);
+		root.style.scrollBehavior = behaviour;
+	}
+
 	function render() {
+		var place = placeOnScreen();
 		var shown = visibleEdges();
 		var allCallers = hops(shown, 'from');
 		var allServices = hops(shown, 'to');
@@ -311,6 +342,7 @@
 			sel('gf-legend').textContent = '';
 			renderKpis(shown, allCallers, allServices);
 			arrived = {};
+			restore(place);
 			return;
 		}
 		sel('gf-empty').style.display = 'none';
@@ -349,6 +381,7 @@
 		renderKpis(shown, allCallers, allServices);
 		// Drawn once. A later redraw for a filter or a resize must not replay it.
 		arrived = {};
+		restore(place);
 	}
 
 	function renderKpis(shown, callers, services) {

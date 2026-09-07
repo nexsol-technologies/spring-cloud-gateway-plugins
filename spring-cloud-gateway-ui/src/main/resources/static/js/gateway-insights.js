@@ -609,12 +609,24 @@
 		return { inner: body.scrollTop, outer: window.pageYOffset };
 	}
 
+	/*
+	 * Put back, and put back at once. Bootstrap sets `scroll-behavior: smooth` on the root,
+	 * so scrolling the page back would glide rather than land — visible every time a level
+	 * is set. The behaviour is suspended for the length of the correction.
+	 */
 	function restore(place) {
 		if (!place) {
 			return;
 		}
 		body.scrollTop = place.inner;
+		if (window.pageYOffset === place.outer) {
+			return;
+		}
+		var root = document.documentElement;
+		var behaviour = root.style.scrollBehavior;
+		root.style.scrollBehavior = 'auto';
 		window.scrollTo(0, place.outer);
+		root.style.scrollBehavior = behaviour;
 	}
 
 	/*

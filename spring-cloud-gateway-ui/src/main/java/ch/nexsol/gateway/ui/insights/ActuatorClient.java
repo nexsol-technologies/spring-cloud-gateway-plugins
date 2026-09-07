@@ -16,7 +16,6 @@
 
 package ch.nexsol.gateway.ui.insights;
 
-import java.net.URI;
 import java.util.Map;
 
 import ch.nexsol.gateway.ui.insights.ActuatorInstances.Instance;
@@ -51,12 +50,16 @@ public class ActuatorClient {
 
 	private final InsightsProperties properties;
 
+	private final LocalActuator local;
+
 	/**
 	 * Creates the client.
 	 * @param webClientBuilder the builder the client is created from
 	 * @param properties the introspection configuration
+	 * @param local where this instance serves its own Actuator endpoints
 	 */
-	public ActuatorClient(WebClient.Builder webClientBuilder, InsightsProperties properties) {
+	public ActuatorClient(WebClient.Builder webClientBuilder, InsightsProperties properties, LocalActuator local) {
+		this.local = local;
 		// The condition report and the bean report of a gateway running every plugin both
 		// run past a megabyte, and the client refuses anything over 256 KB by default.
 		this.webClient = webClientBuilder
@@ -117,15 +120,22 @@ public class ActuatorClient {
 	 * reachable at &mdash; a port read from the configuration is the port it was asked to
 	 * bind, not necessarily the one a reverse proxy is reaching it on.
 	 */
+	/*
+	 * The instance answering the console is read where it actually serves Actuator, which
+	 * is not always where it serves the console: `management.server.port` moves the
+	 * endpoints to a port of their own, and the base paths move them again. Taking the
+	 * port of the incoming request assumes a deployment that never separated the two, and
+	 * answers 404 on every one that did.
+	 *
+	 * Another instance is read on the address it published, with the base path configured
+	 * here: nothing tells this console how that instance configured its own management
+	 * server.
+	 */
 	private String url(ServerWebExchange exchange, Instance instance, String endpoint) {
-		String base = instance.self() ? self(exchange) : trimmed(instance.uri());
-		return base + this.properties.getBasePath() + "/" + endpoint;
-	}
-
-	private static String self(ServerWebExchange exchange) {
-		URI uri = exchange.getRequest().getURI();
-		int port = uri.getPort();
-		return uri.getScheme() + "://" + uri.getHost() + ((port > 0) ? ":" + port : "");
+		if (instance.self()) {
+			return this.local.url(exchange, endpoint, this.properties.basePathOr(this.local.basePath()));
+		}
+		return trimmed(instance.uri()) + this.properties.basePathOr(this.local.basePath()) + "/" + endpoint;
 	}
 
 	private static String trimmed(String uri) {
