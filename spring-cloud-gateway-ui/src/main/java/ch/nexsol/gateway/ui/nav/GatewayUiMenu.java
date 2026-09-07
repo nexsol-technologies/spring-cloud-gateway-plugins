@@ -16,8 +16,11 @@
 
 package ch.nexsol.gateway.ui.nav;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.ObjectProvider;
 
@@ -48,6 +51,39 @@ public class GatewayUiMenu {
 	public List<NavItem> items() {
 		return this.items.orderedStream()
 			.sorted(Comparator.comparingInt(NavItem::order).thenComparing(NavItem::label))
+			.toList();
+	}
+
+	/**
+	 * Returns the same entries laid out as the shell draws them: a section per group, and
+	 * a section of its own for every entry carrying none.
+	 * <p>
+	 * A group sits where its first entry would have sat, so a plugin joins a group by
+	 * naming it and still decides where the group as a whole lands through its order. The
+	 * entries stay in the order {@link #items()} put them in.
+	 * @return the immutable, ordered list of sections
+	 */
+	public List<NavSection> sections() {
+		Map<String, List<NavItem>> groups = new LinkedHashMap<>();
+		List<NavSection> sections = new ArrayList<>();
+		for (NavItem item : items()) {
+			if (item.group() == null) {
+				sections.add(new NavSection(null, List.of(item)));
+				continue;
+			}
+			List<NavItem> group = groups.get(item.group());
+			if (group == null) {
+				group = new ArrayList<>();
+				groups.put(item.group(), group);
+				// A placeholder holding the place of the group, filled in below: the list
+				// it carries is the one still being appended to.
+				sections.add(new NavSection(item.group(), List.of(item)));
+			}
+			group.add(item);
+		}
+		return sections.stream()
+			.map((section) -> (section.group() == null) ? section
+					: new NavSection(section.group(), groups.get(section.group())))
 			.toList();
 	}
 

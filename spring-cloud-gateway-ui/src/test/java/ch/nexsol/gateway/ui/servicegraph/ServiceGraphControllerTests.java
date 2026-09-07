@@ -60,6 +60,23 @@ class ServiceGraphControllerTests {
 	}
 
 	@Test
+	void shouldRenderTheFlowPage() {
+		this.webTestClient.get()
+			.uri("/ui/service-graph/flow")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("id=\"gf-flow\"")
+				.contains("id=\"gf-4xx\"")
+				.contains("id=\"gf-5xx\"")
+				.contains("id=\"gf-auto\"")
+				// The flow entry is the active one, and it is fed by the graph endpoint.
+				.contains(">Flow</span>")
+				.contains("/ui/service-graph/data"));
+	}
+
+	@Test
 	void shouldReturnTheGraphAsJson() {
 		this.webTestClient.get()
 			.uri("/ui/service-graph/data")
@@ -73,6 +90,10 @@ class ServiceGraphControllerTests {
 			.isEqualTo("service-a")
 			.jsonPath("$.edges[0].calls")
 			.isEqualTo(10)
+			.jsonPath("$.edges[0].clientErrors")
+			.isEqualTo(3)
+			.jsonPath("$.edges[0].errors")
+			.isEqualTo(1)
 			.jsonPath("$.nodes[0].kind")
 			.isEqualTo("SERVICE");
 	}
@@ -111,8 +132,8 @@ class ServiceGraphControllerTests {
 		@Primary
 		ServiceGraphSource testServiceGraphSource() {
 			return () -> Mono.just(ServiceGraphSnapshot.of("this instance only (test)",
-					List.of(new GraphEdge("frontend", "service-a", "a-route", 10, 1),
-							new GraphEdge("service-a", "service-b", "b-route", 4, 0))));
+					List.of(new GraphEdge("frontend", "service-a", "a-route", 10, 3, 1),
+							new GraphEdge("service-a", "service-b", "b-route", 4, 0, 0))));
 		}
 
 	}

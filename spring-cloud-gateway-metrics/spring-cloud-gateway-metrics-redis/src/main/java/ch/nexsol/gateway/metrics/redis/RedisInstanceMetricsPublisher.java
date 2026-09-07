@@ -17,6 +17,7 @@
 package ch.nexsol.gateway.metrics.redis;
 
 import ch.nexsol.gateway.commons.InstanceIdentity;
+import ch.nexsol.gateway.metrics.InstanceMetric;
 import ch.nexsol.gateway.metrics.LocalInstanceMetricsSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -27,6 +28,7 @@ import reactor.core.publisher.Mono;
 
 import org.springframework.context.SmartLifecycle;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.util.StringUtils;
 
 /**
  * Publishes the technical figures of this instance to Redis, for the instances view to
@@ -44,6 +46,8 @@ public class RedisInstanceMetricsPublisher implements SmartLifecycle {
 
 	private final ObjectMapper objectMapper;
 
+	private final InstanceUri instanceUri;
+
 	private final String key;
 
 	private volatile Disposable subscription;
@@ -55,14 +59,16 @@ public class RedisInstanceMetricsPublisher implements SmartLifecycle {
 	 * @param properties the Redis configuration
 	 * @param objectMapper the mapper rendering the figures
 	 * @param identity the identity of the running instance
+	 * @param instanceUri where this instance is reachable, published with its figures
 	 */
 	public RedisInstanceMetricsPublisher(ReactiveStringRedisTemplate redisTemplate,
 			LocalInstanceMetricsSource localSource, RedisMetricsProperties properties, ObjectMapper objectMapper,
-			InstanceIdentity identity) {
+			InstanceIdentity identity, InstanceUri instanceUri) {
 		this.redisTemplate = redisTemplate;
 		this.localSource = localSource;
 		this.properties = properties;
 		this.objectMapper = objectMapper;
+		this.instanceUri = instanceUri;
 		this.key = properties.getInstanceKeyPrefix() + identity.id();
 	}
 
@@ -95,7 +101,7 @@ public class RedisInstanceMetricsPublisher implements SmartLifecycle {
 	 * @return a mono completing once the key is written
 	 */
 	public Mono<Void> publish() {
-		return Mono.fromCallable(() -> this.objectMapper.writeValueAsString(this.localSource.read()))
+		return Mono.fromCallable(() -> this.objectMapper.writeValueAsString(reachableAt(this.localSource.read())))
 			.flatMap((payload) -> this.redisTemplate.opsForValue()
 				.set(this.key, payload, this.properties.getTimeToLive()))
 			.onErrorResume((ex) -> {
@@ -103,6 +109,24 @@ public class RedisInstanceMetricsPublisher implements SmartLifecycle {
 				return Mono.empty();
 			})
 			.then();
+	}
+
+	/**
+	 * Puts the address of this instance on the figures it is about to publish.
+	 * <p>
+	 * The local source leaves it out on purpose &mdash; an instance does not know where
+	 * it is reached from — and the discovery provider fills it from the registry. Redis
+	 * is not a registry, so it is filled here, from the port the server bound or from
+	 * what the operator declared. Left empty, the console can still show this instance
+	 * among the figures but cannot read its endpoints.
+	 */
+	private InstanceMetric reachableAt(InstanceMetric metric) {
+		String uri = this.instanceUri.get();
+		if (!StringUtils.hasText(uri)) {
+			return metric;
+		}
+		return new InstanceMetric(metric.instanceId(), uri, metric.uptimeSeconds(), metric.jvm(), metric.system(),
+				metric.netty(), metric.pools(), metric.instrumentation());
 	}
 
 	/**

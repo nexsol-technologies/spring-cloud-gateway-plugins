@@ -44,6 +44,19 @@ public class RedisMetricsProperties {
 	/**
 	 * How often each instance publishes its figures.
 	 */
+	/**
+	 * Where this instance is reachable, published with its figures so the console can
+	 * read its Actuator endpoints. Unset, it is guessed from the port the server bound
+	 * and the host this machine reports, which is wrong behind anything that rewrites
+	 * addresses: set it explicitly for a container or a proxied deployment.
+	 */
+	private String instanceUri;
+
+	/**
+	 * Scheme the guessed address is built with. Ignored when {@code instance-uri} is set.
+	 */
+	private String instanceScheme = "http";
+
 	private Duration publishInterval = Duration.ofSeconds(10);
 
 	/**
@@ -84,6 +97,22 @@ public class RedisMetricsProperties {
 	/**
 	 * @return the publish interval
 	 */
+	public String getInstanceUri() {
+		return this.instanceUri;
+	}
+
+	public void setInstanceUri(String instanceUri) {
+		this.instanceUri = instanceUri;
+	}
+
+	public String getInstanceScheme() {
+		return this.instanceScheme;
+	}
+
+	public void setInstanceScheme(String instanceScheme) {
+		this.instanceScheme = instanceScheme;
+	}
+
 	public Duration getPublishInterval() {
 		return this.publishInterval;
 	}

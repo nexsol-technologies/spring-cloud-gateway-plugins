@@ -48,7 +48,7 @@ class TempoServiceGraphSourceTests {
 
 		ServiceGraphSnapshot snapshot = source(tempo).collect().block();
 
-		assertThat(snapshot.edges()).containsExactly(new GraphEdge("frontend", "service-a", null, 10, 2));
+		assertThat(snapshot.edges()).containsExactly(new GraphEdge("frontend", "service-a", null, 10, 0, 2));
 		assertThat(snapshot.coverage()).isEqualTo("every service, from Tempo");
 	}
 
@@ -59,7 +59,7 @@ class TempoServiceGraphSourceTests {
 
 		ServiceGraphSnapshot snapshot = source(tempo).collect().block();
 
-		assertThat(snapshot.edges()).contains(new GraphEdge("service-a", "service-b", null, 4, 0));
+		assertThat(snapshot.edges()).contains(new GraphEdge("service-a", "service-b", null, 4, 0, 0));
 	}
 
 	@Test
@@ -104,7 +104,7 @@ class TempoServiceGraphSourceTests {
 			.collect()
 			.block();
 
-		assertThat(snapshot.edges()).containsExactly(new GraphEdge("a", "b", null, 5, 0));
+		assertThat(snapshot.edges()).containsExactly(new GraphEdge("a", "b", null, 5, 0, 0));
 	}
 
 	@Test

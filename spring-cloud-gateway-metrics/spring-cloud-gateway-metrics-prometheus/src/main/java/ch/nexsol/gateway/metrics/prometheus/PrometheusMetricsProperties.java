@@ -61,6 +61,14 @@ public class PrometheusMetricsProperties {
 	private String instanceLabel = "instance";
 
 	/**
+	 * Scheme an instance address is built with, from the {@code instance} label:
+	 * Prometheus sets that label to the address it scraped, which is {@code host:port}
+	 * and carries no scheme. Left empty, no address is derived and the console can show
+	 * these instances without being able to read their Actuator endpoints.
+	 */
+	private String instanceScheme = "http";
+
+	/**
 	 * How far back an instance must have reported to still be listed.
 	 * <p>
 	 * Prometheus keeps the series of instances that no longer exist, which is exactly
@@ -150,6 +158,14 @@ public class PrometheusMetricsProperties {
 	/**
 	 * @return the label identifying an instance
 	 */
+	public String getInstanceScheme() {
+		return this.instanceScheme;
+	}
+
+	public void setInstanceScheme(String instanceScheme) {
+		this.instanceScheme = instanceScheme;
+	}
+
 	public String getInstanceLabel() {
 		return this.instanceLabel;
 	}

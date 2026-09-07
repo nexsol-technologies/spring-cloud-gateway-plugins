@@ -1,28 +1,244 @@
 /*
- * Gateway UI shell: collapsible side menu.
- * The layout is a flex row of a fixed-width sidebar and a growing content area.
+ * Gateway UI theme and shell.
+ *
+ * The palette is one set of --gw-* tokens declared for the light theme and redeclared for
+ * the dark one, and a bridge mapping them onto the --bs-* variables Bootstrap draws with.
+ * That bridge is what lets the views keep plain Bootstrap markup: a card, a table or a
+ * badge picks the theme up without a class of ours on it.
+ *
+ * The shell itself is a flex row of a fixed-width sidebar and a growing content area.
  * Collapsing is driven by the .gw-collapsed class toggled on .gw-shell.
  */
 
-:root {
+/* Tokens ------------------------------------------------------------------ */
+
+:root,
+[data-bs-theme="light"] {
 	--gw-sidebar-width: 248px;
 	--gw-sidebar-width-collapsed: 64px;
-	--gw-sidebar-bg: #1f2937;
-	--gw-sidebar-fg: #cbd5e1;
-	--gw-sidebar-fg-muted: #94a3b8;
-	--gw-sidebar-active-bg: #2563eb;
-	--gw-sidebar-hover-bg: #334155;
+
+	/* The interaction accent, on every hover the console answers with. */
+	--gw-accent: #198754;
+	--gw-accent-strong: #146c43;
+	--gw-accent-soft: rgba(25, 135, 84, .08);
+	--gw-accent-edge: rgba(25, 135, 84, .18);
+
+	/* The colour a destructive action answers in. */
+	--gw-danger: #b02a37;
+	--gw-danger-soft: rgba(220, 53, 69, .09);
+
+	--gw-text: #152033;
+	--gw-text-muted: #56667b;
+	--gw-text-subtle: #5b6b80;
+
+	/* Panels are translucent over the page wash, which is what keeps it visible. */
+	--gw-surface: rgba(255, 255, 255, .82);
+	--gw-surface-solid: #fff;
+	--gw-surface-alt: #f1f5f9;
+	--gw-sidebar-bg: rgba(255, 255, 255, .76);
+
+	--gw-border: rgba(15, 23, 42, .08);
+	--gw-border-subtle: rgba(15, 23, 42, .06);
+	--gw-border-strong: rgba(100, 116, 139, .28);
+
+	--gw-shadow-sm: 0 .25rem .75rem rgba(15, 23, 42, .05);
+	--gw-shadow-md: 0 1.2rem 3rem rgba(15, 23, 42, .11);
+	--gw-shadow-sidebar: .75rem 0 2rem rgba(15, 23, 42, .06);
+
+	--gw-body: linear-gradient(135deg, #f6fbf8 0%, #fdf8f1 46%, #fdf3e9 100%);
+	--gw-body-orb: rgba(25, 135, 84, .18);
+
+	--gw-nav-fg: #334155;
+	--gw-nav-hover-bg: var(--gw-accent-soft);
+	--gw-nav-hover-fg: var(--gw-accent-strong);
+	--gw-nav-active-bg: linear-gradient(135deg, #198754, #ea7e2a);
+	--gw-nav-active-fg: #fff;
+	--gw-nav-active-shadow: 0 .5rem 1.1rem rgba(25, 135, 84, .28);
+
+	--gw-radius-sm: .5rem;
+	--gw-radius-md: .75rem;
+	--gw-radius-lg: 1.1rem;
 }
 
-/* Dark theme: the sidebar steps back from the content, which Bootstrap darkens on its own. */
 [data-bs-theme="dark"] {
-	--gw-sidebar-bg: #111827;
-	--gw-sidebar-hover-bg: #1f2937;
+	--gw-accent: #34d068;
+	--gw-accent-strong: #4ade80;
+	--gw-accent-soft: rgba(52, 208, 104, .1);
+	--gw-accent-edge: rgba(52, 208, 104, .24);
+
+	--gw-danger: #ea868f;
+	--gw-danger-soft: rgba(234, 134, 143, .12);
+
+	--gw-text: #e2e8f0;
+	--gw-text-muted: #a3b1c6;
+	--gw-text-subtle: #94a3b8;
+
+	--gw-surface: rgba(30, 41, 59, .9);
+	--gw-surface-solid: #1e293b;
+	--gw-surface-alt: #172032;
+	--gw-sidebar-bg: rgba(15, 23, 42, .88);
+
+	--gw-border: rgba(226, 232, 240, .1);
+	--gw-border-subtle: rgba(226, 232, 240, .07);
+	--gw-border-strong: rgba(148, 163, 184, .3);
+
+	--gw-shadow-sm: 0 .25rem .75rem rgba(0, 0, 0, .22);
+	--gw-shadow-md: 0 1.2rem 3rem rgba(0, 0, 0, .4);
+	--gw-shadow-sidebar: .75rem 0 2rem rgba(0, 0, 0, .25);
+
+	--gw-body: linear-gradient(135deg, #0d1a12 0%, #16151a 46%, #1b1610 100%);
+	--gw-body-orb: rgba(52, 208, 104, .12);
+
+	--gw-nav-fg: #cbd5e1;
+	--gw-nav-active-bg: linear-gradient(135deg, #198754, #ea7e2a);
+	--gw-nav-active-shadow: 0 .5rem 1.1rem rgba(0, 0, 0, .35);
+}
+
+/* Bootstrap bridge -------------------------------------------------------- */
+
+/*
+ * Bootstrap draws everything from these, so restating them here is what re-themes the
+ * views without a single class change in the templates. The shadow variables are among
+ * them on purpose: the cards carry .shadow-sm, whose !important would beat a box-shadow
+ * of ours but not the value it is built from.
+ */
+:root,
+[data-bs-theme="light"],
+[data-bs-theme="dark"] {
+	--bs-body-color: var(--gw-text);
+	--bs-body-color-rgb: 21, 32, 51;
+	--bs-emphasis-color: var(--gw-text);
+	--bs-secondary-color: var(--gw-text-muted);
+	--bs-tertiary-color: var(--gw-text-subtle);
+	--bs-tertiary-bg: var(--gw-surface-alt);
+	--bs-border-color: var(--gw-border-strong);
+	--bs-border-color-translucent: var(--gw-border);
+	--bs-border-radius: var(--gw-radius-sm);
+	--bs-border-radius-sm: .35rem;
+	--bs-border-radius-lg: var(--gw-radius-md);
+	--bs-border-radius-xl: var(--gw-radius-lg);
+	--bs-box-shadow-sm: var(--gw-shadow-sm);
+	--bs-box-shadow: var(--gw-shadow-md);
+	--bs-heading-color: var(--gw-text);
+	--bs-primary: var(--gw-accent);
+	--bs-primary-rgb: 25, 135, 84;
+	--bs-link-color: var(--gw-accent-strong);
+	--bs-link-color-rgb: 20, 108, 67;
+	--bs-link-hover-color: var(--gw-accent);
+	--bs-focus-ring-color: var(--gw-accent-soft);
+}
+
+[data-bs-theme="dark"] {
+	--bs-body-color-rgb: 226, 232, 240;
+	--bs-body-bg: #0f1929;
+	--bs-body-bg-rgb: 15, 25, 41;
+	--bs-secondary-bg: var(--gw-surface-solid);
+	--bs-primary-rgb: 52, 208, 104;
+	--bs-link-color-rgb: 74, 222, 128;
+}
+
+/* Page -------------------------------------------------------------------- */
+
+/*
+ * The wash is painted as an image rather than a colour: .bg-body-tertiary on the body
+ * carries an !important background-color, which an image still covers.
+ */
+body {
+	background-image: radial-gradient(circle at top left, var(--gw-body-orb), transparent 34rem),
+		var(--gw-body);
+	background-attachment: fixed;
 }
 
 .gw-shell {
 	display: flex;
 	min-height: 100vh;
+}
+
+/* Loading ----------------------------------------------------------------- */
+
+/*
+ * The bar a navigation runs under. It says that the click was taken and that the next page
+ * is on its way; it cannot say how far along it is, since a page load reports no progress,
+ * so it sweeps rather than fills.
+ */
+.gw-progress {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 3px;
+	z-index: 2000;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+.gw-progress::after {
+	content: "";
+	display: block;
+	width: 40%;
+	height: 100%;
+	background: linear-gradient(90deg, transparent, var(--gw-accent), var(--gw-accent), transparent);
+	animation: gw-progress-sweep 1.1s ease-in-out infinite;
+}
+
+@keyframes gw-progress-sweep {
+	from {
+		transform: translateX(-100%);
+	}
+
+	to {
+		transform: translateX(350%);
+	}
+}
+
+/* A reader who asked for no motion still gets the bar, simply standing still. */
+@media (prefers-reduced-motion: reduce) {
+	.gw-progress::after {
+		animation: none;
+		width: 100%;
+		opacity: .5;
+	}
+}
+
+/* The entry that was clicked, while its page is on its way. */
+.gw-nav-link-busy {
+	opacity: .65;
+}
+
+/*
+ * What a view shows while it is reading, and while it is drawing what it read. The second
+ * half matters more than the first here: these reports run to thousands of rows, and it is
+ * building them that holds the page, not fetching them.
+ */
+.gw-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: .6rem;
+	padding: 3rem 0;
+	color: var(--gw-text-muted);
+}
+
+.gw-loading::before {
+	content: "";
+	width: 1rem;
+	height: 1rem;
+	border: 2px solid var(--gw-border-strong);
+	border-top-color: var(--gw-accent);
+	border-radius: 50%;
+	animation: gw-spin .7s linear infinite;
+}
+
+@keyframes gw-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.gw-loading::before {
+		animation-duration: 2.4s;
+	}
 }
 
 /* Sidebar ----------------------------------------------------------------- */
@@ -36,7 +252,11 @@
 	position: sticky;
 	top: 0;
 	background: var(--gw-sidebar-bg);
-	color: var(--gw-sidebar-fg);
+	backdrop-filter: blur(22px);
+	-webkit-backdrop-filter: blur(22px);
+	border-right: 1px solid var(--gw-border);
+	box-shadow: var(--gw-shadow-sidebar);
+	color: var(--gw-nav-fg);
 	overflow: hidden;
 	transition: flex-basis .2s ease, width .2s ease;
 }
@@ -52,15 +272,16 @@
 	gap: .75rem;
 	padding: 1rem;
 	min-height: 60px;
-	border-bottom: 1px solid rgba(255, 255, 255, .08);
+	border-bottom: 1px solid var(--gw-border-subtle);
 }
 
 .gw-brand {
 	display: flex;
 	align-items: center;
 	gap: .6rem;
-	font-weight: 600;
-	color: #fff;
+	font-weight: 700;
+	letter-spacing: -.01em;
+	color: var(--gw-text);
 	white-space: nowrap;
 	overflow: hidden;
 }
@@ -81,16 +302,16 @@
 	height: 32px;
 	padding: 0;
 	border: 0;
-	border-radius: .375rem;
+	border-radius: var(--gw-radius-sm);
 	background: transparent;
-	color: var(--gw-sidebar-fg-muted);
+	color: var(--gw-text-muted);
 	cursor: pointer;
-	transition: background .15s ease, color .15s ease;
+	transition: background .16s ease, color .16s ease;
 }
 
 .gw-toggle:hover {
-	background: var(--gw-sidebar-hover-bg);
-	color: #fff;
+	background: var(--gw-nav-hover-bg);
+	color: var(--gw-nav-hover-fg);
 }
 
 /* Collapsed, the header only has room for the toggle: the brand would be cut in half. */
@@ -116,7 +337,7 @@
 	padding: .5rem;
 	/* Thin scrollbar (Firefox). */
 	scrollbar-width: thin;
-	scrollbar-color: rgba(148, 163, 184, .4) transparent;
+	scrollbar-color: var(--gw-border-strong) transparent;
 }
 
 /* Thin scrollbar (WebKit/Blink). */
@@ -129,36 +350,128 @@
 }
 
 .gw-nav::-webkit-scrollbar-thumb {
-	background: rgba(148, 163, 184, .35);
+	background: var(--gw-border-strong);
 	border-radius: 3px;
 }
 
 .gw-nav::-webkit-scrollbar-thumb:hover {
-	background: rgba(148, 163, 184, .6);
+	background: var(--gw-text-subtle);
 }
 
 .gw-nav-link {
 	display: flex;
 	align-items: center;
-	gap: .85rem;
-	padding: .6rem .7rem;
+	gap: .75rem;
+	padding: .62rem .75rem;
 	margin-bottom: .15rem;
-	border-radius: .5rem;
-	color: var(--gw-sidebar-fg);
+	border-radius: var(--gw-radius-md);
+	color: var(--gw-nav-fg);
 	text-decoration: none;
 	white-space: nowrap;
 	overflow: hidden;
-	transition: background .15s ease, color .15s ease;
+	transition: background .16s ease, color .16s ease, transform .16s ease;
 }
 
 .gw-nav-link:hover {
-	background: var(--gw-sidebar-hover-bg);
-	color: #fff;
+	background: var(--gw-nav-hover-bg);
+	color: var(--gw-nav-hover-fg);
+	transform: translateX(3px);
 }
 
 .gw-nav-link.active {
-	background: var(--gw-sidebar-active-bg);
-	color: #fff;
+	background: var(--gw-nav-active-bg);
+	color: var(--gw-nav-active-fg);
+	box-shadow: var(--gw-nav-active-shadow);
+}
+
+/* The active entry is already the strongest thing in the menu: it does not also slide. */
+.gw-nav-link.active:hover {
+	transform: none;
+}
+
+/* Menu sections ----------------------------------------------------------- */
+
+/*
+ * A group heading, in the register bootui uses for the same thing: small, upper case and
+ * spaced, so it reads as a label over its entries rather than as one more of them.
+ */
+.gw-nav-group-toggle {
+	display: flex;
+	align-items: center;
+	gap: .45rem;
+	width: 100%;
+	padding: .5rem .7rem;
+	margin-bottom: .15rem;
+	border: 1px solid var(--gw-border-subtle);
+	border-radius: var(--gw-radius-md);
+	background: var(--gw-surface-alt);
+	color: var(--gw-text-muted);
+	font-size: .72rem;
+	font-weight: 800;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+	text-align: left;
+	cursor: pointer;
+	transition: background .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.gw-nav-group-toggle:hover {
+	background: var(--gw-nav-hover-bg);
+	border-color: var(--gw-accent-edge);
+	color: var(--gw-nav-hover-fg);
+}
+
+/* How many views the section holds, so a folded one still says what it is worth opening for. */
+.gw-nav-group-count {
+	margin-left: auto;
+	padding: .1rem .4rem;
+	border-radius: var(--gw-radius-pill, 999px);
+	background: var(--gw-border-subtle);
+	font-size: .68rem;
+	font-weight: 700;
+	letter-spacing: 0;
+	line-height: 1.35;
+}
+
+.gw-nav-group-chevron {
+	flex: 0 0 16px;
+	width: 16px;
+	height: 16px;
+	transition: transform .16s ease;
+}
+
+/* Points up once the section is open. */
+.gw-nav-group-toggle[aria-expanded="true"] .gw-nav-group-chevron {
+	transform: rotate(180deg);
+}
+
+/*
+ * The entries of a section are indented under their heading, and the rail joining them to
+ * it is what says they belong to it once the labels are the only thing left to read.
+ */
+.gw-nav-group-items {
+	margin: 0 0 .3rem .7rem;
+	padding-left: .55rem;
+	border-left: 1px solid var(--gw-border);
+}
+
+.gw-nav-group-toggle[aria-expanded="false"] + .gw-nav-group-items {
+	display: none;
+}
+
+/*
+ * Collapsed, there is no room for a heading and no label to fold: the section flattens
+ * into its icons, which is the only thing the narrow menu shows anyway.
+ */
+.gw-collapsed .gw-nav-group-toggle {
+	display: none;
+}
+
+.gw-collapsed .gw-nav-group-items {
+	margin: 0;
+	padding: 0;
+	border-left: 0;
+	display: block;
 }
 
 .gw-icon {
@@ -178,7 +491,12 @@
 
 .gw-collapsed .gw-nav-link {
 	justify-content: center;
-	padding: .6rem 0;
+	padding: .62rem 0;
+}
+
+/* Collapsed, the slide would push the icon off the centre it was collapsed onto. */
+.gw-collapsed .gw-nav-link:hover {
+	transform: none;
 }
 
 /*
@@ -192,7 +510,7 @@
 	align-items: center;
 	gap: .4rem;
 	padding: .5rem .7rem;
-	border-top: 1px solid rgba(255, 255, 255, .08);
+	border-top: 1px solid var(--gw-border-subtle);
 }
 
 .gw-collapsed .gw-sidebar-footer {
@@ -207,23 +525,23 @@
 	justify-content: center;
 	padding: .3rem;
 	border: 0;
-	border-radius: .5rem;
+	border-radius: var(--gw-radius-sm);
 	background: transparent;
-	color: var(--gw-sidebar-fg-muted);
+	color: var(--gw-text-muted);
 	cursor: pointer;
-	transition: background .15s ease, color .15s ease;
+	transition: background .16s ease, color .16s ease;
 }
 
 .gw-footer-btn:hover {
-	background: var(--gw-sidebar-hover-bg);
-	color: #fff;
+	background: var(--gw-nav-hover-bg);
+	color: var(--gw-nav-hover-fg);
 }
 
 /* Pushes the theme switch to the far edge, and takes the free space when it is hidden. */
 .gw-version {
 	margin-right: auto;
 	font-size: .78rem;
-	color: var(--gw-sidebar-fg-muted);
+	color: var(--gw-text-subtle);
 }
 
 /* The switch shows the theme it leads to, not the one in use. */
@@ -247,9 +565,9 @@
 	flex: 0 0 auto;
 	display: flex;
 	align-items: center;
-	gap: .85rem;
+	gap: .75rem;
 	padding: .5rem 1.2rem;
-	color: var(--gw-sidebar-fg-muted);
+	color: var(--gw-text-muted);
 	font-size: .82rem;
 	white-space: nowrap;
 	overflow: hidden;
@@ -267,6 +585,183 @@
 	min-width: 0;
 	padding: 1.75rem 2rem;
 }
+
+/* A page arrives rather than appears. Only on load: an HTMX swap replaces what is inside. */
+@media (prefers-reduced-motion: no-preference) {
+	.gw-content > * {
+		animation: gw-fade-in .3s ease-out both;
+	}
+}
+
+@keyframes gw-fade-in {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
+}
+
+/* Panels ------------------------------------------------------------------ */
+
+/*
+ * Bootstrap sets these on .card itself, so the values are restated at the same specificity
+ * rather than overridden. The views draw their cards with .border-0, which is why the edge
+ * is a shadow ring here instead of a border.
+ */
+.card {
+	--bs-card-bg: var(--gw-surface);
+	--bs-card-border-color: var(--gw-border);
+	--bs-card-border-radius: var(--gw-radius-lg);
+	--bs-card-inner-border-radius: calc(var(--gw-radius-lg) - 1px);
+	--bs-card-color: var(--gw-text);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+}
+
+.card.shadow-sm {
+	box-shadow: 0 0 0 1px var(--gw-border), var(--gw-shadow-sm) !important;
+}
+
+.alert {
+	--bs-alert-border-color: transparent;
+	border-radius: var(--gw-radius-md);
+}
+
+.list-group {
+	--bs-list-group-bg: var(--gw-surface-solid);
+	--bs-list-group-border-color: var(--gw-border);
+	--bs-list-group-action-hover-bg: var(--gw-accent-soft);
+	--bs-list-group-action-hover-color: var(--gw-nav-hover-fg);
+}
+
+.modal-content,
+.dropdown-menu {
+	background: var(--gw-surface-solid);
+	border-color: var(--gw-border);
+	box-shadow: var(--gw-shadow-md);
+}
+
+/* Tables ------------------------------------------------------------------ */
+
+/*
+ * Transparent rather than the body colour: the table sits on a card that is itself
+ * translucent over the page wash, and an opaque row would punch a hole in it.
+ */
+.table {
+	--bs-table-bg: transparent;
+	--bs-table-color: var(--gw-text);
+	--bs-table-border-color: var(--gw-border);
+	--bs-table-hover-bg: var(--gw-accent-soft);
+	--bs-table-hover-color: var(--gw-text);
+	--bs-table-striped-bg: var(--gw-border-subtle);
+	--bs-table-striped-color: var(--gw-text);
+}
+
+.table > thead {
+	color: var(--gw-text-muted);
+}
+
+/* Controls ---------------------------------------------------------------- */
+
+.form-control,
+.form-select {
+	background-color: var(--gw-surface-solid);
+	border-color: var(--gw-border-strong);
+	color: var(--gw-text);
+	border-radius: var(--gw-radius-sm);
+}
+
+.form-control:focus,
+.form-select:focus {
+	background-color: var(--gw-surface-solid);
+	border-color: var(--gw-accent);
+	color: var(--gw-text);
+	box-shadow: 0 0 0 .2rem var(--gw-accent-soft);
+}
+
+.form-check-input:checked {
+	background-color: var(--gw-accent);
+	border-color: var(--gw-accent);
+}
+
+.form-check-input:focus {
+	border-color: var(--gw-accent);
+	box-shadow: 0 0 0 .2rem var(--gw-accent-soft);
+}
+
+.btn {
+	--bs-btn-border-radius: var(--gw-radius-sm);
+	transition: background-color .16s ease, border-color .16s ease, color .16s ease,
+		box-shadow .16s ease;
+}
+
+.btn-primary {
+	--bs-btn-bg: var(--gw-accent);
+	--bs-btn-border-color: var(--gw-accent);
+	--bs-btn-hover-bg: var(--gw-accent-strong);
+	--bs-btn-hover-border-color: var(--gw-accent-strong);
+	--bs-btn-active-bg: var(--gw-accent-strong);
+	--bs-btn-active-border-color: var(--gw-accent-strong);
+	--bs-btn-disabled-bg: var(--gw-accent);
+	--bs-btn-disabled-border-color: var(--gw-accent);
+}
+
+/* The dark theme's accent is a light green: black reads on it, white does not. */
+[data-bs-theme="dark"] .btn-primary {
+	--bs-btn-color: #08150d;
+	--bs-btn-hover-color: #08150d;
+	--bs-btn-active-color: #08150d;
+	--bs-btn-disabled-color: #08150d;
+}
+
+/*
+ * The three outline variants are one control wearing three labels: the same neutral edge at
+ * rest, and only the colour of the label saying which. Bootstrap gives each variant its own
+ * border colour, which is what put a red-boxed Delete against a grey-boxed Edit inside the
+ * button group they share.
+ */
+.btn-outline-primary,
+.btn-outline-secondary,
+.btn-outline-danger {
+	--bs-btn-border-color: var(--gw-border-strong);
+	--bs-btn-disabled-color: var(--gw-text-subtle);
+	--bs-btn-disabled-border-color: var(--gw-border);
+}
+
+.btn-outline-primary {
+	--bs-btn-color: var(--gw-accent-strong);
+	--bs-btn-hover-bg: var(--gw-accent-soft);
+	--bs-btn-hover-border-color: var(--gw-accent);
+	--bs-btn-hover-color: var(--gw-accent-strong);
+	--bs-btn-active-bg: var(--gw-accent-soft);
+	--bs-btn-active-border-color: var(--gw-accent);
+	--bs-btn-active-color: var(--gw-accent-strong);
+}
+
+.btn-outline-secondary {
+	--bs-btn-color: var(--gw-text-muted);
+	--bs-btn-hover-bg: var(--gw-accent-soft);
+	--bs-btn-hover-border-color: var(--gw-accent);
+	--bs-btn-hover-color: var(--gw-accent-strong);
+	--bs-btn-active-bg: var(--gw-accent-soft);
+	--bs-btn-active-border-color: var(--gw-accent);
+	--bs-btn-active-color: var(--gw-accent-strong);
+}
+
+/* A destructive action answers in its own colour: hovering Delete green reads as approval. */
+.btn-outline-danger {
+	--bs-btn-color: var(--gw-danger);
+	--bs-btn-hover-bg: var(--gw-danger-soft);
+	--bs-btn-hover-border-color: var(--gw-danger);
+	--bs-btn-hover-color: var(--gw-danger);
+	--bs-btn-active-bg: var(--gw-danger-soft);
+	--bs-btn-active-border-color: var(--gw-danger);
+	--bs-btn-active-color: var(--gw-danger);
+}
+
+/* Home -------------------------------------------------------------------- */
 
 /* Home header: the product lockup, sized so its wordmark stays readable. */
 .gw-home-logo {
@@ -293,6 +788,46 @@
 	}
 }
 
+/* One contributed figure, marked at its head with the accent so the row reads as a set. */
+.gw-stat {
+	position: relative;
+	overflow: hidden;
+}
+
+.gw-stat::before {
+	content: "";
+	position: absolute;
+	inset: 0 auto 0 0;
+	width: 3px;
+	background: linear-gradient(180deg, var(--gw-accent), transparent);
+}
+
+/* One view of the console, on the home page. The whole tile is the link. */
+.gw-tile {
+	display: flex;
+	align-items: center;
+	gap: .6rem;
+	padding: .6rem .7rem;
+	border: 1px solid var(--gw-border);
+	border-radius: var(--gw-radius-md);
+	background: var(--gw-surface-alt);
+	color: var(--gw-text);
+	text-decoration: none;
+	transition: background .16s ease, border-color .16s ease, color .16s ease,
+		transform .16s ease;
+}
+
+.gw-tile:hover {
+	background: var(--gw-nav-hover-bg);
+	border-color: var(--gw-accent-edge);
+	color: var(--gw-nav-hover-fg);
+	transform: translateY(-2px);
+}
+
+.gw-tile .gw-icon {
+	color: var(--gw-accent);
+}
+
 /* Traffic table ----------------------------------------------------------- */
 
 .gw-sortable {
@@ -302,7 +837,7 @@
 }
 
 .gw-sortable:hover {
-	color: var(--gw-sidebar-active-bg);
+	color: var(--gw-accent-strong);
 }
 
 /* Predicate / filter chips ------------------------------------------------ */
@@ -320,19 +855,13 @@
 	max-width: 100%;
 	margin: 0 .25rem .25rem 0;
 	padding: .1rem .4rem;
-	border: 1px solid rgba(0, 0, 0, .1);
+	border: 1px solid var(--gw-border);
 	border-radius: .3rem;
-	background: rgba(0, 0, 0, .03);
+	background: var(--gw-surface-alt);
 	font-family: var(--bs-font-monospace);
 	font-size: .78rem;
 	white-space: normal;
 	overflow-wrap: anywhere;
-}
-
-/* The chip is drawn from the page it sits on, which is dark here. */
-[data-bs-theme="dark"] .gw-chip {
-	border-color: rgba(255, 255, 255, .15);
-	background: rgba(255, 255, 255, .06);
 }
 
 /* Routes table ------------------------------------------------------------ */
@@ -387,7 +916,7 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	color: var(--bs-secondary-color);
+	color: var(--gw-text-muted);
 	font-size: .8rem;
 }
 
@@ -402,13 +931,9 @@
 	width: 2.75rem;
 	height: 2.75rem;
 	border-radius: 50%;
-	background: rgba(37, 99, 235, .1);
-	color: var(--gw-sidebar-active-bg);
-}
-
-/* The tint has to sit on a card the theme darkened, not on the white one it was mixed for. */
-[data-bs-theme="dark"] .gw-band-badge {
-	background: rgba(37, 99, 235, .2);
+	background: var(--gw-accent-soft);
+	box-shadow: inset 0 0 0 1px var(--gw-accent-edge);
+	color: var(--gw-accent-strong);
 }
 
 /*
@@ -482,7 +1007,7 @@
 	position: sticky;
 	top: 0;
 	z-index: 1;
-	background: var(--bs-tertiary-bg);
+	background: var(--gw-surface-alt);
 	white-space: nowrap;
 }
 
@@ -492,6 +1017,343 @@
  */
 .gw-pools-toggle:hover {
 	text-decoration: underline;
+}
+
+/* Flow view ---------------------------------------------------------------- */
+
+/*
+ * The picture is laid out in real pixels from the width of this container rather than
+ * scaled through a viewBox: a viewBox would grow the labels with the screen, and the names
+ * of the endpoints are the one thing on it that has to stay readable at any width.
+ */
+.gw-flow {
+	overflow-x: auto;
+}
+
+.gw-flow-svg {
+	display: block;
+}
+
+.gw-flow-node rect {
+	fill: var(--gw-surface-alt);
+	stroke: var(--gw-border-strong);
+	stroke-width: 1;
+}
+
+/* The gateway sits on every hop, so it is the one box drawn in the accent. */
+.gw-flow-hub rect {
+	fill: var(--gw-accent);
+	stroke: var(--gw-accent);
+}
+
+.gw-flow-name {
+	fill: var(--gw-text);
+	font-family: var(--bs-font-monospace);
+	font-size: 13px;
+}
+
+.gw-flow-detail {
+	fill: var(--gw-text-muted);
+	font-size: 11px;
+}
+
+/* Drawn on the accent, the two lines of the hub need the contrast of their own ground. */
+.gw-flow-hub .gw-flow-name {
+	fill: #fff;
+	font-family: inherit;
+	font-weight: 600;
+}
+
+.gw-flow-hub .gw-flow-detail {
+	fill: rgba(255, 255, 255, .85);
+}
+
+[data-bs-theme="dark"] .gw-flow-hub .gw-flow-name {
+	fill: #08150d;
+}
+
+[data-bs-theme="dark"] .gw-flow-hub .gw-flow-detail {
+	fill: rgba(8, 21, 13, .75);
+}
+
+.gw-flow-edge {
+	fill: none;
+	stroke: var(--gw-border-strong);
+	stroke-width: 1.6;
+}
+
+/*
+ * A hop carries two colours, and they answer different questions. The line is how its last
+ * calls came back, so it returns to green as soon as a batch does; the dot resting at its
+ * end is everything it has carried, so it stays amber once a 4xx has been seen. The two are
+ * therefore keyed apart — the state of the line on the group, the state of the dot on the
+ * dot — or the line would drag the dot back with it.
+ *
+ * Green and red are the semantic colours of the console rather than the Spring green of its
+ * accent: a hop answering cleanly is not a hovered control.
+ */
+.gw-flow-ok .gw-flow-edge {
+	stroke: var(--bs-success);
+}
+
+.gw-flow-warn .gw-flow-edge {
+	stroke: var(--bs-warning);
+}
+
+.gw-flow-bad .gw-flow-edge {
+	stroke: var(--bs-danger);
+}
+
+.gw-flow-dot {
+	stroke: var(--gw-surface);
+	stroke-width: 2;
+}
+
+.gw-flow-dot.gw-flow-rest-ok {
+	fill: var(--bs-success);
+}
+
+.gw-flow-dot.gw-flow-rest-warn {
+	fill: var(--bs-warning);
+}
+
+.gw-flow-dot.gw-flow-rest-bad {
+	fill: var(--bs-danger);
+}
+
+/*
+ * The dot travelling a hop, placed on the line by the motion of its own animation: it takes
+ * its colour from the calls that produced it rather than from the group it is drawn in, so
+ * the two classes are on the element and not on an ancestor.
+ */
+.gw-flow-travelling {
+	pointer-events: none;
+	stroke: var(--gw-surface);
+	stroke-width: 2;
+}
+
+.gw-flow-travelling.gw-flow-ok {
+	fill: var(--bs-success);
+}
+
+.gw-flow-travelling.gw-flow-warn {
+	fill: var(--bs-warning);
+}
+
+.gw-flow-travelling.gw-flow-bad {
+	fill: var(--bs-danger);
+}
+
+/* Introspection views ------------------------------------------------------ */
+
+/*
+ * These tables are long — every bean of a context, every property of an environment — so
+ * they scroll inside their own card rather than pushing the page to a length nobody reads,
+ * and their header stays while the rows move under it.
+ */
+.gw-insights {
+	max-height: 62vh;
+	overflow: auto;
+}
+
+.gw-insights-table thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: var(--gw-surface-solid);
+	white-space: nowrap;
+}
+
+/*
+ * A bean name, a property key or a pattern: read as a token, never as prose, and never
+ * broken across lines. A prefix like `spring.cloud.gateway.server.webflux.audit` wrapped
+ * one character per line is what a column with no floor does to it, so the table would
+ * rather scroll than squeeze.
+ */
+.gw-insights-code {
+	display: block;
+	max-width: 34rem;
+	color: var(--gw-text);
+	font-size: .8rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.gw-insights-table td {
+	vertical-align: top;
+}
+
+/* A property several sources declare: the value in use is not the only one declared. */
+.gw-insights-shadowed td:first-child {
+	border-left: 3px solid var(--bs-warning);
+}
+
+.gw-insights-badge {
+	font-weight: 600;
+}
+
+/*
+ * The condition report, stacked rather than tabulated: the outcome and the configuration
+ * hold the left, and the sentence explaining them wraps underneath. A message runs longer
+ * than any column can be, so in columns this report is read sideways — which for a
+ * thousand entries is not read at all.
+ */
+.gw-condition {
+	display: flex;
+	align-items: baseline;
+	gap: .75rem;
+	padding: .5rem .25rem;
+	border-bottom: 1px solid var(--gw-border-subtle);
+}
+
+/* One width for every badge, so the names line up down the page. */
+.gw-condition > .gw-insights-badge {
+	flex: 0 0 5.5rem;
+	text-align: center;
+	letter-spacing: .03em;
+}
+
+/* Without this the flex child refuses to shrink, and a long line pushes the page wide. */
+.gw-condition-body {
+	min-width: 0;
+}
+
+.gw-condition-name {
+	color: var(--gw-text);
+	font-family: var(--bs-font-monospace);
+	font-size: .85rem;
+	font-weight: 700;
+	overflow-wrap: anywhere;
+}
+
+.gw-condition-kind {
+	color: var(--gw-text-muted);
+	font-family: var(--bs-font-monospace);
+	font-size: .78rem;
+}
+
+.gw-condition-why {
+	color: var(--gw-text);
+	font-size: .85rem;
+	overflow-wrap: anywhere;
+}
+
+.gw-insights-ok {
+	background: var(--gw-accent-soft);
+	color: var(--gw-accent-strong);
+}
+
+.gw-insights-no {
+	background: var(--gw-danger-soft);
+	color: var(--gw-danger);
+}
+
+/* A logger the instances of the fleet do not agree on: no one level to claim. */
+.gw-insights-warn {
+	background: rgba(255, 193, 7, .16);
+	color: var(--bs-warning-text-emphasis, #997404);
+}
+
+/*
+ * The level of one logger, as six buttons and a reset. The level in force is filled rather
+ * than outlined, so a column of them reads down the page without any of them being opened.
+ */
+.gw-insights-levels .btn {
+	--bs-btn-font-size: .72rem;
+	padding: .18rem .45rem;
+	font-weight: 600;
+	letter-spacing: .02em;
+}
+
+.gw-insights-levels .btn.gw-insights-level-on {
+	background: var(--gw-accent);
+	border-color: var(--gw-accent);
+	color: #fff;
+}
+
+[data-bs-theme="dark"] .gw-insights-levels .btn.gw-insights-level-on {
+	color: #08150d;
+}
+
+.gw-insights-level-reset {
+	font-size: .85rem;
+	line-height: 1;
+}
+
+/*
+ * The configuration tree: one folding group per prefix, and the properties bound under it
+ * as a two-column list, so the values line up down the page and a prefix can be closed
+ * once it has been read.
+ */
+.gw-insights-group {
+	border-bottom: 1px solid var(--gw-border-subtle);
+}
+
+.gw-insights-group > summary {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	padding: .55rem .25rem;
+	cursor: pointer;
+	list-style: none;
+}
+
+/* The native marker is replaced by one that turns with the group. */
+.gw-insights-group > summary::-webkit-details-marker {
+	display: none;
+}
+
+.gw-insights-group > summary::before {
+	content: "";
+	flex: 0 0 auto;
+	width: .4rem;
+	height: .4rem;
+	border-right: 1.5px solid var(--gw-text-subtle);
+	border-bottom: 1.5px solid var(--gw-text-subtle);
+	transform: rotate(-45deg);
+	transition: transform .15s ease;
+}
+
+.gw-insights-group[open] > summary::before {
+	transform: rotate(45deg);
+}
+
+.gw-insights-group > summary:hover {
+	background: var(--gw-nav-hover-bg);
+}
+
+/* How many properties the prefix carries, so a folded group still says what it holds. */
+.gw-insights-count {
+	margin-left: auto;
+	padding: .05rem .4rem;
+	border-radius: var(--gw-radius-pill, 999px);
+	background: var(--gw-border-subtle);
+	color: var(--gw-text-muted);
+	font-size: .7rem;
+	font-weight: 600;
+}
+
+.gw-insights-props {
+	display: grid;
+	grid-template-columns: minmax(10rem, 22rem) 1fr;
+	gap: .15rem 1.5rem;
+	margin: 0 0 .6rem 1.4rem;
+	font-size: .85rem;
+}
+
+.gw-insights-props dt {
+	color: var(--gw-text-muted);
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+
+.gw-insights-props dd {
+	margin: 0;
+	color: var(--gw-text);
+	font-family: var(--bs-font-monospace);
+	font-size: .8rem;
+	overflow-wrap: anywhere;
 }
 
 /* Login ------------------------------------------------------------------- */
@@ -526,7 +1388,7 @@
 .gw-forbidden-icon {
 	width: 56px;
 	height: 56px;
-	color: var(--bs-secondary-color);
+	color: var(--gw-text-muted);
 }
 
 /* A rule on either side of the word separating the providers from the form. */
@@ -541,5 +1403,5 @@
 .gw-login-divider::after {
 	content: "";
 	flex: 1 1 auto;
-	border-top: 1px solid var(--bs-border-color);
+	border-top: 1px solid var(--gw-border);
 }

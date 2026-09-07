@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Flow', ~{:: #flow-content}, ~{:: #flow-scripts})}">
+<body>
+	<div id="flow-content">
+		<header class="mb-4">
+			<h1 class="h3 fw-bold mb-1">Flow</h1>
+			<p class="text-secondary mb-0">Who reaches the gateway, and what the gateway reaches.</p>
+		</header>
+
+		<!-- The same figures as the graph, over the same snapshot. -->
+		<div class="row g-3 mb-3">
+			<div class="col-6 col-lg">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small">Callers</div>
+						<div class="h4 fw-semibold mb-0" id="gf-kpi-callers">&mdash;</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-lg">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small">Services</div>
+						<div class="h4 fw-semibold mb-0" id="gf-kpi-services">&mdash;</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-lg">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small">Calls</div>
+						<div class="h4 fw-semibold mb-0" id="gf-kpi-calls">&mdash;</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-lg">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small">Client errors (4xx)</div>
+						<div class="h4 fw-semibold mb-0" id="gf-kpi-client-errors">&mdash;</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-lg">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small">Server errors (5xx)</div>
+						<div class="h4 fw-semibold mb-0" id="gf-kpi-errors">&mdash;</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="card border-0 shadow-sm">
+			<div class="card-body">
+				<div class="d-flex flex-wrap gap-3 align-items-end mb-2">
+					<div>
+						<label class="form-label small text-secondary mb-1" for="gf-search">Keep only</label>
+						<input type="search" id="gf-search" class="form-control form-control-sm"
+								style="min-width: 14rem" placeholder="caller or service fragment">
+					</div>
+					<div>
+						<!-- A gateway fronting a hundred services would otherwise stack a hundred
+						     boxes down the page, which is no more readable than no picture at all. -->
+						<label class="form-label small text-secondary mb-1" for="gf-top">Show</label>
+						<select id="gf-top" class="form-select form-select-sm" style="width: 11rem">
+							<option value="10">Top 10 by calls</option>
+							<option value="20" selected>Top 20 by calls</option>
+							<option value="50">Top 50 by calls</option>
+							<option value="0">Everything</option>
+						</select>
+					</div>
+					<div class="ms-auto d-flex align-items-center gap-3">
+						<!-- How long ago the figures were read, ticking on its own between two
+						     polls: a flow left open on a dead poll must not look live. -->
+						<span class="text-secondary small" id="gf-age"></span>
+						<div class="form-check form-switch mb-0">
+							<input class="form-check-input" type="checkbox" role="switch" id="gf-auto" checked>
+							<label class="form-check-label small" for="gf-auto">Auto</label>
+						</div>
+						<!-- Same pair as the graph view, and the same rule: neither on draws
+						     everything, both on keep a hop that saw either. -->
+						<div class="form-check form-switch mb-0">
+							<input class="form-check-input" type="checkbox" role="switch" id="gf-4xx">
+							<label class="form-check-label small" for="gf-4xx"
+									title="Keep only the hops that saw a 4xx">4xx</label>
+						</div>
+						<div class="form-check form-switch mb-0">
+							<input class="form-check-input" type="checkbox" role="switch" id="gf-5xx">
+							<label class="form-check-label small" for="gf-5xx"
+									title="Keep only the hops that saw a 5xx">5xx</label>
+						</div>
+						<button type="button" id="gf-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
+					</div>
+				</div>
+
+				<div class="alert alert-light border py-2 px-3 small text-secondary mb-3">
+					The calls of the service graph, laid out as they run: the callers that reached the
+					gateway on the left, the services it reached on the right.
+					<br>
+					<strong>A dot travels a hop when calls arrive on it</strong>, coloured by how those
+					calls came back: it is the traffic since the last poll, not a replay of one request.
+					A quiet hop stays still, which is the point &mdash; the picture only moves when the
+					gateway is carrying something. Turn <em>Auto</em> off to stop polling.
+					<br>
+					<strong>The line of a hop is its last traffic</strong>: it turns amber or red when
+					calls come back 4xx or 5xx, and back to green as soon as a batch comes back clean.
+					<strong>The dot resting at its end is everything it has carried</strong> and only ever
+					gets worse, so a hop that has misbehaved stays recognisable once its line has gone
+					green again.
+					<br>
+					A service that also calls appears on both sides, once as what it reached and once as
+					what reached through the gateway. The graph view merges the two into one node; here
+					they are two ends of a flow, which is what the two columns are for.
+				</div>
+
+				<!-- What this flow covers: one instance, every instance through a provider, or a
+				     tracing backend. Filled from the payload on every poll. -->
+				<p class="text-secondary small mb-2" id="gf-coverage"></p>
+
+				<div id="gf-flow" class="gw-flow"
+						th:attr="data-url=@{/ui/service-graph/data}" data-url="/ui/service-graph/data"></div>
+				<div id="gf-empty" class="text-secondary text-center py-5" style="display: none">
+					Nothing to draw yet &mdash; send some traffic through the gateway, then refresh.
+				</div>
+				<p class="text-secondary small mb-0 mt-2" id="gf-legend"></p>
+			</div>
+		</div>
+	</div>
+
+	<div id="flow-scripts">
+		<script th:src="@{/js/gateway-service-flow.js}" src="/js/gateway-service-flow.js"></script>
+	</div>
+</body>
+</html>

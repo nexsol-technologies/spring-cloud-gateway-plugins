@@ -79,7 +79,7 @@ public record ServiceGraphSnapshot(String coverage, List<GraphNode> nodes, List<
 
 	private static GraphEdge sum(GraphEdge left, GraphEdge right) {
 		return new GraphEdge(left.from(), left.to(), left.routeId(), left.calls() + right.calls(),
-				left.errors() + right.errors());
+				left.clientErrors() + right.clientErrors(), left.errors() + right.errors());
 	}
 
 	/**

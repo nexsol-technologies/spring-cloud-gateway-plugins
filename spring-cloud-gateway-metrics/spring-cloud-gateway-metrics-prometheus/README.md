@@ -34,6 +34,7 @@ spring.cloud.gateway.server.webflux.metrics:
     # Label naming an instance. The default is the scrape target
     # (host:port), so point it at a pod label when there is one.
     instance-label: instance
+    instance-scheme: http
     # How far back an instance must have reported to still be listed.
     stale-after: 2m
     timeout: 5s
@@ -47,6 +48,7 @@ spring.cloud.gateway.server.webflux.metrics:
 | `...prometheus.selector` | — | Extra label matchers, written without the braces |
 | `...prometheus.meter` | `spring_cloud_gateway_requests_seconds` | Base name of the gateway request timer |
 | `...prometheus.instance-label` | `instance` | Label identifying a gateway instance |
+| `...prometheus.instance-scheme` | `http` | Scheme an instance address is built with, from that label; empty derives none |
 | `...prometheus.stale-after` | `2m` | How far back an instance must have reported to still be listed |
 | `...prometheus.timeout` | `5s` | How long to wait before reporting no data |
 | `...prometheus.max-response-size` | — | Largest answer read; unset keeps the ceiling of `spring.http.codecs.max-in-memory-size` |
@@ -122,6 +124,26 @@ The views report no data and say why, rather than failing the page:
 | `… — unreachable` | The server never answered: wrong host, network, timeout |
 | `… — authentication refused (401)` | The credentials were rejected or missing |
 | `… — refused with 500` | The server answered, with an error of its own |
+
+
+## The address an instance is read at
+
+The [console](../../spring-cloud-gateway-ui/README.md) reads the Actuator endpoints of the
+instance a reader picked — its loggers among them — at the address derived from the
+`instance-label` of its series. Prometheus sets that label to the address it scraped,
+`host:port`; `instance-scheme` supplies the scheme it does not carry.
+
+| The label holds | Derived address |
+| --- | --- |
+| `10.4.2.17:8080` | `http://10.4.2.17:8080` |
+| `http://gw-a:8080` | taken as it is |
+| `gateway-a`, or anything with no port | none |
+
+With `instance-scheme` empty, no address is derived at all. An instance without one is listed
+but cannot be read: its endpoints are unreachable, and a level set across the fleet skips it.
+
+Instances that stopped reporting leave the list after `stale-after`, so an address is only ever
+derived from a live series.
 
 ## Sample
 

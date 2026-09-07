@@ -20,6 +20,7 @@ import java.util.List;
 
 import ch.nexsol.gateway.ui.nav.GatewayUiMenu;
 import ch.nexsol.gateway.ui.nav.NavItem;
+import ch.nexsol.gateway.ui.nav.NavSection;
 
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -57,6 +58,16 @@ public class GatewayUiModelAttributes {
 	@ModelAttribute("navItems")
 	public List<NavItem> navItems() {
 		return this.menu.items();
+	}
+
+	/**
+	 * Adds the same entries laid out as the shell draws them &mdash; a section per group,
+	 * a section of its own for every entry carrying none.
+	 * @return the ordered menu sections
+	 */
+	@ModelAttribute("navSections")
+	public List<NavSection> navSections() {
+		return this.menu.sections();
 	}
 
 	/**

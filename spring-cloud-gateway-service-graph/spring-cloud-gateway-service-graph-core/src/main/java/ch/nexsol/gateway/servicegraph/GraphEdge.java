@@ -18,12 +18,18 @@ package ch.nexsol.gateway.servicegraph;
 
 /**
  * One directed edge of the graph: what one endpoint called, through which route, how
- * often, and how often it failed.
+ * often, and how often it was refused or failed.
  * <p>
  * The route is part of what makes an edge, not a label on it: two routes leading to the
  * same target answer different questions of the same pair, and merging them would hide
  * which one carries the traffic. Two endpoints joined by two routes are therefore two
  * edges.
+ * <p>
+ * The two error counts are kept apart for the reason the traffic view keeps them apart: a
+ * 4xx is the caller asking for something it may not have, a 5xx is the service failing to
+ * answer, and one edge can carry a great many of the first while the service behind it is
+ * perfectly healthy. Summing them into one figure is what makes a graph read as broken
+ * when nothing is.
  * <p>
  * The failure share is left to the view rather than carried here, because a rate cannot
  * be merged &mdash; two partial edges are summed, and dividing before summing is how an
@@ -35,8 +41,10 @@ package ch.nexsol.gateway.servicegraph;
  * does not know it &mdash; a graph read from a tracing backend describes calls that never
  * went through the gateway at all
  * @param calls the number of calls
+ * @param clientErrors the number of calls answered with a 4xx, {@code 0} from a source
+ * that cannot tell the two error classes apart
  * @param errors the number of calls answered with a 5xx
  */
-public record GraphEdge(String from, String to, String routeId, long calls, long errors) {
+public record GraphEdge(String from, String to, String routeId, long calls, long clientErrors, long errors) {
 
 }

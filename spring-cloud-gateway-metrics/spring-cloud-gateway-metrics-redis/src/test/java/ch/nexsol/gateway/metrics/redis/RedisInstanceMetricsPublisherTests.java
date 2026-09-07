@@ -73,9 +73,45 @@ class RedisInstanceMetricsPublisherTests {
 				new InstanceInstrumentation(true, true));
 	}
 
+	/** The payload the publisher handed Redis. */
+	private String written() {
+		ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
+		verify(this.valueOperations).set(anyString(), payload.capture(), any(Duration.class));
+		return payload.getValue();
+	}
+
 	private RedisInstanceMetricsPublisher publisher(RedisMetricsProperties properties) {
+		return publisher(properties, new InstanceUri(properties.getInstanceUri(), properties.getInstanceScheme()));
+	}
+
+	private RedisInstanceMetricsPublisher publisher(RedisMetricsProperties properties, InstanceUri instanceUri) {
 		return new RedisInstanceMetricsPublisher(this.redisTemplate, this.localSource, properties, this.objectMapper,
-				new InstanceIdentity("pod-a"));
+				new InstanceIdentity("pod-a"), instanceUri);
+	}
+
+	/**
+	 * The console reads the Actuator endpoints of an instance at the address it
+	 * published, so an instance publishing none is one it cannot reach — and cannot
+	 * include when a level is set across the fleet.
+	 */
+	@Test
+	void publishesTheAddressTheOperatorDeclared() {
+		RedisMetricsProperties properties = new RedisMetricsProperties();
+		properties.setInstanceUri("http://gateway-a.internal:8080");
+		when(this.localSource.read()).thenReturn(metric());
+
+		publisher(properties).publish().block();
+
+		assertThat(written()).contains("\"uri\":\"http://gateway-a.internal:8080\"");
+	}
+
+	@Test
+	void leavesTheFiguresAloneWhenNoAddressIsKnownYet() {
+		when(this.localSource.read()).thenReturn(metric());
+
+		publisher(new RedisMetricsProperties()).publish().block();
+
+		assertThat(written()).contains("\"uri\":null");
 	}
 
 	@Test

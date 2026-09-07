@@ -47,6 +47,13 @@ public final class HubOpenapiPaths {
 	 */
 	public static final String REMOVE_COOKIE_FILTER = "RemoveRequestHeader=Cookie";
 
+	/**
+	 * Prefix the Swagger UI webjar is served under. SpringDoc 3 dropped its
+	 * {@code DEFAULT_WEB_JARS_PREFIX_URL} constant; the prefix is now the default of
+	 * {@code spring.webflux.webjars-path-pattern}.
+	 */
+	private static final String WEBJARS_PREFIX = "/webjars";
+
 	private HubOpenapiPaths() {
 	}
 
@@ -109,7 +116,7 @@ public final class HubOpenapiPaths {
 		paths.add(HubDiscoveryRouteLocator.API_DOCS_URL + "/*");
 		// The Swagger UI assets, whose file names belong to the shipped webjar.
 		paths.add(Constants.SWAGGER_UI_PREFIX + "/**");
-		paths.add(Constants.DEFAULT_WEB_JARS_PREFIX_URL + Constants.SWAGGER_UI_PREFIX + "/**");
+		paths.add(WEBJARS_PREFIX + Constants.SWAGGER_UI_PREFIX + "/**");
 		return List.copyOf(paths);
 	}
 

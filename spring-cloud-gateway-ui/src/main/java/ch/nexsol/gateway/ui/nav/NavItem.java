@@ -29,6 +29,25 @@ package ch.nexsol.gateway.ui.nav;
  * @param icon the id of the SVG symbol (defined in the shell sprite) rendered as the icon
  * @param href the target URL the entry links to
  * @param order the sort weight; lower values appear first
+ * @param group the heading this entry folds under, {@code null} for an entry sitting on
+ * its own at the top level. Entries carrying the same group are drawn together under it,
+ * wherever their order puts the group as a whole.
  */
-public record NavItem(String id, String label, String icon, String href, int order) {
+public record NavItem(String id, String label, String icon, String href, int order, String group) {
+
+	/**
+	 * Creates an entry sitting at the top level of the menu, under no heading.
+	 * <p>
+	 * Kept so a plugin written against the console before menu groups existed still
+	 * compiles and still links against this class unchanged.
+	 * @param id the stable identifier used to flag the active entry
+	 * @param label the text shown next to the icon when the menu is expanded
+	 * @param icon the id of the SVG symbol rendered as the icon
+	 * @param href the target URL the entry links to
+	 * @param order the sort weight; lower values appear first
+	 */
+	public NavItem(String id, String label, String icon, String href, int order) {
+		this(id, label, icon, href, order, null);
+	}
+
 }

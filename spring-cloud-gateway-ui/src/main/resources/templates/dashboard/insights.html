@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+		th:replace="~{dashboard/fragments/layout :: layout(${'Spring Cloud Gateway — ' + view.label()}, ~{:: #insights-content}, ~{:: #insights-scripts})}">
+<body>
+	<div id="insights-content">
+		<header class="mb-4">
+			<h1 class="h3 fw-bold mb-1" th:text="${view.label()}">View</h1>
+			<p class="text-secondary mb-0" th:text="${view.description()}">What it shows.</p>
+		</header>
+
+		<div class="card border-0 shadow-sm">
+			<div class="card-body">
+				<div class="d-flex flex-wrap gap-3 align-items-end mb-3">
+					<!--
+						Which instance is being read. Every view is served with the instances the
+						runtime view already knows, so a console fronting a cluster reads the one
+						asked for rather than whichever answered. One instance alone leaves the
+						control out: a select with a single option is furniture.
+					-->
+					<div th:if="${#lists.size(instances) > 1}">
+						<label class="form-label small text-secondary mb-1" for="gi-instance">Instance</label>
+						<select id="gi-instance" class="form-select form-select-sm" style="min-width: 16rem">
+							<!--
+								The loggers view answers for the fleet unless one instance is asked
+								for: a level is a property of the deployment, and raising it on the
+								instance that happened to answer leaves the others recording nothing.
+								The reading views have nothing to merge, so they name an instance.
+							-->
+							<option th:if="${viewId == 'loggers'}" value="*"
+									th:text="'All ' + ${#lists.size(instances)} + ' instances'">All instances</option>
+							<option th:each="instance : ${instances}" th:value="${instance.id()}"
+									th:text="${instance.id() + (instance.self() ? ' (this one)' : '')}">id</option>
+						</select>
+					</div>
+					<!-- Only the conditions report has an outcome to narrow on. -->
+					<div th:if="${viewId == 'conditions'}">
+						<label class="form-label small text-secondary mb-1" for="gi-outcome">Outcome</label>
+						<select id="gi-outcome" class="form-select form-select-sm" style="min-width: 11rem">
+							<option value="">Matched and not</option>
+							<option value="matched">Matched</option>
+							<option value="not-matched">Did not match</option>
+						</select>
+					</div>
+					<div class="flex-grow-1">
+						<label class="form-label small text-secondary mb-1" for="gi-search">Keep only</label>
+						<input type="search" id="gi-search" class="form-control form-control-sm"
+								style="max-width: 22rem" placeholder="filter">
+					</div>
+					<div class="d-flex align-items-center gap-3">
+						<span class="text-secondary small" id="gi-count"></span>
+						<button type="button" id="gi-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
+					</div>
+				</div>
+
+				<div id="gi-error" class="alert alert-warning py-2 px-3 small mb-3" style="display: none"></div>
+
+				<div id="gi-body" class="gw-insights"
+						th:attr="data-view=${viewId}, data-writable=${writable},
+								data-url=@{'/ui/insights/' + ${viewId} + '/data'},
+								data-write-url=@{/ui/insights/loggers}"></div>
+
+				<div id="gi-loading" class="gw-loading" style="display: none">Reading&hellip;</div>
+
+				<div id="gi-empty" class="text-secondary text-center py-5" style="display: none">
+					Nothing to show.
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="insights-scripts">
+		<script th:src="@{/js/gateway-insights.js}" src="/js/gateway-insights.js"></script>
+	</div>
+</body>
+</html>

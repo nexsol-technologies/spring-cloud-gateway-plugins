@@ -16,7 +16,12 @@
 
 package ch.nexsol.gateway.ui.autoconfigure;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import ch.nexsol.gateway.audit.AuditEventPublisher;
+import ch.nexsol.gateway.commons.InstanceIdentity;
 import ch.nexsol.gateway.commons.security.SecuredPaths;
 import ch.nexsol.gateway.commons.security.SecuredPathsContribution;
 import ch.nexsol.gateway.database.service.ApiService;
@@ -31,6 +36,13 @@ import ch.nexsol.gateway.ui.audit.AuditTailBuffer;
 import ch.nexsol.gateway.ui.audit.AuditTailController;
 import ch.nexsol.gateway.ui.controller.DashboardController;
 import ch.nexsol.gateway.ui.controller.GatewayUiModelAttributes;
+import ch.nexsol.gateway.ui.insights.ActuatorClient;
+import ch.nexsol.gateway.ui.insights.ActuatorInstances;
+import ch.nexsol.gateway.ui.insights.InsightsController;
+import ch.nexsol.gateway.ui.insights.InsightsProperties;
+import ch.nexsol.gateway.ui.insights.LoggerBaseline;
+import ch.nexsol.gateway.ui.insights.LoggerWriteAccess;
+import ch.nexsol.gateway.ui.insights.RoleLoggerWriteAccess;
 import ch.nexsol.gateway.ui.metrics.InstanceMetricsController;
 import ch.nexsol.gateway.ui.metrics.InstancesOverviewContribution;
 import ch.nexsol.gateway.ui.metrics.MetricsOverviewContribution;
@@ -58,6 +70,7 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
@@ -68,6 +81,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Auto-configuration wiring the gateway UI shell: the dashboard controller, the side-menu
@@ -87,6 +102,27 @@ import org.springframework.context.annotation.Import;
 		afterName = "ch.nexsol.gateway.database.autoconfigure.GatewayDatabaseAutoConfiguration")
 @Import({ DashboardController.class, GatewayUiModelAttributes.class })
 public class GatewayUiAutoConfiguration {
+
+	/**
+	 * Heading the views of the traffic the gateway carries fold under &mdash; what came
+	 * through it, drawn three ways. A group is named rather than declared: the shell
+	 * draws one section per distinct name, so an entry joins this one simply by carrying
+	 * it, and the plugins contributing these views stay unaware of each other.
+	 */
+	static final String ACTIVITY = "Activity";
+
+	/**
+	 * Heading the views of the route table fold under &mdash; what the gateway is
+	 * configured to do, as opposed to what it has done. Named rather than declared, the
+	 * same way {@link #ACTIVITY} is.
+	 */
+	static final String ROUTING = "Routing";
+
+	/**
+	 * Heading the introspection views fold under &mdash; what this gateway is made of, as
+	 * opposed to what it routes or what it has carried.
+	 */
+	static final String CONFIGURATION = "Configuration";
 
 	/**
 	 * Registers the side-menu registry aggregating every contributed {@link NavItem}.
@@ -168,7 +204,7 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem routesNavItem() {
-			return new NavItem("routes", "Database routes", "icon-plugin", "/ui/routes/db", 10);
+			return new NavItem("routes", "Database routes", "icon-plugin", "/ui/routes/db", 10, ROUTING);
 		}
 
 		/**
@@ -229,7 +265,7 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem routesInventoryNavItem() {
-			return new NavItem("routes-all", "Routes", "icon-route", "/ui/routes", 5);
+			return new NavItem("routes-all", "Routes", "icon-route", "/ui/routes", 5, ROUTING);
 		}
 
 		/**
@@ -273,7 +309,7 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem routeTesterNavItem() {
-			return new NavItem("route-tester", "Route tester", "icon-target", "/ui/routes/test", 15);
+			return new NavItem("route-tester", "Route tester", "icon-target", "/ui/routes/test", 15, ROUTING);
 		}
 
 		/**
@@ -320,7 +356,7 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem trafficNavItem() {
-			return new NavItem("traffic", "Traffic", "icon-chart", "/ui/metrics", 20);
+			return new NavItem("traffic", "Traffic", "icon-chart", "/ui/metrics", 20, ACTIVITY);
 		}
 
 		/**
@@ -435,7 +471,17 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem serviceGraphNavItem() {
-			return new NavItem("service-graph", "Service graph", "icon-graph", "/ui/service-graph", 22);
+			return new NavItem("service-graph", "Service graph", "icon-graph", "/ui/service-graph", 22, ACTIVITY);
+		}
+
+		/**
+		 * Contributes the flow entry, next to the graph it shares its data with: the same
+		 * calls laid out as callers, the gateway and the services it reached.
+		 * @return the flow menu entry
+		 */
+		@Bean
+		NavItem serviceFlowNavItem() {
+			return new NavItem("service-flow", "Flow", "icon-flow", "/ui/service-graph/flow", 19, ACTIVITY);
 		}
 
 		/**
@@ -445,8 +491,147 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		UiSecuredPaths serviceGraphSecuredPaths() {
-			return new UiSecuredPaths("/ui/service-graph", "/ui/service-graph/data", "/js/echarts.min.js",
-					"/js/gateway-service-graph.js");
+			return new UiSecuredPaths("/ui/service-graph", "/ui/service-graph/flow", "/ui/service-graph/data",
+					"/js/echarts.min.js", "/js/gateway-service-graph.js", "/js/gateway-service-flow.js");
+		}
+
+	}
+
+	/**
+	 * Activates the introspection views when Actuator is on the classpath: they are that
+	 * gateway's own Actuator endpoints, read over HTTP and drawn as tables.
+	 * <p>
+	 * The endpoints still have to be exposed for a view to show anything. One that is not
+	 * reports that it could not be read, and says which property exposes it, rather than
+	 * rendering an empty page.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(name = "org.springframework.boot.actuate.endpoint.web.WebEndpointsSupplier")
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.ui.insights.enabled", matchIfMissing = true)
+	@EnableConfigurationProperties(InsightsProperties.class)
+	@Import(InsightsController.class)
+	static class InsightsConfiguration {
+
+		/**
+		 * The instances a view can be pointed at, read from whichever source the metrics
+		 * plugin resolved.
+		 * @param metricsSource the provider over the instance metrics source
+		 * @param identity the identity of the running instance
+		 * @return the directory
+		 */
+		@Bean
+		ActuatorInstances actuatorInstances(ObjectProvider<InstanceMetricsSource> metricsSource,
+				InstanceIdentity identity) {
+			return new ActuatorInstances(metricsSource, identity);
+		}
+
+		/**
+		 * The client reading the Actuator endpoints of the chosen instance.
+		 * <p>
+		 * The builder is taken if the application declares one, so a gateway that
+		 * configures its outgoing calls once has these follow, and falls back to a plain
+		 * one otherwise: {@code WebClient.Builder} is contributed by an
+		 * auto-configuration that not every application ends up with, and a view is not
+		 * worth failing a context over.
+		 * @param webClientBuilder the provider over the application builder
+		 * @param properties the introspection configuration
+		 * @return the client
+		 */
+		/**
+		 * Whether the principal behind a request may change a logging level, by the role
+		 * it holds.
+		 * @param properties the introspection configuration
+		 * @return the check
+		 */
+		/**
+		 * The levels each instance was first read with, so a changed one can be put back.
+		 * @return the baseline
+		 */
+		@Bean
+		LoggerBaseline loggerBaseline() {
+			return new LoggerBaseline();
+		}
+
+		@Bean
+		@ConditionalOnClass(Authentication.class)
+		LoggerWriteAccess roleLoggerWriteAccess(InsightsProperties properties) {
+			return new RoleLoggerWriteAccess(properties);
+		}
+
+		/**
+		 * The answer where Spring Security is not on the classpath: no principal can be
+		 * established, so no role can be checked, and the loggers view draws no control.
+		 * @return a check that never grants the write
+		 */
+		@Bean
+		@ConditionalOnMissingBean(LoggerWriteAccess.class)
+		LoggerWriteAccess deniedLoggerWriteAccess() {
+			return LoggerWriteAccess.denied();
+		}
+
+		@Bean
+		ActuatorClient actuatorClient(ObjectProvider<WebClient.Builder> webClientBuilder,
+				InsightsProperties properties) {
+			return new ActuatorClient(webClientBuilder.getIfAvailable(WebClient::builder), properties);
+		}
+
+		/*
+		 * One bean per entry, and not a single bean carrying the list: the menu collects
+		 * NavItem beans through an ObjectProvider, which sees a List<NavItem> as one bean
+		 * of the wrong type and skips it. Six declarations is what it costs to be found.
+		 */
+
+		@Bean
+		NavItem insightsConfigurationNavItem() {
+			return entry("configuration");
+		}
+
+		@Bean
+		NavItem insightsProfileDiffNavItem() {
+			return entry("profile-diff");
+		}
+
+		@Bean
+		NavItem insightsLoggersNavItem() {
+			return entry("loggers");
+		}
+
+		@Bean
+		NavItem insightsBeansNavItem() {
+			return entry("beans");
+		}
+
+		@Bean
+		NavItem insightsConditionsNavItem() {
+			return entry("conditions");
+		}
+
+		@Bean
+		NavItem insightsMappingsNavItem() {
+			return entry("mappings");
+		}
+
+		private static NavItem entry(String view) {
+			InsightsController.View declared = InsightsController.view(view);
+			return new NavItem("insights-" + view, declared.label(), declared.icon(), "/ui/insights/" + view,
+					declared.order(), CONFIGURATION);
+		}
+
+		/**
+		 * Declares the paths of the introspection views and of the script they load, so
+		 * the console governs them like its own.
+		 * @return the introspection view paths
+		 */
+		@Bean
+		UiSecuredPaths insightsSecuredPaths() {
+			List<String> paths = new ArrayList<>();
+			paths.add("/js/gateway-insights.js");
+			for (Map.Entry<String, InsightsController.View> view : InsightsController.declared()) {
+				paths.add("/ui/insights/" + view.getKey());
+				paths.add("/ui/insights/" + view.getKey() + "/data");
+			}
+			paths.add("/ui/insights/loggers/**");
+			return new UiSecuredPaths(paths.toArray(String[]::new));
 		}
 
 	}
@@ -549,7 +734,7 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem auditNavItem() {
-			return new NavItem("audit", "Audit", "icon-list", "/ui/audit", 30);
+			return new NavItem("audit", "Audit", "icon-list", "/ui/audit", 30, ACTIVITY);
 		}
 
 		/**
