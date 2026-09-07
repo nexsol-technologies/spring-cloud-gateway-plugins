@@ -39,8 +39,8 @@ class ServiceGraphOverviewContributionTests {
 	@Test
 	void countsTheServicesTheGatewayReached() {
 		ServiceGraphSource source = () -> Mono.just(ServiceGraphSnapshot.of("this instance only (pod-a)",
-				List.of(new GraphEdge("frontend", "service-a", "a-route", 10, 1),
-						new GraphEdge("service-a", "service-b", "b-route", 4, 0))));
+				List.of(new GraphEdge("frontend", "service-a", "a-route", 10, 0, 1),
+						new GraphEdge("service-a", "service-b", "b-route", 4, 0, 0))));
 
 		StepVerifier.create(contribution(source).stats()).assertNext((stat) -> {
 			assertThat(stat.label()).isEqualTo("Services called");
@@ -53,7 +53,7 @@ class ServiceGraphOverviewContributionTests {
 	@Test
 	void singularWhenOneCallIsDrawn() {
 		ServiceGraphSource source = () -> Mono
-			.just(ServiceGraphSnapshot.of("test", List.of(new GraphEdge("web", "orders", "orders-route", 3, 0))));
+			.just(ServiceGraphSnapshot.of("test", List.of(new GraphEdge("web", "orders", "orders-route", 3, 0, 0))));
 
 		StepVerifier.create(contribution(source).stats())
 			.assertNext((stat) -> assertThat(stat.detail()).startsWith("1 call drawn"))

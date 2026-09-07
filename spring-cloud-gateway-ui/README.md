@@ -35,6 +35,7 @@ what the application actually runs.
 | [Traffic](#traffic) | `/ui/metrics` | Micrometer is present |
 | [Runtime](#runtime) | `/ui/metrics/instances` | Micrometer is present and `...metrics.instance.enabled` is not `false` |
 | [Service graph](#service-graph) | `/ui/service-graph` | `spring-cloud-gateway-service-graph-core` is present |
+| [Flow](#flow) | `/ui/service-graph/flow` | `spring-cloud-gateway-service-graph-core` is present |
 | [OpenAPI](#openapi) | `/ui/openapi` | `spring-cloud-gateway-hub-openapi` is present and enabled |
 | [Audit](#audit) | `/ui/audit` | `spring-cloud-gateway-audit-core` is present and `...audit.enabled` is not `false` |
 
@@ -75,8 +76,8 @@ only start to matter.
 * **Collapsible side menu** — the toggle in the top-left corner switches between icon+label
   and icon only. The choice is remembered across page loads.
 * **Light and dark theme** — the switch at the bottom of the menu flips the whole console,
-  starting from what the operating system reports and remembering the choice. It is applied
-  before the page paints, so nothing ever flashes light first.
+  side menu included, starting from what the operating system reports and remembering the
+  choice. It is applied before the page paints, so nothing ever flashes light first.
 * **Version** — read from the manifest of the jar the console ships in, next to the
   repository link. Absent when the classes are not read from a jar, which is what running
   from an IDE does.
@@ -99,6 +100,7 @@ only start to matter.
 ![The traffic view in the dark theme](doc/traffic-dark.png)
 ![The runtime view in the dark theme](doc/instances-dark.png)
 ![The service graph in the dark theme](doc/service-graph-dark.png)
+![The flow view in the dark theme](doc/service-flow-dark.png)
 ![The OpenAPI view in the dark theme](doc/openapi-dark.png)
 ![The audit view in the dark theme](doc/audit-dark.png)
 
@@ -330,18 +332,30 @@ route, read through the
 ![The service graph view](doc/service-graph-light.png)
 
 An arrow goes from the caller to what it reached: it thickens with the number of calls and
-reddens with the share that failed, and node size is the calls the node took part in. **Ctrl +
-scroll** zooms, drag pans, a node is dragged to move it; a wheel without ctrl is left to the
-page, which is what keeps a picture this tall from trapping the scroll.
+reddens with the share answered with a 5xx. A node is sized by the calls it took part in and
+coloured by how they came back — green when every one was answered, amber once some came back
+4xx, red on a 5xx — the same three colours the flow view draws with. What a node stands for, a
+caller or a service, is left to its label and its tooltip.
+**Ctrl + scroll** zooms, drag pans, a node is dragged to move it; a wheel without ctrl is left
+to the page, which is what keeps a picture this tall from trapping the scroll.
 
-Four ways to narrow what is drawn, all applied in the browser on the payload already fetched:
+The 4xx and the 5xx are counted apart, the way the traffic view counts them: each has its own
+tile, its own column in the table, its own line in the tooltip of an edge and its own filter
+switch. Only the 5xx colours an arrow and drives the error rate — a caller asking for what it
+may not have says nothing about the health of the service that refused it.
+
+Five ways to narrow what is drawn, all applied in the browser on the payload already fetched:
 
 | Control | Keeps |
 | --- | --- |
 | Focus | One node and the edges it takes part in — clicking a node does the same |
 | Keep only | The edges whose caller or callee carries the fragment |
 | Min calls | The edges above a volume, for dropping the noise of a busy graph |
-| Failing only | The edges that saw at least one 5xx |
+| 4xx | The edges that saw at least one 4xx |
+| 5xx | The edges that saw at least one 5xx |
+
+The two error switches are additive: neither on draws the whole graph, both on keep an edge
+that saw either.
 
 **Freeze layout** keeps the positions the force layout settled on, so a refresh redraws the
 same picture instead of shuffling it. The view is refreshed on demand and never on a timer —
@@ -350,6 +364,58 @@ does not offer an auto poll.
 
 **All calls** — the same edges as a sortable table, with the route each one went through. The
 view is fed by `GET /ui/service-graph/data` (JSON) and states its coverage.
+
+## Flow
+
+The calls of the [service graph](#service-graph) laid out as they run, at
+`/ui/service-graph/flow`: the callers that reached the gateway on the left, the gateway in the
+middle, the services it reached on the right.
+
+![The flow view](doc/service-flow-light.png)
+
+**A dot travels a hop when calls arrive on it**, coloured by how *those* calls came back
+rather than by what the hop has seen since it started: a hop that failed an hour ago and is
+answering now sends green. It is the traffic since the last poll, not a replay of one request,
+and it is capped at three dots however big the burst was. A quiet hop stays still, which is the
+point — the picture only moves when the gateway is carrying something.
+
+**A hop carries two colours, and they answer different questions.** Its *line* is how its last
+calls came back: amber or red when they came back 4xx or 5xx, and green again as soon as a batch
+comes back clean. The *dot resting at its end* is everything the hop has carried since the
+gateway started — it only ever gets worse, so a hop that has misbehaved stays recognisable once
+its line has gone green again.
+
+Both are needed because the figures behind them are Micrometer counters, which never go down: a
+colour taken from the totals alone turns amber on the first 4xx and stays amber for the life of
+the process, and after an hour every line says the same thing. The line is the state, the dot is
+the memory.
+
+The resting dot sits at the endpoint end rather than at the gateway end, where every hop meets
+at the same point and the dots would be one dot with the rest underneath it.
+
+**This is the one view of the console that polls a picture.** The graph view refuses to, and
+should: what moved under its reader was the force layout, not the refresh. Here the layout is
+three columns computed from the data, so a redraw puts every box back exactly where it was.
+*Auto* polls every three seconds and can be turned off; the age next to it says how old the
+figures on screen are, so a flow left open on a dead poll does not look live. A reader who has
+asked for no motion — `prefers-reduced-motion` — gets the resting dots and no travel.
+
+**The gateway is a node here, and only here.** The graph view leaves it out on purpose: it sits
+on every edge, which is what lets it count them. Drawn in the middle, it is what makes this a
+flow rather than a second graph, and it is where the totals of the whole picture read.
+
+**An endpoint that both calls and is called appears on both sides** — once as what it reached,
+once as what reached through the gateway. The graph view merges the two into one node so a
+service's traffic is not split in half; here they are the two ends of a flow, which is what the
+two columns are for.
+
+**Keep only** narrows on either endpoint, and the **4xx** and **5xx** switches behave as they do
+on the graph view. **Show** keeps the busiest endpoints of each column and says in the legend how
+many quieter ones were left out: a gateway fronting a hundred services would otherwise stack a
+hundred boxes down the page, which is no more readable than no picture at all. The cut is by
+calls, so what goes is always the quiet end of the column, and *Everything* puts it back.
+
+Both views are fed by the same `GET /ui/service-graph/data` and state the same coverage.
 
 ## OpenAPI
 
@@ -741,9 +807,34 @@ NavItem routesNavItem() {
 
 Icons reference the SVG sprite declared in `templates/dashboard/fragments/layout.html`
 (`icon-home`, `icon-plugin`, `icon-route`, `icon-target`, `icon-chart`, `icon-book`,
-`icon-list`). The built-in entries are ordered `home` (0), `Routes` (5), `Database routes`
-(10), `Route tester` (15), `Traffic` (20), `OpenAPI` (25) and `Audit` (30), leaving room for
-your own in between.
+`icon-list`, `icon-graph`, `icon-flow`, `icon-server`). The built-in entries are ordered
+`home` (0), `Routes` (5), `Database routes` (10), `Route tester` (15), `Flow` (19), `Traffic`
+(20), `Runtime` (21), `Service graph` (22), `OpenAPI` (25) and `Audit` (30), leaving room for
+your own in between. A group sits where its first entry would have sat, so `Routing` opens at 5
+and `Activity` at 19.
+
+**A menu group** — a sixth argument names the heading the entry folds under. Entries carrying
+the same name are drawn together under it, and the group as a whole sits where its first entry
+would have sat, so an entry joins a group without any of them knowing about the others:
+
+```java
+@Bean
+NavItem quotaNavItem() {
+    return new NavItem("quota", "Quota", "icon-chart", "/ui/quota", 23, "Activity");
+}
+```
+
+The five-argument form is the same entry with no group, and still compiles and links against
+this class unchanged. The console ships two groups:
+
+| Group | Holds | What it gathers |
+| --- | --- | --- |
+| **Routing** | [Routes](#routes), [Database routes](#database-routes-view), [Route tester](#route-tester) | What the gateway is configured to do |
+| **Activity** | [Flow](#flow), [Traffic](#traffic), [Service graph](#service-graph), [Audit](#audit) | What it has carried, and what it kept of it |
+
+A group folds, remembers whether it was folded, and is always rendered open when the page being
+read is one of its own — a fold never hides the page under the reader. Collapsed, the menu drops
+the headings and shows the icons on their own.
 
 **A page inside the shell** — target the layout fragment and supply a content and a scripts
 slot. The sidebar is populated automatically by `GatewayUiModelAttributes`; the controller only

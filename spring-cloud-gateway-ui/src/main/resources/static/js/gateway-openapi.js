@@ -85,6 +85,38 @@
 		};
 	}
 
+	/*
+	 * What Scalar is drawn in, on top of the styles it ships with.
+	 *
+	 * Its dark palette is a neutral near-black with a blue accent, which lands as a hole in
+	 * the middle of a console whose dark theme is a blue-green slate. The variables below
+	 * are the ones the bundle declares on `.dark-mode`; they are restated here in the
+	 * colours of the console. The selector is doubled to raise its specificity above the
+	 * bundle's own `.dark-mode`, so this does not depend on which stylesheet is injected
+	 * last.
+	 *
+	 * Light mode is left alone: Scalar's white already sits on the near-white page.
+	 */
+	var CUSTOM_CSS = [
+		// The search modal opens with its input focused but stays invisible: it carries the
+		// utility class `opacity-0`, and the animation revealing it is declared in a
+		// stylesheet the bundle does not inject in this integration. Remove once the bundle
+		// ships those styles.
+		'.scalar-modal-layout, .scalar-modal { opacity: 1 !important; }',
+		'.dark-mode.dark-mode {',
+		'  --scalar-background-1: #0f1929;',
+		'  --scalar-background-2: #1e293b;',
+		'  --scalar-background-3: #2b3b55;',
+		'  --scalar-background-card: #1e293b;',
+		'  --scalar-color-1: #e2e8f0;',
+		'  --scalar-color-2: #a3b1c6;',
+		'  --scalar-color-3: #94a3b8;',
+		'  --scalar-color-accent: #4ade80;',
+		'  --scalar-background-accent: rgba(52, 208, 104, .14);',
+		'  --scalar-border-color: rgba(226, 232, 240, .12);',
+		'}'
+	].join('\n');
+
 	function configuration(sources) {
 		return {
 			// The agent flag is read off the active source, so it is set on each of them
@@ -118,11 +150,7 @@
 			// The 'Open API Client' link at the foot of the sidebar, which leaves the
 			// console for https://client.scalar.com carrying the document URL.
 			hideClientButton: true,
-			// The search modal opens with its input focused but stays invisible: it carries
-			// the utility class `opacity-0`, and the animation revealing it is declared in
-			// a stylesheet the bundle does not inject in this integration. Remove once the
-			// bundle ships those styles.
-			customCss: '.scalar-modal-layout, .scalar-modal { opacity: 1 !important; }',
+			customCss: CUSTOM_CSS,
 			plugins: [extensionsPlugin]
 		};
 	}

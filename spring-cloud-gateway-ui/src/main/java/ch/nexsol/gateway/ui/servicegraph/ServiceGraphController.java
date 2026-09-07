@@ -65,6 +65,19 @@ public class ServiceGraphController {
 	}
 
 	/**
+	 * Renders the flow page inside the shell. It draws the same snapshot as the graph
+	 * page, laid out as callers, the gateway and the services it reached, so it is fed by
+	 * the same data endpoint and needs no model of its own.
+	 * @param model the view model
+	 * @return the page view name
+	 */
+	@GetMapping("/flow")
+	public String flow(Model model) {
+		model.addAttribute("activeNav", "service-flow");
+		return "dashboard/service-flow";
+	}
+
+	/**
 	 * Returns the current graph and its coverage. A view whose source is absent reports
 	 * that it has nothing to show rather than breaking the page.
 	 * @return the current snapshot

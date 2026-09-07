@@ -10,11 +10,21 @@
 		return;
 	}
 
-	// Node colours. A caller only ever called; a service was reached by the gateway at
-	// least once, whichever side of an edge it also appears on.
-	var SERVICE_COLOR = '#4f83cc';
+	/*
+	 * Node and edge colours, the palette the flow view draws with so the console has one
+	 * green, one amber and one red rather than a set per picture. A node reports the worst
+	 * outcome of the calls it took part in, whichever side of an edge it was on: green when
+	 * every one was answered, amber once some came back 4xx, red as soon as one came back
+	 * 5xx. What a node stands for — a caller, a service — is left to its label and its
+	 * tooltip; the colour is worth more spent on its health.
+	 */
+	var OK_COLOR = '#198754';
 
-	var CALLER_COLOR = '#8e8e93';
+	var WARN_COLOR = '#ffc107';
+
+	var BAD_COLOR = '#dc3545';
+
+	var IDLE_COLOR = '#7f8c9b';
 
 	var dataUrl = chartEl.getAttribute('data-url') || '/ui/service-graph/data';
 	var chart = echarts.init(chartEl, window.gatewayUi.theme() === 'dark' ? 'dark' : null);
@@ -35,21 +45,32 @@
 		return !toggle || toggle.checked;
 	}
 
+	/*
+	 * The share of calls the service failed to answer. The 4xx stay out of it: an edge is
+	 * coloured on whether the far end broke, and a caller asking for what it may not have
+	 * is not the far end breaking. They carry their own tile, column, tooltip line and
+	 * filter switch instead.
+	 */
 	function errorRate(edge) {
 		return (edge.calls > 0) ? edge.errors / edge.calls : 0;
 	}
 
 	/**
 	 * The edges left after the filters: a name fragment matched on either endpoint, a
-	 * minimum number of calls, and failures only. The focused node keeps the edges it
-	 * takes part in, whichever side it is on, so focusing shows a node with its immediate
-	 * neighbourhood rather than a node alone.
+	 * minimum number of calls, and the classes of error asked for. The focused node keeps
+	 * the edges it takes part in, whichever side it is on, so focusing shows a node with
+	 * its immediate neighbourhood rather than a node alone.
+	 *
+	 * The two error switches are additive, and neither of them on means no filtering at
+	 * all rather than nothing drawn: they each add a class of failure worth keeping, so
+	 * both on keeps an edge that saw either.
 	 */
 	function visibleEdges() {
 		var focus = sel('gg-focus').value;
 		var needle = (sel('gg-search').value || '').trim().toLowerCase();
 		var minCalls = parseInt(sel('gg-min-calls').value, 10) || 0;
-		var failingOnly = sel('gg-failing').checked;
+		var only4xx = sel('gg-4xx').checked;
+		var only5xx = sel('gg-5xx').checked;
 		return edges.filter(function (edge) {
 			if (focus && edge.from !== focus && edge.to !== focus) {
 				return false;
@@ -61,22 +82,49 @@
 			if (edge.calls < minCalls) {
 				return false;
 			}
-			return !failingOnly || edge.errors > 0;
+			if (!only4xx && !only5xx) {
+				return true;
+			}
+			return (only4xx && edge.clientErrors > 0) || (only5xx && edge.errors > 0);
 		});
 	}
 
-	/** The nodes the visible edges refer to, with the totals recomputed over them. */
+	/**
+	 * The nodes the visible edges refer to, with the totals recomputed over them — the
+	 * calls, and the two classes of error the node's colour is taken from.
+	 */
 	function visibleNodes(shown) {
 		var totals = {};
 		shown.forEach(function (edge) {
-			totals[edge.from] = (totals[edge.from] || 0) + edge.calls;
-			totals[edge.to] = (totals[edge.to] || 0) + edge.calls;
+			collect(totals, edge.from, edge);
+			collect(totals, edge.to, edge);
 		});
 		return nodes.filter(function (node) {
 			return Object.prototype.hasOwnProperty.call(totals, node.id);
 		}).map(function (node) {
-			return { id: node.id, kind: node.kind, calls: totals[node.id] };
+			var total = totals[node.id];
+			return {
+				id: node.id, kind: node.kind, calls: total.calls,
+				clientErrors: total.clientErrors, errors: total.errors
+			};
 		});
+	}
+
+	function collect(totals, id, edge) {
+		if (!totals[id]) {
+			totals[id] = { calls: 0, clientErrors: 0, errors: 0 };
+		}
+		totals[id].calls += edge.calls;
+		totals[id].clientErrors += edge.clientErrors;
+		totals[id].errors += edge.errors;
+	}
+
+	/** The worst outcome of the calls a node took part in. */
+	function nodeColor(node) {
+		if (node.errors > 0) {
+			return BAD_COLOR;
+		}
+		return (node.clientErrors > 0) ? WARN_COLOR : OK_COLOR;
 	}
 
 	/**
@@ -91,13 +139,17 @@
 		return 12 + 26 * Math.sqrt(calls / max);
 	}
 
-	/** Edge colour, from grey to red as the share of failed calls grows. */
+	/*
+	 * Edge colour, from grey to red as the share of failed calls grows. An edge stays on
+	 * the 5xx where a node also answers to the 4xx: the arrow is the health of what the
+	 * call reached, and a caller asking for what it may not have did not break anything.
+	 */
 	function edgeColor(edge) {
 		var rate = errorRate(edge);
 		if (rate <= 0) {
-			return '#7f8c9b';
+			return IDLE_COLOR;
 		}
-		return (rate >= 0.5) ? '#c0392b' : '#e08e0b';
+		return (rate >= 0.5) ? BAD_COLOR : WARN_COLOR;
 	}
 
 	function renderChart() {
@@ -124,11 +176,14 @@
 						return params.data.source + ' &rarr; ' + params.data.target
 							+ (edge.routeId ? '<br>route: ' + edge.routeId : '')
 							+ '<br>calls: ' + edge.calls
+							+ '<br>4xx: ' + edge.clientErrors
 							+ '<br>5xx: ' + edge.errors
 							+ ' (' + (errorRate(edge) * 100).toFixed(1) + '%)';
 					}
 					return params.data.name + '<br>' + params.data.kind.toLowerCase()
-						+ '<br>calls: ' + params.data.calls;
+						+ '<br>calls: ' + params.data.calls
+						+ '<br>4xx: ' + params.data.clientErrors
+						+ '<br>5xx: ' + params.data.errors;
 				}
 			},
 			series: [{
@@ -152,11 +207,13 @@
 						name: node.id,
 						kind: node.kind,
 						calls: node.calls,
+						clientErrors: node.clientErrors,
+						errors: node.errors,
 						symbolSize: radius(node.calls, maxNodeCalls),
 						x: point ? point.x : undefined,
 						y: point ? point.y : undefined,
 						fixed: !!point && frozen(),
-						itemStyle: { color: node.kind === 'SERVICE' ? SERVICE_COLOR : CALLER_COLOR }
+						itemStyle: { color: nodeColor(node) }
 					};
 				}),
 				links: shown.map(function (edge) {
@@ -178,7 +235,8 @@
 		}, true);
 		sel('gg-legend').textContent = drawn.length + ' node' + (drawn.length > 1 ? 's' : '') + ', '
 			+ shown.length + ' edge' + (shown.length > 1 ? 's' : '')
-			+ ' — node size and arrow width are the number of calls, red is the share that failed'
+			+ ' — node size and arrow width are the number of calls; a node is green when every call'
+			+ ' it took part in was answered, amber once some came back 4xx, red on a 5xx'
 			+ ' · ctrl + scroll to zoom, drag to pan.';
 	}
 
@@ -228,7 +286,8 @@
 				cell.textContent = value;
 				row.appendChild(cell);
 			});
-			[edge.calls, edge.errors, (errorRate(edge) * 100).toFixed(1) + '%'].forEach(function (value) {
+			[edge.calls, edge.clientErrors, edge.errors,
+					(errorRate(edge) * 100).toFixed(1) + '%'].forEach(function (value) {
 				var cell = document.createElement('td');
 				cell.className = 'text-end';
 				cell.textContent = value;
@@ -267,12 +326,16 @@
 		var calls = edges.reduce(function (total, edge) {
 			return total + edge.calls;
 		}, 0);
+		var clientErrors = edges.reduce(function (total, edge) {
+			return total + edge.clientErrors;
+		}, 0);
 		var errors = edges.reduce(function (total, edge) {
 			return total + edge.errors;
 		}, 0);
 		sel('gg-kpi-services').textContent = services;
 		sel('gg-kpi-callers').textContent = nodes.length - services;
 		sel('gg-kpi-calls').textContent = calls;
+		sel('gg-kpi-client-errors').textContent = clientErrors;
 		sel('gg-kpi-errors').textContent = errors;
 	}
 
@@ -321,7 +384,7 @@
 		}
 	});
 
-	['gg-focus', 'gg-search', 'gg-min-calls', 'gg-failing'].forEach(function (id) {
+	['gg-focus', 'gg-search', 'gg-min-calls', 'gg-4xx', 'gg-5xx'].forEach(function (id) {
 		sel(id).addEventListener('input', render);
 		sel(id).addEventListener('change', render);
 	});
@@ -359,7 +422,7 @@
 		chart.resize();
 	});
 
-	['gg-focus', 'gg-search', 'gg-min-calls', 'gg-failing', 'gg-freeze'].forEach(function (id) {
+	['gg-focus', 'gg-search', 'gg-min-calls', 'gg-4xx', 'gg-5xx', 'gg-freeze'].forEach(function (id) {
 		window.gatewayUi.remember(sel(id));
 	});
 

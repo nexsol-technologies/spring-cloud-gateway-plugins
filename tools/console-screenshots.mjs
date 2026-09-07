@@ -61,6 +61,7 @@ const VIEWS = [
 	{ name: 'instances', path: '/ui/metrics/instances', themes: ['dark'],
 		prepare: 'for (var i = 0; i < 100; i++) { var fold = document.querySelector("[data-gi-toggle][aria-expanded=false]"); if (!fold) { break; } fold.click(); }' },
 	{ name: 'service-graph', path: '/ui/service-graph' },
+	{ name: 'service-flow', path: '/ui/service-graph/flow' },
 	{ name: 'audit', path: '/ui/audit' },
 	{ name: 'openapi', path: '/ui/openapi' },
 	// Shown to a signed-in visitor holding none of the required roles. It renders for any

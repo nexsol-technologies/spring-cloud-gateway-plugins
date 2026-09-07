@@ -68,6 +68,24 @@
 			<circle cx="17.5" cy="5.5" r="2.5"/>
 			<circle cx="17.5" cy="18.5" r="2.5"/>
 		</symbol>
+		<symbol id="icon-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<!-- Points down when the section is folded, up when it is open. -->
+			<path d="M6 9.5 12 15.5 18 9.5"/>
+		</symbol>
+		<symbol id="icon-flow" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+			<!-- Two callers into one hop, and out to two services: the shape of the flow view. -->
+			<circle cx="4" cy="6" r="1.8"/>
+			<circle cx="4" cy="18" r="1.8"/>
+			<rect x="9.4" y="9.4" width="5.2" height="5.2" rx="1.4"/>
+			<circle cx="20" cy="6" r="1.8"/>
+			<circle cx="20" cy="18" r="1.8"/>
+			<path d="M5.7 7.2 9.5 10.3"/>
+			<path d="M5.7 16.8 9.5 13.7"/>
+			<path d="M14.5 10.3 18.3 7.2"/>
+			<path d="M14.5 13.7 18.3 16.8"/>
+		</symbol>
 		<symbol id="icon-server" viewBox="0 0 24 24" fill="none" stroke="currentColor"
 				stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
 			<!-- Two stacked instances, each with its own status light. -->
@@ -151,13 +169,40 @@
 					<svg class="gw-icon"><use href="#icon-menu"></use></svg>
 				</button>
 			</div>
+			<!--
+				One run per section: a lone entry is a link, a group is a heading with its
+				entries folded under it. The heading carries the id the shell remembers the
+				folded state under, and stays open when the active view is one of its own,
+				so a fold never hides the page being read.
+			-->
 			<nav class="gw-nav">
-				<a th:each="item : ${navItems}" class="gw-nav-link"
-						th:classappend="${item.id() == activeNav} ? 'active'"
-						th:href="@{${item.href()}}" th:title="${item.label()}" href="#">
-					<svg class="gw-icon"><use th:attr="href='#' + ${item.icon()}" href="#icon-plugin"></use></svg>
-					<span class="gw-nav-label" th:text="${item.label()}">Label</span>
-				</a>
+				<th:block th:each="section : ${navSections}">
+					<a th:if="${section.group() == null}" class="gw-nav-link"
+							th:with="item=${section.items()[0]}"
+							th:classappend="${item.id() == activeNav} ? 'active'"
+							th:href="@{${item.href()}}" th:title="${item.label()}" href="#">
+						<svg class="gw-icon"><use th:attr="href='#' + ${item.icon()}" href="#icon-plugin"></use></svg>
+						<span class="gw-nav-label" th:text="${item.label()}">Label</span>
+					</a>
+					<div th:unless="${section.group() == null}" class="gw-nav-group"
+							th:attr="data-gw-group=${section.id()}">
+						<button type="button" class="gw-nav-group-toggle" th:title="${section.group()}"
+								th:attr="aria-expanded=${#lists.contains(section.items().![id()], activeNav)}">
+							<span class="gw-nav-label" th:text="${section.group()}">Group</span>
+							<span class="gw-nav-group-count gw-nav-label"
+									th:text="${#lists.size(section.items())}">0</span>
+							<svg class="gw-icon gw-nav-group-chevron"><use href="#icon-chevron"></use></svg>
+						</button>
+						<div class="gw-nav-group-items">
+							<a th:each="item : ${section.items()}" class="gw-nav-link"
+									th:classappend="${item.id() == activeNav} ? 'active'"
+									th:href="@{${item.href()}}" th:title="${item.label()}" href="#">
+								<svg class="gw-icon"><use th:attr="href='#' + ${item.icon()}" href="#icon-plugin"></use></svg>
+								<span class="gw-nav-label" th:text="${item.label()}">Label</span>
+							</a>
+						</div>
+					</div>
+				</th:block>
 			</nav>
 			<!-- Only drawn when the console authenticates: there is no principal otherwise. -->
 			<div class="gw-user" th:if="${currentUser != null}">

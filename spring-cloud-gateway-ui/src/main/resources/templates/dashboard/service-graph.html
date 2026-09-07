@@ -10,7 +10,7 @@
 
 		<!-- Summary of the whole graph, read before the drawing below. -->
 		<div class="row g-3 mb-3">
-			<div class="col-6 col-lg-3">
+			<div class="col-6 col-lg">
 				<div class="card border-0 shadow-sm h-100">
 					<div class="card-body py-3">
 						<div class="text-secondary small">Services</div>
@@ -18,7 +18,7 @@
 					</div>
 				</div>
 			</div>
-			<div class="col-6 col-lg-3">
+			<div class="col-6 col-lg">
 				<div class="card border-0 shadow-sm h-100">
 					<div class="card-body py-3">
 						<div class="text-secondary small">Callers</div>
@@ -26,7 +26,7 @@
 					</div>
 				</div>
 			</div>
-			<div class="col-6 col-lg-3">
+			<div class="col-6 col-lg">
 				<div class="card border-0 shadow-sm h-100">
 					<div class="card-body py-3">
 						<div class="text-secondary small">Calls</div>
@@ -34,10 +34,18 @@
 					</div>
 				</div>
 			</div>
-			<div class="col-6 col-lg-3">
+			<div class="col-6 col-lg">
 				<div class="card border-0 shadow-sm h-100">
 					<div class="card-body py-3">
-						<div class="text-secondary small">Failed calls (5xx)</div>
+						<div class="text-secondary small">Client errors (4xx)</div>
+						<div class="h4 fw-semibold mb-0" id="gg-kpi-client-errors">&mdash;</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-lg">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small">Server errors (5xx)</div>
 						<div class="h4 fw-semibold mb-0" id="gg-kpi-errors">&mdash;</div>
 					</div>
 				</div>
@@ -64,9 +72,18 @@
 								style="width: 7rem">
 					</div>
 					<div class="ms-auto d-flex align-items-center gap-3">
+						<!-- One switch per class of error, rather than one "failing" covering both: a
+						     wave of 404 and a backend outage are read by different people. Neither on
+						     draws the whole graph; both on keep an edge that saw either. -->
 						<div class="form-check form-switch mb-0">
-							<input class="form-check-input" type="checkbox" role="switch" id="gg-failing">
-							<label class="form-check-label small" for="gg-failing">Failing only</label>
+							<input class="form-check-input" type="checkbox" role="switch" id="gg-4xx">
+							<label class="form-check-label small" for="gg-4xx"
+									title="Keep only the edges that saw a 4xx">4xx</label>
+						</div>
+						<div class="form-check form-switch mb-0">
+							<input class="form-check-input" type="checkbox" role="switch" id="gg-5xx">
+							<label class="form-check-label small" for="gg-5xx"
+									title="Keep only the edges that saw a 5xx">5xx</label>
 						</div>
 						<div class="form-check form-switch mb-0">
 							<input class="form-check-input" type="checkbox" role="switch" id="gg-freeze" checked>
@@ -79,7 +96,10 @@
 				<div class="alert alert-light border py-2 px-3 small text-secondary mb-3">
 					Ctrl and the wheel to zoom, drag to pan, drag a node to move it. Click a node to focus it and its
 					neighbours, click it again to come back. An arrow goes from the caller to what it
-					reached; it thickens with the number of calls and reddens with the share that failed.
+					reached; it thickens with the number of calls and reddens with the share answered with a
+					5xx. A 4xx is counted, reported and filtered on, but never colours an arrow: a caller
+					asking for what it may not have says nothing about the health of the service that
+					refused it.
 					The graph is refreshed on demand, never on a timer, so a layout you are reading does
 					not move under you.
 					<br>
@@ -115,6 +135,7 @@
 								<th class="gw-sortable" data-sort="to">Called</th>
 								<th class="gw-sortable" data-sort="routeId">Route</th>
 								<th class="gw-sortable text-end" data-sort="calls">Calls</th>
+								<th class="gw-sortable text-end" data-sort="clientErrors">4xx</th>
 								<th class="gw-sortable text-end" data-sort="errors">5xx</th>
 								<th class="gw-sortable text-end" data-sort="errorRate">Error rate</th>
 							</tr>

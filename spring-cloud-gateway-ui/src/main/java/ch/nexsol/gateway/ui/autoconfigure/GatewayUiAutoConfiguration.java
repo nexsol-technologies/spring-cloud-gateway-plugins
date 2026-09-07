@@ -89,6 +89,21 @@ import org.springframework.context.annotation.Import;
 public class GatewayUiAutoConfiguration {
 
 	/**
+	 * Heading the views of the traffic the gateway carries fold under &mdash; what came
+	 * through it, drawn three ways. A group is named rather than declared: the shell
+	 * draws one section per distinct name, so an entry joins this one simply by carrying
+	 * it, and the plugins contributing these views stay unaware of each other.
+	 */
+	static final String ACTIVITY = "Activity";
+
+	/**
+	 * Heading the views of the route table fold under &mdash; what the gateway is
+	 * configured to do, as opposed to what it has done. Named rather than declared, the
+	 * same way {@link #ACTIVITY} is.
+	 */
+	static final String ROUTING = "Routing";
+
+	/**
 	 * Registers the side-menu registry aggregating every contributed {@link NavItem}.
 	 * @param navItems the provider over every {@link NavItem} bean in the context
 	 * @return the menu registry
@@ -168,7 +183,7 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem routesNavItem() {
-			return new NavItem("routes", "Database routes", "icon-plugin", "/ui/routes/db", 10);
+			return new NavItem("routes", "Database routes", "icon-plugin", "/ui/routes/db", 10, ROUTING);
 		}
 
 		/**
@@ -229,7 +244,7 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem routesInventoryNavItem() {
-			return new NavItem("routes-all", "Routes", "icon-route", "/ui/routes", 5);
+			return new NavItem("routes-all", "Routes", "icon-route", "/ui/routes", 5, ROUTING);
 		}
 
 		/**
@@ -273,7 +288,7 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem routeTesterNavItem() {
-			return new NavItem("route-tester", "Route tester", "icon-target", "/ui/routes/test", 15);
+			return new NavItem("route-tester", "Route tester", "icon-target", "/ui/routes/test", 15, ROUTING);
 		}
 
 		/**
@@ -320,7 +335,7 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem trafficNavItem() {
-			return new NavItem("traffic", "Traffic", "icon-chart", "/ui/metrics", 20);
+			return new NavItem("traffic", "Traffic", "icon-chart", "/ui/metrics", 20, ACTIVITY);
 		}
 
 		/**
@@ -435,7 +450,17 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem serviceGraphNavItem() {
-			return new NavItem("service-graph", "Service graph", "icon-graph", "/ui/service-graph", 22);
+			return new NavItem("service-graph", "Service graph", "icon-graph", "/ui/service-graph", 22, ACTIVITY);
+		}
+
+		/**
+		 * Contributes the flow entry, next to the graph it shares its data with: the same
+		 * calls laid out as callers, the gateway and the services it reached.
+		 * @return the flow menu entry
+		 */
+		@Bean
+		NavItem serviceFlowNavItem() {
+			return new NavItem("service-flow", "Flow", "icon-flow", "/ui/service-graph/flow", 19, ACTIVITY);
 		}
 
 		/**
@@ -445,8 +470,8 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		UiSecuredPaths serviceGraphSecuredPaths() {
-			return new UiSecuredPaths("/ui/service-graph", "/ui/service-graph/data", "/js/echarts.min.js",
-					"/js/gateway-service-graph.js");
+			return new UiSecuredPaths("/ui/service-graph", "/ui/service-graph/flow", "/ui/service-graph/data",
+					"/js/echarts.min.js", "/js/gateway-service-graph.js", "/js/gateway-service-flow.js");
 		}
 
 	}
@@ -549,7 +574,7 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		NavItem auditNavItem() {
-			return new NavItem("audit", "Audit", "icon-list", "/ui/audit", 30);
+			return new NavItem("audit", "Audit", "icon-list", "/ui/audit", 30, ACTIVITY);
 		}
 
 		/**

@@ -104,6 +104,44 @@ window.gatewayUi = (function () {
 })();
 
 /*
+ * Folding menu sections. The state is remembered per section, and the shell renders a
+ * section open when the page being read is one of its own — so the fold is only ever
+ * restored over a section the reader is not currently inside.
+ */
+(function () {
+	var PREFIX = 'gw-nav-group-';
+	Array.prototype.forEach.call(document.querySelectorAll('.gw-nav-group'), function (group) {
+		var id = group.getAttribute('data-gw-group');
+		var toggle = group.querySelector('.gw-nav-group-toggle');
+		if (!id || !toggle) {
+			return;
+		}
+		// A section holding the active view stays open whatever was stored: folding the
+		// page under the reader is never what they asked for.
+		if (toggle.getAttribute('aria-expanded') !== 'true') {
+			var stored = null;
+			try {
+				stored = localStorage.getItem(PREFIX + id);
+			}
+			catch (ignored) {
+				// Storage refused by the browser: the section keeps the state it rendered in.
+			}
+			toggle.setAttribute('aria-expanded', String(stored !== 'false'));
+		}
+		toggle.addEventListener('click', function () {
+			var open = toggle.getAttribute('aria-expanded') !== 'true';
+			toggle.setAttribute('aria-expanded', String(open));
+			try {
+				localStorage.setItem(PREFIX + id, String(open));
+			}
+			catch (ignored) {
+				// A storage that is full or disabled must not break the fold.
+			}
+		});
+	});
+})();
+
+/*
  * CSRF token on every HTMX request. A console that authenticates keeps its writes behind a
  * session cookie, which a form can carry a hidden field for but an HTMX request cannot:
  * the token is put on the request as a header instead, from the meta tags the shell renders
