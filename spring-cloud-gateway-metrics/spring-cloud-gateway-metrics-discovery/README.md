@@ -140,6 +140,29 @@ load-balance every poll onto a random pod and count the same one several times.
 An instance that fails or times out is left out rather than failing the whole reading, and the
 view says so: `2 of 3 instances (the others did not answer)`.
 
+
+## The address an instance is read at
+
+The [console](../../spring-cloud-gateway-ui/README.md) reads the Actuator endpoints of the
+instance a reader picked — its loggers among them — at the address stamped on its figures.
+
+That address is the registered one, with one substitution: where the registry publishes a
+management port in the instance metadata, that port replaces the registered one, and
+`management.server.base-path` is appended when it is published too.
+
+| Metadata key | Read as |
+| --- | --- |
+| `management.server.port`, then `management.port` | The port the endpoints are on |
+| `management.server.base-path` | The path they are served under |
+
+Spring Cloud publishes those keys on its own when the endpoints have a port of their own, so a
+deployment running `management.server.port: 8088` behind an application on `8080` needs nothing
+here: the registry carries `8080`, because that is where its traffic arrives, and the metadata
+carries `8088`.
+
+The figures themselves are still polled on the registered address: the path they are served on
+belongs to the application, not to Actuator.
+
 ## Sample
 
 [gateway-metrics](../../spring-cloud-gateway-samples/gateway/gateway-metrics/README.md),

@@ -16,7 +16,9 @@
 
 package ch.nexsol.gateway.metrics.discovery;
 
+import java.net.URI;
 import java.util.Comparator;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import ch.nexsol.gateway.metrics.InstanceMetric;
@@ -43,6 +45,16 @@ import org.springframework.web.reactive.function.client.WebClient;
  * the route fan-out this one only concatenates what it collected.
  */
 public class DiscoveryInstanceMetricsSource implements InstanceMetricsSource {
+
+	/**
+	 * Metadata keys Spring Cloud publishes the management port under. The first is what a
+	 * current client writes; the second is what it has always written, and what a
+	 * registry filled by an older one still carries.
+	 */
+	private static final String[] MANAGEMENT_PORT_KEYS = { "management.server.port", "management.port" };
+
+	/** Metadata key the management base path is published under, when there is one. */
+	private static final String MANAGEMENT_BASE_PATH = "management.server.base-path";
 
 	private static final Logger LOG = LoggerFactory.getLogger(DiscoveryInstanceMetricsSource.class);
 
@@ -114,7 +126,7 @@ public class DiscoveryInstanceMetricsSource implements InstanceMetricsSource {
 			.bodyToMono(InstanceMetric.class)
 			// An instance does not know where it is reachable from; the registry does,
 			// so the address is stamped here rather than guessed there.
-			.map((metric) -> withUri(metric, instance.getUri().toString()))
+			.map((metric) -> withUri(metric, actuatorUri(instance)))
 			.timeout(this.properties.getTimeout())
 			.onErrorResume((ex) -> {
 				// One unreachable instance must not cost the figures of all the others.
@@ -122,6 +134,40 @@ public class DiscoveryInstanceMetricsSource implements InstanceMetricsSource {
 				return Mono.empty();
 			})
 			.flux();
+	}
+
+	/**
+	 * Where the Actuator endpoints of one instance are, which is not always where the
+	 * registry says the instance is.
+	 * <p>
+	 * A deployment that gives the endpoints a port of their own registers the application
+	 * port &mdash; that is the port its traffic arrives on &mdash; and publishes the
+	 * other one in the metadata, which is what is read here. Stamping the registered
+	 * address alone sends the console to the application port, where Actuator answers
+	 * 404.
+	 * <p>
+	 * The figures themselves are polled on the registered address, since the path they
+	 * are served on belongs to the application rather than to Actuator.
+	 */
+	private static String actuatorUri(ServiceInstance instance) {
+		URI registered = instance.getUri();
+		Map<String, String> metadata = instance.getMetadata();
+		String port = (metadata != null) ? firstOf(metadata, MANAGEMENT_PORT_KEYS) : null;
+		if (port == null) {
+			return registered.toString();
+		}
+		String basePath = (metadata.get(MANAGEMENT_BASE_PATH) != null) ? metadata.get(MANAGEMENT_BASE_PATH) : "";
+		return registered.getScheme() + "://" + registered.getHost() + ":" + port + basePath;
+	}
+
+	private static String firstOf(Map<String, String> metadata, String... keys) {
+		for (String key : keys) {
+			String value = metadata.get(key);
+			if (value != null && !value.isBlank()) {
+				return value.trim();
+			}
+		}
+		return null;
 	}
 
 	private static InstanceMetric withUri(InstanceMetric metric, String uri) {

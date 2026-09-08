@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import ch.nexsol.gateway.metrics.InstanceMetric;
 import ch.nexsol.gateway.metrics.InstanceMetricsSnapshot;
@@ -168,6 +169,42 @@ class DiscoveryInstanceMetricsSourceTests {
 			.extracting(InstanceMetric::uri)
 			.asString()
 			.contains(String.valueOf(server.getPort()));
+	}
+
+	/**
+	 * A deployment that gives Actuator a port of its own registers the application port —
+	 * that is where its traffic arrives — and publishes the other one in the metadata.
+	 * Stamping the registered address alone sends the console to the application port,
+	 * where Actuator answers 404.
+	 */
+	@Test
+	void stampsTheManagementPortWhenTheRegistryPublishesOne() throws IOException {
+		MockWebServer server = instance(figures("gateway-a", 1000));
+		DefaultServiceInstance registered = new DefaultServiceInstance("gateway-a", "gateway", server.getHostName(),
+				server.getPort(), false, Map.of("management.port", "8088"));
+
+		InstanceMetricsSnapshot snapshot = sourceOver(List.of((ServiceInstance) registered)).collect().block();
+
+		assertThat(snapshot.instances()).singleElement()
+			.extracting(InstanceMetric::uri)
+			.asString()
+			.endsWith(":8088")
+			.doesNotContain(":" + server.getPort() + "/");
+	}
+
+	@Test
+	void carriesTheManagementBasePathAlongWithThatPort() throws IOException {
+		MockWebServer server = instance(figures("gateway-a", 1000));
+		DefaultServiceInstance registered = new DefaultServiceInstance("gateway-a", "gateway", server.getHostName(),
+				server.getPort(), false,
+				Map.of("management.server.port", "9099", "management.server.base-path", "/mgmt"));
+
+		InstanceMetricsSnapshot snapshot = sourceOver(List.of((ServiceInstance) registered)).collect().block();
+
+		assertThat(snapshot.instances()).singleElement()
+			.extracting(InstanceMetric::uri)
+			.asString()
+			.endsWith(":9099/mgmt");
 	}
 
 	@Test
