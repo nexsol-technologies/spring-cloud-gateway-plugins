@@ -71,9 +71,14 @@ The figures carry the address the instance is reachable at. The
 [console](../../spring-cloud-gateway-ui/README.md) reads that instance's Actuator endpoints
 there — its loggers among them.
 
-Unset, the address is built from the host this machine reports and the port the server bound,
-which is the port in use rather than the port requested: on `server.port: 0` it is the one
-taken. `instance-scheme` supplies its scheme.
+Unset, the address is built from the name this instance answers to on its own network —
+`HOSTNAME`, which a container runtime sets to a name the other containers resolve, then the host
+name — and the port the endpoints are bound to: `management.server.port` when they have one of
+their own, the port the server bound otherwise. That is the port in use rather than the port
+requested: on `server.port: 0` it is the one taken. `instance-scheme` supplies the scheme.
+
+It is never built from an address the console was reached through. An ingress or a load
+balancer is the way in from outside, not the way one instance reaches another.
 
 Set, `instance-uri` is published as it is and `instance-scheme` is ignored.
 

@@ -81,7 +81,8 @@ class RedisInstanceMetricsPublisherTests {
 	}
 
 	private RedisInstanceMetricsPublisher publisher(RedisMetricsProperties properties) {
-		return publisher(properties, new InstanceUri(properties.getInstanceUri(), properties.getInstanceScheme()));
+		return publisher(properties,
+				new InstanceUri(properties.getInstanceUri(), properties.getInstanceScheme(), null));
 	}
 
 	private RedisInstanceMetricsPublisher publisher(RedisMetricsProperties properties, InstanceUri instanceUri) {

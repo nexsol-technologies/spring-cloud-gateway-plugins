@@ -34,11 +34,13 @@ import org.springframework.util.StringUtils;
  * the figures carry no address of their own, and why the discovery provider fills it in
  * from the registry &mdash; a registry is exactly the thing that knows.
  * <p>
- * Redis is not a registry. So the address is guessed from the port the server actually
- * bound and the host this machine reports, which is right on a flat network and wrong
- * behind anything that rewrites addresses. Wherever it is wrong, {@code instance-uri}
- * states it and wins &mdash; that property is the answer for a container, not an
- * afterthought.
+ * Redis is not a registry. So the address is built from the name this instance answers to
+ * on its own network &mdash; {@code HOSTNAME}, which a container runtime sets to a name
+ * the other containers resolve &mdash; and the port its Actuator endpoints are bound to.
+ * Never from anything the console was reached through: an ingress or a load balancer is
+ * the way in from outside, not the way one instance reaches another.
+ * <p>
+ * Where that address is wrong all the same, {@code instance-uri} states it and wins.
  * <p>
  * What reads this is the console: an instance publishing no address is one it cannot
  * offer to read the Actuator endpoints of, and cannot include when a logging level is set
@@ -52,16 +54,21 @@ public class InstanceUri implements ApplicationListener<WebServerInitializedEven
 
 	private final String scheme;
 
+	private final Integer managementPort;
+
 	private volatile String resolved;
 
 	/**
 	 * Creates the resolver.
 	 * @param configured the address the operator declared, used as-is when set
 	 * @param scheme the scheme to build the guessed address with
+	 * @param managementPort {@code management.server.port}, {@code null} when the
+	 * endpoints share the port of the application
 	 */
-	public InstanceUri(String configured, String scheme) {
+	public InstanceUri(String configured, String scheme, Integer managementPort) {
 		this.configured = configured;
 		this.scheme = StringUtils.hasText(scheme) ? scheme : "http";
+		this.managementPort = managementPort;
 	}
 
 	@Override
@@ -69,9 +76,11 @@ public class InstanceUri implements ApplicationListener<WebServerInitializedEven
 		if (StringUtils.hasText(this.configured)) {
 			return;
 		}
-		// The port the server bound, not the one it was asked to: started on port 0, a
-		// gateway takes whatever was free, and that is where it is reached.
-		this.resolved = this.scheme + "://" + host() + ":" + event.getWebServer().getPort();
+		// The port the endpoints are on, which is what this address is read for: the
+		// management port when they have one of their own, otherwise the port the server
+		// bound — the bound one, since `server.port: 0` takes whatever was free.
+		int port = (this.managementPort != null) ? this.managementPort : event.getWebServer().getPort();
+		this.resolved = this.scheme + "://" + host() + ":" + port;
 	}
 
 	/**
@@ -82,9 +91,22 @@ public class InstanceUri implements ApplicationListener<WebServerInitializedEven
 		return StringUtils.hasText(this.configured) ? this.configured : this.resolved;
 	}
 
+	/**
+	 * The name this instance answers to on its own network.
+	 * <p>
+	 * {@code HOSTNAME} first: a container is reachable from the others by that name,
+	 * which is what Docker and Kubernetes put there, and it survives the address changing
+	 * under it. The host name and then the address follow for a deployment that sets no
+	 * such variable.
+	 */
 	private static String host() {
+		String hostname = System.getenv("HOSTNAME");
+		if (StringUtils.hasText(hostname)) {
+			return hostname;
+		}
 		try {
-			return InetAddress.getLocalHost().getHostAddress();
+			InetAddress local = InetAddress.getLocalHost();
+			return StringUtils.hasText(local.getHostName()) ? local.getHostName() : local.getHostAddress();
 		}
 		catch (UnknownHostException ex) {
 			// A machine that cannot name itself still publishes something reachable from

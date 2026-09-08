@@ -427,6 +427,17 @@ exposes it.
 **Keep only** narrows on the names each view lists, and on the message for **Conditions**.
 **Conditions** also narrows on the outcome: matched, not matched, or both.
 
+**This instance is read on its loopback**, at `management.server.port` when the endpoints have
+a port of their own and at the port the server bound otherwise, honouring
+`management.server.address` and both base paths. Nothing is taken from the request being
+served: it arrived through whatever fronts the gateway, and an instance sent back out through
+its own ingress to reach itself gets a refused connection or a different instance.
+
+Another instance is read at the address it published, which the metrics provider decides — see
+[metrics-redis](../spring-cloud-gateway-metrics/spring-cloud-gateway-metrics-redis/README.md#the-address-an-instance-publishes).
+Nothing here can know how that instance configured its own management server, so
+`insights.base-path` applies to it: set it when the fleet moved its endpoints.
+
 **The instance selector** appears once more than one instance is known, and lists what the
 [runtime](#runtime) view lists — whichever provider the metrics plugin resolved. A view names an
 instance by id; an id that is not in that list reads this instance instead.

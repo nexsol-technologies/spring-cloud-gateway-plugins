@@ -16,42 +16,62 @@
 
 package ch.nexsol.gateway.ui.insights;
 
-import java.net.URI;
-
+import org.springframework.boot.web.server.context.WebServerInitializedEvent;
+import org.springframework.context.ApplicationListener;
 import org.springframework.util.StringUtils;
-import org.springframework.web.server.ServerWebExchange;
 
 /**
  * Where this instance serves its own Actuator endpoints.
  * <p>
- * Not necessarily where it serves the console. {@code management.server.port} moves the
- * endpoints to a port of their own — a common thing to do, since it lets a deployment
- * expose the console and keep the endpoints off the public interface — and
- * {@code management.server.base-path} and {@code management.endpoints.web.base-path} move
- * them again. Reading them at the port and path the console request arrived on works only
- * where none of that was configured.
+ * Nothing here is taken from the request being served. That request arrived through
+ * whatever fronts this gateway &mdash; an ingress, a load balancer, a reverse proxy
+ * &mdash; and its host and port are that front door's, not this instance's: reading them
+ * back sends the instance out through the front door to reach itself, which either
+ * refuses the connection or lands on a different instance entirely.
  * <p>
- * The host is still taken from the request: it is the name this instance is actually
- * reached by, which no property records.
+ * It calls itself instead, on the loopback and on the port its endpoints are actually
+ * bound to: {@code management.server.port} when the endpoints have one of their own,
+ * otherwise the port the application server bound &mdash; the bound one, since
+ * {@code server.port: 0} takes whatever was free. {@code management.server.address} is
+ * honoured where a deployment pinned the management server to one interface, loopback not
+ * being among them then.
  */
-public class LocalActuator {
+public class LocalActuator implements ApplicationListener<WebServerInitializedEvent> {
 
-	private final Integer port;
+	private final Integer managementPort;
+
+	private final String managementAddress;
 
 	private final String basePath;
 
+	private volatile int applicationPort;
+
 	/**
 	 * Creates the resolver from the management configuration of this instance.
-	 * @param port {@code management.server.port}, {@code null} when the endpoints share
-	 * the port of the application
+	 * @param managementPort {@code management.server.port}, {@code null} when the
+	 * endpoints share the port of the application
+	 * @param managementAddress {@code management.server.address}, empty when the
+	 * management server binds every interface
 	 * @param serverBasePath {@code management.server.base-path}, which applies only when
 	 * the endpoints have a port of their own
 	 * @param webBasePath {@code management.endpoints.web.base-path}
 	 */
-	public LocalActuator(Integer port, String serverBasePath, String webBasePath) {
-		this.port = port;
-		String prefix = (port != null && StringUtils.hasText(serverBasePath)) ? serverBasePath : "";
+	public LocalActuator(Integer managementPort, String managementAddress, String serverBasePath, String webBasePath) {
+		this.managementPort = managementPort;
+		this.managementAddress = managementAddress;
+		String prefix = (managementPort != null && StringUtils.hasText(serverBasePath)) ? serverBasePath : "";
 		this.basePath = prefix + (StringUtils.hasText(webBasePath) ? webBasePath : "");
+	}
+
+	@Override
+	public void onApplicationEvent(WebServerInitializedEvent event) {
+		// The port bound rather than the port requested, and the application server
+		// rather
+		// than the management one: the management server publishes an event of its own,
+		// which this deliberately ignores — its port is already known from configuration.
+		if (this.applicationPort == 0) {
+			this.applicationPort = event.getWebServer().getPort();
+		}
 	}
 
 	/**
@@ -63,17 +83,14 @@ public class LocalActuator {
 
 	/**
 	 * The address of one endpoint on this instance.
-	 * @param exchange the request being served, which carries the host this instance is
-	 * reached by
 	 * @param endpoint the endpoint, e.g. {@code loggers}
 	 * @param basePath the path the endpoints are served under
 	 * @return the address to read it at
 	 */
-	public String url(ServerWebExchange exchange, String endpoint, String basePath) {
-		URI uri = exchange.getRequest().getURI();
-		int resolved = (this.port != null) ? this.port : uri.getPort();
-		String authority = uri.getHost() + ((resolved > 0) ? ":" + resolved : "");
-		return uri.getScheme() + "://" + authority + basePath + "/" + endpoint;
+	public String url(String endpoint, String basePath) {
+		String host = StringUtils.hasText(this.managementAddress) ? this.managementAddress : "localhost";
+		int port = (this.managementPort != null) ? this.managementPort : this.applicationPort;
+		return "http://" + host + ":" + port + basePath + "/" + endpoint;
 	}
 
 }

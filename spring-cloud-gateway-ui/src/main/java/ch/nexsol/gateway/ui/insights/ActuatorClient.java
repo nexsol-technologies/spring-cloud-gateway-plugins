@@ -133,7 +133,7 @@ public class ActuatorClient {
 	 */
 	private String url(ServerWebExchange exchange, Instance instance, String endpoint) {
 		if (instance.self()) {
-			return this.local.url(exchange, endpoint, this.properties.basePathOr(this.local.basePath()));
+			return this.local.url(endpoint, this.properties.basePathOr(this.local.basePath()));
 		}
 		return trimmed(instance.uri()) + this.properties.basePathOr(this.local.basePath()) + "/" + endpoint;
 	}

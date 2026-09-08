@@ -35,6 +35,7 @@ import io.micrometer.core.instrument.binder.jvm.convention.JvmCpuMeterConvention
 import io.micrometer.core.instrument.binder.jvm.convention.JvmMemoryMeterConventions;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -177,11 +178,14 @@ public class RedisMetricsAutoConfiguration {
 		 * Registers the resolver naming where this instance is reachable, published with
 		 * its figures so the console can read its Actuator endpoints.
 		 * @param properties the Redis configuration
+		 * @param managementPort the port the Actuator endpoints are bound to, absent when
+		 * they share the port of the application
 		 * @return the address resolver
 		 */
 		@Bean
-		InstanceUri redisInstanceUri(RedisMetricsProperties properties) {
-			return new InstanceUri(properties.getInstanceUri(), properties.getInstanceScheme());
+		InstanceUri redisInstanceUri(RedisMetricsProperties properties,
+				@Value("${management.server.port:#{null}}") Integer managementPort) {
+			return new InstanceUri(properties.getInstanceUri(), properties.getInstanceScheme(), managementPort);
 		}
 
 		/**

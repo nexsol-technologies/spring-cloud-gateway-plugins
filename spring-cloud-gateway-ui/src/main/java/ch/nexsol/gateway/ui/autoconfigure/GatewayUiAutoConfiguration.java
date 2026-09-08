@@ -592,9 +592,10 @@ public class GatewayUiAutoConfiguration {
 		 */
 		@Bean
 		LocalActuator localActuator(@Value("${management.server.port:#{null}}") Integer port,
+				@Value("${management.server.address:}") String address,
 				@Value("${management.server.base-path:}") String serverBasePath,
 				@Value("${management.endpoints.web.base-path:/actuator}") String webBasePath) {
-			return new LocalActuator(port, serverBasePath, webBasePath);
+			return new LocalActuator(port, address, serverBasePath, webBasePath);
 		}
 
 		@Bean
