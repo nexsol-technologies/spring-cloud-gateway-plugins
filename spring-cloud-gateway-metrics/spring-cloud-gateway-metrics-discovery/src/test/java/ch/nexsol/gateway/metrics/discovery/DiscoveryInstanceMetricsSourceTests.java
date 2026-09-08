@@ -207,6 +207,39 @@ class DiscoveryInstanceMetricsSourceTests {
 			.endsWith(":9099/mgmt");
 	}
 
+	/**
+	 * Kubernetes does not write the Eureka keys: it publishes the ports of the service
+	 * under a prefix of its own, so a port named {@code management} arrives as
+	 * {@code port.management}.
+	 */
+	@Test
+	void stampsTheManagementPortKubernetesPublishesUnderItsOwnKey() throws IOException {
+		MockWebServer server = instance(figures("gateway-a", 1000));
+		DefaultServiceInstance registered = new DefaultServiceInstance("gateway-a", "gateway", server.getHostName(),
+				server.getPort(), false, Map.of("port.management", "8088"));
+
+		InstanceMetricsSnapshot snapshot = sourceOver(List.of((ServiceInstance) registered)).collect().block();
+
+		assertThat(snapshot.instances()).singleElement().extracting(InstanceMetric::uri).asString().endsWith(":8088");
+	}
+
+	/**
+	 * A registry that publishes no port at all leaves the registered address standing: a
+	 * gateway serving Actuator on its application port is the common case, and it is the
+	 * one that needs nothing.
+	 */
+	@Test
+	void keepsTheRegisteredAddressWhenNoManagementPortIsPublished() throws IOException {
+		MockWebServer server = instance(figures("gateway-a", 1000));
+
+		InstanceMetricsSnapshot snapshot = sourceOver(server).collect().block();
+
+		assertThat(snapshot.instances()).singleElement()
+			.extracting(InstanceMetric::uri)
+			.asString()
+			.endsWith(":" + server.getPort());
+	}
+
 	@Test
 	void leavesAnUnreachableInstanceOutRatherThanLosingTheOthers() throws IOException {
 		MockWebServer alive = instance(figures("gateway-a", 1000));

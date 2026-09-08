@@ -18,6 +18,7 @@ package ch.nexsol.gateway.metrics.discovery;
 
 import java.net.URI;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -45,16 +46,6 @@ import org.springframework.web.reactive.function.client.WebClient;
  * the route fan-out this one only concatenates what it collected.
  */
 public class DiscoveryInstanceMetricsSource implements InstanceMetricsSource {
-
-	/**
-	 * Metadata keys Spring Cloud publishes the management port under. The first is what a
-	 * current client writes; the second is what it has always written, and what a
-	 * registry filled by an older one still carries.
-	 */
-	private static final String[] MANAGEMENT_PORT_KEYS = { "management.server.port", "management.port" };
-
-	/** Metadata key the management base path is published under, when there is one. */
-	private static final String MANAGEMENT_BASE_PATH = "management.server.base-path";
 
 	private static final Logger LOG = LoggerFactory.getLogger(DiscoveryInstanceMetricsSource.class);
 
@@ -148,19 +139,29 @@ public class DiscoveryInstanceMetricsSource implements InstanceMetricsSource {
 	 * <p>
 	 * The figures themselves are polled on the registered address, since the path they
 	 * are served on belongs to the application rather than to Actuator.
+	 * <p>
+	 * Which key carries it depends on the registry: Eureka writes
+	 * {@code management.server.port}, Kubernetes writes the ports of the service under a
+	 * prefix of its own, so a port named {@code management} arrives as
+	 * {@code port.management}. The keys are a property rather than a constant, for the
+	 * registries that write neither.
 	 */
-	private static String actuatorUri(ServiceInstance instance) {
+	private String actuatorUri(ServiceInstance instance) {
 		URI registered = instance.getUri();
 		Map<String, String> metadata = instance.getMetadata();
-		String port = (metadata != null) ? firstOf(metadata, MANAGEMENT_PORT_KEYS) : null;
+		String port = firstOf(metadata, this.properties.getManagementPortMetadata());
 		if (port == null) {
 			return registered.toString();
 		}
-		String basePath = (metadata.get(MANAGEMENT_BASE_PATH) != null) ? metadata.get(MANAGEMENT_BASE_PATH) : "";
-		return registered.getScheme() + "://" + registered.getHost() + ":" + port + basePath;
+		String basePath = firstOf(metadata, this.properties.getManagementBasePathMetadata());
+		return registered.getScheme() + "://" + registered.getHost() + ":" + port
+				+ ((basePath != null) ? basePath : "");
 	}
 
-	private static String firstOf(Map<String, String> metadata, String... keys) {
+	private static String firstOf(Map<String, String> metadata, List<String> keys) {
+		if (metadata == null || keys == null) {
+			return null;
+		}
 		for (String key : keys) {
 			String value = metadata.get(key);
 			if (value != null && !value.isBlank()) {

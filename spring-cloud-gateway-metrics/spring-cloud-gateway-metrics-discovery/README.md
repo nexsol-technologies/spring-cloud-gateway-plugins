@@ -44,6 +44,8 @@ spring.cloud.gateway.server.webflux.metrics:
 | --- | --- | --- |
 | `...discovery.service-id` | `spring.application.name` | Id this gateway is registered under |
 | `...discovery.path` | `/ui/metrics/local` | Path the siblings are polled on for their route figures |
+| `...discovery.management-port-metadata` | `management.server.port`, `management.port`, `port.management`, `port.actuator` | Metadata keys the Actuator port is looked for under, in order |
+| `...discovery.management-base-path-metadata` | `management.server.base-path` | Metadata keys the Actuator base path is looked for under |
 | `...discovery.instance-path` | `/ui/metrics/local/instance` | Path the siblings are polled on for their instance figures |
 | `...discovery.timeout` | `3s` | How long to wait for a sibling before leaving it out |
 | `...discovery.max-response-size` | — | Largest answer read from a sibling; unset keeps the ceiling of `spring.http.codecs.max-in-memory-size` |
@@ -150,15 +152,36 @@ That address is the registered one, with one substitution: where the registry pu
 management port in the instance metadata, that port replaces the registered one, and
 `management.server.base-path` is appended when it is published too.
 
-| Metadata key | Read as |
-| --- | --- |
-| `management.server.port`, then `management.port` | The port the endpoints are on |
-| `management.server.base-path` | The path they are served under |
+Which key carries that port depends on the registry, so the keys are a property and the
+defaults cover the two that publish it:
 
-Spring Cloud publishes those keys on its own when the endpoints have a port of their own, so a
-deployment running `management.server.port: 8088` behind an application on `8080` needs nothing
-here: the registry carries `8080`, because that is where its traffic arrives, and the metadata
-carries `8088`.
+| Registry | Key it writes | Needs configuring |
+| --- | --- | --- |
+| Eureka | `management.server.port`, or `management.port` from an older client | No |
+| Kubernetes | `port.<name>` — a service port named `management` arrives as `port.management` | No, if the port is named `management` or `actuator` |
+| Anything else | — | Name the key in `management-port-metadata` |
+
+Eureka publishes it on its own: a deployment running `management.server.port: 8088` behind an
+application on `8080` needs nothing here, since the registry carries `8080` — that is where its
+traffic arrives — and the metadata carries `8088`.
+
+Kubernetes publishes the ports of the service instead, under the prefix
+`spring.cloud.kubernetes.discovery.metadata.ports-prefix` (`port.` by default). A port named
+something else is named here:
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          metrics:
+            discovery:
+              management-port-metadata: [ "port.http-management" ]
+```
+
+An instance whose registry publishes no such port keeps its registered address, which is right
+wherever Actuator shares the application port.
 
 The figures themselves are still polled on the registered address: the path they are served on
 belongs to the application, not to Actuator.

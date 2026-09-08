@@ -17,6 +17,8 @@
 package ch.nexsol.gateway.metrics.discovery;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.util.unit.DataSize;
 
@@ -54,6 +56,22 @@ public class DiscoveryMetricsProperties {
 	 * Path the sibling instances are polled on for their technical figures.
 	 */
 	private String instancePath = DEFAULT_INSTANCE_PATH;
+
+	/**
+	 * Metadata keys the port of the Actuator endpoints is looked for under, in order. The
+	 * defaults cover the registries that publish it: Eureka writes
+	 * {@code management.server.port}, an older Eureka client {@code management.port}, and
+	 * Kubernetes writes the ports of the service under its own prefix, so a port named
+	 * {@code management} arrives as {@code port.management}.
+	 */
+	private List<String> managementPortMetadata = new ArrayList<>(
+			List.of("management.server.port", "management.port", "port.management", "port.actuator"));
+
+	/**
+	 * Metadata keys the base path of the Actuator endpoints is looked for under, in
+	 * order.
+	 */
+	private List<String> managementBasePathMetadata = new ArrayList<>(List.of("management.server.base-path"));
 
 	/**
 	 * How long to wait for a sibling before leaving it out of the figures.
@@ -115,6 +133,36 @@ public class DiscoveryMetricsProperties {
 	 */
 	public String getInstancePath() {
 		return this.instancePath;
+	}
+
+	/**
+	 * @return the metadata keys the management port is looked for under
+	 */
+	public List<String> getManagementPortMetadata() {
+		return this.managementPortMetadata;
+	}
+
+	/**
+	 * Sets the metadata keys the management port is looked for under.
+	 * @param managementPortMetadata the keys, in the order they are tried
+	 */
+	public void setManagementPortMetadata(List<String> managementPortMetadata) {
+		this.managementPortMetadata = managementPortMetadata;
+	}
+
+	/**
+	 * @return the metadata keys the management base path is looked for under
+	 */
+	public List<String> getManagementBasePathMetadata() {
+		return this.managementBasePathMetadata;
+	}
+
+	/**
+	 * Sets the metadata keys the management base path is looked for under.
+	 * @param managementBasePathMetadata the keys, in the order they are tried
+	 */
+	public void setManagementBasePathMetadata(List<String> managementBasePathMetadata) {
+		this.managementBasePathMetadata = managementBasePathMetadata;
 	}
 
 	/**
