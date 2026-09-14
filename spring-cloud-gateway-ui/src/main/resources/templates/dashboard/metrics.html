@@ -53,7 +53,7 @@
 		</div>
 
 		<!-- Map: one bubble per route, framed by a named question. -->
-		<div class="card border-0 shadow-sm mb-3">
+		<div class="card border-0 shadow-sm mb-3" id="gm-card">
 			<div class="card-body">
 				<div class="d-flex flex-wrap gap-3 align-items-end mb-2">
 					<div>
@@ -109,6 +109,9 @@
 							<input class="form-check-input" type="checkbox" role="switch" id="gm-auto">
 							<label class="form-check-label small" for="gm-auto">Auto</label>
 						</div>
+						<button type="button" class="btn btn-sm btn-outline-secondary" data-gw-expand="gm-card"
+								aria-pressed="false"
+								title="Give the picture the whole page (Escape to come back)">Expand</button>
 						<button type="button" id="gm-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
 					</div>
 				</div>
@@ -143,13 +146,14 @@
 				</div>
 
 				<!-- Plain-language reading guide, rewritten for the selected question. -->
-				<div id="gm-help" class="alert alert-light border py-2 px-3 small text-secondary mb-3"></div>
+				<div id="gm-help" class="alert alert-light border py-2 px-3 small text-secondary mb-3 gw-graph-help"></div>
 
 				<!-- Whose traffic this is: one instance, or every instance consolidated by
 				     a metrics provider. Filled from the payload on every refresh. -->
 				<p class="text-secondary small mb-2" id="gm-coverage"></p>
 
-				<div id="gm-chart" style="width: 100%; height: 58vh; min-height: 400px" data-gw-theme-reload
+				<div id="gm-chart" class="gw-chart-canvas"
+						style="width: 100%; height: 58vh; min-height: 400px" data-gw-theme-reload
 						th:attr="data-url=@{/ui/metrics/data}" data-url="/ui/metrics/data"></div>
 				<div id="gm-empty" class="text-secondary text-center py-5" style="display: none">
 					No route metrics yet &mdash; send some traffic through the gateway, then refresh.

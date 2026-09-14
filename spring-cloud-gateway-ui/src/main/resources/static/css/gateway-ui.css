@@ -1019,6 +1019,61 @@ body {
 	text-decoration: underline;
 }
 
+/* Expanded pictures -------------------------------------------------------- */
+
+/*
+ * Expanded, a picture takes the content column and nothing else: the menu keeps its width,
+ * so the rest of the console stays one click away. Fixed rather than grown in flow, because
+ * the page it sits in is several cards long and the picture is meant to be the only thing
+ * read.
+ */
+.gw-expanded {
+	/* Solid: every other card is translucent over the page wash, and this one covers them. */
+	--bs-card-bg: var(--gw-surface-solid);
+	position: fixed;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: var(--gw-sidebar-width);
+	z-index: 1030;
+	margin: 0;
+	border-radius: 0;
+}
+
+.gw-collapsed .gw-expanded {
+	left: var(--gw-sidebar-width-collapsed);
+}
+
+/* The card body holds the height it was given, and the picture takes what the rest leaves. */
+.gw-expanded > .card-body {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+
+/*
+ * The height a picture is drawn at rest is an inline style on each view, and nothing short of
+ * !important displaces one. The scrollbar is for the flow view: its SVG is as tall as it has
+ * rows, whatever the box it is handed.
+ */
+.gw-expanded .gw-chart-canvas,
+.gw-expanded .gw-flow {
+	flex: 1 1 auto;
+	height: auto !important;
+	min-height: 0 !important;
+	overflow: auto;
+}
+
+/* Read once, and worth more as height for the picture the reader just asked to enlarge. */
+.gw-expanded .gw-graph-help {
+	display: none;
+}
+
+/* The page behind is covered: scrolling it would only move what cannot be seen. */
+.gw-expanded-open {
+	overflow: hidden;
+}
+
 /* Flow view ---------------------------------------------------------------- */
 
 /*
@@ -1321,6 +1376,20 @@ body {
 
 .gw-insights-group > summary:hover {
 	background: var(--gw-nav-hover-bg);
+}
+
+/*
+ * The prefix has the whole row to itself — there is no column under it to keep in line —
+ * so the cap and the ellipsis a table cell needs would only hide the end of the one string
+ * the reader came for. It takes the width of the row and wraps when it runs out.
+ */
+.gw-insights-group > summary > .gw-insights-code {
+	flex: 1 1 auto;
+	min-width: 0;
+	max-width: none;
+	overflow: visible;
+	white-space: normal;
+	overflow-wrap: anywhere;
 }
 
 /* How many properties the prefix carries, so a folded group still says what it holds. */

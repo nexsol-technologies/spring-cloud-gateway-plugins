@@ -774,8 +774,22 @@
 			renderTable();
 		});
 	});
+	/*
+	 * The plot follows its box whatever moved it — the window, the expand button, the menu
+	 * folding beside it. Only the first of those resizes the window, which is what the bars
+	 * still hang on: they sit in a card of their own that nothing expands.
+	 */
+	if (window.ResizeObserver) {
+		new ResizeObserver(function () {
+			chart.resize();
+		}).observe(chartEl);
+	}
+	else {
+		window.addEventListener('resize', function () {
+			chart.resize();
+		});
+	}
 	window.addEventListener('resize', function () {
-		chart.resize();
 		bars.resize();
 	});
 

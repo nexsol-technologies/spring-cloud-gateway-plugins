@@ -237,6 +237,9 @@ discovered service, and they all pile up in the same corner. Three controls take
 | Show | caps the plot and the table to the busiest N routes by calls; Top 100 by default |
 | Scale | `Auto` turns an axis logarithmic as soon as its largest value is fifty times the median one, which is what un-stacks the cloud; `Linear` and `Logarithmic` force it either way |
 
+**Expand** gives the plot the whole content column, the menu keeping its place; the same
+button, or Escape, brings the page back.
+
 Only a dozen routes are named on the plot — the tooltip names any other one. **Ctrl + scroll**
 zooms, drag pans, **Reset zoom** puts the axes back; a wheel without ctrl is left to the page,
 which is what keeps a plot this tall from trapping the scroll.
@@ -358,6 +361,11 @@ Five ways to narrow what is drawn, all applied in the browser on the payload alr
 The two error switches are additive: neither on draws the whole graph, both on keep an edge
 that saw either.
 
+**Expand** gives the picture the whole content column — the menu keeps its place, the filters
+keep theirs, and the description above it folds away. The same button, now reading *Exit full
+screen*, or Escape, brings the page back. The [traffic](#traffic) and [flow](#flow) views carry
+the same button.
+
 **Freeze layout** keeps the positions the force layout settled on, so a refresh redraws the
 same picture instead of shuffling it. The view is refreshed on demand and never on a timer —
 a graph that moves while it is being read is unreadable, which is the one place this console
@@ -376,7 +384,9 @@ middle, the services it reached on the right.
 
 **A dot travels a hop when calls arrive on it**, coloured by how those calls came back. It is
 the traffic since the last poll, capped at three dots however large. A hop that carried nothing
-stays still.
+stays still. **The two legs run in order**, in from the left and then on to the right: a call is
+counted once at each end, so the dot that reaches the gateway and the dot that leaves it are the
+same traffic.
 
 **A hop carries two colours.** Its *line* is how its last calls came back: amber or red on a 4xx
 or a 5xx, green again as soon as a batch comes back clean. The *dot resting at its end* is
@@ -398,6 +408,10 @@ were left out; the cut is by calls. *Everything* puts them back.
 
 **Keep only** narrows on either endpoint, and the **4xx** and **5xx** switches behave as they do
 on the graph view.
+
+**Expand** gives the picture the whole content column, the menu keeping its place; the same
+button, or Escape, brings the page back. The columns spread over the width it gains, and the
+picture scrolls inside the card when it has more rows than the screen has height.
 
 Both views are fed by the same `GET /ui/service-graph/data` and state the same coverage.
 

@@ -52,7 +52,7 @@
 			</div>
 		</div>
 
-		<div class="card border-0 shadow-sm mb-3">
+		<div class="card border-0 shadow-sm mb-3" id="gg-card">
 			<div class="card-body">
 				<div class="d-flex flex-wrap gap-3 align-items-end mb-2">
 					<div>
@@ -89,11 +89,14 @@
 							<input class="form-check-input" type="checkbox" role="switch" id="gg-freeze" checked>
 							<label class="form-check-label small" for="gg-freeze">Freeze layout</label>
 						</div>
+						<button type="button" class="btn btn-sm btn-outline-secondary" data-gw-expand="gg-card"
+								aria-pressed="false"
+								title="Give the picture the whole page (Escape to come back)">Expand</button>
 						<button type="button" id="gg-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
 					</div>
 				</div>
 
-				<div class="alert alert-light border py-2 px-3 small text-secondary mb-3">
+				<div class="alert alert-light border py-2 px-3 small text-secondary mb-3 gw-graph-help">
 					Ctrl and the wheel to zoom, drag to pan, drag a node to move it. Click a node to focus it and its
 					neighbours, click it again to come back. An arrow goes from the caller to what it
 					reached; it thickens with the number of calls and reddens with the share answered with a
@@ -112,7 +115,8 @@
 				     tracing backend. Filled from the payload on every refresh. -->
 				<p class="text-secondary small mb-2" id="gg-coverage"></p>
 
-				<div id="gg-chart" style="width: 100%; height: 62vh; min-height: 420px" data-gw-theme-reload
+				<div id="gg-chart" class="gw-chart-canvas"
+						style="width: 100%; height: 62vh; min-height: 420px" data-gw-theme-reload
 						th:attr="data-url=@{/ui/service-graph/data}" data-url="/ui/service-graph/data"></div>
 				<div id="gg-empty" class="text-secondary text-center py-5" style="display: none">
 					Nothing to draw yet &mdash; send some traffic through the gateway, then refresh.

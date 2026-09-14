@@ -30,7 +30,9 @@
 	var HUB_W = 150;
 
 	var POLL_MS = 3000;
-	var TRAVEL_MS = 1400;
+	// One leg of a call. A dot runs the two of them one after the other and the next poll
+	// wipes the picture, so twice this plus the spread of the last dot has to fit in POLL_MS.
+	var TRAVEL_MS = 1100;
 	// A burst of a thousand calls is still traffic on one hop, not a thousand dots to draw.
 	var MAX_DOTS = 3;
 
@@ -227,7 +229,7 @@
 		group.appendChild(el('circle', {
 			cx: dotX, cy: dotY, r: 5, class: 'gw-flow-dot gw-flow-rest-' + health(hop)
 		}));
-		travel(group, pathId, arrived[key]);
+		travel(group, pathId, arrived[key], inbound);
 		return group;
 	}
 
@@ -240,35 +242,53 @@
 	 * on the way out: a released motion puts the element back at its own coordinates, which
 	 * for a circle carrying no centre is the top-left corner of the picture. Between the end
 	 * of the travel and the removal that is a dot blinking outside the flow.
+	 *
+	 * The outbound leg leaves when the inbound one has arrived, rather than with it. A call
+	 * is counted once at each end — the same exchange feeds 'in:caller' and 'out:service' —
+	 * so the two legs are the two halves of one journey, and running them together drew a
+	 * gateway sending on what it had not received yet.
 	 */
-	function travel(group, pathId, delta) {
+	function travel(group, pathId, delta, inbound) {
 		if (!delta || still) {
 			return;
 		}
 		var count = Math.min(MAX_DOTS, delta.calls);
 		for (var index = 0; index < count; index += 1) {
-			sendOne(group, pathId, health(delta), index);
+			sendOne(group, pathId, health(delta), index, inbound ? 0 : TRAVEL_MS);
 		}
 	}
 
 	/*
-	 * Several dots on one hop are spread by giving each a longer journey than the one
-	 * before, never by delaying its start: a motion that has not begun leaves its element
-	 * at its own coordinates, and a circle drawn at the origin of the picture is a dot
-	 * blinking in the top-left corner until its turn comes.
+	 * Several dots on one hop are spread by giving each a longer journey than the one before,
+	 * never by delaying its start: a motion that has not begun leaves its element at its own
+	 * coordinates, and a circle drawn at the origin of the picture is a dot blinking in the
+	 * top-left corner until its turn comes.
+	 *
+	 * The one leg that does start later — the outbound one — waits through `begin` and is held
+	 * out of sight until then, never by being inserted later: the SVG is rebuilt whole and its
+	 * SMIL clock starts when it is attached, so a motion added a second afterwards is already a
+	 * second into its own journey and its dot appears part of the way down the line.
 	 */
-	function sendOne(group, pathId, state, index) {
+	function sendOne(group, pathId, state, index, delay) {
 		var duration = TRAVEL_MS + index * 260;
 		var dot = el('circle', { r: 5, class: 'gw-flow-travelling gw-flow-' + state });
-		var motion = el('animateMotion', { dur: (duration / 1000) + 's', fill: 'freeze' });
+		var motion = el('animateMotion', {
+			dur: (duration / 1000) + 's', begin: (delay / 1000) + 's', fill: 'freeze'
+		});
 		motion.appendChild(el('mpath', { href: '#' + pathId }));
 		dot.appendChild(motion);
+		if (delay) {
+			dot.setAttribute('visibility', 'hidden');
+			dot.appendChild(el('set', {
+				attributeName: 'visibility', to: 'visible', begin: (delay / 1000) + 's'
+			}));
+		}
 		group.appendChild(dot);
 		window.setTimeout(function () {
 			if (dot.parentNode) {
 				dot.parentNode.removeChild(dot);
 			}
-		}, duration + 60);
+		}, delay + duration + 60);
 	}
 
 	/** The column of boxes and the hops joining it to the gateway. */
@@ -447,9 +467,24 @@
 	window.gatewayUi.remember(sel('gf-auto'));
 	sel('gf-auto').addEventListener('change', schedule);
 	sel('gf-refresh').addEventListener('click', load);
-	// The layout is measured from the width of its container, so it is taken again when
-	// that width changes. Nothing is re-fetched: the picture is redrawn from what is held.
-	window.addEventListener('resize', render);
+	/*
+	 * The layout is measured from the width of its container, so it is taken again when that
+	 * width changes — the window, the expand button, the menu folding beside it. Nothing is
+	 * re-fetched: the picture is redrawn from what is held. The width only: the height of the
+	 * box follows the number of rows, so watching it would have each redraw order the next.
+	 */
+	if (window.ResizeObserver) {
+		var drawnAt = 0;
+		new ResizeObserver(function () {
+			if (flowEl.clientWidth !== drawnAt) {
+				drawnAt = flowEl.clientWidth;
+				render();
+			}
+		}).observe(flowEl);
+	}
+	else {
+		window.addEventListener('resize', render);
+	}
 
 	load();
 	schedule();

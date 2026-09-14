@@ -170,7 +170,10 @@
 		details.className = 'gw-insights-group';
 		details.open = open;
 		var summary = document.createElement('summary');
-		summary.appendChild(code(prefix));
+		var label = code(prefix);
+		// Shown whole here, so the tooltip a cut token needs would only cover the row under it.
+		label.removeAttribute('title');
+		summary.appendChild(label);
 		var count = document.createElement('span');
 		count.className = 'gw-insights-count';
 		count.textContent = kept.length;

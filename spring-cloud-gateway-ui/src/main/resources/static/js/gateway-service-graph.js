@@ -418,9 +418,20 @@
 			originY: event.clientY - box.top
 		});
 	}, { passive: false });
-	window.addEventListener('resize', function () {
-		chart.resize();
-	});
+	/*
+	 * The picture follows its box whatever moved it — the window, the expand button, the menu
+	 * folding beside it. Only the first of those resizes the window.
+	 */
+	if (window.ResizeObserver) {
+		new ResizeObserver(function () {
+			chart.resize();
+		}).observe(chartEl);
+	}
+	else {
+		window.addEventListener('resize', function () {
+			chart.resize();
+		});
+	}
 
 	['gg-focus', 'gg-search', 'gg-min-calls', 'gg-4xx', 'gg-5xx', 'gg-freeze'].forEach(function (id) {
 		window.gatewayUi.remember(sel(id));

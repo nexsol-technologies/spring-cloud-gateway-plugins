@@ -52,7 +52,7 @@
 			</div>
 		</div>
 
-		<div class="card border-0 shadow-sm">
+		<div class="card border-0 shadow-sm" id="gf-card">
 			<div class="card-body">
 				<div class="d-flex flex-wrap gap-3 align-items-end mb-2">
 					<div>
@@ -91,16 +91,21 @@
 							<label class="form-check-label small" for="gf-5xx"
 									title="Keep only the hops that saw a 5xx">5xx</label>
 						</div>
+						<button type="button" class="btn btn-sm btn-outline-secondary" data-gw-expand="gf-card"
+								aria-pressed="false"
+								title="Give the picture the whole page (Escape to come back)">Expand</button>
 						<button type="button" id="gf-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
 					</div>
 				</div>
 
-				<div class="alert alert-light border py-2 px-3 small text-secondary mb-3">
+				<div class="alert alert-light border py-2 px-3 small text-secondary mb-3 gw-graph-help">
 					The calls of the service graph, laid out as they run: the callers that reached the
 					gateway on the left, the services it reached on the right.
 					<br>
 					<strong>A dot travels a hop when calls arrive on it</strong>, coloured by how those
 					calls came back: it is the traffic since the last poll, not a replay of one request.
+					The two legs run in order &mdash; in from the left, then on to the right &mdash;
+					because they are the same calls, counted once at each end.
 					A quiet hop stays still, which is the point &mdash; the picture only moves when the
 					gateway is carrying something. Turn <em>Auto</em> off to stop polling.
 					<br>

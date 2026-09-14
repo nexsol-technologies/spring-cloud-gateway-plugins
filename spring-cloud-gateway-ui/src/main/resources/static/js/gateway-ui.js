@@ -214,6 +214,47 @@ window.gatewayUi = (function () {
 })();
 
 /*
+ * The expand button of a picture. A button carrying data-gw-expand="<card id>" gives that
+ * card the whole content column and gives itself back the way out, so a view adds a full
+ * screen by writing one button rather than a behaviour of its own.
+ *
+ * The card is fixed over the content rather than promoted to the fullscreen API: the menu is
+ * meant to stay beside it, and a fullscreen element has nothing beside it.
+ */
+(function () {
+	var buttons = document.querySelectorAll('[data-gw-expand]');
+	if (!buttons.length) {
+		return;
+	}
+
+	function card(button) {
+		return document.getElementById(button.getAttribute('data-gw-expand'));
+	}
+
+	function apply(button, on) {
+		card(button).classList.toggle('gw-expanded', on);
+		document.body.classList.toggle('gw-expanded-open', on);
+		button.setAttribute('aria-pressed', String(on));
+		button.classList.toggle('btn-outline-secondary', !on);
+		button.classList.toggle('btn-secondary', on);
+		button.textContent = on ? 'Exit full screen' : 'Expand';
+		button.title = on ? 'Back to the page (Escape)'
+			: 'Give the picture the whole page (Escape to come back)';
+	}
+
+	Array.prototype.forEach.call(buttons, function (button) {
+		button.addEventListener('click', function () {
+			apply(button, !card(button).classList.contains('gw-expanded'));
+		});
+		document.addEventListener('keydown', function (event) {
+			if (event.key === 'Escape' && card(button).classList.contains('gw-expanded')) {
+				apply(button, false);
+			}
+		});
+	});
+})();
+
+/*
  * Light / dark switch. The theme itself is applied by the head of the shell, before the
  * page paints; this only writes the choice down and puts it in place straight away.
  */
