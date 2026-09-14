@@ -82,6 +82,7 @@
 		<module>spring-cloud-gateway-oauth2</module>
 		<module>spring-cloud-gateway-hub-openapi</module>
 		<module>spring-cloud-gateway-openapi-validation</module>
+		<module>spring-cloud-gateway-passive-scan</module>
 		<module>spring-cloud-gateway-ui</module>
 		<module>spring-cloud-gateway-samples</module>
 		<module>spring-cloud-gateway-plugins-dependencies</module>

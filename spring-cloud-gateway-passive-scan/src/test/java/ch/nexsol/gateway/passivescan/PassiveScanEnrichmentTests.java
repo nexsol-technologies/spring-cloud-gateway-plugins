@@ -1,0 +1,93 @@
+/*
+ * Copyright 2025 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.nexsol.gateway.passivescan;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+import ch.nexsol.gateway.passivescan.engine.PassiveScanEngine;
+import ch.nexsol.gateway.passivescan.metrics.MicrometerFindingListener;
+import ch.nexsol.gateway.passivescan.model.Finding;
+import ch.nexsol.gateway.passivescan.model.HttpExchange;
+import ch.nexsol.gateway.passivescan.model.OwaspCategory;
+import ch.nexsol.gateway.passivescan.model.Severity;
+import ch.nexsol.gateway.passivescan.scanner.BrokenAuthScanner;
+import ch.nexsol.gateway.passivescan.scanner.SecurityHeadersScanner;
+import ch.nexsol.gateway.passivescan.store.InMemoryFindingStore;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.Test;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.util.LinkedMultiValueMap;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class PassiveScanEnrichmentTests {
+
+	private static HttpExchange exchange(HttpHeaders request, Map<String, String> routeMetadata, HttpStatus status) {
+		return new HttpExchange(Instant.now(), "GET", "https", "/api/x", new LinkedMultiValueMap<>(),
+				HttpHeaders.readOnlyHttpHeaders(request), HttpHeaders.readOnlyHttpHeaders(new HttpHeaders()), status,
+				"route-x", "10.0.0.1", routeMetadata, null);
+	}
+
+	@Test
+	void unauthenticatedSuccessOnProtectedRouteIsFlagged() {
+		HttpExchange ex = exchange(new HttpHeaders(), Map.of("public", "false"), HttpStatus.OK);
+		assertThat(new BrokenAuthScanner().inspect(ex)).hasSize(1);
+	}
+
+	@Test
+	void publicRouteIsNotFlagged() {
+		HttpExchange ex = exchange(new HttpHeaders(), Map.of("public", "true"), HttpStatus.OK);
+		assertThat(new BrokenAuthScanner().inspect(ex)).isEmpty();
+	}
+
+	@Test
+	void authenticatedRequestIsNotFlagged() {
+		HttpHeaders request = new HttpHeaders();
+		request.set(HttpHeaders.AUTHORIZATION, "Bearer token");
+		HttpExchange ex = exchange(request, Map.of("public", "false"), HttpStatus.OK);
+		assertThat(new BrokenAuthScanner().inspect(ex)).isEmpty();
+	}
+
+	@Test
+	void micrometerListenerCountsFindings() {
+		SimpleMeterRegistry registry = new SimpleMeterRegistry();
+		MicrometerFindingListener listener = new MicrometerFindingListener(registry);
+		listener.onFinding(new Finding("cors", OwaspCategory.API8_SECURITY_MISCONFIGURATION, Severity.CRITICAL, "t",
+				"d", "GET", "/p", "r", Instant.now(), null));
+		assertThat(registry.get("gateway.passive.scan.findings").counter().count()).isEqualTo(1.0);
+	}
+
+	@Test
+	void engineNotifiesListeners() {
+		SimpleMeterRegistry registry = new SimpleMeterRegistry();
+		MicrometerFindingListener listener = new MicrometerFindingListener(registry);
+		InMemoryFindingStore store = new InMemoryFindingStore(100);
+		PassiveScanEngine engine = new PassiveScanEngine(List.of(new SecurityHeadersScanner()), store,
+				List.of(listener), 16);
+		engine.scan(new HttpExchange(Instant.now(), "GET", "http", "/api/x", new LinkedMultiValueMap<>(),
+				HttpHeaders.readOnlyHttpHeaders(new HttpHeaders()), HttpHeaders.readOnlyHttpHeaders(new HttpHeaders()),
+				HttpStatus.OK, "route-x", "10.0.0.1"));
+		assertThat(store.recent()).hasSize(1);
+		assertThat(registry.get("gateway.passive.scan.findings").counter().count()).isEqualTo(1.0);
+		engine.destroy();
+	}
+
+}

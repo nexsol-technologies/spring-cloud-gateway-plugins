@@ -1,0 +1,83 @@
+/*
+ * Copyright 2025 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.nexsol.gateway.passivescan.web;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+import ch.nexsol.gateway.passivescan.model.Finding;
+import ch.nexsol.gateway.passivescan.report.Report;
+import ch.nexsol.gateway.passivescan.report.ReportFormat;
+import ch.nexsol.gateway.passivescan.report.ReportService;
+import ch.nexsol.gateway.passivescan.store.FindingStore;
+import ch.nexsol.gateway.passivescan.store.FindingSummary;
+
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Read-only console API over the passive analyser: the retained findings, their summary,
+ * a downloadable export, and a purge.
+ */
+@RestController
+@RequestMapping("/passive-scan")
+public class PassiveScanController {
+
+	private final FindingStore store;
+
+	private final ReportService reports;
+
+	public PassiveScanController(FindingStore store, ReportService reports) {
+		this.store = store;
+		this.reports = reports;
+	}
+
+	@GetMapping("/findings")
+	public List<Finding> findings() {
+		return this.store.recent();
+	}
+
+	@GetMapping("/summary")
+	public FindingSummary summary() {
+		return this.store.summary();
+	}
+
+	@PostMapping("/findings/clear")
+	public Map<String, Object> clear() {
+		this.store.clear();
+		return Map.of("cleared", true);
+	}
+
+	@GetMapping("/export")
+	public ResponseEntity<byte[]> export(@RequestParam(defaultValue = "json") String format) {
+		ReportFormat reportFormat = ReportFormat.valueOf(format.toUpperCase(Locale.ROOT));
+		Report report = this.reports.render(reportFormat, this.store.recent(), this.store.summary());
+		ContentDisposition disposition = ContentDisposition.attachment().filename(report.filename()).build();
+		return ResponseEntity.ok()
+			.contentType(report.contentType())
+			.header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+			.body(report.content());
+	}
+
+}

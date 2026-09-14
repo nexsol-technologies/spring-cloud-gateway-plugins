@@ -1,0 +1,74 @@
+/*
+ * Copyright 2025 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.nexsol.gateway.passivescan.scanner;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+import ch.nexsol.gateway.passivescan.model.Finding;
+import ch.nexsol.gateway.passivescan.model.HttpExchange;
+import ch.nexsol.gateway.passivescan.model.OwaspCategory;
+import ch.nexsol.gateway.passivescan.model.Severity;
+
+import org.springframework.http.HttpHeaders;
+
+/**
+ * Flags {@code Set-Cookie} responses whose cookies miss the {@code HttpOnly},
+ * {@code Secure} or {@code SameSite} attributes.
+ */
+public class CookieSecurityScanner extends AbstractPassiveScanner {
+
+	@Override
+	public String id() {
+		return "cookie-security";
+	}
+
+	@Override
+	public List<Finding> inspect(HttpExchange exchange) {
+		List<String> cookies = exchange.responseHeaders().get(HttpHeaders.SET_COOKIE);
+		if (cookies == null || cookies.isEmpty()) {
+			return List.of();
+		}
+		boolean secure = exchange.secure()
+				|| "https".equalsIgnoreCase(exchange.requestHeaders().getFirst("X-Forwarded-Proto"));
+		List<Finding> findings = new ArrayList<>();
+		for (String cookie : cookies) {
+			String lower = cookie.toLowerCase(Locale.ROOT);
+			List<String> missing = new ArrayList<>();
+			if (!lower.contains("httponly")) {
+				missing.add("HttpOnly");
+			}
+			if (secure && !lower.contains("secure")) {
+				missing.add("Secure");
+			}
+			if (!lower.contains("samesite")) {
+				missing.add("SameSite");
+			}
+			if (missing.isEmpty()) {
+				continue;
+			}
+			String name = cookie.contains("=") ? cookie.substring(0, cookie.indexOf('=')) : cookie;
+			findings.add(finding(exchange, OwaspCategory.API8_SECURITY_MISCONFIGURATION, Severity.MEDIUM,
+					"Insecure cookie attributes", "Cookie '" + name.trim() + "' misses: " + String.join(", ", missing),
+					Map.of("cookie", name.trim(), "missing", String.join(", ", missing))));
+		}
+		return findings;
+	}
+
+}
