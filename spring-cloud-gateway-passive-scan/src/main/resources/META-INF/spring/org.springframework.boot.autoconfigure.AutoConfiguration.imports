@@ -1,3 +1,0 @@
-ch.nexsol.gateway.passivescan.autoconfigure.PassiveScanAutoConfiguration
-ch.nexsol.gateway.passivescan.autoconfigure.PassiveScanRoutesSecurityAutoConfiguration
-ch.nexsol.gateway.passivescan.autoconfigure.PassiveScanMetricsAutoConfiguration

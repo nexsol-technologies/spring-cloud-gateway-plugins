@@ -28,6 +28,7 @@ import ch.nexsol.gateway.database.service.ApiService;
 import ch.nexsol.gateway.metrics.InstanceMetricsSource;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
+import ch.nexsol.gateway.pentest.core.store.FindingStore;
 import ch.nexsol.gateway.servicegraph.ServiceGraphSource;
 import ch.nexsol.gateway.ui.audit.AuditExclusionBeanPostProcessor;
 import ch.nexsol.gateway.ui.audit.AuditOverviewContribution;
@@ -55,6 +56,7 @@ import ch.nexsol.gateway.ui.openapi.OpenapiViewController;
 import ch.nexsol.gateway.ui.openapi.OpenapiViewProperties;
 import ch.nexsol.gateway.ui.overview.OverviewContribution;
 import ch.nexsol.gateway.ui.overview.OverviewService;
+import ch.nexsol.gateway.ui.passivescan.PassiveScanViewController;
 import ch.nexsol.gateway.ui.routes.DatabaseRoutesController;
 import ch.nexsol.gateway.ui.routes.RouteInventoryController;
 import ch.nexsol.gateway.ui.routes.RouteInventoryService;
@@ -130,6 +132,12 @@ public class GatewayUiAutoConfiguration {
 	 * Heading the technical health of the instances folds under.
 	 */
 	static final String RUNTIME = "Runtime";
+
+	/**
+	 * Heading the security testing views fold under: passive analysis now, active
+	 * scanning later.
+	 */
+	static final String SECURITY = "Security";
 
 	/**
 	 * Heading the API contracts fold under.
@@ -773,6 +781,30 @@ public class GatewayUiAutoConfiguration {
 		@Bean
 		UiSecuredPaths auditTailSecuredPaths() {
 			return new UiSecuredPaths("/ui/audit", "/ui/audit/events", "/js/gateway-audit.js");
+		}
+
+	}
+
+	/**
+	 * The passive-scan view: the findings the analyser raised from live traffic. Present
+	 * when the passive-scan plugin is on the classpath and enabled, since it is that
+	 * plugin's {@link FindingStore} the controller reads.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(FindingStore.class)
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.pentest.passive.enabled", havingValue = "true")
+	@Import(PassiveScanViewController.class)
+	static class PassiveScanViewConfiguration {
+
+		@Bean
+		NavItem passiveScanNavItem() {
+			return new NavItem("passive-scan", "Passive scan", "icon-shield", "/ui/passive-scan", 30, SECURITY);
+		}
+
+		@Bean
+		UiSecuredPaths passiveScanViewSecuredPaths() {
+			return new UiSecuredPaths("/ui/passive-scan", "/ui/passive-scan/findings", "/ui/passive-scan/summary",
+					"/js/gateway-passive-scan.js");
 		}
 
 	}

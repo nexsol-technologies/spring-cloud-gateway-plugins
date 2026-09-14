@@ -194,6 +194,17 @@ spring.cloud.gateway.server.webflux.audit:
     - /actuator/**
     - /eureka/**
 
+# Passive OWASP analysis (spring-cloud-gateway-pentest-passive). It observes the traffic and
+# raises findings, sending nothing of its own. Body capture is on so the body-aware scanners
+# (verbose-error, excessive-data-exposure) run too. With routes-security present, broken-auth
+# lights up; with metrics present, each finding is counted. Seen under /ui/passive-scan.
+# routed-only is on by default, so the console, its assets and the actuator probes are left
+# out on their own: only the traffic a route actually handled is inspected.
+spring.cloud.gateway.server.webflux.pentest.passive:
+  enabled: true
+  body:
+    enabled: true
+
 spring.cloud.gateway.server.webflux.ui:
   openapi:
     extensions:
@@ -501,6 +512,7 @@ spring.cloud.gateway.server.webflux:
   metrics:
     enabled: false
     instance.enabled: false
+  pentest.passive.enabled: false
   # openapi-validation has no enabled flag, for a reason of its own: it is attached route
   # by route, and both directions on OFF is what neutralises it wherever a route attached
   # it. Quoted, or YAML reads OFF as the boolean false.

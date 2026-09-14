@@ -39,11 +39,16 @@ import org.springframework.context.annotation.FilterType;
  * declared under a condition on Actuator being present, which a component scan does not
  * evaluate. Scanned, it would be built in every test and ask for the client its own
  * configuration was never applied to create.
+ * <p>
+ * The passivescan package is excluded on that same ground: its controller is declared
+ * under a condition on the passive-scan plugin being present and enabled, which a scan
+ * does not evaluate. Scanned, it would be built in every test and ask for a
+ * {@code FindingStore} the disabled-by-default plugin never contributed.
  */
 @SpringBootConfiguration
 @ComponentScan(excludeFilters = { @ComponentScan.Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
 		@ComponentScan.Filter(type = FilterType.REGEX,
-				pattern = "ch\\.nexsol\\.gateway\\.ui\\.(security|insights)\\..*") })
+				pattern = "ch\\.nexsol\\.gateway\\.ui\\.(security|insights|passivescan)\\..*") })
 @EnableAutoConfiguration
 public class SpringAppConfiguration {
 

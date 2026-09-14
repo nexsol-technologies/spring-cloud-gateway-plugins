@@ -26,6 +26,7 @@
 		<module>gateway-routes-files</module>
 		<module>gateway-routes-all</module>
 		<module>gateway-secured</module>
+		<module>gateway-passive-scan</module>
 		<module>gateway-full</module>
 	</modules>
 

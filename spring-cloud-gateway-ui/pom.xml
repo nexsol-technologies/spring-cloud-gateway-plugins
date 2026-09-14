@@ -49,6 +49,12 @@
 		</dependency>
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-pentest-passive</artifactId>
+			<version>${revision}</version>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-routes-database</artifactId>
 			<version>${revision}</version>
 			<optional>true</optional>

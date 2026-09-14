@@ -1,0 +1,54 @@
+server.port: 8214
+spring.application.name: gateway-passive-scan
+
+spring.cloud.gateway.server.webflux.pentest.passive:
+  # The analyser is off by default: it observes every routed exchange, so switching it on
+  # is a deliberate act. Here it is on for the sample.
+  enabled: true
+  body:
+    # Response body capture is what lets verbose-error and excessive-data-exposure run. It
+    # buffers a bounded prefix of each response, so it is opt-in and capped.
+    enabled: true
+    max-bytes: 65536
+  # Empty include runs every scanner; narrow it with include/exclude by scanner id, e.g.
+  # exclude: [ parameter-pollution ]
+  scanners:
+    include: []
+    exclude: []
+
+spring.cloud.gateway.server.webflux:
+  routes:
+
+  # httpbin answers without the usual browser-protection headers, so a call to this route
+  # is enough to see the security-headers finding appear in the console.
+  - id: httpbin
+    uri: https://httpbin.org
+    predicates:
+    - Path=/httpbin/**
+    filters:
+    - StripPrefix=1
+
+  # A route towards service-a (the sample backend on :8080). It need not be up for the
+  # analyser to work: whatever the gateway answers is inspected.
+  - id: service_a
+    uri: http://localhost:8080
+    predicates:
+    - Path=/service-a/**
+    filters:
+    - StripPrefix=1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+  endpoint:
+    gateway:
+      access: read-only
+
+logging:
+  level:
+    '[ch.nexsol]': info
