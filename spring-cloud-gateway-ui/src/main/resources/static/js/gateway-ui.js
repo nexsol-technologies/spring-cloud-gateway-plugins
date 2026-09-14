@@ -197,6 +197,45 @@ window.gatewayUi = (function () {
 })();
 
 /*
+ * Where the menu was scrolled to, across the page load a click on it starts.
+ *
+ * Every view of this console is a full page load, so the menu is rebuilt with each one and
+ * comes back at the top. A menu long enough to scroll then takes the reader away from the
+ * entry they just clicked — the further down it sits, the further the menu jumps. The offset
+ * is put back before the page paints: this script is the last thing in the body, ahead of
+ * the first frame, and after the sections above have settled — a group that folds or unfolds
+ * under a restored offset moves the menu again, or has the browser clamp it.
+ *
+ * sessionStorage rather than localStorage: this is where one tab was, not a preference to
+ * carry into the next one.
+ */
+(function () {
+	var KEY = 'gw-nav-scroll';
+	var nav = document.querySelector('.gw-nav');
+	if (!nav) {
+		return;
+	}
+
+	try {
+		nav.scrollTop = parseInt(sessionStorage.getItem(KEY), 10) || 0;
+	}
+	catch (ignored) {
+		// Storage refused by the browser: the menu starts at the top, as it did before.
+	}
+
+	// pagehide rather than a listener on every scroll: it covers a click, a reload and a
+	// back alike, and writes once instead of once a frame.
+	window.addEventListener('pagehide', function () {
+		try {
+			sessionStorage.setItem(KEY, String(nav.scrollTop));
+		}
+		catch (ignored) {
+			// Same again: nothing is remembered, nothing else breaks.
+		}
+	});
+})();
+
+/*
  * CSRF token on every HTMX request. A console that authenticates keeps its writes behind a
  * session cookie, which a form can carry a hidden field for but an HTMX request cannot:
  * the token is put on the request as a header instead, from the meta tags the shell renders
