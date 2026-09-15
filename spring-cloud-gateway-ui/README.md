@@ -106,6 +106,8 @@ only start to matter.
 ![The flow view in the dark theme](doc/service-flow-dark.png)
 ![The OpenAPI view in the dark theme](doc/openapi-dark.png)
 ![The audit view in the dark theme](doc/audit-dark.png)
+![The passive scan view in the dark theme](doc/passive-scan-dark.png)
+![The route scores view in the dark theme](doc/passive-scan-routes-dark.png)
 
 </details>
 
@@ -573,6 +575,8 @@ Two views over what the
 [passive scan plugin](../spring-cloud-gateway-pentest/spring-cloud-gateway-pentest-passive/README.md)
 found in the live traffic, grouped under **Security** in the menu.
 
+![The passive scan view](doc/passive-scan-light.png)
+
 **Passive scan** lists the findings, collapsed to one row per distinct problem with an
 occurrence count, newest first: severity, OWASP API category, CWE, scanner, method, path and
 title. A row expands into the rule id and confidence, the description, the remediation, a link
@@ -580,6 +584,8 @@ to the reference and the evidence the scanner recorded. Filter by severity and s
 scanner, title, path, category, CWE and description; the **Live** switch polls every 3 seconds.
 Above the table, a matrix shows which of the OWASP API Top 10 categories passive analysis can
 and cannot reach.
+
+![The route scores view](doc/passive-scan-routes-light.png)
 
 **Route scores** ranks the routes by a security score computed from their findings, worst
 first, with a gauge showing the average of the routes on screen. Filter by grade, route id and
