@@ -71,6 +71,14 @@ const VIEWS = [
 
 	{ name: 'audit', path: '/ui/audit' },
 	{ name: 'openapi', path: '/ui/openapi' },
+	/*
+	 * Both security views poll, so the Live switch is turned off before the shot: a redraw
+	 * landing between the layout settling and the capture produces a half-painted table.
+	 */
+	{ name: 'passive-scan', path: '/ui/passive-scan',
+		prepare: 'var live = document.getElementById("ps-live"); if (live && live.checked) { live.click(); }' },
+	{ name: 'passive-scan-routes', path: '/ui/passive-scan/routes',
+		prepare: 'var live = document.getElementById("psr-live"); if (live && live.checked) { live.click(); }' },
 	// Shown to a signed-in visitor holding none of the required roles. It renders for any
 	// principal, so it is shot with the same session as the rest.
 	{ name: 'forbidden', path: '/ui/forbidden' },

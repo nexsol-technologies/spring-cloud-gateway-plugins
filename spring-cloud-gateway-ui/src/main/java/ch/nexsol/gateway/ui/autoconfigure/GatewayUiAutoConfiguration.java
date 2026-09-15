@@ -28,6 +28,7 @@ import ch.nexsol.gateway.database.service.ApiService;
 import ch.nexsol.gateway.metrics.InstanceMetricsSource;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
+import ch.nexsol.gateway.pentest.passive.score.RouteScoreService;
 import ch.nexsol.gateway.servicegraph.ServiceGraphSource;
 import ch.nexsol.gateway.ui.audit.AuditExclusionBeanPostProcessor;
 import ch.nexsol.gateway.ui.audit.AuditOverviewContribution;
@@ -55,6 +56,7 @@ import ch.nexsol.gateway.ui.openapi.OpenapiViewController;
 import ch.nexsol.gateway.ui.openapi.OpenapiViewProperties;
 import ch.nexsol.gateway.ui.overview.OverviewContribution;
 import ch.nexsol.gateway.ui.overview.OverviewService;
+import ch.nexsol.gateway.ui.passivescan.PassiveScanViewController;
 import ch.nexsol.gateway.ui.routes.DatabaseRoutesController;
 import ch.nexsol.gateway.ui.routes.RouteInventoryController;
 import ch.nexsol.gateway.ui.routes.RouteInventoryService;
@@ -130,6 +132,11 @@ public class GatewayUiAutoConfiguration {
 	 * Heading the technical health of the instances folds under.
 	 */
 	static final String RUNTIME = "Runtime";
+
+	/**
+	 * Heading the security testing views fold under.
+	 */
+	static final String SECURITY = "Security";
 
 	/**
 	 * Heading the API contracts fold under.
@@ -773,6 +780,39 @@ public class GatewayUiAutoConfiguration {
 		@Bean
 		UiSecuredPaths auditTailSecuredPaths() {
 			return new UiSecuredPaths("/ui/audit", "/ui/audit/events", "/js/gateway-audit.js");
+		}
+
+	}
+
+	/**
+	 * The passive-scan view: the findings the analyser raised from live traffic. Present
+	 * when the passive-scan plugin is on the classpath and enabled. The condition names a
+	 * class of the passive module rather than of the shared core: pentest-redis depends
+	 * on the core alone, and a classpath holding it without the passive module would
+	 * satisfy the condition and then fail to load the controller.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(RouteScoreService.class)
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.pentest.passive.enabled", havingValue = "true")
+	@Import(PassiveScanViewController.class)
+	static class PassiveScanViewConfiguration {
+
+		@Bean
+		NavItem passiveScanNavItem() {
+			return new NavItem("passive-scan", "Passive scan", "icon-shield", "/ui/passive-scan", 30, SECURITY);
+		}
+
+		@Bean
+		NavItem passiveScanRoutesNavItem() {
+			return new NavItem("passive-scan-routes", "Route scores", "icon-chart", "/ui/passive-scan/routes", 31,
+					SECURITY);
+		}
+
+		@Bean
+		UiSecuredPaths passiveScanViewSecuredPaths() {
+			return new UiSecuredPaths("/ui/passive-scan", "/ui/passive-scan/findings", "/ui/passive-scan/summary",
+					"/ui/passive-scan/coverage", "/ui/passive-scan/routes", "/ui/passive-scan/routes/data",
+					"/js/gateway-passive-scan.js", "/js/gateway-passive-scan-routes.js");
 		}
 
 	}

@@ -33,10 +33,47 @@
 								title="Asks the gateway to rebuild its route table from the current definitions, as the gateway actuator refresh endpoint does. This does not re-read a file or Config Server source.">
 							Rebuild gateway routes
 						</button>
+						<button type="button" class="btn btn-sm btn-outline-secondary"
+								data-bs-toggle="modal" data-bs-target="#gr-export"
+								title="Writes the routes of the sources you pick as gateway configuration, ready to paste into an application.yml.">
+							Export YAML
+						</button>
 					</div>
 				</div>
 
 				<div th:replace="~{dashboard/fragments/route-inventory :: inventory}">Route table</div>
+			</div>
+		</div>
+
+		<!--
+			The export dialog. Its source list is filled from the table when it opens rather
+			than rendered here: the table is re-rendered on its own by the two actions above,
+			and a list rendered once with the page would offer sources it no longer shows.
+		-->
+		<div class="modal fade" id="gr-export" tabindex="-1" aria-hidden="true" aria-labelledby="gr-export-title">
+			<div class="modal-dialog modal-dialog-centered">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h2 class="h6 modal-title" id="gr-export-title">Export routes as YAML</h2>
+						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					</div>
+					<div class="modal-body">
+						<p class="text-secondary small mb-3">
+							The sources you keep, written under
+							<code>spring.cloud.gateway.server.webflux.routes</code> &mdash; the configuration
+							declaring the same routes, with their predicates, filters and metadata.
+						</p>
+						<div id="gr-export-sources" class="d-grid gap-1">
+							<span class="text-secondary small">No source to export.</span>
+						</div>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-sm btn-outline-secondary"
+								data-bs-dismiss="modal">Cancel</button>
+						<button type="button" id="gr-export-download" class="btn btn-sm btn-primary"
+								th:attr="data-url=@{/ui/routes/export}" data-url="/ui/routes/export">Download</button>
+					</div>
+				</div>
 			</div>
 		</div>
 	</div>

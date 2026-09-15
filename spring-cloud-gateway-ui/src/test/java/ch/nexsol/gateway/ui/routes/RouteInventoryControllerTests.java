@@ -145,6 +145,50 @@ class RouteInventoryControllerTests {
 		assertThat(this.refreshCounter.count()).isGreaterThan(before);
 	}
 
+	@Test
+	void shouldOfferTheExportDialogOnThePage() {
+		this.webTestClient.get()
+			.uri("/ui/routes")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("Export YAML")
+				.contains("id=\"gr-export\"")
+				.contains("data-source=\"Sample\""));
+	}
+
+	@Test
+	void shouldExportEverySourceAsGatewayConfigurationWhenNoneIsAskedFor() {
+		this.webTestClient.get()
+			.uri("/ui/routes/export")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectHeader()
+			.valueMatches("Content-Disposition", ".*attachment.*gateway-routes\\.yml.*")
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("spring:")
+				.contains("routes:")
+				.contains("id: alpha")
+				.contains("Path=/alpha/**")
+				.contains("StripPrefix=1")
+				.contains("http://alpha.example.com")
+				.contains("http://alpha.other.example.com"));
+	}
+
+	@Test
+	void shouldExportOnlyTheSourcesAskedFor() {
+		this.webTestClient.get()
+			.uri("/ui/routes/export?source=Shadowing")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.value((body) -> assertThat(body).contains("http://alpha.other.example.com")
+				.doesNotContain("http://alpha.example.com"));
+	}
+
 	/**
 	 * Stands in for a plugin contributing routes from its own source. The source name
 	 * shown in the UI is derived from the locator class name, hence {@code Sample}.

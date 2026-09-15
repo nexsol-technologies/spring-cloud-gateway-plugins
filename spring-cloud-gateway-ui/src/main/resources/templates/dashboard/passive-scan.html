@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Passive scan', ~{:: #ps-content}, ~{:: #ps-scripts})}">
+<body>
+	<div id="ps-content">
+		<header class="mb-4">
+			<h1 class="h3 fw-bold mb-1">Passive scan</h1>
+			<p class="text-secondary mb-0">
+				OWASP issues the analyser observed in the live traffic flowing through the gateway. Identical
+				findings are collapsed into one row with an occurrence count. No request is sent by the scan.
+				Click a row for the description, the remediation and the evidence.
+			</p>
+		</header>
+
+		<div class="row g-3 mb-4">
+			<div class="col-6 col-md">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small">Distinct</div>
+						<div class="h4 fw-bold mb-0" id="ps-total">0</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-md" th:each="sev : ${ {'CRITICAL','HIGH','MEDIUM','LOW','INFO'} }">
+				<div class="card border-0 shadow-sm h-100">
+					<div class="card-body py-3">
+						<div class="text-secondary small" th:text="${#strings.capitalize(#strings.toLowerCase(sev))}">Severity</div>
+						<div class="h4 fw-bold mb-0" th:id="'ps-count-' + ${sev}" th:text="0">0</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="card border-0 shadow-sm mb-4">
+			<div class="card-body">
+				<h2 class="h6 fw-bold mb-1">OWASP API Security Top 10 (2023) coverage</h2>
+				<p class="text-secondary small mb-3">
+					What passive analysis can and cannot see. Reading real traffic is what fixes the
+					limit: a category needing active probing is not something this analyser claims.
+				</p>
+				<div class="table-responsive">
+					<table class="table table-sm align-middle mb-0">
+						<tbody id="ps-coverage" th:attr="data-url=@{/ui/passive-scan/coverage}"
+								data-url="/ui/passive-scan/coverage"></tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+
+		<div class="card border-0 shadow-sm">
+			<div class="card-body">
+				<div class="d-flex flex-wrap gap-3 align-items-end mb-3">
+					<div>
+						<label class="form-label small text-secondary mb-1" for="ps-severity">Severity</label>
+						<select id="ps-severity" class="form-select form-select-sm">
+							<option value="" selected>All</option>
+							<option value="CRITICAL">Critical</option>
+							<option value="HIGH">High</option>
+							<option value="MEDIUM">Medium</option>
+							<option value="LOW">Low</option>
+							<option value="INFO">Info</option>
+						</select>
+					</div>
+					<div>
+						<label class="form-label small text-secondary mb-1" for="ps-query">Search</label>
+						<input type="search" id="ps-query" class="form-control form-control-sm"
+								style="min-width: 16rem" placeholder="scanner, path, category, CWE or detail">
+					</div>
+					<div class="ms-auto d-flex align-items-center gap-3">
+						<div class="dropdown">
+							<button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+									data-bs-toggle="dropdown" aria-expanded="false">Export</button>
+							<ul class="dropdown-menu dropdown-menu-end">
+								<li><a class="dropdown-item" th:href="@{/passive-scan/export(format='sarif')}" href="/passive-scan/export?format=sarif">SARIF</a></li>
+								<li><a class="dropdown-item" th:href="@{/passive-scan/export(format='json')}" href="/passive-scan/export?format=json">JSON</a></li>
+								<li><a class="dropdown-item" th:href="@{/passive-scan/export(format='html')}" href="/passive-scan/export?format=html">HTML</a></li>
+							</ul>
+						</div>
+						<div class="form-check form-switch mb-0">
+							<input class="form-check-input" type="checkbox" role="switch" id="ps-live" checked>
+							<label class="form-check-label small" for="ps-live">Live</label>
+						</div>
+						<button type="button" id="ps-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
+					</div>
+				</div>
+
+				<div class="table-responsive">
+					<table class="table table-sm align-middle mb-0">
+						<thead>
+							<tr class="text-secondary small">
+								<th>Last seen</th>
+								<th>Count</th>
+								<th>Severity</th>
+								<th>OWASP</th>
+								<th>CWE</th>
+								<th>Scanner</th>
+								<th>Method</th>
+								<th>Path</th>
+								<th>Finding</th>
+							</tr>
+						</thead>
+						<tbody id="ps-tbody" th:attr="data-url=@{/ui/passive-scan/findings}" data-url="/ui/passive-scan/findings"
+								th:data-summary-url="@{/ui/passive-scan/summary}" data-summary-url="/ui/passive-scan/summary"></tbody>
+					</table>
+				</div>
+				<div id="ps-empty" class="text-secondary text-center py-5" style="display: none">
+					No finding yet &mdash; send some traffic through the gateway with the passive scan
+					enabled. Some scanners only produce findings once response body capture is switched on.
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="ps-scripts">
+		<script th:src="@{/js/gateway-passive-scan.js}" src="/js/gateway-passive-scan.js"></script>
+	</div>
+</body>
+</html>

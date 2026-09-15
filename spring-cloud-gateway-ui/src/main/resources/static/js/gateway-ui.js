@@ -253,6 +253,22 @@ window.gatewayUi = (function () {
 })();
 
 /*
+ * Dialogs are moved to the body before anything opens one.
+ *
+ * A page of this console arrives with a fade, and an element being animated is a stacking
+ * context of its own: a dialog rendered inside the page is trapped in it, while the backdrop
+ * Bootstrap adds is a child of the body. The backdrop then covers the dialog however high its
+ * own z-index is — the dialog is drawn, and every click on it lands on the backdrop instead.
+ * Reparenting is the fix that survives the next dialog someone adds to a view.
+ */
+(function () {
+	var dialogs = document.querySelectorAll('.gw-content .modal');
+	Array.prototype.forEach.call(dialogs, function (dialog) {
+		document.body.appendChild(dialog);
+	});
+})();
+
+/*
  * The expand button of a picture. A button carrying data-gw-expand="<card id>" gives that
  * card the whole content column and gives itself back the way out, so a view adds a full
  * screen by writing one button rather than a behaviour of its own.

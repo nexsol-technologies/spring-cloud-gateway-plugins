@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Route scores', ~{:: #psr-content}, ~{:: #psr-scripts})}">
+<body>
+	<div id="psr-content">
+		<header class="mb-4">
+			<h1 class="h3 fw-bold mb-1">Route scores</h1>
+			<p class="text-secondary mb-0">
+				A security score per route, from the passive findings raised on it, worst first. A route with
+				no finding scores 100. Click a route to see the findings behind its score.
+			</p>
+		</header>
+
+		<div class="card border-0 shadow-sm mb-4">
+			<div class="card-body d-flex align-items-center gap-4">
+				<svg width="120" height="120" viewBox="0 0 120 120" aria-hidden="true">
+					<circle cx="60" cy="60" r="50" fill="none" stroke="currentColor" stroke-width="10"
+							class="text-body-tertiary" opacity="0.25"/>
+					<circle id="psr-gauge-arc" cx="60" cy="60" r="50" fill="none" stroke="currentColor"
+							stroke-width="10" stroke-linecap="round" transform="rotate(-90 60 60)"
+							stroke-dasharray="0 314.16" class="text-secondary"/>
+					<text id="psr-gauge-score" x="60" y="58" text-anchor="middle" dominant-baseline="middle"
+							font-size="30" font-weight="700" fill="currentColor">–</text>
+					<text x="60" y="80" text-anchor="middle" dominant-baseline="middle" font-size="13"
+							fill="currentColor" opacity="0.6">/ 100</text>
+				</svg>
+				<div>
+					<div class="text-secondary">Overall score</div>
+					<div class="mt-2"><span id="psr-gauge-grade" class="badge text-bg-secondary fs-6">–</span></div>
+					<div class="text-secondary small mt-2" id="psr-gauge-note">The average of the scored routes.</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="card border-0 shadow-sm">
+			<div class="card-body">
+				<div class="d-flex flex-wrap gap-3 align-items-end mb-3">
+					<div>
+						<label class="form-label small text-secondary mb-1" for="psr-grade">Grade</label>
+						<select id="psr-grade" class="form-select form-select-sm">
+							<option value="" selected>All</option>
+							<option value="GOOD">Good</option>
+							<option value="FAIR">Fair</option>
+							<option value="POOR">Poor</option>
+							<option value="BAD">Bad</option>
+						</select>
+					</div>
+					<div>
+						<label class="form-label small text-secondary mb-1" for="psr-query">Search</label>
+						<input type="search" id="psr-query" class="form-control form-control-sm"
+								style="min-width: 16rem" placeholder="route id or path">
+					</div>
+					<div class="form-check form-switch ms-auto">
+						<input class="form-check-input" type="checkbox" id="psr-live" checked>
+						<label class="form-check-label small text-secondary" for="psr-live">Live</label>
+					</div>
+					<div>
+						<button type="button" id="psr-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
+					</div>
+				</div>
+
+				<div class="table-responsive">
+					<table class="table table-sm align-middle mb-0">
+						<thead>
+							<tr class="text-secondary small">
+								<th style="width: 12rem">Score</th>
+								<th>Grade</th>
+								<th>Route</th>
+								<th>Path</th>
+								<th>Findings</th>
+								<th>Critical</th>
+								<th>High</th>
+								<th>Medium</th>
+								<th>Low</th>
+							</tr>
+						</thead>
+						<tbody id="psr-tbody" th:attr="data-url=@{/ui/passive-scan/routes/data}"
+								data-url="/ui/passive-scan/routes/data"
+								th:data-findings-url="@{/ui/passive-scan/findings}"
+								data-findings-url="/ui/passive-scan/findings"></tbody>
+					</table>
+				</div>
+				<div id="psr-empty" class="text-secondary text-center py-5" style="display: none">
+					No route to score yet &mdash; the analyser needs some routed traffic first.
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="psr-scripts">
+		<script th:src="@{/js/gateway-passive-scan-routes.js}" src="/js/gateway-passive-scan-routes.js"></script>
+	</div>
+</body>
+</html>

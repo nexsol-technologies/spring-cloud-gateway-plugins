@@ -29,6 +29,21 @@
             </dependency>
             <dependency>
                 <groupId>ch.nexsol-tech.gateway</groupId>
+                <artifactId>spring-cloud-gateway-pentest-core</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol-tech.gateway</groupId>
+                <artifactId>spring-cloud-gateway-pentest-passive</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol-tech.gateway</groupId>
+                <artifactId>spring-cloud-gateway-pentest-redis</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.nexsol-tech.gateway</groupId>
                 <artifactId>spring-cloud-gateway-audit-kafka</artifactId>
                 <version>${revision}</version>
             </dependency>

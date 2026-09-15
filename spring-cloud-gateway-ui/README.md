@@ -39,6 +39,8 @@ what the application actually runs.
 | [Configuration, and five others](#introspection) | `/ui/insights/*` | Actuator is on the classpath |
 | [OpenAPI](#openapi) — *Hub* in the menu | `/ui/openapi` | `spring-cloud-gateway-hub-openapi` is present and enabled |
 | [Audit](#audit) | `/ui/audit` | `spring-cloud-gateway-audit-core` is present and `...audit.enabled` is not `false` |
+| [Passive scan](#passive-scan) | `/ui/passive-scan` | `spring-cloud-gateway-pentest-passive` is present and `...pentest.passive.enabled` is `true` |
+| [Route scores](#passive-scan) | `/ui/passive-scan/routes` | same as above |
 
 ## Configuration
 
@@ -104,6 +106,8 @@ only start to matter.
 ![The flow view in the dark theme](doc/service-flow-dark.png)
 ![The OpenAPI view in the dark theme](doc/openapi-dark.png)
 ![The audit view in the dark theme](doc/audit-dark.png)
+![The passive scan view in the dark theme](doc/passive-scan-dark.png)
+![The route scores view in the dark theme](doc/passive-scan-routes-dark.png)
 
 </details>
 
@@ -159,10 +163,27 @@ What *Refresh view* picks up depends on the locator: a database or discovery sou
 queried live, while a file or Config Server source serves the snapshot it last loaded — those
 reload through their own plugin, never through this page.
 
-The inventory is **read once, then served while it is refreshed**, so navigating between views
-queries nothing and a locator reaching the network is never called mid-render. A refresh
+**Export YAML** writes the routes back out as gateway configuration: pick the sources to keep
+— *Discovery Client*, *Properties*, *File*, *Open Api*, whatever this gateway resolves —
+and the download is the `spring.cloud.gateway.server.webflux.routes` block declaring the same
+routes, with their predicates, filters, order and metadata. Predicates and filters take the
+shortcut form (`Path=/api/**`) wherever the gateway reads it back as what was exported, and
+the long `name`/`args` form where it would not: a named argument, or a value holding the comma
+the shortcut splits on. *Discovery Client* is the one source ticked to begin with: the routes a
+registry hands the gateway are the ones nobody has written down yet, and every other source is
+already a file somewhere.
+
+**This page reads its sources on every load.** It is opened to find out what the gateway
+resolves *now* — a service that has just registered, a file that has just changed — and a
+cached table is the one thing that cannot answer that. Other views are served from the cached
+inventory instead, which is refreshed in the background on every `RefreshRoutesEvent`. A read
 already in flight is shared, and a source given more than five seconds to answer is dropped
-from the snapshot with a warning.
+with a warning.
+
+**A service registering takes as long as discovery takes.** Neither action here shortens it:
+the discovery locator reads the registry its client holds locally, and a Eureka client refetches
+that registry on its own schedule — 30 seconds by default. Between starting a service and seeing
+its route, that wait is the registry's, not the console's.
 
 ### Database routes view
 
@@ -565,6 +586,31 @@ static assets are added to `...audit.web-filter.exclude-paths`. The exclusions a
 paths the active views declare, never a `/ui/**` pattern, so a gateway route declared under
 `/ui` keeps being audited.
 
+## Passive scan
+
+Two views over what the
+[passive scan plugin](../spring-cloud-gateway-pentest/spring-cloud-gateway-pentest-passive/README.md)
+found in the live traffic, grouped under **Security** in the menu.
+
+![The passive scan view](doc/passive-scan-light.png)
+
+**Passive scan** lists the findings, collapsed to one row per distinct problem with an
+occurrence count, newest first: severity, OWASP API category, CWE, scanner, method, path and
+title. A row expands into the rule id and confidence, the description, the remediation, a link
+to the reference and the evidence the scanner recorded. Filter by severity and search across
+scanner, title, path, category, CWE and description; the **Live** switch polls every 3 seconds.
+Above the table, a matrix shows which of the OWASP API Top 10 categories passive analysis can
+and cannot reach.
+
+![The route scores view](doc/passive-scan-routes-light.png)
+
+**Route scores** ranks the routes by a security score computed from their findings, worst
+first, with a gauge showing the average of the routes on screen. Filter by grade, route id and
+path; a row expands into the findings that cost the route its points.
+
+Both views read the plugin's finding store directly — no scan is ever issued from the console.
+With `...pentest.store=redis` that store is the consolidated view of every instance.
+
 ## Spring Security
 
 When Spring Security is on the classpath, the plugin contributes its own
@@ -897,7 +943,7 @@ NavItem quotaNavItem() {
 }
 ```
 
-The five-argument form is the same entry with no group. The console ships two groups:
+The five-argument form is the same entry with no group. The console ships six groups:
 
 | Group | Holds | What it gathers |
 | --- | --- | --- |
@@ -906,6 +952,7 @@ The five-argument form is the same entry with no group. The console ships two gr
 | **Runtime** | [Metrics](#runtime) | The technical health of each instance |
 | **OpenAPI** | [Hub](#openapi) | The contracts served through the gateway |
 | **Configuration** | [The six introspection views](#introspection) | What it is made of |
+| **Security** | [Passive scan, Route scores](#passive-scan) | What the traffic reveals about the API's exposure |
 
 A group folds and remembers whether it was folded, and is rendered open when the page being read
 is one of its own. Collapsed, the menu drops the headings and shows the icons on their own.
