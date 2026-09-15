@@ -98,6 +98,19 @@
 		download.disabled = !chosen().length;
 	}
 
+	/*
+	 * The endpoint, resolved against the page and checked to be on its own origin.
+	 *
+	 * The server renders it into the page, but it reaches this script as DOM text all the
+	 * same, and DOM text handed to a navigation is how a 'javascript:' URL gets run. The
+	 * check is on the resolved URL rather than on the text: a scheme of its own resolves to
+	 * another origin, and a relative path resolves to this one.
+	 */
+	function endpoint() {
+		var url = new URL(download.getAttribute('data-url'), window.location.href);
+		return (url.origin === window.location.origin) ? url : null;
+	}
+
 	dialog.addEventListener('show.bs.modal', function () {
 		var found = sources();
 		list.textContent = '';
@@ -117,12 +130,14 @@
 		var query = chosen().map(function (source) {
 			return 'source=' + encodeURIComponent(source);
 		});
-		if (!query.length) {
+		var url = query.length ? endpoint() : null;
+		if (!url) {
 			return;
 		}
+		url.search = query.join('&');
 		// A navigation rather than a fetch: the response carries Content-Disposition, so
 		// the browser saves it and leaves the page where it is.
-		window.location = download.getAttribute('data-url') + '?' + query.join('&');
+		window.location.assign(url.href);
 		var open = window.bootstrap && window.bootstrap.Modal.getInstance(dialog);
 		if (open) {
 			open.hide();
