@@ -24,3 +24,8 @@ server.port: 8191
 # InstanceIdentity bean and the metrics one is registered first, so
 # 'service-graph.instance-id' is never read here.
 spring.cloud.gateway.server.webflux.metrics.instance-id: gateway-full-2
+
+# Distinct id for the consolidated passive-scan store, so this instance writes its own Redis
+# key rather than overwriting the first instance's. Used with the 'pentest-redis' profile:
+#   mvn spring-boot:run -Dspring-boot.run.profiles=dev,pentest-redis,instance2
+spring.cloud.gateway.server.webflux.pentest.redis.instance-id: gateway-full-2

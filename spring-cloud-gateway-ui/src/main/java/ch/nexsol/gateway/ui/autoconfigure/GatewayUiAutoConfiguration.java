@@ -804,7 +804,7 @@ public class GatewayUiAutoConfiguration {
 		@Bean
 		UiSecuredPaths passiveScanViewSecuredPaths() {
 			return new UiSecuredPaths("/ui/passive-scan", "/ui/passive-scan/findings", "/ui/passive-scan/summary",
-					"/js/gateway-passive-scan.js");
+					"/ui/passive-scan/coverage", "/js/gateway-passive-scan.js");
 		}
 
 	}

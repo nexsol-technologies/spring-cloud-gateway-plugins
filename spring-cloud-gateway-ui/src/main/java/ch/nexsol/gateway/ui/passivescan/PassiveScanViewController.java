@@ -74,6 +74,12 @@ public class PassiveScanViewController {
 		return this.store.summary();
 	}
 
+	@GetMapping("/coverage")
+	@ResponseBody
+	public java.util.List<ch.nexsol.gateway.pentest.passive.coverage.CategoryCoverage> coverage() {
+		return ch.nexsol.gateway.pentest.passive.coverage.PassiveCoverage.categories();
+	}
+
 	private static boolean matches(AggregatedFinding aggregate, String wantedSeverity, String needle) {
 		Finding finding = aggregate.finding();
 		if (wantedSeverity != null && !finding.severity().name().equals(wantedSeverity)) {

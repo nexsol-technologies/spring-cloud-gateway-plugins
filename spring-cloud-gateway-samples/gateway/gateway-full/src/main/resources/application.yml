@@ -519,3 +519,25 @@ spring.cloud.gateway.server.webflux:
   openapi-validation:
     request.mode: "OFF"
     response.mode: "OFF"
+---
+# Consolidate passive-scan findings across instances through Redis (pentest-redis). Each
+# instance publishes its findings under a key of its own and reads every instance's keys
+# back, so /ui/passive-scan shows the whole fleet with the counts merged.
+#   docker compose up -d redis            # a Redis on localhost:6379
+#   mvn spring-boot:run -Dspring-boot.run.profiles=dev,eureka,pentest-redis
+#   mvn spring-boot:run -Dspring-boot.run.profiles=dev,pentest-redis,instance2   # 2nd instance
+# The two instances must carry a distinct instance-id (they do: instance2 overrides it),
+# otherwise they write the same key and overwrite each other.
+spring:
+  config:
+    activate:
+      on-profile:
+      - pentest-redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+spring.cloud.gateway.server.webflux.pentest:
+  store: redis
+  redis:
+    instance-id: gateway-full-1

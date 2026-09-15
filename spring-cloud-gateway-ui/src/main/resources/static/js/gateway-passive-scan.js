@@ -12,6 +12,8 @@
 
 	var dataUrl = tbody.getAttribute('data-url') || '/ui/passive-scan/findings';
 	var summaryUrl = tbody.getAttribute('data-summary-url') || '/ui/passive-scan/summary';
+	var coverageEl = document.getElementById('ps-coverage');
+	var coverageUrl = coverageEl ? (coverageEl.getAttribute('data-url') || '/ui/passive-scan/coverage') : null;
 	var LIMIT = 200;
 	var POLL_MS = 3000;
 	var SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
@@ -84,8 +86,21 @@
 		td.colSpan = COLSPAN;
 		td.className = 'bg-body-tertiary';
 
+		section(td, 'Rule', finding.ruleId + ' · ' + finding.categoryCode + ' · ' + text(finding.cwe));
 		section(td, 'Description', finding.detail);
 		section(td, 'Remediation', finding.remediation);
+		if (finding.reference) {
+			var refWrap = document.createElement('div');
+			refWrap.className = 'mb-2';
+			var link = document.createElement('a');
+			link.href = finding.reference;
+			link.target = '_blank';
+			link.rel = 'noopener';
+			link.className = 'small';
+			link.textContent = 'Learn more';
+			refWrap.appendChild(link);
+			td.appendChild(refWrap);
+		}
 
 		var evidence = finding.evidence || {};
 		var keys = Object.keys(evidence);
@@ -136,6 +151,12 @@
 			badge.className = 'badge ' + severityClass(finding.severity);
 			badge.textContent = text(finding.severity);
 			sevCell.appendChild(badge);
+			if (finding.confidence) {
+				var conf = document.createElement('span');
+				conf.className = 'badge text-bg-light ms-1';
+				conf.textContent = finding.confidence.toLowerCase() + ' conf.';
+				sevCell.appendChild(conf);
+			}
 			row.appendChild(sevCell);
 
 			cell(row, finding.categoryCode, 'text-nowrap');
@@ -164,6 +185,67 @@
 				node.textContent = bySeverity[severity] || 0;
 			}
 		});
+	}
+
+	function coverageClass(status) {
+		switch (status) {
+			case 'GOOD':
+				return 'text-bg-success';
+			case 'PARTIAL':
+				return 'text-bg-warning';
+			default:
+				return 'text-bg-secondary';
+		}
+	}
+
+	function coverageLabel(status) {
+		switch (status) {
+			case 'GOOD':
+				return 'Covered';
+			case 'PARTIAL':
+				return 'Partial';
+			default:
+				return 'Not passive';
+		}
+	}
+
+	function renderCoverage(rows) {
+		if (!coverageEl) {
+			return;
+		}
+		coverageEl.textContent = '';
+		rows.forEach(function (row) {
+			var tr = document.createElement('tr');
+			var status = document.createElement('td');
+			status.style.width = '9rem';
+			var badge = document.createElement('span');
+			badge.className = 'badge ' + coverageClass(row.status);
+			badge.textContent = coverageLabel(row.status);
+			status.appendChild(badge);
+			tr.appendChild(status);
+			var name = document.createElement('td');
+			name.className = 'text-nowrap';
+			name.innerHTML = '<span class="text-secondary small">' + text(row.code) + '</span> ' + text(row.title);
+			tr.appendChild(name);
+			cell(tr, row.note, 'small text-secondary');
+			coverageEl.appendChild(tr);
+		});
+	}
+
+	function loadCoverage() {
+		if (!coverageUrl) {
+			return;
+		}
+		fetch(coverageUrl, { headers: { Accept: 'application/json' } })
+			.then(function (response) {
+				return response.json();
+			})
+			.then(function (json) {
+				renderCoverage(json || []);
+			})
+			.catch(function () {
+				renderCoverage([]);
+			});
 	}
 
 	function load() {
@@ -213,6 +295,7 @@
 		window.gatewayUi.remember(sel(id));
 	});
 
+	loadCoverage();
 	load();
 	live(sel('ps-live').checked);
 })();

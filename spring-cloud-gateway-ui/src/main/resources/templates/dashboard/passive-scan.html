@@ -31,6 +31,22 @@
 			</div>
 		</div>
 
+		<div class="card border-0 shadow-sm mb-4">
+			<div class="card-body">
+				<h2 class="h6 fw-bold mb-1">OWASP API Security Top 10 (2023) coverage</h2>
+				<p class="text-secondary small mb-3">
+					What passive analysis can and cannot see. A category needing active probing is not
+					something the passive analyser claims &mdash; it will be covered by the active scanner.
+				</p>
+				<div class="table-responsive">
+					<table class="table table-sm align-middle mb-0">
+						<tbody id="ps-coverage" th:attr="data-url=@{/ui/passive-scan/coverage}"
+								data-url="/ui/passive-scan/coverage"></tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+
 		<div class="card border-0 shadow-sm">
 			<div class="card-body">
 				<div class="d-flex flex-wrap gap-3 align-items-end mb-3">
