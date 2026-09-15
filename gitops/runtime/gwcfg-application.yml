@@ -1,0 +1,31 @@
+# application.yml at the root of gwcfg/<gateway>.git, one branch per environment
+# (dev, cert, form, prod). Written once when the gateway is created, then never again:
+# every route change lands in dist/routes.yaml next to it, pushed by the CI.
+#
+# This file is byte-for-byte identical in all ten gateways. What differs is the
+# repository it sits in, and spring.application.name on the gateway itself.
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes-configserver:
+            enabled: true
+            # Gateway and Config Server both live in the swarm, so the gateway polls.
+            # No webhook, no bus, no ingress into the swarm to operate.
+            update-interval: 30s
+            config-server:
+              uri: http://config-server:8888
+              # Resolved on the gateway: it asks for its own name and its own label,
+              # so this block needs no per-gateway and no per-environment edit.
+              name: ${spring.application.name}
+              profile: default
+              label: ${spring.cloud.config.label}
+              files:
+                - dist/routes.yaml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, gateway

@@ -1,0 +1,6 @@
+# The teams own their routes. Nobody owns the rules but the security team.
+/routes/orders*         @org/team-commande
+/routes/billing*        @org/team-facturation
+/policy.yaml            @org/secops
+/Jenkinsfile            @org/platform
+/routes/**              @org/platform

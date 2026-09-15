@@ -51,6 +51,13 @@ per plugin, plus four exercising them in combination. Start with
 [gateway-full](spring-cloud-gateway-samples/gateway/gateway-full/README.md) to see everything
 at once.
 
+## GitOps
+
+[gitops](gitops/README.md) — a reference Bitbucket + Jenkins + Config Server chain publishing
+route definitions to a gateway: teams commit route files, a pull request validates them against
+a per-gateway security policy, a merge publishes an aggregate the `routes-configserver` source
+polls.
+
 ## Tools
 
 [tools](tools/README.md) — scripts for the maintenance of this repository, such as re-capturing

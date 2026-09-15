@@ -1,0 +1,96 @@
+// Route repository of one gateway, in the Bitbucket project the developers work in.
+// It has no link to the Config Server: publishing is a push into a separate repository
+// that developers never see.
+//
+//   pull request        -> validate + smoke, nothing else
+//   merge on an env     -> validate + smoke + aggregate + push to the Config Server repo
+//
+// Configure the multibranch job to build "the merge of the PR with the target branch",
+// not the PR head — otherwise a PR is validated against routes it will not be merged
+// onto, two colliding PRs both go green, and the failure surfaces after the merge.
+@Library('gateway-routes') _
+
+def entries
+
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds(abortPrevious: false)
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+    }
+
+    parameters {
+        booleanParam(name: 'ALLOW_SHRINK', defaultValue: false,
+                     description: 'Publish even though the aggregate loses most of its routes')
+    }
+
+    environment {
+        // Identity of this gateway: the {application} coordinate on the Config Server,
+        // and the name of its own configuration repository.
+        GATEWAY = 'external'
+
+        // The image the Smoke stage starts on the route files. Its full coordinate,
+        // exactly as it is deployed — no convention derived from GATEWAY.
+        SMOKE_IMAGE = 'registry.acme.corp/apigw/edge-gateway:1.15.0'
+
+        CONFIG_REPO_BASE = 'ssh://git@bitbucket.acme.corp:7999/gwcfg'
+        CONFIG_CRED = 'gateway-config-deploy-key'
+        ENVIRONMENTS = 'dev cert form prod'
+    }
+
+    stages {
+
+        stage('Validate') {
+            steps {
+                script {
+                    entries = gatewayRoutes.validate()
+                }
+            }
+        }
+
+        stage('Smoke') {
+            steps {
+                script {
+                    gatewayRoutes.smoke(image: env.SMOKE_IMAGE, expected: entries.size())
+                }
+            }
+        }
+
+        stage('Publish') {
+            when {
+                allOf {
+                    not { changeRequest() }
+                    expression { env.BRANCH_NAME in env.ENVIRONMENTS.split(' ') }
+                }
+            }
+            steps {
+                script {
+                    gatewayRoutes.aggregate(entries)
+                    archiveArtifacts artifacts: 'dist/routes.yaml', fingerprint: true
+                    gatewayRoutes.publish(branch: env.BRANCH_NAME,
+                                          repo: "${env.CONFIG_REPO_BASE}/${env.GATEWAY}.git",
+                                          credentialsId: env.CONFIG_CRED,
+                                          expected: entries.size(), allowShrink: params.ALLOW_SHRINK)
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            script {
+                if (!env.CHANGE_ID && env.BRANCH_NAME in env.ENVIRONMENTS.split(' ')) {
+                    // Nothing was pushed, so the environment is not broken — it is frozen
+                    // on its previous routes and will stay there until someone acts.
+                    // A silent freeze is the failure mode this alert exists for.
+                    def msg = "${env.GATEWAY} / ${env.BRANCH_NAME}: routes NOT published, " +
+                              "environment frozen on the previous aggregate. ${env.BUILD_URL}"
+                    echo "ALERT: ${msg}"
+                    // mail to: 'platform@acme.corp', subject: "[gateway-routes] ${env.BRANCH_NAME} frozen", body: msg
+                }
+            }
+        }
+    }
+}

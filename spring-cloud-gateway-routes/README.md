@@ -60,6 +60,12 @@ Server client — and degrades gracefully otherwise.
 > The `database` source is not cached: it reads on demand and always reflects the latest
 > state, so it needs none of this.
 
+## GitOps pipeline
+
+[gitops](../gitops/README.md) — a reference Jenkins pipeline over a route repository per gateway:
+teams commit route files, a pull request validates them against a per-gateway policy, a merge
+publishes an aggregate into the Config Server repository the `configserver` source reads.
+
 ## Sample
 
 [gateway-routes-all](../spring-cloud-gateway-samples/gateway/gateway-routes-all/README.md) —

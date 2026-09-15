@@ -1,0 +1,27 @@
+# Config Server. One backing repository per gateway, selected by the {application}
+# placeholder in the URI — verified in MultipleJGitEnvironmentRepository.getRepository():
+# the substitution happens as soon as the URI contains '{', and getLocations() (the path
+# the plain-text resource endpoint takes) goes through it too.
+#
+#   GET /external/default/prod/dist/routes.yaml  ->  gwcfg/external.git, branch prod
+#   GET /internal/default/cert/dist/routes.yaml  ->  gwcfg/internal.git, branch cert
+#
+# Nothing here changes when an eleventh gateway is added: create gwcfg/<name>.git and
+# it is served. No 'repos:' block, no restart of the Config Server.
+spring:
+  application:
+    name: config-server
+  cloud:
+    config:
+      server:
+        git:
+          uri: ssh://git@bitbucket.acme.corp:7999/gwcfg/{application}.git
+          default-label: prod
+          clone-on-start: false          # the repo set is open-ended; clone on demand
+          search-paths: /
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

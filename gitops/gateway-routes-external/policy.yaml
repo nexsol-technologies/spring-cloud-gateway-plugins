@@ -1,0 +1,22 @@
+# Gateway exposed on the internet: internal targets only, over TLS, and no route
+# escapes Spring Security without an explicit security approval.
+# This file is owned by @org/secops in CODEOWNERS — the teams own routes/, not policy.
+uri:
+  requireTls: true
+  allow:
+    - '^https://[a-z0-9.-]+\.internal\.acme\.corp(:\d+)?$'
+    - '^lb://[A-Za-z0-9-]+$'
+
+filters:
+  required:
+    - CorrelationId
+    - AuthorizationToken
+  forbidden:
+    - RemoveRequestHeader      # would let a route strip Authorization on its way in
+    - SetRequestHostHeader
+
+metadata:
+  # Route ids exempted from Spring Security by routes-security (metadata.public: true).
+  approvedPublic:
+    - health_public
+    - openapi_public

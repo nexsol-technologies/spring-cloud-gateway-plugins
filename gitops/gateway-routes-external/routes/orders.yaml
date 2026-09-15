@@ -1,0 +1,13 @@
+routes:
+  - id: orders_public
+    uri: lb://ORDERS
+    predicates:
+      - Path=/api/orders/**
+      - Host=api.acme.com
+    filters:
+      - CorrelationId
+      - name: AuthorizationToken
+        args:
+          scope: orders.read
+    metadata:
+      owner: team-commande
