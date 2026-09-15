@@ -17,8 +17,9 @@
 
 
 Drop-in plugins for a Spring Cloud Gateway (WebFlux) application: route sources, security
-filters, auditing, observability, and a web console that lights up a view per plugin present on
-the classpath. Each one is activated by configuration alone.
+filters, auditing, observability, OWASP analysis of the live traffic, and a web console that
+lights up a view per plugin present on the classpath. Each one is activated by configuration
+alone.
 
 ```xml
 <dependency>
@@ -32,7 +33,7 @@ the classpath. Each one is activated by configuration alone.
 
 | Plugin | What it does |
 | --- | --- |
-| [ui](spring-cloud-gateway-ui/README.md) | A Spring Boot Admin-like console under `/ui`: the resolved routes and the source each came from, a route tester, a traffic chart, the health of every instance, a service graph and a live audit tail. Also where the HTTP endpoints of the other plugins are governed |
+| [ui](spring-cloud-gateway-ui/README.md) | A Spring Boot Admin-like console under `/ui`: the resolved routes and the source each came from, a route tester, a traffic chart, the health of every instance, a service graph, a live audit tail, and the OWASP findings with a security score per route. Also where the HTTP endpoints of the other plugins are governed |
 | [routes](spring-cloud-gateway-routes/README.md) | Route definitions from pluggable sources aggregated into one locator: a database (with a management view), JSON/YAML files, a Config Server, OpenAPI contracts |
 | [filters](spring-cloud-gateway-filters/README.md) | `Authorization`, `ConvertHttpMethod`, `CorrelationId`, `IdentityPropagation`, `Maintenance` and `Recaptcha` |
 | [oauth2](spring-cloud-gateway-oauth2/README.md) | Multi-tenant authentication, JWT validation, Basic-to-Bearer exchange, and the `AuthorizationToken` filter validating an access token per route |
@@ -63,9 +64,9 @@ line and is never moved to another one:
 
 | Line | Spring Boot | Spring Cloud | Status |
 | --- | --- | --- | --- |
-| `1.16.x` | 4.1.Y | 2025.1.x | Current, developed on `main` |
+| `1.17.x` | 4.1.Y | 2025.1.x | Current, developed on `main` |
 | `1.14.x` | 4.0.Y | 2025.1.x | Maintained on `spring_boot_4.0.x` |
-| `1.5.x` – `1.13.x`, `1.15.x` | 4.0.Y, 4.1.Y | 2025.1.x | End of life |
+| `1.5.x` – `1.13.x`, `1.15.x`, `1.16.x` | 4.0.Y, 4.1.Y | 2025.1.x | End of life |
 | `1.0.x` – `1.3.x` | 3.5.Y | 2025.0.x | End of life |
 
 ## Reference documentation
