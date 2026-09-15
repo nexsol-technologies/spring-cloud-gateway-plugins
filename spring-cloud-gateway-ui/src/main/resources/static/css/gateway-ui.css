@@ -1437,19 +1437,25 @@ body {
 	padding: 1.5rem;
 }
 
+/*
+ * Wide enough for the sentence the console turns a visitor away with — 'You need to be
+ * signed in to reach that page.' — to sit on one line, padding of the card and of the
+ * alert included. Narrow it and that sentence wraps.
+ */
 .gw-login-card {
 	width: 100%;
-	max-width: 26rem;
+	max-width: 29rem;
 }
 
 /*
- * The lockup of the home page, at the size a card can carry. It sets no display, so the
- * rules picking the drawing of the theme in use keep the other one hidden; the card centres
- * whichever is left.
+ * The lockup of the home page, at the size a card can carry. The drawing is a portrait one,
+ * so its height is what sets how large it reads: at the width of this card it is nowhere
+ * near the 100% it is capped at. It sets no display, so the rules picking the drawing of the
+ * theme in use keep the other one hidden; the card centres whichever is left.
  */
 .gw-login-logo {
 	max-width: 100%;
-	height: 92px;
+	height: 140px;
 	width: auto;
 	margin: 0 auto;
 }
