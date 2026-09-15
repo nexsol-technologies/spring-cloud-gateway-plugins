@@ -23,6 +23,9 @@ import ch.nexsol.gateway.pentest.core.model.AggregatedFinding;
 import ch.nexsol.gateway.pentest.core.model.Finding;
 import ch.nexsol.gateway.pentest.core.store.FindingStore;
 import ch.nexsol.gateway.pentest.core.store.FindingSummary;
+import ch.nexsol.gateway.pentest.passive.score.RouteScore;
+import ch.nexsol.gateway.pentest.passive.score.RouteScoreService;
+import reactor.core.publisher.Mono;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -35,8 +38,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 /**
  * Serves the passive-scan view: the findings the analyser raised from live traffic,
  * collapsed to one row per distinct problem with an occurrence count, newest first, with
- * a running summary. The full page renders inside the shell; the JSON endpoints feed the
- * table and the counters.
+ * a running summary, and the route scores derived from them. The full pages render inside
+ * the shell; the JSON endpoints feed the tables and the counters.
  */
 @Controller
 @RequestMapping("/ui/passive-scan")
@@ -44,14 +47,29 @@ public class PassiveScanViewController {
 
 	private final FindingStore store;
 
-	public PassiveScanViewController(FindingStore store) {
+	private final RouteScoreService routeScores;
+
+	public PassiveScanViewController(FindingStore store, RouteScoreService routeScores) {
 		this.store = store;
+		this.routeScores = routeScores;
 	}
 
 	@GetMapping
 	public String page(Model model) {
 		model.addAttribute("activeNav", "passive-scan");
 		return "dashboard/passive-scan";
+	}
+
+	@GetMapping("/routes")
+	public String routesPage(Model model) {
+		model.addAttribute("activeNav", "passive-scan-routes");
+		return "dashboard/passive-scan-routes";
+	}
+
+	@GetMapping("/routes/data")
+	@ResponseBody
+	public Mono<List<RouteScore>> routesData() {
+		return this.routeScores.scores();
 	}
 
 	@GetMapping("/findings")

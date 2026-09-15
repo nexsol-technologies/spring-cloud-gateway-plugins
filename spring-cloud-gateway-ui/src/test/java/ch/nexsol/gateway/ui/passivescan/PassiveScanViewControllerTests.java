@@ -17,11 +17,13 @@
 package ch.nexsol.gateway.ui.passivescan;
 
 import java.time.Instant;
+import java.util.List;
 
 import ch.nexsol.gateway.pentest.core.model.Finding;
 import ch.nexsol.gateway.pentest.core.model.OwaspCategory;
 import ch.nexsol.gateway.pentest.core.model.Severity;
 import ch.nexsol.gateway.pentest.core.store.InMemoryFindingStore;
+import ch.nexsol.gateway.pentest.passive.score.RouteScoreService;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -29,7 +31,9 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 class PassiveScanViewControllerTests {
 
 	private WebTestClient client(InMemoryFindingStore store) {
-		return WebTestClient.bindToController(new PassiveScanViewController(store)).build();
+		return WebTestClient
+			.bindToController(new PassiveScanViewController(store, new RouteScoreService(List.of(), store)))
+			.build();
 	}
 
 	private static Finding finding(Severity severity) {

@@ -802,9 +802,16 @@ public class GatewayUiAutoConfiguration {
 		}
 
 		@Bean
+		NavItem passiveScanRoutesNavItem() {
+			return new NavItem("passive-scan-routes", "Route scores", "icon-chart", "/ui/passive-scan/routes", 31,
+					SECURITY);
+		}
+
+		@Bean
 		UiSecuredPaths passiveScanViewSecuredPaths() {
 			return new UiSecuredPaths("/ui/passive-scan", "/ui/passive-scan/findings", "/ui/passive-scan/summary",
-					"/ui/passive-scan/coverage", "/js/gateway-passive-scan.js");
+					"/ui/passive-scan/coverage", "/ui/passive-scan/routes", "/ui/passive-scan/routes/data",
+					"/js/gateway-passive-scan.js", "/js/gateway-passive-scan-routes.js");
 		}
 
 	}

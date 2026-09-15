@@ -86,7 +86,8 @@
 		td.colSpan = COLSPAN;
 		td.className = 'bg-body-tertiary';
 
-		section(td, 'Rule', finding.ruleId + ' · ' + finding.categoryCode + ' · ' + text(finding.cwe));
+		section(td, 'Rule', finding.ruleId + ' · ' + finding.categoryCode + ' · ' + text(finding.cwe) + ' · '
+				+ text(finding.confidence).toLowerCase() + ' confidence');
 		section(td, 'Description', finding.detail);
 		section(td, 'Remediation', finding.remediation);
 		if (finding.reference) {
@@ -151,12 +152,7 @@
 			badge.className = 'badge ' + severityClass(finding.severity);
 			badge.textContent = text(finding.severity);
 			sevCell.appendChild(badge);
-			if (finding.confidence) {
-				var conf = document.createElement('span');
-				conf.className = 'badge text-bg-light ms-1';
-				conf.textContent = finding.confidence.toLowerCase() + ' conf.';
-				sevCell.appendChild(conf);
-			}
+			// The confidence is not on the row; it is on the Rule line of the expanded panel.
 			row.appendChild(sevCell);
 
 			cell(row, finding.categoryCode, 'text-nowrap');

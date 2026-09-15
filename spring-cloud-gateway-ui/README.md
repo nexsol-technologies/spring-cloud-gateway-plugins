@@ -39,6 +39,8 @@ what the application actually runs.
 | [Configuration, and five others](#introspection) | `/ui/insights/*` | Actuator is on the classpath |
 | [OpenAPI](#openapi) — *Hub* in the menu | `/ui/openapi` | `spring-cloud-gateway-hub-openapi` is present and enabled |
 | [Audit](#audit) | `/ui/audit` | `spring-cloud-gateway-audit-core` is present and `...audit.enabled` is not `false` |
+| [Passive scan](#passive-scan) | `/ui/passive-scan` | `spring-cloud-gateway-pentest-passive` is present and `...pentest.passive.enabled` is `true` |
+| [Route scores](#passive-scan) | `/ui/passive-scan/routes` | same as above |
 
 ## Configuration
 
@@ -565,6 +567,26 @@ static assets are added to `...audit.web-filter.exclude-paths`. The exclusions a
 paths the active views declare, never a `/ui/**` pattern, so a gateway route declared under
 `/ui` keeps being audited.
 
+## Passive scan
+
+Two views over what the
+[passive scan plugin](../spring-cloud-gateway-pentest/spring-cloud-gateway-pentest-passive/README.md)
+found in the live traffic, grouped under **Security** in the menu.
+
+**Passive scan** lists the findings, collapsed to one row per distinct problem with an
+occurrence count, newest first: severity, OWASP API category, CWE, scanner, method, path and
+title. A row expands into the rule id and confidence, the description, the remediation, a link
+to the reference and the evidence the scanner recorded. Filter by severity and search across
+path and title; the **Live** switch polls every 3 seconds. Above the table, a matrix shows
+which of the OWASP API Top 10 categories passive analysis can and cannot reach.
+
+**Route scores** ranks the routes by a security score computed from their findings, worst
+first, with an overall gauge above the table. Filter by grade, route id and path; a row expands
+into the findings that cost the route its points.
+
+Both views read the plugin's in-memory store directly — no scan is ever issued from the
+console.
+
 ## Spring Security
 
 When Spring Security is on the classpath, the plugin contributes its own
@@ -897,7 +919,7 @@ NavItem quotaNavItem() {
 }
 ```
 
-The five-argument form is the same entry with no group. The console ships two groups:
+The five-argument form is the same entry with no group. The console ships six groups:
 
 | Group | Holds | What it gathers |
 | --- | --- | --- |
@@ -906,6 +928,7 @@ The five-argument form is the same entry with no group. The console ships two gr
 | **Runtime** | [Metrics](#runtime) | The technical health of each instance |
 | **OpenAPI** | [Hub](#openapi) | The contracts served through the gateway |
 | **Configuration** | [The six introspection views](#introspection) | What it is made of |
+| **Security** | [Passive scan, Route scores](#passive-scan) | What the traffic reveals about the API's exposure |
 
 A group folds and remembers whether it was folded, and is rendered open when the page being read
 is one of its own. Collapsed, the menu drops the headings and shows the icons on their own.
