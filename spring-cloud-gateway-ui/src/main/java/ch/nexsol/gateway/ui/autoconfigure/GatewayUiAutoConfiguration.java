@@ -28,7 +28,7 @@ import ch.nexsol.gateway.database.service.ApiService;
 import ch.nexsol.gateway.metrics.InstanceMetricsSource;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration;
-import ch.nexsol.gateway.pentest.core.store.FindingStore;
+import ch.nexsol.gateway.pentest.passive.score.RouteScoreService;
 import ch.nexsol.gateway.servicegraph.ServiceGraphSource;
 import ch.nexsol.gateway.ui.audit.AuditExclusionBeanPostProcessor;
 import ch.nexsol.gateway.ui.audit.AuditOverviewContribution;
@@ -787,11 +787,13 @@ public class GatewayUiAutoConfiguration {
 
 	/**
 	 * The passive-scan view: the findings the analyser raised from live traffic. Present
-	 * when the passive-scan plugin is on the classpath and enabled, since it is that
-	 * plugin's {@link FindingStore} the controller reads.
+	 * when the passive-scan plugin is on the classpath and enabled. The condition names a
+	 * class of the passive module rather than of the shared core: pentest-redis depends
+	 * on the core alone, and a classpath holding it without the passive module would
+	 * satisfy the condition and then fail to load the controller.
 	 */
 	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnClass(FindingStore.class)
+	@ConditionalOnClass(RouteScoreService.class)
 	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.pentest.passive.enabled", havingValue = "true")
 	@Import(PassiveScanViewController.class)
 	static class PassiveScanViewConfiguration {

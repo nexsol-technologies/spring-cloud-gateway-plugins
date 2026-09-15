@@ -12,9 +12,21 @@
 	var dataUrl = tbody.getAttribute('data-url') || '/ui/passive-scan/routes/data';
 	var findingsUrl = tbody.getAttribute('data-findings-url') || '/ui/passive-scan/findings';
 	var CIRCUMFERENCE = 2 * Math.PI * 50;
+	var POLL_MS = 3000;
 	var all = [];
 	var findingsByRoute = {};
 	var expanded = {};
+	var pollTimer = null;
+
+	function live(enabled) {
+		if (pollTimer) {
+			clearInterval(pollTimer);
+			pollTimer = null;
+		}
+		if (enabled) {
+			pollTimer = setInterval(load, POLL_MS);
+		}
+	}
 
 	function sel(id) {
 		return document.getElementById(id);
@@ -221,7 +233,7 @@
 			tbody.appendChild(tr);
 			tbody.appendChild(detail);
 		});
-		renderGauge(all);
+		renderGauge(rows);
 	}
 
 	function groupFindings(findings) {
@@ -255,6 +267,14 @@
 	sel('psr-grade').addEventListener('change', render);
 	sel('psr-query').addEventListener('input', render);
 	sel('psr-refresh').addEventListener('click', load);
+	sel('psr-live').addEventListener('change', function () {
+		live(sel('psr-live').checked);
+	});
+
+	['psr-grade', 'psr-live'].forEach(function (id) {
+		window.gatewayUi.remember(sel(id));
+	});
 
 	load();
+	live(sel('psr-live').checked);
 })();

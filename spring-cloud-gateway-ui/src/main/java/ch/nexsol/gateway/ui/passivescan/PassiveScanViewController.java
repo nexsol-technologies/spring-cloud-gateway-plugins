@@ -23,6 +23,8 @@ import ch.nexsol.gateway.pentest.core.model.AggregatedFinding;
 import ch.nexsol.gateway.pentest.core.model.Finding;
 import ch.nexsol.gateway.pentest.core.store.FindingStore;
 import ch.nexsol.gateway.pentest.core.store.FindingSummary;
+import ch.nexsol.gateway.pentest.passive.coverage.CategoryCoverage;
+import ch.nexsol.gateway.pentest.passive.coverage.PassiveCoverage;
 import ch.nexsol.gateway.pentest.passive.score.RouteScore;
 import ch.nexsol.gateway.pentest.passive.score.RouteScoreService;
 import reactor.core.publisher.Mono;
@@ -94,8 +96,8 @@ public class PassiveScanViewController {
 
 	@GetMapping("/coverage")
 	@ResponseBody
-	public java.util.List<ch.nexsol.gateway.pentest.passive.coverage.CategoryCoverage> coverage() {
-		return ch.nexsol.gateway.pentest.passive.coverage.PassiveCoverage.categories();
+	public List<CategoryCoverage> coverage() {
+		return PassiveCoverage.categories();
 	}
 
 	private static boolean matches(AggregatedFinding aggregate, String wantedSeverity, String needle) {
@@ -106,9 +108,9 @@ public class PassiveScanViewController {
 		if (needle == null) {
 			return true;
 		}
-		return contains(finding.scannerId(), needle) || contains(finding.path(), needle)
-				|| contains(finding.detail(), needle) || contains(finding.category().getCode(), needle)
-				|| contains(finding.cwe(), needle);
+		return contains(finding.scannerId(), needle) || contains(finding.title(), needle)
+				|| contains(finding.path(), needle) || contains(finding.detail(), needle)
+				|| contains(finding.category().getCode(), needle) || contains(finding.cwe(), needle);
 	}
 
 	private static boolean contains(String value, String needle) {

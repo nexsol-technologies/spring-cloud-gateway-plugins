@@ -577,15 +577,16 @@ found in the live traffic, grouped under **Security** in the menu.
 occurrence count, newest first: severity, OWASP API category, CWE, scanner, method, path and
 title. A row expands into the rule id and confidence, the description, the remediation, a link
 to the reference and the evidence the scanner recorded. Filter by severity and search across
-path and title; the **Live** switch polls every 3 seconds. Above the table, a matrix shows
-which of the OWASP API Top 10 categories passive analysis can and cannot reach.
+scanner, title, path, category, CWE and description; the **Live** switch polls every 3 seconds.
+Above the table, a matrix shows which of the OWASP API Top 10 categories passive analysis can
+and cannot reach.
 
 **Route scores** ranks the routes by a security score computed from their findings, worst
-first, with an overall gauge above the table. Filter by grade, route id and path; a row expands
-into the findings that cost the route its points.
+first, with a gauge showing the average of the routes on screen. Filter by grade, route id and
+path; a row expands into the findings that cost the route its points.
 
-Both views read the plugin's in-memory store directly — no scan is ever issued from the
-console.
+Both views read the plugin's finding store directly — no scan is ever issued from the console.
+With `...pentest.store=redis` that store is the consolidated view of every instance.
 
 ## Spring Security
 

@@ -58,8 +58,8 @@
 		return td;
 	}
 
-	function keyOf(finding, index) {
-		return [finding.scanner, finding.method, finding.path, finding.title, index].join('|');
+	function keyOf(finding) {
+		return [finding.scanner, finding.method, finding.path, finding.title].join('|');
 	}
 
 	function section(parent, label, value) {
@@ -90,7 +90,7 @@
 				+ text(finding.confidence).toLowerCase() + ' confidence');
 		section(td, 'Description', finding.detail);
 		section(td, 'Remediation', finding.remediation);
-		if (finding.reference) {
+		if (finding.reference && /^https?:\/\//i.test(finding.reference)) {
 			var refWrap = document.createElement('div');
 			refWrap.className = 'mb-2';
 			var link = document.createElement('a');
@@ -134,8 +134,8 @@
 	function render(findings) {
 		tbody.textContent = '';
 		sel('ps-empty').style.display = findings.length ? 'none' : '';
-		findings.forEach(function (finding, index) {
-			var key = keyOf(finding, index);
+		findings.forEach(function (finding) {
+			var key = keyOf(finding);
 			var row = document.createElement('tr');
 			row.style.cursor = 'pointer';
 			cell(row, time(finding.lastSeen), 'text-nowrap');
@@ -221,7 +221,11 @@
 			tr.appendChild(status);
 			var name = document.createElement('td');
 			name.className = 'text-nowrap';
-			name.innerHTML = '<span class="text-secondary small">' + text(row.code) + '</span> ' + text(row.title);
+			var code = document.createElement('span');
+			code.className = 'text-secondary small';
+			code.textContent = text(row.code);
+			name.appendChild(code);
+			name.appendChild(document.createTextNode(' ' + text(row.title)));
 			tr.appendChild(name);
 			cell(tr, row.note, 'small text-secondary');
 			coverageEl.appendChild(tr);
