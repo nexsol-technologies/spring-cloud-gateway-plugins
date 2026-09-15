@@ -82,24 +82,28 @@ window.gatewayUi = (function () {
 
 (function () {
 	var STORAGE_KEY = 'gw-sidebar-collapsed';
-	var shell = document.getElementById('gw-shell');
+	var root = document.documentElement;
 	var toggle = document.getElementById('gw-toggle');
-	if (!shell || !toggle) {
+	if (!toggle) {
 		return;
 	}
 
-	function apply(collapsed) {
-		shell.classList.toggle('gw-collapsed', collapsed);
-		toggle.setAttribute('aria-expanded', String(!collapsed));
+	function collapsed() {
+		return root.classList.contains('gw-collapsed');
 	}
 
-	// Restore the previously chosen state.
-	apply(localStorage.getItem(STORAGE_KEY) === 'true');
+	function apply(folded) {
+		root.classList.toggle('gw-collapsed', folded);
+		toggle.setAttribute('aria-expanded', String(!folded));
+	}
+
+	// The head has already applied the stored state to the page; this is the button
+	// catching up with it.
+	apply(collapsed());
 
 	toggle.addEventListener('click', function () {
-		var collapsed = !shell.classList.contains('gw-collapsed');
-		apply(collapsed);
-		localStorage.setItem(STORAGE_KEY, String(collapsed));
+		apply(!collapsed());
+		localStorage.setItem(STORAGE_KEY, String(collapsed()));
 	});
 })();
 

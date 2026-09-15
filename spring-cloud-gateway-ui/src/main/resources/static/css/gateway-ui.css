@@ -7,7 +7,8 @@
  * badge picks the theme up without a class of ours on it.
  *
  * The shell itself is a flex row of a fixed-width sidebar and a growing content area.
- * Collapsing is driven by the .gw-collapsed class toggled on .gw-shell.
+ * Collapsing is driven by the .gw-collapsed class, put on the root element by the head
+ * of the shell before anything paints and toggled there afterwards.
  */
 
 /* Tokens ------------------------------------------------------------------ */

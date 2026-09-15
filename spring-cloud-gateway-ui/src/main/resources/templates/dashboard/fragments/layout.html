@@ -24,6 +24,25 @@
 					chosen || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 		})();
 	</script>
+	<!--
+		The side menu is drawn at its stored width before the stylesheets paint, for the same
+		reason the theme is: left to the script at the end of the body, the menu is laid out
+		wide first and the class then animates it narrow, so every click on a collapsed menu
+		made it open and fold again. The class goes on the root element, which is what exists
+		this early; every rule reaching for it is a descendant selector.
+	-->
+	<script>
+		(function () {
+			try {
+				if (localStorage.getItem('gw-sidebar-collapsed') === 'true') {
+					document.documentElement.classList.add('gw-collapsed');
+				}
+			}
+			catch (ignored) {
+				// Storage refused by the browser: the menu starts at its full width.
+			}
+		})();
+	</script>
 	<link rel="stylesheet" th:href="@{/css/bootstrap.min.css}" href="/css/bootstrap.min.css">
 	<link rel="stylesheet" th:href="@{/css/gateway-ui.css}" href="/css/gateway-ui.css">
 	<!--
