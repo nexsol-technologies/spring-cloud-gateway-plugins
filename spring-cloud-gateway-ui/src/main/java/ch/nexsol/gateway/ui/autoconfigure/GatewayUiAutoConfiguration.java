@@ -134,8 +134,7 @@ public class GatewayUiAutoConfiguration {
 	static final String RUNTIME = "Runtime";
 
 	/**
-	 * Heading the security testing views fold under: passive analysis now, active
-	 * scanning later.
+	 * Heading the security testing views fold under.
 	 */
 	static final String SECURITY = "Security";
 

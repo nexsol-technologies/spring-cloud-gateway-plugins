@@ -28,6 +28,7 @@ so several gateways can run side by side.
 | [gateway-metrics](gateway/gateway-metrics/README.md) | 8206 | [metrics](../spring-cloud-gateway-metrics/README.md) — and its Prometheus, Redis and discovery sources | `docker compose`, `eureka` |
 | [gateway-routes-files](gateway/gateway-routes-files/README.md) | 8207 | [routes-files](../spring-cloud-gateway-routes/spring-cloud-gateway-routes-files/README.md) — routes as files | — |
 | [gateway-openapi-validation](gateway/gateway-openapi-validation/README.md) | 8212 | [openapi-validation](../spring-cloud-gateway-openapi-validation/README.md) — requests enforced against a contract | — |
+| [gateway-passive-scan](gateway/gateway-passive-scan/README.md) | 8214 | [pentest-passive](../spring-cloud-gateway-pentest/spring-cloud-gateway-pentest-passive/README.md) — the OWASP traffic analyser and its console views | — |
 
 ### Combinations
 

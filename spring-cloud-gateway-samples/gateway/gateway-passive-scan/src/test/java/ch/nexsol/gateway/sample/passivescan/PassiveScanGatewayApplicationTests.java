@@ -30,10 +30,8 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Verifies the analyser raises findings from the traffic the gateway answers. The filter
- * runs on every exchange, so even a request no route matched &mdash; served by the
- * gateway as a 404 without the usual security headers &mdash; produces a finding.
- * Inspection is asynchronous, hence the await.
+ * Verifies the analyser raises findings from the traffic the gateway answers. Inspection
+ * is asynchronous, hence the await.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
 		properties = "spring.cloud.gateway.server.webflux.pentest.passive.routed-only=false")
@@ -48,11 +46,28 @@ class PassiveScanGatewayApplicationTests {
 
 	@Test
 	void shouldRaiseFindingsFromAnsweredTraffic() {
-		this.webTestClient.get().uri("/nothing-here").exchange();
+		// The console's own login page is served by this gateway: HTML, 200, and without
+		// a Content-Security-Policy, which is what security-headers reports.
+		this.webTestClient.get().uri("/ui/login").exchange().expectStatus().isOk();
 
 		Awaitility.await()
 			.atMost(Duration.ofSeconds(5))
 			.untilAsserted(() -> assertThat(this.findingStore.recent()).isNotEmpty());
+	}
+
+	@Test
+	void shouldNotRaiseFindingsAboutAResponseTheGatewayNeverServed() {
+		// Unmatched, and behind the console's login: the gateway refuses it.
+		this.webTestClient.get().uri("/nothing-here").exchange().expectStatus().isUnauthorized();
+
+		// A refusal carries no representation of its own, so there is nothing to say
+		// about its headers. Reporting it made this rule fire on every such request. The
+		// store is shared with the other test, so this asks about this path alone.
+		Awaitility.await()
+			.during(Duration.ofSeconds(1))
+			.atMost(Duration.ofSeconds(2))
+			.untilAsserted(() -> assertThat(this.findingStore.recent())
+				.noneMatch((aggregate) -> "/nothing-here".equals(aggregate.finding().path())));
 	}
 
 }

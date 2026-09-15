@@ -1,6 +1,6 @@
 # gateway-passive-scan
 
-Exercises [spring-cloud-gateway-passive-scan](../../../spring-cloud-gateway-pentest/spring-cloud-gateway-pentest-passive/README.md)
+Exercises [spring-cloud-gateway-pentest-passive](../../../spring-cloud-gateway-pentest/spring-cloud-gateway-pentest-passive/README.md)
 — port `8214`, with response body capture switched on.
 
 ## Run it
