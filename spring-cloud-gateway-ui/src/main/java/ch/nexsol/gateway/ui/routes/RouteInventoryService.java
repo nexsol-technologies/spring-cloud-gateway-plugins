@@ -17,7 +17,9 @@
 package ch.nexsol.gateway.ui.routes;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -179,10 +181,7 @@ public class RouteInventoryService implements ApplicationListener<RefreshRoutesE
 	}
 
 	private Mono<List<RouteView>> readSources() {
-		List<RouteDefinitionLocator> sources = this.locators.orderedStream()
-			.filter((locator) -> !(locator instanceof CompositeRouteDefinitionLocator))
-			.toList();
-		return Flux.fromIterable(sources)
+		return Flux.fromIterable(sourceLocators())
 			// Sources are read concurrently but emitted in locator order: a slow source
 			// costs its own latency, not that of every source queued before it.
 			.flatMapSequential(this::readSource)
@@ -190,6 +189,38 @@ public class RouteInventoryService implements ApplicationListener<RefreshRoutesE
 			.map(RouteInventoryService::flagDuplicates)
 			.doOnNext(this.lastKnown::set)
 			.cache();
+	}
+
+	/**
+	 * Reads every source and returns its definitions, in locator order, under the source
+	 * name the views show. Unlike {@link #routes()} this is never served from the cache
+	 * and never reduced to what a table displays: the definitions come back whole,
+	 * arguments included, which is what writing them back out as configuration needs.
+	 * <p>
+	 * Two locators can carry the same displayed name &mdash; two file sources, say
+	 * &mdash; and their definitions are then listed together under it.
+	 * @return the route definitions of each source
+	 */
+	public Mono<Map<String, List<RouteDefinition>>> definitionsBySource() {
+		return Flux.fromIterable(sourceLocators())
+			.flatMapSequential((locator) -> readDefinitions(locator).collectList()
+				.map((definitions) -> Map.entry(sourceName(locator), definitions)))
+			.collectList()
+			.map(RouteInventoryService::group);
+	}
+
+	private static Map<String, List<RouteDefinition>> group(List<Map.Entry<String, List<RouteDefinition>>> read) {
+		Map<String, List<RouteDefinition>> grouped = new LinkedHashMap<>();
+		for (Map.Entry<String, List<RouteDefinition>> source : read) {
+			grouped.computeIfAbsent(source.getKey(), (name) -> new ArrayList<>()).addAll(source.getValue());
+		}
+		return grouped;
+	}
+
+	private List<RouteDefinitionLocator> sourceLocators() {
+		return this.locators.orderedStream()
+			.filter((locator) -> !(locator instanceof CompositeRouteDefinitionLocator))
+			.toList();
 	}
 
 	/**
@@ -249,17 +280,16 @@ public class RouteInventoryService implements ApplicationListener<RefreshRoutesE
 
 	private Flux<RouteView> readSource(RouteDefinitionLocator locator) {
 		String source = sourceName(locator);
+		return readDefinitions(locator).map((definition) -> toView(definition, source));
+	}
+
+	private Flux<RouteDefinition> readDefinitions(RouteDefinitionLocator locator) {
 		// Collected before the timeout is applied, so the delay bounds the whole read of
 		// the source rather than the gap between two of its routes.
-		return locator.getRouteDefinitions()
-			.map((definition) -> toView(definition, source))
-			.collectList()
-			.timeout(SOURCE_TIMEOUT)
-			.onErrorResume((ex) -> {
-				LOG.warn("Route definition source {} could not be read", source, ex);
-				return Mono.just(List.of());
-			})
-			.flatMapMany(Flux::fromIterable);
+		return locator.getRouteDefinitions().collectList().timeout(SOURCE_TIMEOUT).onErrorResume((ex) -> {
+			LOG.warn("Route definition source {} could not be read", sourceName(locator), ex);
+			return Mono.just(List.of());
+		}).flatMapMany(Flux::fromIterable);
 	}
 
 	private static RouteView toView(RouteDefinition definition, String source) {

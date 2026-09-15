@@ -327,7 +327,10 @@
 	 * goes with it — a wide flow scrolls inside its own container.
 	 */
 	function placeOnScreen() {
-		return { inner: flowEl.scrollLeft, outer: window.pageYOffset };
+		// Both axes of the container, not only the horizontal one: expanded, the card is the
+		// height of the content column and the picture scrolls inside it rather than moving
+		// the page, so the vertical offset that has to survive the redraw is this one.
+		return { inner: flowEl.scrollLeft, down: flowEl.scrollTop, outer: window.pageYOffset };
 	}
 
 	/*
@@ -338,6 +341,7 @@
 	 */
 	function restore(place) {
 		flowEl.scrollLeft = place.inner;
+		flowEl.scrollTop = place.down;
 		if (window.pageYOffset === place.outer) {
 			return;
 		}

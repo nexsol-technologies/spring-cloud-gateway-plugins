@@ -20,7 +20,8 @@
 				</thead>
 				<tbody id="gr-tbody">
 					<tr th:each="route : ${routes}" class="gr-row"
-							th:attr="data-search=${route.routeId()} + ' ' + ${route.uri()} + ' ' + ${route.source()}">
+							th:attr="data-search=${route.routeId()} + ' ' + ${route.uri()} + ' ' + ${route.source()},
+									data-source=${route.source()}">
 						<!--
 							Route id and target share a cell: the target is what the id resolves to, and
 							a URI is far too long to survive a column of its own next to the predicates.

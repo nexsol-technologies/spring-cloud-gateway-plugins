@@ -163,10 +163,27 @@ What *Refresh view* picks up depends on the locator: a database or discovery sou
 queried live, while a file or Config Server source serves the snapshot it last loaded — those
 reload through their own plugin, never through this page.
 
-The inventory is **read once, then served while it is refreshed**, so navigating between views
-queries nothing and a locator reaching the network is never called mid-render. A refresh
+**Export YAML** writes the routes back out as gateway configuration: pick the sources to keep
+— *Discovery Client*, *Properties*, *File*, *Open Api*, whatever this gateway resolves —
+and the download is the `spring.cloud.gateway.server.webflux.routes` block declaring the same
+routes, with their predicates, filters, order and metadata. Predicates and filters take the
+shortcut form (`Path=/api/**`) wherever the gateway reads it back as what was exported, and
+the long `name`/`args` form where it would not: a named argument, or a value holding the comma
+the shortcut splits on. *Discovery Client* is the one source ticked to begin with: the routes a
+registry hands the gateway are the ones nobody has written down yet, and every other source is
+already a file somewhere.
+
+**This page reads its sources on every load.** It is opened to find out what the gateway
+resolves *now* — a service that has just registered, a file that has just changed — and a
+cached table is the one thing that cannot answer that. Other views are served from the cached
+inventory instead, which is refreshed in the background on every `RefreshRoutesEvent`. A read
 already in flight is shared, and a source given more than five seconds to answer is dropped
-from the snapshot with a warning.
+with a warning.
+
+**A service registering takes as long as discovery takes.** Neither action here shortens it:
+the discovery locator reads the registry its client holds locally, and a Eureka client refetches
+that registry on its own schedule — 30 seconds by default. Between starting a service and seeing
+its route, that wait is the registry's, not the console's.
 
 ### Database routes view
 
