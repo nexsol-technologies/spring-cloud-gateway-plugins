@@ -9,9 +9,10 @@ its own — port `8201`.
 mvn spring-boot:run
 ```
 
-The `Authorization` routes forward to the `service-a` sample on `:8080`, and so do the two
-maintenance routes that let a caller through — `maintenance-admin` for `admin:admin` and
-`maintenance-planned`, whose window is still ahead. Start `service-a` too to see a granted
+The `Authorization` routes forward to the `service-a` sample on `:8080`, and so do the three
+maintenance routes that let a caller through — `maintenance-admin` for `admin:admin`,
+`maintenance-planned`, whose window is still ahead, and `maintenance-notice`, which only
+announces one. Start `service-a` too to see a granted
 call reach a backend. The routes that are actually closed answer from the gateway itself and
 need nothing; the rest need nothing beyond an internet connection.
 
@@ -25,6 +26,7 @@ need nothing; the rest need nothing beyond an internet connection.
 | http://localhost:8201/maintenance-admin/sample | `Maintenance` | The same maintenance, lifted for `admin:admin`; everyone else is answered `593` |
 | http://localhost:8201/maintenance-bounded/sample | `Maintenance` | A window with a known end, so the answer carries a `Retry-After` |
 | http://localhost:8201/maintenance-planned/sample | `Maintenance` | The window opens in 2125, so the route is served normally |
+| http://localhost:8201/maintenance-notice/sample | `Maintenance` | Pre-maintenance: answered `200` by `service-a`, with the window announced in the headers |
 | http://localhost:8201/convert-method/anything | `ConvertHttpMethod` | A `GET` reaches httpbin.org as a `POST` |
 | any response | `CorrelationId` | An `x-correlation-id` header carrying the traceId of the exchange |
 
@@ -50,6 +52,13 @@ retry-after: Sun, 02 Sep 2125 02:00:00 GMT
 
 $ curl -u admin:admin http://localhost:8201/maintenance-admin/sample -i
 HTTP/1.1 200 OK
+
+$ curl http://localhost:8201/maintenance-notice/sample -i
+HTTP/1.1 200 OK
+Sunset: Sun, 01 Sep 2126 22:00:00 GMT
+x-maintenance-start: 2126-09-01T22:00:00Z
+x-maintenance-end: 2126-09-02T02:00:00Z
+x-maintenance-message: Maintenance%20pr%C3%A9vue%20le%201er%20septembre.
 ```
 
 ## The authority prefix
@@ -67,6 +76,11 @@ prefix added; see [gateway-secured](../gateway-secured/README.md), whose route a
 `503` an overloaded or unreachable backend produces. Netty sends it as it is configured and
 names it `Server Error (593)`, having no phrase of its own for it — the body is what a front end
 reads.
+
+The `maintenance-notice` route shows the other half: while the notice runs, nothing about the
+answer changes — `service-a` replies as it always does — and the window travels in the headers
+beside it. The message is percent-encoded UTF-8, since a header value is US-ASCII and the accent
+in `prévue` would not survive otherwise; `decodeURIComponent` reads it back.
 
 The bypass needs an authenticated caller, so it only means something behind a filter chain that
 populates one. Here Basic authentication runs on every path, which is why `-u admin:admin` is

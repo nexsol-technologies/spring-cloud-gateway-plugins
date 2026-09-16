@@ -22,3 +22,14 @@ spring.cloud.gateway.server.webflux:
       args:
         message: The shop will close tonight.
         start: 2125-09-01T22:00:00Z
+  - id: maintenance-notice
+    uri: forward:/maintenance
+    predicates:
+    - Path=/maintenance-notice
+    - Host=www.maintenance.ch
+    filters:
+    - name: Maintenance
+      args:
+        message: Maintenance prévue.
+        start: ${test.maintenance.start}
+        notice: 3d

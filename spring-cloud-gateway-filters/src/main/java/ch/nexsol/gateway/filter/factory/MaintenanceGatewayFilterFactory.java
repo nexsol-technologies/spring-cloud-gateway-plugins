@@ -16,8 +16,10 @@
 
 package ch.nexsol.gateway.filter.factory;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -40,12 +42,14 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
+import org.springframework.boot.convert.DurationStyle;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.http.HttpHeaders;
@@ -59,6 +63,7 @@ import org.springframework.security.oauth2.server.resource.authentication.Abstra
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.util.UriUtils;
 
 /**
  * Gateway filter factory taking a route out of service for the duration of a maintenance
@@ -70,6 +75,12 @@ import org.springframework.web.server.ServerWebExchange;
  * The window is open from {@code start} inclusive to {@code end} exclusive, and an unset
  * bound is unbounded &mdash; no {@code start} means the maintenance is already on, no
  * {@code end} means it lasts until the configuration says otherwise.
+ * <p>
+ * A {@code notice} announces the maintenance before it begins. For that duration ahead of
+ * {@code start} the route is served exactly as it always was &mdash; same status, same
+ * payload, the request forwarded untouched &mdash; and the answer carries the window as
+ * response headers, which is the one channel that informs without altering what the
+ * caller asked for.
  * <p>
  * A population can be let through while everyone else is held back, by authority or by
  * JWT claim. Holding any one of the configured authorities lifts the maintenance, and so
@@ -97,6 +108,38 @@ public class MaintenanceGatewayFilterFactory
 	 * Message carried by the body when the route configures none.
 	 */
 	public static final String DEFAULT_MESSAGE = "This service is temporarily unavailable for maintenance.";
+
+	/**
+	 * Longest message a route may configure.
+	 * <p>
+	 * During a notice the message travels as a response header, and a client reads a
+	 * bounded header block &mdash; 8&nbsp;KB for Netty, this gateway included. Percent
+	 * encoding costs up to twelve characters per character, so a message beyond this
+	 * length could push the block past what the caller will accept and cost it the whole
+	 * response, which is a worse outage than the maintenance being announced.
+	 */
+	public static final int MAX_MESSAGE_LENGTH = 512;
+
+	/**
+	 * Header announcing, while the notice runs, the moment the route becomes
+	 * unresponsive. Defined by RFC 8594.
+	 */
+	public static final String SUNSET_HEADER = "Sunset";
+
+	/**
+	 * Header carrying the start of the announced window.
+	 */
+	public static final String START_HEADER = "x-maintenance-start";
+
+	/**
+	 * Header carrying the end of the announced window, absent when it has none.
+	 */
+	public static final String END_HEADER = "x-maintenance-end";
+
+	/**
+	 * Header carrying the announced message, percent-encoded UTF-8.
+	 */
+	public static final String MESSAGE_HEADER = "x-maintenance-message";
 
 	private static final Logger LOG = LoggerFactory.getLogger(MaintenanceGatewayFilterFactory.class);
 
@@ -132,7 +175,11 @@ public class MaintenanceGatewayFilterFactory
 	@Override
 	public GatewayFilter apply(Config config) {
 		return (exchange, chain) -> {
-			if (!config.isOpenAt(this.clock.instant())) {
+			Instant now = this.clock.instant();
+			if (!config.isOpenAt(now)) {
+				if (config.isNoticeAt(now)) {
+					announce(config, exchange);
+				}
 				return chain.filter(exchange);
 			}
 			if (!config.hasExemption()) {
@@ -147,6 +194,29 @@ public class MaintenanceGatewayFilterFactory
 				.defaultIfEmpty(Boolean.FALSE)
 				.flatMap((exempt) -> exempt ? chain.filter(exchange) : underMaintenance(config, exchange));
 		};
+	}
+
+	/**
+	 * Writes the announcement of a maintenance still to come onto the response, leaving
+	 * the status and the payload to the route.
+	 * <p>
+	 * The headers are set before the request is forwarded, which holds because
+	 * {@code NettyRoutingFilter} merges the headers of the upstream response into the
+	 * client response with {@code addAll}: what is written here survives alongside them.
+	 */
+	private static void announce(Config config, ServerWebExchange exchange) {
+		HttpHeaders headers = exchange.getResponse().getHeaders();
+		headers.setInstant(SUNSET_HEADER, config.getStart().toInstant());
+		headers.set(START_HEADER, format(config.getStart()));
+		if (config.getEnd() != null) {
+			headers.set(END_HEADER, format(config.getEnd()));
+		}
+		if (StringUtils.hasText(config.getMessage())) {
+			// A header value is US-ASCII (RFC 9110), so a message carrying an accent
+			// reaches the browser mangled unless it is percent-encoded first. Encoded
+			// here, it is read back with a single decodeURIComponent.
+			headers.set(MESSAGE_HEADER, UriUtils.encode(config.getMessage(), StandardCharsets.UTF_8));
+		}
 	}
 
 	/**
@@ -278,11 +348,14 @@ public class MaintenanceGatewayFilterFactory
 	@Validated
 	public static class Config {
 
+		@Size(max = MAX_MESSAGE_LENGTH)
 		private String message = DEFAULT_MESSAGE;
 
 		private OffsetDateTime start;
 
 		private OffsetDateTime end;
+
+		private Duration notice;
 
 		@Min(400)
 		@Max(599)
@@ -304,8 +377,9 @@ public class MaintenanceGatewayFilterFactory
 		}
 
 		/**
-		 * Sets the message the response body carries.
-		 * @param message the message to display
+		 * Sets the message the response body carries, and the notice announces.
+		 * @param message the message to display, at most {@link #MAX_MESSAGE_LENGTH}
+		 * characters
 		 */
 		public void setMessage(String message) {
 			this.message = message;
@@ -347,6 +421,43 @@ public class MaintenanceGatewayFilterFactory
 		 */
 		public void setEnd(String end) {
 			this.end = parse("end", end);
+		}
+
+		/**
+		 * Returns how long before {@code start} the maintenance is announced,
+		 * {@code null} when it is not announced at all.
+		 * @return the notice period
+		 */
+		public Duration getNotice() {
+			return this.notice;
+		}
+
+		/**
+		 * Sets how long before {@code start} the maintenance is announced, from a
+		 * duration written the way Spring reads one &mdash; {@code 3d}, {@code 72h} or
+		 * {@code PT72H}.
+		 * @param notice the notice period, none when blank
+		 * @throws IllegalArgumentException when the value is not a duration, or is not a
+		 * positive one
+		 */
+		public void setNotice(String notice) {
+			if (!StringUtils.hasText(notice)) {
+				this.notice = null;
+				return;
+			}
+			Duration parsed;
+			try {
+				parsed = DurationStyle.detectAndParse(notice.trim());
+			}
+			catch (IllegalArgumentException ex) {
+				throw new IllegalArgumentException("'" + notice + "' is not a valid 'notice' for the Maintenance"
+						+ " filter; expected a duration such as 3d, 72h or PT72H");
+			}
+			if (parsed.isNegative() || parsed.isZero()) {
+				throw new IllegalArgumentException("'" + notice + "' is not a valid 'notice' for the Maintenance"
+						+ " filter; a notice runs back from the start of the window, so it has to be positive");
+			}
+			this.notice = parsed;
 		}
 
 		/**
@@ -431,6 +542,31 @@ public class MaintenanceGatewayFilterFactory
 		 */
 		public boolean hasExemption() {
 			return !this.allowedAuthorities.isEmpty() || !this.allowedClaims.isEmpty();
+		}
+
+		/**
+		 * Whether the maintenance is being announced at the given moment: the notice runs
+		 * from {@code start} back, and stops where the window itself opens.
+		 * @param now the moment to hold the notice against
+		 * @return {@code true} when the route is announcing a maintenance to come
+		 */
+		public boolean isNoticeAt(Instant now) {
+			if (this.notice == null || this.start == null) {
+				return false;
+			}
+			Instant opens = this.start.toInstant();
+			return !now.isBefore(opens.minus(this.notice)) && now.isBefore(opens);
+		}
+
+		/**
+		 * Whether a notice has a start to count back from. A notice on a window that is
+		 * already open announces nothing, so it is rejected rather than left as a warning
+		 * nobody would ever receive.
+		 * @return {@code true} when the notice is answerable
+		 */
+		@AssertTrue(message = "the maintenance notice needs a start to count back from")
+		public boolean isNoticeScheduled() {
+			return this.notice == null || this.start != null;
 		}
 
 		/**

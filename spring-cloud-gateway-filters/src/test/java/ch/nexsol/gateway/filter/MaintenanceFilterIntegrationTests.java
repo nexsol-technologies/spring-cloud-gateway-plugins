@@ -16,6 +16,11 @@
 
 package ch.nexsol.gateway.filter;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+
 import ch.nexsol.gateway.filter.factory.MaintenanceGatewayFilterFactory;
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +29,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT;
 
@@ -36,6 +43,19 @@ import static org.springframework.boot.test.context.SpringBootTest.WebEnvironmen
 @DirtiesContext
 @ActiveProfiles(profiles = "maintenance")
 class MaintenanceFilterIntegrationTests extends BaseWebClientTests {
+
+	/**
+	 * A maintenance a day out, so the three day notice of the {@code maintenance-notice}
+	 * route is running whenever the test runs.
+	 */
+	private static final OffsetDateTime NOTICED_START = OffsetDateTime.now(ZoneOffset.UTC)
+		.plusDays(1)
+		.truncatedTo(ChronoUnit.SECONDS);
+
+	@DynamicPropertySource
+	static void noticedWindow(DynamicPropertyRegistry registry) {
+		registry.add("test.maintenance.start", () -> NOTICED_START.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+	}
 
 	@Test
 	void shouldAnswerTheMaintenanceBodyWhileTheWindowIsOpen() {
@@ -56,6 +76,31 @@ class MaintenanceFilterIntegrationTests extends BaseWebClientTests {
 			.isEqualTo("2025-09-01T22:00:00Z")
 			.jsonPath("$.end")
 			.isEqualTo("2125-09-02T02:00:00Z");
+	}
+
+	/**
+	 * The notice informs without obstructing: the route answers as it always does, and
+	 * the announcement rides along in headers. The message is percent-encoded UTF-8,
+	 * since a header value is US-ASCII and the accent would not survive otherwise.
+	 */
+	@Test
+	void shouldAnnounceTheWindowWithoutTouchingTheAnswer() {
+		this.testClient.get()
+			.uri("/maintenance-notice")
+			.header("Host", "www.maintenance.ch")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectHeader()
+			.valueEquals(MaintenanceGatewayFilterFactory.START_HEADER,
+					NOTICED_START.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+			.expectHeader()
+			.exists(MaintenanceGatewayFilterFactory.SUNSET_HEADER)
+			.expectHeader()
+			.valueEquals(MaintenanceGatewayFilterFactory.MESSAGE_HEADER, "Maintenance%20pr%C3%A9vue.")
+			.expectBody()
+			.jsonPath("$.reached")
+			.isEqualTo(true);
 	}
 
 	@Test

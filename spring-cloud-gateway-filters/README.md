@@ -77,6 +77,7 @@ spring.cloud.gateway.server.webflux.routes:
       - name: Maintenance
         args:
           message: The shop is closed until 4am.
+          notice: 3d
           start: 2126-09-01T22:00:00Z
           end: 2126-09-02T02:00:00+02:00
           status: 593
@@ -89,9 +90,10 @@ spring.cloud.gateway.server.webflux.routes:
 
 | Argument | Default | What it does |
 | --- | --- | --- |
-| `message` | `This service is temporarily unavailable for maintenance.` | The text the body carries |
+| `message` | `This service is temporarily unavailable for maintenance.` | The text the body carries, and the notice announces; at most 512 characters |
 | `start` | — | When the window opens, inclusive; unset means it is already open |
 | `end` | — | When the window closes, exclusive; unset means it lasts until the configuration says otherwise |
+| `notice` | — | How long before `start` the maintenance is announced; unset announces nothing |
 | `status` | `593` | The status answered while the window is open, from 400 to 599 |
 | `allowed-authorities` | `[]` | Authorities lifting the maintenance for their holder; holding any one is enough |
 | `allowed-claims` | `[]` | Claims lifting the maintenance for their holder |
@@ -125,6 +127,67 @@ would be a return date the gateway invented.
 `593` is not a status HTTP defines, which is the point &mdash; it separates a planned
 outage from the `503` an overloaded or unreachable backend produces. Any status from 400 to
 599 is accepted.
+
+### Announcing it in advance
+
+`notice` announces the maintenance for a duration before it begins — `3d`, `72h` or `PT72H`,
+the way Spring reads a duration anywhere else. Throughout that period **the route is served
+exactly as it always was**: same status, same payload, the request forwarded untouched. The
+announcement rides along in response headers, which is the one channel that informs without
+altering what the caller asked for.
+
+```console
+HTTP/1.1 200 OK
+content-type: application/json
+sunset: Sun, 01 Sep 2126 22:00:00 GMT
+x-maintenance-start: 2126-09-01T22:00:00Z
+x-maintenance-end: 2126-09-02T02:00:00+02:00
+x-maintenance-message: The%20shop%20is%20closed%20until%204am.
+
+{ ... the answer of the route, untouched ... }
+```
+
+| Header | What it carries |
+| --- | --- |
+| `Sunset` | The start of the window as an HTTP-date, per RFC 8594 |
+| `x-maintenance-start` | The start, as it was written |
+| `x-maintenance-end` | The end, as it was written; absent when the window has none |
+| `x-maintenance-message` | The message, percent-encoded UTF-8 |
+
+> **The message is percent-encoded.** A header value is US-ASCII, so a message carrying an
+> accent would reach the browser mangled. One call reads it back:
+> ```js
+> decodeURIComponent(response.headers.get('x-maintenance-message'))
+> ```
+
+Encoding leaves only the unreserved set of RFC 3986 — `A-Za-z0-9-._~` and the percent sign —
+so **nothing a message contains can end the header and start another one**: a newline, a
+colon or a quote in the YAML travels as `%0A`, `%3A`, `%22`. The same holds of the body,
+which is rendered as JSON rather than concatenated.
+
+The message is capped at 512 characters for the same channel: a client reads a bounded header
+block, 8 KB for Netty, and percent encoding costs up to twelve characters per character. A
+message past the cap is rejected when the route is built, rather than costing the caller the
+whole response on the day the maintenance is announced.
+
+### Displaying the message
+
+**Insert it as text, never as markup.** Neither channel strips anything — a message is
+delivered exactly as it was configured, markup and all, because the gateway has no idea what
+it will be rendered into:
+
+```js
+banner.textContent = decodeURIComponent(response.headers.get('x-maintenance-message'));
+// not banner.innerHTML — the message is content, not markup
+```
+
+That matters wherever the route definitions are not written by the same people who own the
+front end: with [routes-database](../spring-cloud-gateway-routes/spring-cloud-gateway-routes-database/README.md)
+a route, and its message, is editable from the console.
+
+A notice counts back from `start` and is rejected without one: there would be no moment to
+count back from. It stops where the window opens, since from there the route answers the
+maintenance itself.
 
 ### The window
 

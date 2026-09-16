@@ -16,8 +16,11 @@
 
 package ch.nexsol.gateway.filter.factory;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -205,6 +208,200 @@ class MaintenanceGatewayFilterFactoryTests {
 		config.setStart("2025-09-02T00:30:00+02:00");
 
 		expectClosed(config, anonymousExchange());
+	}
+
+	/**
+	 * The point of the notice: the request reaches the route untouched. The status and
+	 * the payload are whatever the route answers, and the announcement travels beside
+	 * them.
+	 */
+	@Test
+	void shouldForwardWithoutTouchingTheAnswerWhileTheNoticeRuns() {
+		Config config = noticedMaintenance();
+
+		MockServerWebExchange exchange = anonymousExchange();
+		expectForwarded(config, exchange);
+
+		assertThat(exchange.getResponse().getStatusCode()).isNull();
+		// Nothing was written: the gateway set neither of the two headers it has to set
+		// to answer a body of its own.
+		assertThat(exchange.getResponse().getHeaders().getContentType()).isNull();
+		assertThat(exchange.getResponse().getHeaders().getContentLength()).isEqualTo(-1);
+	}
+
+	@Test
+	void shouldAnnounceTheWindowWhileTheNoticeRuns() {
+		Config config = noticedMaintenance();
+
+		MockServerWebExchange exchange = anonymousExchange();
+		expectForwarded(config, exchange);
+
+		HttpHeaders headers = exchange.getResponse().getHeaders();
+		assertThat(headers.getFirst(MaintenanceGatewayFilterFactory.SUNSET_HEADER))
+			.isEqualTo("Thu, 04 Sep 2025 22:00:00 GMT");
+		assertThat(headers.getFirst(MaintenanceGatewayFilterFactory.START_HEADER)).isEqualTo("2025-09-04T22:00:00Z");
+		assertThat(headers.getFirst(MaintenanceGatewayFilterFactory.END_HEADER)).isEqualTo("2025-09-05T02:00:00Z");
+	}
+
+	/**
+	 * A header value is US-ASCII, so the message is percent-encoded UTF-8 on the way out
+	 * &mdash; what a browser reads back with a single {@code decodeURIComponent}.
+	 */
+	@Test
+	void shouldPercentEncodeAnAnnouncedMessageCarryingAnAccent() {
+		Config config = noticedMaintenance();
+		config.setMessage("Maintenance le 5 à 0h.");
+
+		MockServerWebExchange exchange = anonymousExchange();
+		expectForwarded(config, exchange);
+
+		String encoded = exchange.getResponse().getHeaders().getFirst(MaintenanceGatewayFilterFactory.MESSAGE_HEADER);
+		assertThat(encoded).isEqualTo("Maintenance%20le%205%20%C3%A0%200h.");
+		assertThat(URLDecoder.decode(encoded, StandardCharsets.UTF_8)).isEqualTo("Maintenance le 5 à 0h.");
+	}
+
+	/**
+	 * A header value is built from the message a route configures, so nothing the message
+	 * contains may end the header and start another one. Percent encoding leaves only the
+	 * unreserved set of RFC 3986, which holds neither CR, LF nor a colon: the injected
+	 * header below travels as inert text.
+	 */
+	@Test
+	void shouldLeaveNothingInTheMessageAbleToForgeAHeader() {
+		Config config = noticedMaintenance();
+		config.setMessage("Fermé\r\nX-Injected: evil\nligne 2 <script>alert('xss')</script> & \"quoted\"");
+
+		MockServerWebExchange exchange = anonymousExchange();
+		expectForwarded(config, exchange);
+
+		HttpHeaders headers = exchange.getResponse().getHeaders();
+		assertThat(headers.getFirst(MaintenanceGatewayFilterFactory.MESSAGE_HEADER)).matches("[A-Za-z0-9\\-._~%]*");
+		assertThat(headers.headerNames()).doesNotContain("X-Injected");
+	}
+
+	/**
+	 * Nothing is stripped on the way through: the message reaches the caller as it was
+	 * written, which is why it has to be inserted as text rather than as markup.
+	 */
+	@Test
+	void shouldCarryMarkupInTheMessageThroughUnchanged() {
+		Config config = noticedMaintenance();
+		config.setMessage("<b>Fermé</b>");
+
+		MockServerWebExchange exchange = anonymousExchange();
+		expectForwarded(config, exchange);
+
+		String encoded = exchange.getResponse().getHeaders().getFirst(MaintenanceGatewayFilterFactory.MESSAGE_HEADER);
+		assertThat(URLDecoder.decode(encoded, StandardCharsets.UTF_8)).isEqualTo("<b>Fermé</b>");
+	}
+
+	/**
+	 * The message travels as a header during a notice, and a client reads a bounded
+	 * header block: a message long enough to overflow it would cost the caller the whole
+	 * response.
+	 */
+	@Test
+	void shouldRejectAMessageLongerThanAHeaderCanCarry() {
+		Config config = new Config();
+		config.setMessage("é".repeat(MaintenanceGatewayFilterFactory.MAX_MESSAGE_LENGTH + 1));
+
+		Set<ConstraintViolation<Config>> violations = validator.validate(config);
+
+		assertThat(violations).singleElement()
+			.satisfies((violation) -> assertThat(violation.getPropertyPath()).hasToString("message"));
+	}
+
+	@Test
+	void shouldAnnounceNoEndWhenTheWindowHasNone() {
+		Config config = new Config();
+		config.setStart("2025-09-04T22:00:00Z");
+		config.setNotice("3d");
+
+		MockServerWebExchange exchange = anonymousExchange();
+		expectForwarded(config, exchange);
+
+		assertThat(exchange.getResponse().getHeaders().headerNames())
+			.doesNotContain(MaintenanceGatewayFilterFactory.END_HEADER);
+	}
+
+	@Test
+	void shouldStaySilentBeforeTheNoticeBegins() {
+		Config config = new Config();
+		config.setStart("2025-09-04T22:00:00Z");
+		config.setNotice("1h");
+
+		MockServerWebExchange exchange = anonymousExchange();
+		expectForwarded(config, exchange);
+
+		assertThat(exchange.getResponse().getHeaders().headerNames()).isEmpty();
+	}
+
+	/**
+	 * The notice stops where the window opens: from there on the route answers the
+	 * maintenance itself, and announcing it beside a 593 would say it twice.
+	 */
+	@Test
+	void shouldStopAnnouncingOnceTheWindowIsOpen() {
+		Config config = new Config();
+		config.setStart("2025-09-01T22:00:00Z");
+		config.setEnd("2025-09-02T02:00:00Z");
+		config.setNotice("3d");
+
+		MockServerWebExchange exchange = anonymousExchange();
+		expectClosed(config, exchange);
+
+		assertThat(exchange.getResponse().getHeaders().headerNames())
+			.doesNotContain(MaintenanceGatewayFilterFactory.START_HEADER);
+	}
+
+	@Test
+	void shouldStaySilentOnceTheWindowHasClosed() {
+		Config config = new Config();
+		config.setStart("2025-08-30T22:00:00Z");
+		config.setEnd("2025-08-31T02:00:00Z");
+		config.setNotice("30d");
+
+		MockServerWebExchange exchange = anonymousExchange();
+		expectForwarded(config, exchange);
+
+		assertThat(exchange.getResponse().getHeaders().headerNames()).isEmpty();
+	}
+
+	@Test
+	void shouldReadANoticeInEitherDurationSyntax() {
+		Config simple = new Config();
+		simple.setNotice("3d");
+		Config iso = new Config();
+		iso.setNotice("PT72H");
+
+		assertThat(simple.getNotice()).isEqualTo(Duration.ofDays(3)).isEqualTo(iso.getNotice());
+	}
+
+	@Test
+	void shouldRejectANoticeThatIsNotADuration() {
+		assertThatIllegalArgumentException().isThrownBy(() -> new Config().setNotice("three days"))
+			.withMessageContaining("is not a valid 'notice'");
+	}
+
+	@Test
+	void shouldRejectANoticeThatDoesNotRunBackwards() {
+		assertThatIllegalArgumentException().isThrownBy(() -> new Config().setNotice("0s"))
+			.withMessageContaining("has to be positive");
+	}
+
+	/**
+	 * A notice on a window that is already open announces nothing: without a start there
+	 * is no moment to count back from.
+	 */
+	@Test
+	void shouldRejectANoticeWithoutAStart() {
+		Config config = new Config();
+		config.setNotice("3d");
+
+		Set<ConstraintViolation<Config>> violations = validator.validate(config);
+
+		assertThat(violations).singleElement()
+			.satisfies((violation) -> assertThat(violation.getPropertyPath()).hasToString("noticeScheduled"));
 	}
 
 	@Test
@@ -460,6 +657,17 @@ class MaintenanceGatewayFilterFactoryTests {
 		assertThat(this.forwarded).isFalse();
 		assertThat(exchange.getResponse().getStatusCode())
 			.isEqualTo(HttpStatusCode.valueOf(MaintenanceGatewayFilterFactory.DEFAULT_STATUS));
+	}
+
+	/**
+	 * A maintenance three days out, with the clock sitting one day into its notice.
+	 */
+	private static Config noticedMaintenance() {
+		Config config = new Config();
+		config.setStart("2025-09-04T22:00:00Z");
+		config.setEnd("2025-09-05T02:00:00Z");
+		config.setNotice("3d");
+		return config;
 	}
 
 	private GatewayFilter filter(Config config) {

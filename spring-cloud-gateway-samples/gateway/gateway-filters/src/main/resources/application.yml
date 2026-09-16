@@ -85,6 +85,23 @@ spring.cloud.gateway.server.webflux:
         end: 2125-09-02T04:00:00+02:00
     - StripPrefix=1
 
+  # Pre-maintenance: for the duration of the notice before the window opens, the route is
+  # served exactly as it always was — 200 and the payload of service-a — and the answer
+  # carries the window in its headers. The notice here runs from 2017 to 2126 so the sample
+  # is always in it whichever day you run it; a real one reads 'notice: 3d'.
+  - id: maintenance_notice
+    uri: http://localhost:8080
+    predicates:
+    - Path=/maintenance-notice/**
+    filters:
+    - name: Maintenance
+      args:
+        message: Maintenance prévue le 1er septembre.
+        notice: 40000d
+        start: 2126-09-01T22:00:00Z
+        end: 2126-09-02T02:00:00Z
+    - StripPrefix=1
+
   # A planned maintenance: the window opens in 2125, so the route is served normally until
   # then. Both bounds carry their offset — a value without one is rejected on startup.
   - id: maintenance_planned
