@@ -534,14 +534,20 @@ public class GatewayUiAutoConfiguration {
 		/**
 		 * The instances a view can be pointed at, read from whichever source the metrics
 		 * plugin resolved.
+		 * <p>
+		 * The identity is declared by the metrics and service graph plugins, and by
+		 * nobody else. A gateway running neither &mdash; both switched off, or neither on
+		 * the classpath &mdash; still serves these views, and they still have to name the
+		 * instance answering them, so one is resolved here rather than asked for. Asked
+		 * for, it would fail the context of every such gateway at start-up.
 		 * @param metricsSource the provider over the instance metrics source
-		 * @param identity the identity of the running instance
+		 * @param identity the provider over the identity of the running instance
 		 * @return the directory
 		 */
 		@Bean
 		ActuatorInstances actuatorInstances(ObjectProvider<InstanceMetricsSource> metricsSource,
-				InstanceIdentity identity) {
-			return new ActuatorInstances(metricsSource, identity);
+				ObjectProvider<InstanceIdentity> identity) {
+			return new ActuatorInstances(metricsSource, identity.getIfAvailable(() -> new InstanceIdentity(null)));
 		}
 
 		/**
