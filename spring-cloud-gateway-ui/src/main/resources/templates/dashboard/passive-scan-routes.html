@@ -3,13 +3,8 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Route scores', ~{:: #psr-content}, ~{:: #psr-scripts})}">
 <body>
 	<div id="psr-content">
-		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1">Route scores</h1>
-			<p class="text-secondary mb-0">
-				A security score per route, from the passive findings raised on it, worst first. A route with
-				no finding scores 100. Click a route to see the findings behind its score.
-			</p>
-		</header>
+		<div th:replace="~{dashboard/fragments/view-band :: band('icon-award', 'Route scores',
+				'A security score per route, from the passive findings raised on it, worst first. A route with no finding scores 100. Click a route to see the findings behind its score.', '')}"></div>
 
 		<div class="card border-0 shadow-sm mb-4">
 			<div class="card-body d-flex align-items-center gap-4">

@@ -3,13 +3,8 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Audit', ~{:: #audit-content}, ~{:: #audit-scripts})}">
 <body>
 	<div id="audit-content">
-		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1">Audit</h1>
-			<p class="text-secondary mb-0">
-				The exchanges the audit plugin captured, newest first. Click a row for every audited
-				attribute.
-			</p>
-		</header>
+		<div th:replace="~{dashboard/fragments/view-band :: band('icon-list', 'Audit',
+				'The exchanges the audit plugin captured, newest first. Click a row for every audited attribute.', '')}"></div>
 
 		<div class="card border-0 shadow-sm">
 			<div class="card-body">

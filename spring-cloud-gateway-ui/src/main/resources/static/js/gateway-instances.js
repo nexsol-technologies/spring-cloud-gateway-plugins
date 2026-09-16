@@ -369,8 +369,9 @@
 	}
 
 	function table(instances) {
-		return '<div class="card border-0 shadow-sm"><div class="card-body">'
-			+ '<div class="table-responsive"><table class="table table-sm align-middle mb-0 gw-fleet">'
+		// The card is the page's, not this function's: the controls above the table live in
+		// it and are wired once, so only what is below them is replaced on a refresh.
+		return '<div class="table-responsive"><table class="table table-sm align-middle mb-0 gw-fleet">'
 			// Abbreviated, with the full name in the tooltip: spelled out, four of these
 			// headings are wider than the figures under them, and the table stops fitting
 			// the page — which is the one thing it is here to do.
@@ -383,7 +384,7 @@
 			+ '<th title="Tasks queued across the event loops">Queue</th>'
 			+ '</tr></thead><tbody>'
 			+ instances.map(row).join('')
-			+ '</tbody></table></div></div></div>';
+			+ '</tbody></table></div>';
 	}
 
 	/* Rendering and polling --------------------------------------------------------- */

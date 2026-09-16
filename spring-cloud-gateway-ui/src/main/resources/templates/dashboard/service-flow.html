@@ -3,10 +3,8 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Flow', ~{:: #flow-content}, ~{:: #flow-scripts})}">
 <body>
 	<div id="flow-content">
-		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1">Flow</h1>
-			<p class="text-secondary mb-0">Who reaches the gateway, and what the gateway reaches.</p>
-		</header>
+		<div th:replace="~{dashboard/fragments/view-band :: band('icon-flow', 'Flow',
+				'Who reaches the gateway, and what the gateway reaches.', 'gf-coverage')}"></div>
 
 		<!-- The same figures as the graph, over the same snapshot. -->
 		<div class="row g-3 mb-3">
@@ -119,10 +117,6 @@
 					what reached through the gateway. The graph view merges the two into one node; here
 					they are two ends of a flow, which is what the two columns are for.
 				</div>
-
-				<!-- What this flow covers: one instance, every instance through a provider, or a
-				     tracing backend. Filled from the payload on every poll. -->
-				<p class="text-secondary small mb-2" id="gf-coverage"></p>
 
 				<div id="gf-flow" class="gw-flow"
 						th:attr="data-url=@{/ui/service-graph/data}" data-url="/ui/service-graph/data"></div>

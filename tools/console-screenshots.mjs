@@ -36,6 +36,11 @@ import { join } from 'node:path';
  * The views the READMEs embed, in the order they are read there. `themes` narrows a view to
  * the drawings that are actually published: the collapsed menu is only ever shown light,
  * since what it demonstrates is the width of the menu and not the palette.
+ *
+ * `width` and `height` are the viewport a view needs, for the few that do not fit the one
+ * every other view is shot in. They belong here rather than in the command line: a run that
+ * has to be repeated with different flags to reproduce the published pictures is a run
+ * nobody repeats correctly, and the drawings come back cropped.
  */
 const VIEWS = [
 	{ name: 'home', path: '/ui' },
@@ -63,11 +68,13 @@ const VIEWS = [
 	{ name: 'service-graph', path: '/ui/service-graph' },
 	{ name: 'service-flow', path: '/ui/service-graph/flow' },
 	{ name: 'insights-configuration', path: '/ui/insights/configuration', themes: ['light'] },
-	{ name: 'insights-profile-diff', path: '/ui/insights/profile-diff', themes: ['light'] },
-	{ name: 'insights-loggers', path: '/ui/insights/loggers', themes: ['light'] },
-	{ name: 'insights-beans', path: '/ui/insights/beans', themes: ['light'] },
-	{ name: 'insights-conditions', path: '/ui/insights/conditions', themes: ['light'] },
-	{ name: 'insights-mappings', path: '/ui/insights/mappings', themes: ['light'] },
+	// The five that list rows rather than cards: a taller frame so the list is long enough
+	// to read as one.
+	{ name: 'insights-profile-diff', path: '/ui/insights/profile-diff', themes: ['light'], height: 1000 },
+	{ name: 'insights-loggers', path: '/ui/insights/loggers', themes: ['light'], height: 1000 },
+	{ name: 'insights-beans', path: '/ui/insights/beans', themes: ['light'], height: 1000 },
+	{ name: 'insights-conditions', path: '/ui/insights/conditions', themes: ['light'], height: 1000 },
+	{ name: 'insights-mappings', path: '/ui/insights/mappings', themes: ['light'], height: 1000 },
 
 	{ name: 'audit', path: '/ui/audit' },
 	{ name: 'openapi', path: '/ui/openapi' },
@@ -75,9 +82,17 @@ const VIEWS = [
 	 * Both security views poll, so the Live switch is turned off before the shot: a redraw
 	 * landing between the layout settling and the capture produces a half-painted table.
 	 */
-	{ name: 'passive-scan', path: '/ui/passive-scan',
+	/*
+	 * The one view published whole rather than as a first screenful: the OWASP coverage
+	 * table, the summary and the findings are read together, and a frame cut under the
+	 * summary hides what the coverage is a coverage of. Narrower with it, so the page keeps
+	 * a shape a reader can take in.
+	 */
+	{ name: 'passive-scan', path: '/ui/passive-scan', width: 1280, height: 1500,
 		prepare: 'var live = document.getElementById("ps-live"); if (live && live.checked) { live.click(); }' },
-	{ name: 'passive-scan-routes', path: '/ui/passive-scan/routes',
+	// The narrower frame of the view it belongs with: its table is a score, a grade and a
+	// route, and a wide frame leaves the counts stranded from the name they belong to.
+	{ name: 'passive-scan-routes', path: '/ui/passive-scan/routes', width: 1280,
 		prepare: 'var live = document.getElementById("psr-live"); if (live && live.checked) { live.click(); }' },
 	// Shown to a signed-in visitor holding none of the required roles. It renders for any
 	// principal, so it is shot with the same session as the rest.
@@ -100,7 +115,7 @@ const options = {
 	password: 'superadmin',
 	views: '',
 	themes: 'light,dark',
-	width: '1280',
+	width: '1600',
 	height: '860',
 	// How long a view is given to draw before it is shot. The traffic chart and the API
 	// reference render once their data has arrived, which is what this waits for.
@@ -274,8 +289,6 @@ try {
 		await cdp.send('Page.enable', {}, sessionId);
 		await cdp.send('Network.enable', {}, sessionId);
 		await cdp.send('Runtime.enable', {}, sessionId);
-		await cdp.send('Emulation.setDeviceMetricsOverride',
-			{ width: Number(options.width), height: Number(options.height), deviceScaleFactor: 1, mobile: false }, sessionId);
 		// The shell reads the system preference when nothing was stored, so emulating the
 		// media feature is enough to draw either theme.
 		await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] }, sessionId);
@@ -284,6 +297,14 @@ try {
 			if (view.themes && !view.themes.includes(theme)) {
 				continue;
 			}
+			// Per view, and before the navigation: a view asking for a frame of its own is
+			// laid out in it from the first paint, rather than reflowed into it afterwards.
+			await cdp.send('Emulation.setDeviceMetricsOverride', {
+				width: Number(view.width ?? options.width),
+				height: Number(view.height ?? options.height),
+				deviceScaleFactor: 1,
+				mobile: false
+			}, sessionId);
 			await cdp.send('Network.clearBrowserCookies', {}, sessionId);
 			if (session && !view.anonymous) {
 				await cdp.send('Network.setCookie',

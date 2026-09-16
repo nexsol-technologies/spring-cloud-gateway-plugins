@@ -49,7 +49,7 @@ overwriting what is there, and prints each file as it goes.
   `insights-conditions`, `insights-mappings`, `passive-scan`, `passive-scan-routes`, `forbidden`,
   `login` |
 | `--themes` | `light,dark` | Which drawings to produce |
-| `--width`, `--height` | `1280`, `860` | The viewport |
+| `--width`, `--height` | `1600`, `860` | The viewport, for the views that do not ask for one of their own |
 | `--settle` | `4000` | Milliseconds a view is given to draw before it is shot |
 | `--port` | `9222` | The Chrome debugging port |
 | `--chrome` | found automatically | Path to the Chrome binary, or set `CHROME` |
@@ -70,6 +70,11 @@ overwriting what is there, and prints each file as it goes.
   shot keeps every row closed, which is the fleet table; the dark one opens them all, for the
   pool tables.
 * **The login page.** Shot without a session, which is the only way to see it.
+* **The frame each view needs.** Most are shot in the viewport above. The five introspection
+  views that list rows take a taller one, and the passive scan view is published whole rather
+  than as a first screenful &mdash; its coverage table, summary and findings are read together.
+  Those sizes live in the `VIEWS` table of the script, so one run reproduces every published
+  drawing; `--width` and `--height` move only the views that ask for nothing else.
 
 ## What it cannot take care of
 

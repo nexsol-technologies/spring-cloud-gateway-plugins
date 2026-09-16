@@ -3,12 +3,9 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Routes', ~{:: #routes-content}, ~{:: #routes-scripts})}">
 <body>
 	<div id="routes-content">
-		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1">Database routes</h1>
-			<p class="text-secondary mb-0" th:unless="${readOnly}">Manage the Spring Cloud Gateway routes stored in the database.</p>
-			<p class="text-secondary mb-0" th:if="${readOnly}">The Spring Cloud Gateway routes stored in the database. This gateway
-				publishes them for reading only.</p>
-		</header>
+		<div th:replace="~{dashboard/fragments/view-band :: band('icon-plugin', 'Database routes',
+				${readOnly} ? 'The Spring Cloud Gateway routes stored in the database. This gateway publishes them for reading only.'
+					: 'Manage the Spring Cloud Gateway routes stored in the database.', '')}"></div>
 
 		<div class="row g-4">
 			<div class="col-12" th:classappend="${readOnly} ? '' : 'col-lg-6'">

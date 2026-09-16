@@ -3,14 +3,8 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Passive scan', ~{:: #ps-content}, ~{:: #ps-scripts})}">
 <body>
 	<div id="ps-content">
-		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1">Passive scan</h1>
-			<p class="text-secondary mb-0">
-				OWASP issues the analyser observed in the live traffic flowing through the gateway. Identical
-				findings are collapsed into one row with an occurrence count. No request is sent by the scan.
-				Click a row for the description, the remediation and the evidence.
-			</p>
-		</header>
+		<div th:replace="~{dashboard/fragments/view-band :: band('icon-shield', 'Passive scan',
+				'OWASP issues the analyser observed in the live traffic flowing through the gateway. Identical findings are collapsed into one row with an occurrence count. No request is sent by the scan. Click a row for the description, the remediation and the evidence.', '')}"></div>
 
 		<div class="row g-3 mb-4">
 			<div class="col-6 col-md">

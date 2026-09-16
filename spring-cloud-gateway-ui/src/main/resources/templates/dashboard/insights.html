@@ -3,10 +3,8 @@
 		th:replace="~{dashboard/fragments/layout :: layout(${'Spring Cloud Gateway — ' + view.label()}, ~{:: #insights-content}, ~{:: #insights-scripts})}">
 <body>
 	<div id="insights-content">
-		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1" th:text="${view.label()}">View</h1>
-			<p class="text-secondary mb-0" th:text="${view.description()}">What it shows.</p>
-		</header>
+		<div th:replace="~{dashboard/fragments/view-band :: band(${view.icon()}, ${view.label()},
+				${view.description()}, '')}"></div>
 
 		<div class="card border-0 shadow-sm">
 			<div class="card-body">

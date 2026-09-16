@@ -295,9 +295,10 @@ exclusion applies to the summary, the map, the table and the home page tiles ali
 
 The other half of the metrics plugin: not which route carries the load, but **which instance
 is in trouble**. Served at `/ui/metrics/instances`, from the same provider as the traffic view
-and under the same coverage line — which is stated in the band, next to how old the figures on
-screen are. That age keeps counting between two refreshes: a poll that stopped answering must
-not leave a view looking live.
+and under the same coverage line, which the band states. How old the figures on screen are is
+written above the table instead, next to the controls that read them again. That age keeps
+counting between two refreshes: a poll that stopped answering must not leave a view looking
+live.
 
 ![The runtime view](doc/instances-light.png)
 
@@ -926,7 +927,8 @@ NavItem routesNavItem() {
 
 Icons reference the SVG sprite declared in `templates/dashboard/fragments/layout.html`
 (`icon-home`, `icon-plugin`, `icon-route`, `icon-target`, `icon-chart`, `icon-book`,
-`icon-list`, `icon-graph`, `icon-flow`, `icon-server`). The built-in entries are ordered
+`icon-list`, `icon-graph`, `icon-flow`, `icon-server`, `icon-shield`, `icon-award`,
+`icon-gauge`). The built-in entries are ordered
 `home` (0), `Routes` (5), `Database routes` (10), `Route tester` (15), `Flow` (19), `Traffic`
 (20), `Metrics` (21), `Service graph` (22), `Hub` (25) and `Audit` (30), leaving room for
 your own in between. A group sits where its first entry would have sat, so `Routing` opens at 5
@@ -969,6 +971,20 @@ sets `activeNav` to its own entry id.
 </body>
 </html>
 ```
+
+**The band a view opens with** — every view starts with the same card: the icon of its menu
+entry in a circle, its name, what it shows, and, for a view reading figures from more than one
+instance, the coverage line its script fills on each refresh. Open the page with the fragment
+rather than a heading of your own:
+
+```html
+<div th:replace="~{dashboard/fragments/view-band :: band('icon-chart', 'Quota',
+        'What each client has left of its allowance.', 'gq-coverage', ~{})}"></div>
+```
+
+The coverage is the **id** of the line, not its text: pass `''` and the line is left out.
+Nothing else belongs in the band: a filter, a refresh, an auto switch go in the card holding
+what they act on, which is where every view puts them.
 
 ## Samples
 

@@ -3,10 +3,8 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Traffic', ~{:: #metrics-content}, ~{:: #metrics-scripts})}">
 <body>
 	<div id="metrics-content">
-		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1">Traffic</h1>
-			<p class="text-secondary mb-0">Which routes carry the load, which ones are slow, and which ones fail.</p>
-		</header>
+		<div th:replace="~{dashboard/fragments/view-band :: band('icon-chart', 'Traffic',
+				'Which routes carry the load, which ones are slow, and which ones fail.', 'gm-coverage')}"></div>
 
 		<!-- Summary of the whole gateway, read before the detail below. -->
 		<div class="row g-3 mb-3">
@@ -147,10 +145,6 @@
 
 				<!-- Plain-language reading guide, rewritten for the selected question. -->
 				<div id="gm-help" class="alert alert-light border py-2 px-3 small text-secondary mb-3 gw-graph-help"></div>
-
-				<!-- Whose traffic this is: one instance, or every instance consolidated by
-				     a metrics provider. Filled from the payload on every refresh. -->
-				<p class="text-secondary small mb-2" id="gm-coverage"></p>
 
 				<div id="gm-chart" class="gw-chart-canvas"
 						style="width: 100%; height: 58vh; min-height: 400px" data-gw-theme-reload

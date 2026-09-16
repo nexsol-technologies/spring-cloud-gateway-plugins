@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+	<!--
+		The band every view opens with: the icon the side menu gives it, its name, what it
+		shows, and &mdash; for the views reading figures &mdash; where those figures came
+		from. A reader deciding whether to trust a number asks those things at once, and the
+		coverage is not a fact about the page but about the reading.
+
+		The coverage is passed as an element id rather than as a text: the script of the view
+		fills it on every refresh. Views with nothing to consolidate pass an empty id and the
+		line is left out.
+
+		Nothing else sits here: what a view offers its reader &mdash; a filter, a refresh, an
+		auto switch &mdash; belongs to the card holding what it acts on.
+	-->
+	<div th:fragment="band(icon, title, subtitle, coverage)" class="card border-0 shadow-sm mb-3">
+		<div class="card-body d-flex flex-wrap gap-3 align-items-center">
+			<div class="d-flex align-items-center gap-3">
+				<span class="gw-band-badge">
+					<svg class="gw-icon"><use th:attr="href='#' + ${icon}" href="#icon-plugin"></use></svg>
+				</span>
+				<div>
+					<h1 class="h4 fw-bold mb-0" th:utext="${title}">View</h1>
+					<p class="text-secondary small mb-0" th:if="${!#strings.isEmpty(subtitle)}"
+							th:utext="${subtitle}">What it shows.</p>
+					<p class="text-secondary small mb-0" th:if="${!#strings.isEmpty(coverage)}"
+							th:id="${coverage}">&mdash;</p>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

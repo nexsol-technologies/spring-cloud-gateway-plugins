@@ -3,21 +3,29 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Home', ~{:: #gw-page}, ~{})}">
 <body>
 	<div id="gw-page">
-		<header class="mb-4 d-flex flex-wrap gap-4 align-items-center">
-			<!-- Two lockups: the tagline of the shipped one is near-black and would be lost
-			     on a dark page, so the dark theme gets a lightened one. -->
-			<img class="gw-home-logo gw-logo-light" th:src="@{/img/logo.png}" src="/img/logo.png"
-					alt="neXsol Spring Cloud Gateway Plugins">
-			<img class="gw-home-logo gw-logo-dark" th:src="@{/img/logo-dark.png}" src="/img/logo-dark.png"
-					alt="" aria-hidden="true">
-			<div>
-				<h1 class="h3 fw-bold mb-1">Spring Cloud Gateway</h1>
-				<p class="text-secondary mb-0">Where the gateway stands right now.</p>
+		<!--
+			The band of the other views, carrying the lockup of the product where they carry the
+			icon of the view: this page names the gateway itself rather than one of its views.
+		-->
+		<div class="card border-0 shadow-sm mb-3">
+			<div class="card-body d-flex flex-wrap gap-3 align-items-center justify-content-between">
+				<div class="d-flex flex-wrap align-items-center gap-4">
+					<!-- Two lockups: the tagline of the shipped one is near-black and would be lost
+					     on a dark page, so the dark theme gets a lightened one. -->
+					<img class="gw-home-logo gw-logo-light" th:src="@{/img/logo.png}" src="/img/logo.png"
+							alt="neXsol Spring Cloud Gateway Plugins">
+					<img class="gw-home-logo gw-logo-dark" th:src="@{/img/logo-dark.png}" src="/img/logo-dark.png"
+							alt="" aria-hidden="true">
+					<div>
+						<h1 class="h4 fw-bold mb-0">Spring Cloud Gateway</h1>
+						<p class="text-secondary small mb-0">Where the gateway stands right now.</p>
+					</div>
+				</div>
+				<div class="text-secondary small">
+					up for <span class="fw-semibold" th:text="${uptime}">—</span>
+				</div>
 			</div>
-			<div class="ms-auto text-secondary small align-self-end">
-				up for <span class="fw-semibold" th:text="${uptime}">—</span>
-			</div>
-		</header>
+		</div>
 
 		<!-- One tile per contributed figure: routes, traffic and audit light up on their own. -->
 		<div class="row g-3 mb-3" th:if="${not #lists.isEmpty(stats)}">

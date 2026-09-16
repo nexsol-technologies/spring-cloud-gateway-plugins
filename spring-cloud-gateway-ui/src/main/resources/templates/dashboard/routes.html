@@ -3,13 +3,8 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Routes', ~{:: #routes-content}, ~{:: #routes-scripts})}">
 <body>
 	<div id="routes-content">
-		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1">Routes</h1>
-			<p class="text-secondary mb-0">
-				Every route the gateway resolves, and the source it comes from &mdash; so you can tell
-				which configuration actually won.
-			</p>
-		</header>
+		<div th:replace="~{dashboard/fragments/view-band :: band('icon-route', 'Routes',
+				'Every route the gateway resolves, and the source it comes from &mdash; so you can tell which configuration actually won.', '')}"></div>
 
 		<div class="card border-0 shadow-sm">
 			<div class="card-body">

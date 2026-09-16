@@ -3,24 +3,23 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — OpenAPI', ~{:: #openapi-content}, ~{:: #openapi-scripts})}">
 <body>
 	<div id="openapi-content">
-		<header class="mb-4 d-flex flex-wrap gap-3 align-items-start">
-			<div>
-				<h1 class="h3 fw-bold mb-1">OpenAPI</h1>
-				<p class="text-secondary mb-0">The contracts aggregated by the hub, served through the gateway:
-					pick a service, read its operations, and call them from here.</p>
-			</div>
-			<div class="ms-auto d-flex align-items-center gap-3">
-				<span class="text-secondary small" id="gw-openapi-count"></span>
-				<div class="form-check form-switch mb-0">
-					<input class="form-check-input" type="checkbox" role="switch" id="gw-openapi-auto" checked>
-					<label class="form-check-label small" for="gw-openapi-auto">Auto</label>
-				</div>
-				<button type="button" id="gw-openapi-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
-			</div>
-		</header>
+		<div th:replace="~{dashboard/fragments/view-band :: band('icon-book', 'OpenAPI',
+				'The contracts aggregated by the hub, served through the gateway: pick a service, read its operations, and call them from here.',
+				'')}"></div>
 
 		<div class="card border-0 shadow-sm">
 			<div class="card-body p-0">
+				<!-- Padded on its own: the card body carries none, so that Scalar below fills it
+				     edge to edge. -->
+				<div class="d-flex gap-3 align-items-center justify-content-end px-3 pt-3 pb-2">
+					<span class="text-secondary small" id="gw-openapi-count"></span>
+					<div class="form-check form-switch mb-0">
+						<input class="form-check-input" type="checkbox" role="switch" id="gw-openapi-auto" checked>
+						<label class="form-check-label small" for="gw-openapi-auto">Auto</label>
+					</div>
+					<button type="button" id="gw-openapi-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
+				</div>
+
 				<!-- Scalar renders the reference in place, from the contracts listed by SpringDoc. -->
 				<div id="gw-openapi" style="min-height: 70vh" data-gw-theme-reload
 						th:attr="data-config-url=${openapiConfigUrl}, data-document-url=${openapiDocumentUrl},

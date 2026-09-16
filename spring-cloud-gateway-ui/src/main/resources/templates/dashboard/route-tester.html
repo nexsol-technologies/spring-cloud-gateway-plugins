@@ -3,13 +3,8 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Route tester', ~{:: #tester-content}, ~{})}">
 <body>
 	<div id="tester-content">
-		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1">Route tester</h1>
-			<p class="text-secondary mb-0">
-				Describe a request and see which route would handle it, predicate by predicate.
-				Nothing is sent downstream.
-			</p>
-		</header>
+		<div th:replace="~{dashboard/fragments/view-band :: band('icon-target', 'Route tester',
+				'Describe a request and see which route would handle it, predicate by predicate. Nothing is sent downstream.', '')}"></div>
 
 		<div class="card border-0 shadow-sm mb-3">
 			<div class="card-body">

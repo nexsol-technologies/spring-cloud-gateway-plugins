@@ -3,10 +3,8 @@
 		th:replace="~{dashboard/fragments/layout :: layout('Spring Cloud Gateway — Service graph', ~{:: #graph-content}, ~{:: #graph-scripts})}">
 <body>
 	<div id="graph-content">
-		<header class="mb-4">
-			<h1 class="h3 fw-bold mb-1">Service graph</h1>
-			<p class="text-secondary mb-0">Who calls what, and how often it fails.</p>
-		</header>
+		<div th:replace="~{dashboard/fragments/view-band :: band('icon-graph', 'Service graph',
+				'Who calls what, and how often it fails.', 'gg-coverage')}"></div>
 
 		<!-- Summary of the whole graph, read before the drawing below. -->
 		<div class="row g-3 mb-3">
@@ -110,10 +108,6 @@
 					them. A caller it could not name &mdash; no client claim in a token, no caller header
 					&mdash; is drawn as <code>unknown</code>.
 				</div>
-
-				<!-- What this graph covers: one instance, every instance through a provider, or a
-				     tracing backend. Filled from the payload on every refresh. -->
-				<p class="text-secondary small mb-2" id="gg-coverage"></p>
 
 				<div id="gg-chart" class="gw-chart-canvas"
 						style="width: 100%; height: 62vh; min-height: 420px" data-gw-theme-reload

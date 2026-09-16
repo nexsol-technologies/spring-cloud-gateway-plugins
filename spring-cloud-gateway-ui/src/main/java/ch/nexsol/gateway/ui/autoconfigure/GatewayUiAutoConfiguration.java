@@ -804,7 +804,7 @@ public class GatewayUiAutoConfiguration {
 
 		@Bean
 		NavItem passiveScanRoutesNavItem() {
-			return new NavItem("passive-scan-routes", "Route scores", "icon-chart", "/ui/passive-scan/routes", 31,
+			return new NavItem("passive-scan-routes", "Route scores", "icon-award", "/ui/passive-scan/routes", 31,
 					SECURITY);
 		}
 
