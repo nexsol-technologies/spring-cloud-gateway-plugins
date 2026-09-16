@@ -33,7 +33,7 @@ alone.
 
 | Plugin | What it does |
 | --- | --- |
-| [ui](spring-cloud-gateway-ui/README.md) | A Spring Boot Admin-like console under `/ui`: the resolved routes and the source each came from, a route tester, a traffic chart, the health of every instance, a service graph, a live audit tail, and the OWASP findings with a security score per route. Also where the HTTP endpoints of the other plugins are governed |
+| [ui](spring-cloud-gateway-ui/README.md) | A web console under `/ui`: the resolved routes and the source each came from, a route tester, a traffic chart, the health of every instance, a service graph, a live audit tail, and the OWASP findings with a security score per route. Also where the HTTP endpoints of the other plugins are governed |
 | [routes](spring-cloud-gateway-routes/README.md) | Route definitions from pluggable sources aggregated into one locator: a database (with a management view), JSON/YAML files, a Config Server, OpenAPI contracts |
 | [filters](spring-cloud-gateway-filters/README.md) | `Authorization`, `ConvertHttpMethod`, `CorrelationId`, `IdentityPropagation`, `Maintenance` and `Recaptcha` |
 | [oauth2](spring-cloud-gateway-oauth2/README.md) | Multi-tenant authentication, JWT validation, Basic-to-Bearer exchange, and the `AuthorizationToken` filter validating an access token per route |

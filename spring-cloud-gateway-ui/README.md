@@ -1,6 +1,6 @@
 # spring-cloud-gateway-ui
 
-A Spring Boot Admin-like web console for Spring Cloud Gateway, served under `/ui`. Each
+A web console for Spring Cloud Gateway, served under `/ui`. Each
 plugin lights up its own view automatically when it is present on the classpath, and this is
 also where the HTTP endpoints of the other plugins are governed.
 
