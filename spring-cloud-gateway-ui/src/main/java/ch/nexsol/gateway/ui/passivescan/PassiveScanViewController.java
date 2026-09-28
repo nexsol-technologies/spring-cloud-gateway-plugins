@@ -109,8 +109,9 @@ public class PassiveScanViewController {
 			return true;
 		}
 		return contains(finding.scannerId(), needle) || contains(finding.title(), needle)
-				|| contains(finding.path(), needle) || contains(finding.detail(), needle)
-				|| contains(finding.category().getCode(), needle) || contains(finding.cwe(), needle);
+				|| contains(finding.path(), needle) || contains(finding.routeId(), needle)
+				|| contains(finding.detail(), needle) || contains(finding.category().getCode(), needle)
+				|| contains(finding.cwe(), needle);
 	}
 
 	private static boolean contains(String value, String needle) {

@@ -596,12 +596,12 @@ found in the live traffic, grouped under **Security** in the menu.
 ![The passive scan view](doc/passive-scan-light.png)
 
 **Passive scan** lists the findings, collapsed to one row per distinct problem with an
-occurrence count, newest first: severity, OWASP API category, CWE, scanner, method, path and
-title. A row expands into the rule id and confidence, the description, the remediation, a link
-to the reference and the evidence the scanner recorded. Filter by severity and search across
-scanner, title, path, category, CWE and description; the **Live** switch polls every 3 seconds.
-Above the table, a matrix shows which of the OWASP API Top 10 categories passive analysis can
-and cannot reach.
+occurrence count, newest first: severity, OWASP API category, CWE, scanner, method, route, path
+and title. A row expands into the rule id and confidence, the description, the remediation, a
+link to the reference and the evidence the scanner recorded. Filter by severity and search
+across scanner, title, route, path, category, CWE and description; the **Live** switch polls
+every 3 seconds. Above the table, a matrix shows which of the OWASP API Top 10 categories
+passive analysis can and cannot reach.
 
 ![The route scores view](doc/passive-scan-routes-light.png)
 

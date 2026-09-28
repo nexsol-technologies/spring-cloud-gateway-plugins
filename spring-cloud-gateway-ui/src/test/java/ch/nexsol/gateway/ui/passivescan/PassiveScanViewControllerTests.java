@@ -71,6 +71,36 @@ class PassiveScanViewControllerTests {
 	}
 
 	@Test
+	void findsByRouteId() {
+		InMemoryFindingStore store = new InMemoryFindingStore(100);
+		store.record(finding(Severity.CRITICAL));
+		client(store).get()
+			.uri("/ui/passive-scan/findings?query=route-x")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody()
+			.jsonPath("$.length()")
+			.isEqualTo(1)
+			.jsonPath("$[0].routeId")
+			.isEqualTo("route-x");
+	}
+
+	@Test
+	void ignoresAQueryMatchingNoRoute() {
+		InMemoryFindingStore store = new InMemoryFindingStore(100);
+		store.record(finding(Severity.CRITICAL));
+		client(store).get()
+			.uri("/ui/passive-scan/findings?query=route-y")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody()
+			.jsonPath("$.length()")
+			.isEqualTo(0);
+	}
+
+	@Test
 	void filtersBySeverity() {
 		InMemoryFindingStore store = new InMemoryFindingStore(100);
 		store.record(finding(Severity.CRITICAL));
