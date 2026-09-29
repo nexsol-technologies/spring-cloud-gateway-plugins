@@ -365,7 +365,7 @@ public class GatewayUiSecurityAutoConfiguration {
 	/**
 	 * Renames the session cookie of the console, so that a {@code Set-Cookie: SESSION=}
 	 * coming back from any service the gateway routes to cannot land on the browser as
-	 * the cookie of the console.
+	 * the cookie of the console, and gives it a {@code SameSite}.
 	 * @param environment the environment the cookie settings of the application are read
 	 * from
 	 * @return the post-processor naming the cookie
@@ -373,7 +373,8 @@ public class GatewayUiSecurityAutoConfiguration {
 	@Bean
 	@ConditionalOnProperty(prefix = SECURITY_PREFIX, name = "mode", havingValue = "authenticated")
 	static UiSessionCookieName gatewayUiSessionCookieName(Environment environment) {
-		return new UiSessionCookieName(environment.getProperty("server.reactive.session.cookie.name"));
+		return new UiSessionCookieName(environment.getProperty("server.reactive.session.cookie.name"),
+				environment.getProperty("server.reactive.session.cookie.same-site"));
 	}
 
 	/**
