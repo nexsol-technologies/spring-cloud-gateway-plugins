@@ -35,6 +35,7 @@ import ch.nexsol.gateway.ui.audit.AuditOverviewContribution;
 import ch.nexsol.gateway.ui.audit.AuditTailBeanPostProcessor;
 import ch.nexsol.gateway.ui.audit.AuditTailBuffer;
 import ch.nexsol.gateway.ui.audit.AuditTailController;
+import ch.nexsol.gateway.ui.branding.GatewayUiBrandingProperties;
 import ch.nexsol.gateway.ui.controller.DashboardController;
 import ch.nexsol.gateway.ui.controller.GatewayUiModelAttributes;
 import ch.nexsol.gateway.ui.insights.ActuatorClient;
@@ -104,6 +105,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  */
 @AutoConfiguration(after = MetricsAutoConfiguration.class,
 		afterName = "ch.nexsol.gateway.database.autoconfigure.GatewayDatabaseAutoConfiguration")
+@EnableConfigurationProperties(GatewayUiBrandingProperties.class)
 @Import({ DashboardController.class, GatewayUiModelAttributes.class })
 public class GatewayUiAutoConfiguration {
 
@@ -186,17 +188,23 @@ public class GatewayUiAutoConfiguration {
 	/**
 	 * Declares the assets every page loads, the login page included. They stay reachable
 	 * without a principal whatever the console does: a login page painted with assets
-	 * that are themselves behind the login has nothing to paint with.
+	 * that are themselves behind the login has nothing to paint with. The logo the
+	 * application configured in place of the lockup is one of them when the application
+	 * serves it itself.
+	 * @param branding the logo configured in place of the lockup
 	 * @return the shell asset paths
 	 */
 	@Bean
-	public SecuredPaths shellAssetPaths() {
+	public SecuredPaths shellAssetPaths(GatewayUiBrandingProperties branding) {
 		// The minified Bootstrap files carry a sourceMappingURL, so a browser with its
 		// developer tools open requests maps this module does not ship. Declared so those
 		// requests answer as the 404 they are, and stay out of the audit trail.
-		return SecuredPaths.open("/css/bootstrap.min.css", "/css/bootstrap.min.css.map", "/css/gateway-ui.css",
-				"/js/htmx.min.js", "/js/bootstrap.bundle.min.js", "/js/bootstrap.bundle.min.js.map",
-				"/js/gateway-ui.js", "/img/logo.png", "/img/logo-dark.png", "/img/icon.png");
+		List<String> paths = new ArrayList<>(
+				List.of("/css/bootstrap.min.css", "/css/bootstrap.min.css.map", "/css/gateway-ui.css",
+						"/js/htmx.min.js", "/js/bootstrap.bundle.min.js", "/js/bootstrap.bundle.min.js.map",
+						"/js/gateway-ui.js", "/img/logo.png", "/img/logo-dark.png", "/img/icon.png"));
+		paths.addAll(branding.servedPaths());
+		return SecuredPaths.open(paths.toArray(String[]::new));
 	}
 
 	/**

@@ -74,7 +74,11 @@ class GatewayUiLocalLoginTests {
 				.contains("name=\"password\"")
 				.contains("name=\"_csrf\"")
 				// No provider is registered here, so no button and no divider.
-				.doesNotContain("/oauth2/authorization/"));
+				.doesNotContain("/oauth2/authorization/")
+				// No logo configured in place of the lockup: the lockup, and no
+				// signature.
+				.contains("/img/logo.png")
+				.doesNotContain("gw-login-signature"));
 	}
 
 	@Test

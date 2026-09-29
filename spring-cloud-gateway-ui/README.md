@@ -63,6 +63,11 @@ spring.cloud.gateway.server.webflux.ui:
     extensions:
       x-roles: Required roles
       x-from-application-version: Since
+  # Your own logo on the login page and the home page, in place of the neXsol lockup.
+  branding:
+    logo: /img/acme.png
+    logo-dark: /img/acme-dark.png
+    name: Acme
 ```
 
 | Property | Default | What it does |
@@ -70,6 +75,9 @@ spring.cloud.gateway.server.webflux.ui:
 | `...ui.security-chain-enabled` | `true` | Whether the plugin contributes its own `SecurityWebFilterChain` |
 | `...ui.openapi.try-it` | `true` | Whether the OpenAPI view offers to call the operations it documents |
 | `...ui.openapi.extensions.<x-name>` | — | Vendor extension rendered by the OpenAPI view, and the label it reads under |
+| `...ui.branding.logo` | — | Logo drawn in place of the neXsol lockup on the login page and the home page; a path the application serves, starting with `/`, or an absolute URL |
+| `...ui.branding.logo-dark` | — | The drawing for the dark theme; unset, the light one is drawn on both themes |
+| `...ui.branding.name` | — | Name of the organisation, read out in place of the logo by screen readers; unset, they read `Logo` |
 
 The security properties are described under [Signing in](#signing-in), which is where they
 only start to matter.
@@ -88,7 +96,8 @@ only start to matter.
   last left. Search boxes are not: a query kept across page loads would hide rows without the
   reader knowing why.
 * **Branding** — served from `static/img` (`icon.png`, `logo.png`, and `logo-dark.png` whose
-  tagline is drawn for a dark page).
+  tagline is drawn for a dark page). The lockup of the login page and of the home page can
+  give way to [your own logo](#your-own-logo).
 
 | Light | Dark | Collapsed menu |
 | --- | --- | --- |
@@ -135,6 +144,36 @@ OverviewContribution quotaOverviewContribution(QuotaService quotaService) {
     return () -> Flux.just(new OverviewStat("Quota", quotaService.used() + "%", "of the monthly budget", 60));
 }
 ```
+
+## Your own logo
+
+Set `branding.logo` and the login page and the home page carry the logo of your organisation
+where they carried the neXsol lockup. The plugins then sign the page in a corner — "Powered
+by neXsol Technologies" at the foot of the login card, a small "powered by neXsol" pill under
+the uptime of the home band — and nowhere else: the side menu keeps its icon. Leave the
+property unset and nothing changes, signature included.
+
+```yaml
+spring.cloud.gateway.server.webflux.ui:
+  branding:
+    logo: /img/acme.png            # src/main/resources/static/img/acme.png of the application
+    logo-dark: /img/acme-dark.png  # optional; the light one is drawn on both themes without it
+    name: Acme
+```
+
+* **Where the file comes from.** A path is served by the application: Spring Boot serves
+  whatever `src/main/resources/static/` holds at the root, so `/img/acme.png` is
+  `static/img/acme.png`. It starts with `/` and names one file — a wildcard is refused at
+  start-up; a query string such as `?v=2` is allowed. An absolute URL is served by whoever
+  hosts it. A path is opened in the security chain of the console along with the other
+  assets of the login page, since a logo behind the login it illustrates would never be
+  drawn; a URL is not the console's to open.
+* **Size.** Both pages scale the drawing to fit a box of **280 × 80 CSS pixels**, so supply a
+  landscape file at twice that, **560 × 160 pixels**, for it to stay sharp on high-density
+  screens. A taller drawing is scaled to 80 pixels high and reads small; a wider one to 280
+  pixels wide. PNG or SVG with a transparent background, under 100 KB. A logo whose text is
+  dark needs a `logo-dark` drawn for a dark page; one that reads on both grounds needs
+  nothing.
 
 ## Routes
 
