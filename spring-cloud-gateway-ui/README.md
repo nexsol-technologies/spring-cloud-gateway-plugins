@@ -734,6 +734,7 @@ All properties are under `spring.cloud.gateway.server.webflux.ui.security`.
 | `...ui.security.user.roles` | `[ADMIN]` | Roles the local user holds |
 | `...ui.security.roles-claim` | — | Dotted path the roles of a token are read from |
 | `...ui.security.required-roles` | `[]` | Roles a principal must hold; empty lets any authenticated principal through |
+| `...ui.security.post-logout-redirect-uri` | `{baseUrl}/ui/login?logout` | Where the provider sends the browser back to after signing it out |
 | `...ui.security.oauth2.resourceserver.jwt.issuer-uri` | — | Issuer whose Bearer tokens the console accepts |
 | `...ui.security.spring.security.oauth2.client.use` | `[]` | Registration ids the login page offers, out of the ones the application declared; empty offers all of them |
 | `...ui.security.spring.security.oauth2.client.registration` / `.provider` | — | Client registrations of the console's own, read as the Spring Security keys they spell out; declared, they replace those of the application |
@@ -872,6 +873,17 @@ console as a post-logout destination (in Keycloak, *Valid post logout redirect U
 `<gateway>/ui/login?logout`), and this is a single sign-on session, so an operator signing out
 of the console signs out of whatever else shares it. A local user, or a provider publishing no
 `end_session_endpoint`, is signed out the ordinary way.
+
+That destination is `post-logout-redirect-uri`, `{baseUrl}/ui/login?logout` by default, where
+`{baseUrl}` is the scheme, host and port the request reached the console on. Behind a proxy
+terminating TLS that reads `http://`, and the fix is `server.forward-headers-strategy:
+framework` (see [The session cookie](#the-session-cookie)), which also puts the login redirect
+right. Set the property outright only when the address the provider must see is one no header
+carries:
+
+```yaml
+spring.cloud.gateway.server.webflux.ui.security.post-logout-redirect-uri: https://gateway.example.com/ui/login?logout
+```
 
 ### The session cookie
 

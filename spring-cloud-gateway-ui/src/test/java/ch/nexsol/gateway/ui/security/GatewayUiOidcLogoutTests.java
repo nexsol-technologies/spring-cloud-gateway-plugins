@@ -37,16 +37,17 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.function.BodyInserters;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.csrf;
+import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockOidcLogin;
 
 /**
  * Signing out of a console that registered an identity provider ends the session the
  * provider holds too, not only the one the console holds &mdash; otherwise signing back
  * in hands the same account straight back and nobody can come back as somebody else.
  * <p>
- * That handler replaces the plain redirect for everybody, which is what this test is
- * about: the local user must still be signed out the ordinary way. The provider route is
- * taken for a principal that came from the provider, and this test has no provider to
- * sign into.
+ * That handler replaces the plain redirect for everybody: the local user must still be
+ * signed out the ordinary way, and a principal that came from the provider is sent to its
+ * end-session endpoint with the login page of the console as the way back.
  */
 @SpringBootTest(properties = { "spring.cloud.gateway.server.webflux.ui.security.mode=authenticated",
 		"spring.cloud.gateway.server.webflux.ui.security.user.name=superadmin",
@@ -85,6 +86,22 @@ class GatewayUiOidcLogoutTests {
 			.location("/ui/login?logout");
 	}
 
+	@Test
+	void shouldSendTheProviderPrincipalBackToTheLoginPageOfTheConsole() {
+		this.webTestClient.mutateWith(csrf())
+			.mutateWith(mockOidcLogin().clientRegistration(ClientRegistrationConfiguration.REGISTRATION))
+			.post()
+			// Absolute on purpose: {baseUrl} is read off the request, and the mock client
+			// sends a bare path.
+			.uri("http://localhost/ui/logout")
+			.exchange()
+			.expectStatus()
+			.isFound()
+			.expectHeader()
+			.location("https://idp.example.com/logout?id_token_hint=id-token"
+					+ "&post_logout_redirect_uri=http://localhost/ui/login?logout");
+	}
+
 	private String signIn() {
 		EntityExchangeResult<String> page = this.webTestClient.get()
 			.uri("/ui/login")
@@ -120,21 +137,23 @@ class GatewayUiOidcLogoutTests {
 	@TestConfiguration(proxyBeanMethods = false)
 	static class ClientRegistrationConfiguration {
 
+		static final ClientRegistration REGISTRATION = ClientRegistration.withRegistrationId("keycloak")
+			.clientName("Acme")
+			.clientId("console")
+			.clientSecret("secret")
+			.authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+			.redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+			.scope("openid")
+			.authorizationUri("https://idp.example.com/auth")
+			.tokenUri("https://idp.example.com/token")
+			.jwkSetUri("https://idp.example.com/jwks")
+			.userNameAttributeName("preferred_username")
+			.providerConfigurationMetadata(Map.of("end_session_endpoint", "https://idp.example.com/logout"))
+			.build();
+
 		@Bean
 		ReactiveClientRegistrationRepository clientRegistrationRepository() {
-			return new InMemoryReactiveClientRegistrationRepository(ClientRegistration.withRegistrationId("keycloak")
-				.clientName("Acme")
-				.clientId("console")
-				.clientSecret("secret")
-				.authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-				.redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
-				.scope("openid")
-				.authorizationUri("https://idp.example.com/auth")
-				.tokenUri("https://idp.example.com/token")
-				.jwkSetUri("https://idp.example.com/jwks")
-				.userNameAttributeName("preferred_username")
-				.providerConfigurationMetadata(Map.of("end_session_endpoint", "https://idp.example.com/logout"))
-				.build());
+			return new InMemoryReactiveClientRegistrationRepository(REGISTRATION);
 		}
 
 	}

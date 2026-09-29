@@ -113,6 +113,15 @@ public class GatewayUiSecurityProperties {
 	private List<String> requiredRoles = new ArrayList<>();
 
 	/**
+	 * Where the provider sends the browser back to once it has ended its own session.
+	 * {@code {baseUrl}} stands for the scheme, host and port the console was reached on,
+	 * which is why a gateway behind a proxy terminating TLS sets
+	 * {@code server.forward-headers-strategy} rather than this: this is for the case
+	 * where the address the provider must see is not one any header carries.
+	 */
+	private String postLogoutRedirectUri = "{baseUrl}/ui/login?logout";
+
+	/**
 	 * The issuer the console validates Bearer tokens against, when it is not the one the
 	 * gateway validates the traffic it routes against.
 	 */
@@ -180,6 +189,22 @@ public class GatewayUiSecurityProperties {
 	 */
 	public List<String> getRequiredRoles() {
 		return this.requiredRoles;
+	}
+
+	/**
+	 * Returns where the provider sends the browser back to after signing it out.
+	 * @return the post-logout redirect URI, {@code {baseUrl}} included
+	 */
+	public String getPostLogoutRedirectUri() {
+		return this.postLogoutRedirectUri;
+	}
+
+	/**
+	 * Sets where the provider sends the browser back to after signing it out.
+	 * @param postLogoutRedirectUri the post-logout redirect URI
+	 */
+	public void setPostLogoutRedirectUri(String postLogoutRedirectUri) {
+		this.postLogoutRedirectUri = postLogoutRedirectUri;
 	}
 
 	/**

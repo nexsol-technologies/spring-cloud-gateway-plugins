@@ -549,12 +549,13 @@ public class GatewayUiSecurityAutoConfiguration {
 		 * @param registrations the client registrations of the application, if it has any
 		 * @param consoleRegistrations the ones the console declared for itself, if the
 		 * properties module is on the classpath
+		 * @param properties the security configuration of the console
 		 * @return the contribution, which does nothing when no client is registered
 		 */
 		@Bean
 		UiSecurityCustomizer gatewayUiOAuth2LoginCustomizer(
 				ObjectProvider<ReactiveClientRegistrationRepository> registrations,
-				ObjectProvider<UiLoginRegistrations> consoleRegistrations) {
+				ObjectProvider<UiLoginRegistrations> consoleRegistrations, GatewayUiSecurityProperties properties) {
 			return new UiSecurityCustomizer() {
 
 				@Override
@@ -574,7 +575,8 @@ public class GatewayUiSecurityAutoConfiguration {
 						oauth2.authenticationFailureHandler(
 								new RedirectServerAuthenticationFailureHandler(LOGIN_PATH + "?error_oauth2"));
 					});
-					http.logout((logout) -> logout.logoutSuccessHandler(providerLogoutHandler(repository)));
+					http.logout((logout) -> logout.logoutSuccessHandler(
+							providerLogoutHandler(repository, properties.getPostLogoutRedirectUri())));
 				}
 
 				@Override
@@ -620,10 +622,10 @@ public class GatewayUiSecurityAutoConfiguration {
 		 * provider.
 		 */
 		private static ServerLogoutSuccessHandler providerLogoutHandler(
-				ReactiveClientRegistrationRepository registrations) {
+				ReactiveClientRegistrationRepository registrations, String postLogoutRedirectUri) {
 			OidcClientInitiatedServerLogoutSuccessHandler handler = new OidcClientInitiatedServerLogoutSuccessHandler(
 					registrations);
-			handler.setPostLogoutRedirectUri("{baseUrl}" + LOGIN_PATH + "?logout");
+			handler.setPostLogoutRedirectUri(postLogoutRedirectUri);
 			handler.setLogoutSuccessUrl(URI.create(LOGIN_PATH + "?logout"));
 			return handler;
 		}
