@@ -85,10 +85,11 @@ const VIEWS = [
 	/*
 	 * The one view published whole rather than as a first screenful: the OWASP coverage
 	 * table, the summary and the findings are read together, and a frame cut under the
-	 * summary hides what the coverage is a coverage of. Narrower with it, so the page keeps
-	 * a shape a reader can take in.
+	 * summary hides what the coverage is a coverage of. It keeps the default width: its
+	 * findings table carries ten columns, and a narrower frame breaks the route and the
+	 * path mid-word.
 	 */
-	{ name: 'passive-scan', path: '/ui/passive-scan', width: 1280, height: 1500,
+	{ name: 'passive-scan', path: '/ui/passive-scan', height: 1500,
 		prepare: 'var live = document.getElementById("ps-live"); if (live && live.checked) { live.click(); }' },
 	// The narrower frame of the view it belongs with: its table is a score, a grade and a
 	// route, and a wide frame leaves the counts stranded from the name they belong to.

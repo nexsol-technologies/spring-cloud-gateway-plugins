@@ -17,7 +17,7 @@
 	var LIMIT = 200;
 	var POLL_MS = 3000;
 	var SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
-	var COLSPAN = 9;
+	var COLSPAN = 10;
 	var pollTimer = null;
 	var expanded = {};
 
@@ -58,8 +58,10 @@
 		return td;
 	}
 
+	// The same fields the store groups on, so two routes reduced to the same path template
+	// keep an expanded panel of their own.
 	function keyOf(finding) {
-		return [finding.scanner, finding.method, finding.path, finding.title].join('|');
+		return [finding.scanner, finding.method, finding.routeId, finding.path, finding.title].join('|');
 	}
 
 	function section(parent, label, value) {
@@ -159,6 +161,7 @@
 			cell(row, finding.cwe, 'text-nowrap');
 			cell(row, finding.scanner, 'text-nowrap');
 			cell(row, finding.method);
+			cell(row, finding.routeId, 'text-break');
 			cell(row, finding.path, 'text-break');
 			cell(row, finding.title, 'text-break');
 
