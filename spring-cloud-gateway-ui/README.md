@@ -869,9 +869,31 @@ console as a post-logout destination (in Keycloak, *Valid post logout redirect U
 of the console signs out of whatever else shares it. A local user, or a provider publishing no
 `end_session_endpoint`, is signed out the ordinary way.
 
+### The session cookie
+
+The console names its cookie `GATEWAY_CONSOLE_SESSION`, not the `SESSION` every Spring
+application uses. The gateway answers on the same origin as the services it routes to, so under
+the shared name a `Set-Cookie: SESSION=` coming back from any of them would land on the browser
+as the cookie of the console, and the console would hand its own to those services on every
+routed request.
+
+It goes out `HttpOnly` and `SameSite=Lax`. The attribute is the console's doing: Spring Boot
+applies `server.reactive.session.cookie.same-site` whether it is set or not, which wipes the
+`Lax` the framework defaults to and sends the cookie with no `SameSite` at all. `Secure` follows
+the scheme of the request, so a gateway behind a proxy terminating TLS has to be told that the
+scheme it serves is not the one the browser used:
+
+```yaml
+server.forward-headers-strategy: framework
+```
+
+An application that decides for itself keeps what it set: `server.reactive.session.cookie.name`
+and `server.reactive.session.cookie.same-site` are honoured when they carry a value, and
+`server.reactive.session.cookie.secure: true` puts the attribute on whatever the scheme.
+
 ### Running more than one instance
 
-WebFlux keeps sessions in memory, so the `SESSION` cookie means nothing to an instance that did
+WebFlux keeps sessions in memory, so the session cookie means nothing to an instance that did
 not issue it: behind a load balancer, every request served by another one goes back to the
 login page. Signing in through a provider fails outright — the `state` and the PKCE verifier
 live in that session — and so does every form, whose CSRF token lives there too.
@@ -901,7 +923,7 @@ spring.session:
 
 It took when the start-up warning is gone and
 `redis-cli --scan --pattern 'gateway:console:*'` lists a key per session. From then on the
-`SESSION` cookie is worth the same on every instance, and the sign-in, the OpenID Connect
+session cookie is worth the same on every instance, and the sign-in, the OpenID Connect
 callback and the CSRF token of the forms all survive a request landing anywhere. A
 single-instance gateway needs none of this, which is why the plugin asks for nothing and only
 warns.
