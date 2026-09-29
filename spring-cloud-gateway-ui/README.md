@@ -797,11 +797,15 @@ the gateway keep working for the routes that relay them. Narrowed to nothing, th
 offers no provider at all rather than falling back on the list it was told to leave out, and a
 start-up warning says why.
 
-What names the principal is `user-name-attribute` on the provider. Keycloak issues an opaque
-`sub` by default, so point it at something a person recognises or the side menu reads a UUID:
+What names the principal is `user-name-attribute` on the provider, wherever that provider is
+declared. Keycloak issues an opaque `sub` by default, so point it at something a person
+recognises or the side menu reads a UUID:
 
 ```yaml
-spring.security.oauth2.client.provider.keycloak.user-name-attribute: preferred_username
+# a provider of the application
+spring.security.oauth2.client.provider.oidc.user-name-attribute: preferred_username
+# a provider declared for the console
+spring.cloud.gateway.server.webflux.ui.security.spring.security.oauth2.client.provider.console.user-name-attribute: preferred_username
 ```
 
 ### A Bearer token
