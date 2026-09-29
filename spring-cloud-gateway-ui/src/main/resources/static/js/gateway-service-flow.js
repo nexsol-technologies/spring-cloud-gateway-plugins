@@ -24,10 +24,10 @@
 
 	var SVG_NS = 'http://www.w3.org/2000/svg';
 	var BOX_W = 210;
-	var BOX_H = 46;
-	var ROW_GAP = 62;
+	var BOX_H = 60;
+	var ROW_GAP = 76;
 	var PAD_Y = 12;
-	var HUB_W = 150;
+	var HUB_W = 170;
 
 	var POLL_MS = 3000;
 	// One leg of a call. A dot runs the two of them one after the other and the next poll
@@ -155,16 +155,29 @@
 		totals[key].errors += edge.errors;
 	}
 
-	/** The figures under the name of a box, with the classes that stayed at zero left out. */
+	/*
+	 * The figures under the name of a box, as the lines they are drawn on, with the classes
+	 * that stayed at zero left out. Six-figure counts do not fit the width of a box on one
+	 * line, so the error classes go on their own.
+	 */
 	function caption(hop) {
-		var parts = [hop.calls + ((hop.calls === 1) ? ' call' : ' calls')];
+		var lines = [hop.calls + ((hop.calls === 1) ? ' call' : ' calls')];
+		var failed = [];
 		if (hop.clientErrors > 0) {
-			parts.push(hop.clientErrors + ' 4xx');
+			failed.push(hop.clientErrors + ' 4xx');
 		}
 		if (hop.errors > 0) {
-			parts.push(hop.errors + ' 5xx');
+			failed.push(hop.errors + ' 5xx');
 		}
-		return parts.join(' · ');
+		if (failed.length) {
+			lines.push(failed.join(' · '));
+		}
+		return lines;
+	}
+
+	/** The same figures on one line, for the tooltip a box and a hop carry. */
+	function summary(hop) {
+		return caption(hop).join(' · ');
 	}
 
 	/*
@@ -188,15 +201,23 @@
 	function box(hop, x, y, width, hub) {
 		var group = el('g', { class: hub ? 'gw-flow-node gw-flow-hub' : 'gw-flow-node' });
 		var title = document.createElementNS(SVG_NS, 'title');
-		title.textContent = hop.id + ' — ' + caption(hop);
+		title.textContent = hop.id + ' — ' + summary(hop);
 		group.appendChild(title);
 		group.appendChild(el('rect', { x: x, y: y, width: width, height: BOX_H, rx: 10 }));
-		var name = el('text', { x: x + 12, y: y + 20, class: 'gw-flow-name' });
+		var lines = caption(hop);
+		// A box whose classes all stayed at zero has one line fewer to draw: what it does
+		// not use of the height is split above and below rather than left under the name.
+		var shift = (lines.length > 1) ? 0 : 8;
+		var name = el('text', { x: x + 12, y: y + 22 + shift, class: 'gw-flow-name' });
 		name.textContent = fit(hop.id, width);
 		group.appendChild(name);
-		var detail = el('text', { x: x + 12, y: y + 36, class: 'gw-flow-detail' });
-		detail.textContent = caption(hop);
-		group.appendChild(detail);
+		lines.forEach(function (line, index) {
+			var detail = el('text', {
+				x: x + 12, y: y + 38 + shift + index * 14, class: 'gw-flow-detail'
+			});
+			detail.textContent = line;
+			group.appendChild(detail);
+		});
 		return group;
 	}
 
@@ -214,7 +235,7 @@
 		// the line starts on the history and moves to the traffic as soon as some arrives.
 		var group = el('g', { class: 'gw-flow-link gw-flow-' + (recent[key] || health(hop)) });
 		var title = document.createElementNS(SVG_NS, 'title');
-		title.textContent = caption(hop);
+		title.textContent = summary(hop);
 		group.appendChild(title);
 		var middle = (fromX + toX) / 2;
 		var dotX = inbound ? fromX + 12 : toX - 12;
