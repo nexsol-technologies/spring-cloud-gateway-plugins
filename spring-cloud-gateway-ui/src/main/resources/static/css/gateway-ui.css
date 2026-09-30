@@ -789,6 +789,42 @@ body {
 	}
 }
 
+/*
+ * The logo configured in place of the lockup, on the login page and on the home page.
+ * One box on both, so a file drawn for one reads the same on the other: its size is what
+ * the README tells the application to draw for.
+ */
+.gw-brand-mark {
+	max-width: 280px;
+	max-height: 80px;
+	width: auto;
+	height: auto;
+}
+
+/* The mark of the plugins next to their name, once their lockup gave way to that logo. */
+.gw-signature-icon {
+	width: 16px;
+	height: 16px;
+	vertical-align: -3px;
+}
+
+/* The signature of the home band: a bordered pill under the uptime, no fill. */
+.gw-powered {
+	display: inline-flex;
+	align-items: center;
+	gap: .3rem;
+	padding: .15rem .55rem .15rem .35rem;
+	border: 1px solid var(--gw-border);
+	border-radius: 999px;
+	font-size: .72rem;
+	white-space: nowrap;
+}
+
+.gw-powered .gw-signature-icon {
+	width: 13px;
+	height: 13px;
+}
+
 /* One contributed figure, marked at its head with the accent so the row reads as a set. */
 .gw-stat {
 	position: relative;
@@ -1460,6 +1496,19 @@ body {
 	height: 140px;
 	width: auto;
 	margin: 0 auto;
+}
+
+/* Centred like the lockup it replaces; the dark rule above makes it a block. */
+.gw-login .gw-brand-mark {
+	margin: 0 auto;
+}
+
+/* The signature of the login card, under a rule at its foot. */
+.gw-login-signature {
+	margin-top: 1.5rem;
+	padding-top: 1rem;
+	border-top: 1px solid var(--gw-border);
+	text-align: center;
 }
 
 /* The padlock of the page shown to a visitor the console turned away. */

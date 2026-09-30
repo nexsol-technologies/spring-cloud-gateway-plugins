@@ -17,6 +17,7 @@
 package ch.nexsol.gateway.ui.autoconfigure;
 
 import ch.nexsol.gateway.audit.AuditEventPublisher;
+import ch.nexsol.gateway.commons.security.SecuredPaths;
 import ch.nexsol.gateway.ui.security.LoginController;
 import ch.nexsol.gateway.ui.security.UiSecurityModelAttributes;
 import org.junit.jupiter.api.Test;
@@ -70,6 +71,23 @@ class GatewayUiSecurityAutoConfigurationTests {
 			assertThat(matches(chain, "/img/logo.png")).isTrue();
 			assertThat(matches(chain, "/img/logo-dark.png")).isTrue();
 		});
+	}
+
+	@Test
+	void chainMatchesTheLogoTheApplicationConfiguredAndServes() {
+		// The login page paints with it, so it has to be reachable without a principal;
+		// a logo served elsewhere is somebody else's to serve.
+		this.runner
+			.withPropertyValues("spring.cloud.gateway.server.webflux.ui.branding.logo=/img/acme.png",
+					"spring.cloud.gateway.server.webflux.ui.branding.logo-dark=https://cdn.example.com/acme-dark.png")
+			.run((context) -> {
+				assertThat(context).hasNotFailed();
+				SecurityWebFilterChain chain = (SecurityWebFilterChain) context
+					.getBean("gatewayUiSecurityWebFilterChain");
+				assertThat(matches(chain, "/img/acme.png")).isTrue();
+				assertThat(context.getBean("shellAssetPaths", SecuredPaths.class).openPaths()).contains("/img/acme.png")
+					.noneMatch((path) -> path.contains("cdn.example.com"));
+			});
 	}
 
 	@Test

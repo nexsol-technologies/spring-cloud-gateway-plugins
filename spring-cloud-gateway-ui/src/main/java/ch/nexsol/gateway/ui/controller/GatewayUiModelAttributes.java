@@ -18,6 +18,7 @@ package ch.nexsol.gateway.ui.controller;
 
 import java.util.List;
 
+import ch.nexsol.gateway.ui.branding.GatewayUiBrandingProperties;
 import ch.nexsol.gateway.ui.nav.GatewayUiMenu;
 import ch.nexsol.gateway.ui.nav.NavItem;
 import ch.nexsol.gateway.ui.nav.NavSection;
@@ -28,7 +29,8 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 /**
  * Exposes the side-menu entries to every server-rendered view, so any page hosted in the
  * shell &mdash; including those contributed by other gateway plugins &mdash; gets the
- * sidebar populated without depending on this module.
+ * sidebar populated without depending on this module. The logo configured in place of the
+ * lockup rides along, for the login page and the home page.
  */
 @ControllerAdvice
 public class GatewayUiModelAttributes {
@@ -43,12 +45,16 @@ public class GatewayUiModelAttributes {
 
 	private final GatewayUiMenu menu;
 
+	private final GatewayUiBrandingProperties branding;
+
 	/**
 	 * Creates the advice backed by the menu registry.
 	 * @param menu the registry of contributed side-menu entries
+	 * @param branding the logo configured in place of the lockup
 	 */
-	public GatewayUiModelAttributes(GatewayUiMenu menu) {
+	public GatewayUiModelAttributes(GatewayUiMenu menu, GatewayUiBrandingProperties branding) {
 		this.menu = menu;
+		this.branding = branding;
 	}
 
 	/**
@@ -78,6 +84,16 @@ public class GatewayUiModelAttributes {
 	@ModelAttribute("uiVersion")
 	public String uiVersion() {
 		return VERSION;
+	}
+
+	/**
+	 * Adds the logo configured in place of the lockup to the model of every view. The
+	 * login page and the home page draw it; with no logo set they draw the lockup.
+	 * @return the branding properties
+	 */
+	@ModelAttribute("branding")
+	public GatewayUiBrandingProperties branding() {
+		return this.branding;
 	}
 
 }

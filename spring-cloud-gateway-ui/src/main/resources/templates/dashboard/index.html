@@ -12,17 +12,31 @@
 				<div class="d-flex flex-wrap align-items-center gap-4">
 					<!-- Two lockups: the tagline of the shipped one is near-black and would be lost
 					     on a dark page, so the dark theme gets a lightened one. -->
-					<img class="gw-home-logo gw-logo-light" th:src="@{/img/logo.png}" src="/img/logo.png"
-							alt="neXsol Spring Cloud Gateway Plugins">
-					<img class="gw-home-logo gw-logo-dark" th:src="@{/img/logo-dark.png}" src="/img/logo-dark.png"
-							alt="" aria-hidden="true">
+					<th:block th:if="${branding.logo == null}">
+						<img class="gw-home-logo gw-logo-light" th:src="@{/img/logo.png}" src="/img/logo.png"
+								alt="neXsol Spring Cloud Gateway Plugins">
+						<img class="gw-home-logo gw-logo-dark" th:src="@{/img/logo-dark.png}" src="/img/logo-dark.png"
+								alt="" aria-hidden="true">
+					</th:block>
+					<!-- Or the logo of the organisation running the console, when it configured one. -->
+					<th:block th:if="${branding.logo != null}">
+						<img class="gw-brand-mark gw-logo-light" th:src="@{${branding.logo}}" src="#"
+								th:alt="${branding.name} ?: 'Logo'" alt="Logo">
+						<img class="gw-brand-mark gw-logo-dark" th:src="@{${branding.darkLogo()}}" src="#"
+								alt="" aria-hidden="true">
+					</th:block>
 					<div>
 						<h1 class="h4 fw-bold mb-0">Spring Cloud Gateway</h1>
 						<p class="text-secondary small mb-0">Where the gateway stands right now.</p>
 					</div>
 				</div>
-				<div class="text-secondary small">
-					up for <span class="fw-semibold" th:text="${uptime}">—</span>
+				<div class="text-secondary small text-end">
+					<div>up for <span class="fw-semibold" th:text="${uptime}">—</span></div>
+					<!-- The plugins sign the band when their lockup gave way to the logo above. -->
+					<span class="gw-powered mt-1" th:if="${branding.logo != null}">
+						<img class="gw-signature-icon" th:src="@{/img/icon.png}" src="/img/icon.png" alt="">
+						powered by <span class="fw-semibold">neXsol</span>
+					</span>
 				</div>
 			</div>
 		</div>

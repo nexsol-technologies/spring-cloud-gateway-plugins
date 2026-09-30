@@ -63,7 +63,10 @@ class DashboardControllerTests {
 			.value((body) -> assertThat(body).contains("rel=\"icon\"")
 				.contains("/img/icon.png")
 				.contains("/img/logo.png")
-				.contains("id=\"gw-theme\""));
+				.contains("id=\"gw-theme\"")
+				// No logo configured in place of the lockup: nothing to sign next to.
+				.doesNotContain("gw-brand-mark")
+				.doesNotContain("gw-powered"));
 	}
 
 	@Test

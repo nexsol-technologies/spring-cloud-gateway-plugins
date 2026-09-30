@@ -31,11 +31,23 @@
 		<div class="card border-0 shadow-sm gw-login-card">
 			<div class="card-body p-4 p-sm-5">
 				<div class="text-center mb-4">
-					<!-- The lockup of the home page, in the two drawings the themes need. -->
-					<img class="gw-login-logo gw-logo-light" th:src="@{/img/logo.png}" src="/img/logo.png"
-							alt="neXsol Spring Cloud Gateway Plugins">
-					<img class="gw-login-logo gw-logo-dark" th:src="@{/img/logo-dark.png}" src="/img/logo-dark.png"
-							alt="" aria-hidden="true">
+					<!--
+						The lockup of the home page, in the two drawings the themes need — or, when
+						the application configured one, the logo of the organisation running the
+						console, the plugins then signing the foot of the card.
+					-->
+					<th:block th:if="${branding.logo == null}">
+						<img class="gw-login-logo gw-logo-light" th:src="@{/img/logo.png}" src="/img/logo.png"
+								alt="neXsol Spring Cloud Gateway Plugins">
+						<img class="gw-login-logo gw-logo-dark" th:src="@{/img/logo-dark.png}" src="/img/logo-dark.png"
+								alt="" aria-hidden="true">
+					</th:block>
+					<th:block th:if="${branding.logo != null}">
+						<img class="gw-brand-mark gw-logo-light" th:src="@{${branding.logo}}" src="#"
+								th:alt="${branding.name} ?: 'Logo'" alt="Logo">
+						<img class="gw-brand-mark gw-logo-dark" th:src="@{${branding.darkLogo()}}" src="#"
+								alt="" aria-hidden="true">
+					</th:block>
 					<p class="text-secondary mb-0 mt-3">Sign in to the gateway console.</p>
 				</div>
 
@@ -83,6 +95,12 @@
 					</div>
 					<button class="btn btn-primary w-100" type="submit">Sign in</button>
 				</form>
+
+				<div class="gw-login-signature text-secondary small" th:if="${branding.logo != null}">
+					Powered by
+					<img class="gw-signature-icon" th:src="@{/img/icon.png}" src="/img/icon.png" alt="">
+					<span class="fw-semibold">neXsol Technologies</span>
+				</div>
 			</div>
 		</div>
 	</main>
