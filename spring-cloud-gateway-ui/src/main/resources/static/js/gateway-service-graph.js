@@ -298,7 +298,12 @@
 		sel('gg-table-empty').style.display = shown.length ? 'none' : '';
 	}
 
-	/** Fills the focus list with the nodes of the graph, keeping the current selection. */
+	/**
+	 * Fills the focus list with the nodes of the graph, keeping the current selection.
+	 * The list is sorted by name and not by traffic like the nodes are: it is read to
+	 * find one service among many, which is an alphabetical search. The whole graph stays
+	 * on top of it, as the entry that clears the focus rather than one of the nodes.
+	 */
 	function renderFocusOptions() {
 		var focus = sel('gg-focus');
 		var selected = focus.value;
@@ -307,7 +312,9 @@
 		all.value = '';
 		all.textContent = 'The whole graph';
 		focus.appendChild(all);
-		nodes.forEach(function (node) {
+		nodes.slice().sort(function (left, right) {
+			return left.id.localeCompare(right.id);
+		}).forEach(function (node) {
 			var option = document.createElement('option');
 			option.value = node.id;
 			option.textContent = node.id;

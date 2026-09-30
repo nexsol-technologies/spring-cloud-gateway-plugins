@@ -40,6 +40,18 @@ class ServiceGraphSnapshotTests {
 	}
 
 	@Test
+	void mergesTheEndpointsNamedInAnotherCase() {
+		ServiceGraphSnapshot snapshot = ServiceGraphSnapshot.of("test",
+				List.of(new GraphEdge("WEB", "ORDERS-SERVICE", "orders-route", 3, 1, 0),
+						new GraphEdge("web", "orders-service", "orders-route", 2, 0, 2)));
+
+		assertThat(snapshot.edges()).containsExactly(new GraphEdge("web", "orders-service", "orders-route", 5, 1, 2));
+		assertThat(snapshot.nodes()).containsExactlyInAnyOrder(
+				new GraphNode("orders-service", GraphNodeKind.SERVICE, 5),
+				new GraphNode("web", GraphNodeKind.CALLER, 5));
+	}
+
+	@Test
 	void keepsTheSameEndpointsApartWhenTheCallsTookDifferentRoutes() {
 		ServiceGraphSnapshot snapshot = ServiceGraphSnapshot.of("test",
 				List.of(new GraphEdge("web", "orders", "orders-read", 3, 0, 0),

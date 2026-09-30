@@ -413,7 +413,7 @@ Five ways to narrow what is drawn, all applied in the browser on the payload alr
 
 | Control | Keeps |
 | --- | --- |
-| Focus | One node and the edges it takes part in — clicking a node does the same |
+| Focus | One node and the edges it takes part in, the nodes listed alphabetically — clicking a node does the same |
 | Keep only | The edges whose caller or callee carries the fragment |
 | Min calls | The edges above a volume, for dropping the noise of a busy graph |
 | 4xx | The edges that saw at least one 4xx |

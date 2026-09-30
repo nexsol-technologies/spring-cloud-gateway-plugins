@@ -125,6 +125,10 @@ service calling another.
 The route is part of what makes an edge rather than a label on it, so two routes between the
 same pair stay two edges.
 
+**Node names are lowercased when the graph is built**, so a service registered as
+`ORDERS-SERVICE` in discovery and targeted as `orders-service` by a hand-written route is one
+node and not two. Route ids are left as they are.
+
 An edge carries its 4xx and its 5xx as two separate counts, read back from the `outcome` tag.
 They answer different questions — a caller asking for what it may not have, against a service
 failing to answer — so an edge with a hundred 404 and no 500 is not an edge in trouble. The

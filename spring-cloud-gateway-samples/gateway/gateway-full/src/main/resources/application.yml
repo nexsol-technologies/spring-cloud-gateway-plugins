@@ -314,8 +314,8 @@ spring.cloud.gateway.server.webflux:
       # Adds one route per registered service, '/SERVICE-A/**' -> 'lb://SERVICE-A', with an
       # id of its own. It does not collide with the two routes above: Eureka upper cases a
       # service id and path matching is case sensitive, so the paths differ. Turning
-      # 'lower-case-service-id' on would make them the same path served by two routes, and
-      # the same service drawn under two names in the graph.
+      # 'lower-case-service-id' on would make them the same path served by two routes. The
+      # service graph draws one node either way: it lowercases the endpoints it merges.
       enabled: true
 spring.cloud.gateway.server.webflux.hub-openapi:
   enabled: true

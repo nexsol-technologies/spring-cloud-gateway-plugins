@@ -22,6 +22,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -56,8 +57,9 @@ public record ServiceGraphSnapshot(String coverage, List<GraphNode> nodes, List<
 	}
 
 	/**
-	 * Build a snapshot from partial edges, summing everything that joins the same two
-	 * endpoints and deriving the nodes from what is left.
+	 * Build a snapshot from partial edges, lowercasing their endpoints, summing
+	 * everything that joins the same two of them and deriving the nodes from what is
+	 * left.
 	 * <p>
 	 * Every source needs this: the local one because the calls are counted per outcome,
 	 * the consolidating ones because each instance reports the share it served.
@@ -68,13 +70,37 @@ public record ServiceGraphSnapshot(String coverage, List<GraphNode> nodes, List<
 	public static ServiceGraphSnapshot of(String coverage, Collection<GraphEdge> edges) {
 		Map<Endpoints, GraphEdge> merged = new LinkedHashMap<>();
 		for (GraphEdge edge : edges) {
-			merged.merge(new Endpoints(edge.from(), edge.to(), edge.routeId()), edge, ServiceGraphSnapshot::sum);
+			GraphEdge normalised = lowercaseEndpoints(edge);
+			merged.merge(new Endpoints(normalised.from(), normalised.to(), normalised.routeId()), normalised,
+					ServiceGraphSnapshot::sum);
 		}
 		List<GraphEdge> mergedEdges = merged.values()
 			.stream()
 			.sorted(Comparator.comparingLong(GraphEdge::calls).reversed())
 			.toList();
 		return new ServiceGraphSnapshot(coverage, nodes(mergedEdges), mergedEdges);
+	}
+
+	/**
+	 * Lowercases both endpoints, so that one service is one node whichever case its name
+	 * reached the source in: a discovery client reports {@code ORDERS-SERVICE} where a
+	 * route written by hand targets {@code orders-service}, and a host name means the
+	 * same thing in either case. The route id is left alone &mdash; two ids differing
+	 * only by case are two routes.
+	 */
+	private static GraphEdge lowercaseEndpoints(GraphEdge edge) {
+		return new GraphEdge(lowercase(edge.from()), lowercase(edge.to()), edge.routeId(), edge.calls(),
+				edge.clientErrors(), edge.errors());
+	}
+
+	/*
+	 * Null-tolerant on purpose: the edges of the Redis source are deserialised from what
+	 * another instance wrote, and an entry left over from an older version is read rather
+	 * than validated. It used to travel through the merge untouched, and losing the whole
+	 * graph to a NullPointerException here would be a poor trade for a lowercase name.
+	 */
+	private static String lowercase(String id) {
+		return (id != null) ? id.toLowerCase(Locale.ROOT) : null;
 	}
 
 	private static GraphEdge sum(GraphEdge left, GraphEdge right) {
