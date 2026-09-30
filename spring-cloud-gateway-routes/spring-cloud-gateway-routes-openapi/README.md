@@ -30,6 +30,7 @@ spring.cloud.gateway.server.webflux.routes-openapi:
       path-prefix: /book-service             # gateway side: callers add it, it is removed before forwarding
       # base-path: /api/v3                   # backend side; omit to derive it from the contract servers
       validate: true                         # also hold the traffic against this contract
+      public-from-contract: true             # 'security: []' operations become public routes
       metadata:
         team: books
       filters:
@@ -54,6 +55,7 @@ Per source:
 | `path-prefix` | — | Prefix callers use, removed before forwarding |
 | `base-path` | first `servers` entry | Prefix added when forwarding to the backend |
 | `validate` | `false` | Attaches the `OpenapiValidation` filter with this source's contract |
+| `public-from-contract` | `false` | Flags the routes the contract declares as needing no authentication with the `public` metadata |
 | `metadata` | — | Carried onto every generated route |
 | `filters` | — | Applied to every generated route |
 
@@ -142,6 +144,59 @@ route. To hold the traffic against a *different* document — a stricter contrac
 
 What happens to a message that breaks its contract — denied, or forwarded and recorded — is
 configured per direction in the validation plugin, not here.
+
+## Public routes from the contract
+
+The [routes-security](../spring-cloud-gateway-routes-security/README.md) plugin lets a route
+through without authentication when its metadata carries `public: true`. Declared under
+`metadata`, that flag lands on **every** route the source generates.
+`public-from-contract: true` reads it from the document instead, per operation:
+
+```yaml
+spring.cloud.gateway.server.webflux.routes-openapi:
+  sources:
+    - id: barcode
+      uri: lb://BARCODE-SERVICE
+      spec-url: http://barcode-service/v3/api-docs
+      mode: PER_OPERATION
+      public-from-contract: true
+```
+
+An operation is public when it overrides the document-wide requirement with an empty one, which
+is how OpenAPI says "this one needs no credentials":
+
+```yaml
+security:
+  - bearerAuth: []          # every operation needs a token...
+paths:
+  /barcode:
+    post:
+      operationId: generateBarcode
+      security: []          # ...except this one
+    get:
+      operationId: listBarcodes
+  /health:
+    get:
+      operationId: health
+      x-gateway-public: true
+```
+
+`x-gateway-public: true` is the way out for a contract that cannot say it with `security` — one
+generated from code that emits the document-wide requirement on every operation.
+
+Three things to know before turning it on:
+
+* **Only an operation-level `security` counts.** The parser leaves a document-wide
+  `security: []` as an absent requirement rather than an empty one, so a document declaring
+  everything open cannot be told from one saying nothing about authentication at all, and
+  neither flags anything.
+* **`AGGREGATED` covers every operation with a single route**, so that route is flagged only
+  when the whole contract is public. Use `PER_OPERATION` to flag operations one by one.
+* **The flag is only ever added.** A source declaring `metadata.public: true` keeps it on every
+  route, whatever the contract says.
+
+Off by default: a contract already carrying `security: []` must not silently open routes the
+gateway was protecting.
 
 ## Sources declared in documents
 

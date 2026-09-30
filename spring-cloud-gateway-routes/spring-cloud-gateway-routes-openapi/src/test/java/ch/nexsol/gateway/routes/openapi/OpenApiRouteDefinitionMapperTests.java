@@ -16,6 +16,8 @@
 
 package ch.nexsol.gateway.routes.openapi;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -232,6 +234,104 @@ class OpenApiRouteDefinitionMapperTests {
 				rootServer);
 
 		assertThat(routes.get(0).getFilters()).extracting(FilterDefinition::getName).doesNotContain("PrefixPath");
+	}
+
+	@Test
+	void publicFromContractIsOffByDefault() {
+		// A contract already declaring 'security: []' must not silently open routes the
+		// gateway was protecting.
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source(RouteGenerationMode.PER_OPERATION),
+				parse("openapi/public-operations.yaml"));
+
+		assertThat(routes).allSatisfy((route) -> assertThat(route.getMetadata()).doesNotContainKey("public"));
+	}
+
+	@Test
+	void publicFromContractFlagsOnlyTheOperationsTheContractDeclaresPublic() {
+		Source source = source(RouteGenerationMode.PER_OPERATION);
+		source.setPublicFromContract(true);
+
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source, parse("openapi/public-operations.yaml"));
+
+		// 'security: []' overrides the document requirement, the extension states it
+		// outright, and the operation saying nothing inherits the bearer requirement.
+		assertThat(route(routes, "petstore_generateBarcode").getMetadata()).containsEntry("public", true);
+		assertThat(route(routes, "petstore_health").getMetadata()).containsEntry("public", true);
+		assertThat(route(routes, "petstore_listBarcodes").getMetadata()).doesNotContainKey("public");
+	}
+
+	@Test
+	void publicFromContractIgnoresADocumentWideEmptySecurityRequirement() {
+		// The parser leaves a document-wide 'security: []' as a null list rather than an
+		// empty one, so it cannot be told from a contract saying nothing about
+		// authentication: only an operation-level override is acted on.
+		Source source = source(RouteGenerationMode.PER_OPERATION);
+		source.setPublicFromContract(true);
+
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source, parse("openapi/public-document.yaml"));
+
+		assertThat(routes).allSatisfy((route) -> assertThat(route.getMetadata()).doesNotContainKey("public"));
+	}
+
+	@Test
+	void publicFromContractFlagsNothingWhenTheContractDeclaresNoSecurityAtAll() {
+		// A contract with no 'security' anywhere says nothing about authentication,
+		// rather than that everything is open.
+		Source source = source(RouteGenerationMode.PER_OPERATION);
+		source.setPublicFromContract(true);
+
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source, this.openApi);
+
+		assertThat(routes).allSatisfy((route) -> assertThat(route.getMetadata()).doesNotContainKey("public"));
+	}
+
+	@Test
+	void anAggregatedRouteIsNotPublicWhenOnlySomeOperationsAre() {
+		// The single route stands for every operation, so flagging it would open the
+		// protected ones with them.
+		Source source = source(RouteGenerationMode.AGGREGATED);
+		source.setPublicFromContract(true);
+
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source, parse("openapi/public-operations.yaml"));
+
+		assertThat(routes.get(0).getMetadata()).doesNotContainKey("public");
+	}
+
+	@Test
+	void anAggregatedRouteIsPublicWhenEveryOperationIs() {
+		Source source = source(RouteGenerationMode.AGGREGATED);
+		source.setPublicFromContract(true);
+
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source, parse("openapi/all-public.yaml"));
+
+		assertThat(routes.get(0).getMetadata()).containsEntry("public", true);
+	}
+
+	@Test
+	void sourceMetadataKeepsFlaggingEveryRouteWhateverTheContractSays() {
+		Source source = source(RouteGenerationMode.PER_OPERATION);
+		source.setMetadata(Map.of("public", true));
+		source.setPublicFromContract(true);
+
+		List<RouteDefinition> routes = this.mapper.toRouteDefinitions(source, parse("openapi/public-operations.yaml"));
+
+		assertThat(routes).allSatisfy((route) -> assertThat(route.getMetadata()).containsEntry("public", true));
+	}
+
+	private RouteDefinition route(List<RouteDefinition> routes, String id) {
+		return routes.stream().filter((route) -> route.getId().equals(id)).findFirst().orElseThrow();
+	}
+
+	private OpenAPI parse(String resource) {
+		try {
+			String content = new ClassPathResource(resource).getContentAsString(StandardCharsets.UTF_8);
+			ParseOptions options = new ParseOptions();
+			options.setResolve(true);
+			return new OpenAPIV3Parser().readContents(content, null, options).getOpenAPI();
+		}
+		catch (IOException ex) {
+			throw new UncheckedIOException(ex);
+		}
 	}
 
 }

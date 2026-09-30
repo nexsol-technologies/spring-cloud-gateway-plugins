@@ -40,11 +40,15 @@ routes:
       public: true
 ```
 
-**OpenAPI source:**
+**OpenAPI source:** `metadata` is carried onto every route the source generates, so this opens
+the whole contract:
 
 ```yaml
 spring.cloud.gateway.server.webflux.routes-openapi.sources[0].metadata.public: true
 ```
+
+To open only part of it, let the contract say which operations are public — see
+[Public routes from the contract](../spring-cloud-gateway-routes-openapi/README.md#public-routes-from-the-contract).
 
 **Database:** tick **Public route** in the routes view, or set the `public_route` column
 (`publicRoute` in the REST API).

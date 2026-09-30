@@ -31,6 +31,7 @@ import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.PathItem.HttpMethod;
 import io.swagger.v3.oas.models.Paths;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.servers.Server;
 
 import org.springframework.cloud.gateway.filter.FilterDefinition;
@@ -54,6 +55,20 @@ public class OpenApiRouteDefinitionMapper {
 	 * module keeps no dependency towards it.
 	 */
 	private static final String VALIDATION_FILTER_NAME = "OpenapiValidation";
+
+	/**
+	 * Route metadata key the {@code spring-cloud-gateway-routes-security} plugin reads to
+	 * let a request through without authentication. Referred to by name so this module
+	 * keeps no dependency towards it.
+	 */
+	private static final String PUBLIC_METADATA_KEY = "public";
+
+	/**
+	 * Document extension flagging an operation as public, for a contract that cannot say
+	 * so with {@code security: []} &mdash; one generated from code that emits the
+	 * document-wide requirement on every operation, typically.
+	 */
+	private static final String PUBLIC_EXTENSION = "x-gateway-public";
 
 	/**
 	 * Maps the document to route definitions.
@@ -88,6 +103,9 @@ public class OpenApiRouteDefinitionMapper {
 				HttpMethod method = operationEntry.getKey();
 				RouteDefinition route = newRoute(source,
 						operationRouteId(source, method, path, operationEntry.getValue()), basePath, pathPrefix);
+				if (source.isPublicFromContract() && isPublic(operationEntry.getValue())) {
+					route.getMetadata().put(PUBLIC_METADATA_KEY, true);
+				}
 				List<PredicateDefinition> predicates = new ArrayList<>();
 				predicates.add(new PredicateDefinition("Path=" + pathPrefix + path));
 				predicates.add(new PredicateDefinition("Method=" + method.name()));
@@ -100,10 +118,19 @@ public class OpenApiRouteDefinitionMapper {
 
 	private List<RouteDefinition> aggregated(Source source, Paths paths, String basePath, String pathPrefix) {
 		Set<String> methods = new LinkedHashSet<>();
+		boolean allPublic = true;
 		for (PathItem item : paths.values()) {
-			item.readOperationsMap().keySet().forEach((method) -> methods.add(method.name()));
+			for (Map.Entry<HttpMethod, Operation> operationEntry : item.readOperationsMap().entrySet()) {
+				methods.add(operationEntry.getKey().name());
+				allPublic = allPublic && isPublic(operationEntry.getValue());
+			}
 		}
 		RouteDefinition route = newRoute(source, source.getId(), basePath, pathPrefix);
+		// One route stands for every operation, so it can only be flagged when they all
+		// are: flagging it otherwise would open the protected ones with them.
+		if (source.isPublicFromContract() && allPublic && !methods.isEmpty()) {
+			route.getMetadata().put(PUBLIC_METADATA_KEY, true);
+		}
 		List<PredicateDefinition> predicates = new ArrayList<>();
 		String prefixed = paths.keySet().stream().map((path) -> pathPrefix + path).collect(Collectors.joining(","));
 		predicates.add(new PredicateDefinition("Path=" + prefixed));
@@ -144,6 +171,27 @@ public class OpenApiRouteDefinitionMapper {
 		route.setFilters(filters);
 		route.setMetadata(new LinkedHashMap<>(source.getMetadata()));
 		return route;
+	}
+
+	/**
+	 * Whether the contract declares this operation as reachable without authentication:
+	 * an empty {@code security} requirement, which OpenAPI defines as overriding the
+	 * document-wide one, or the {@value #PUBLIC_EXTENSION} extension.
+	 * <p>
+	 * Only an operation-level override counts. The parser leaves a document-wide
+	 * {@code security: []} as a {@code null} list rather than an empty one, so a document
+	 * declaring everything open cannot be told from one saying nothing about
+	 * authentication at all, and nothing is flagged from either.
+	 * @param operation the operation to inspect
+	 * @return whether the operation is public
+	 */
+	private static boolean isPublic(Operation operation) {
+		Map<String, Object> extensions = operation.getExtensions();
+		if (extensions != null && Boolean.parseBoolean(String.valueOf(extensions.get(PUBLIC_EXTENSION)))) {
+			return true;
+		}
+		List<SecurityRequirement> security = operation.getSecurity();
+		return security != null && security.isEmpty();
 	}
 
 	/**

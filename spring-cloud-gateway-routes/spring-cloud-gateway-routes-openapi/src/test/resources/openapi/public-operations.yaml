@@ -1,0 +1,31 @@
+openapi: 3.0.1
+info:
+  title: Barcode
+  version: 1.0.0
+security:
+  - bearerAuth: []
+paths:
+  /barcode:
+    post:
+      operationId: generateBarcode
+      security: []
+      responses:
+        '200':
+          description: ok
+    get:
+      operationId: listBarcodes
+      responses:
+        '200':
+          description: ok
+  /health:
+    get:
+      operationId: health
+      x-gateway-public: true
+      responses:
+        '200':
+          description: ok
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer

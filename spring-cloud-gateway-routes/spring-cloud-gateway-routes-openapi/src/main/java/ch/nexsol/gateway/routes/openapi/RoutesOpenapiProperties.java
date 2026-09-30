@@ -159,6 +159,22 @@ public class RoutesOpenapiProperties {
 		 */
 		private boolean validate;
 
+		/**
+		 * Whether the {@code public} route metadata read by the
+		 * {@code spring-cloud-gateway-routes-security} plugin is derived from the
+		 * contract, for the operations it declares as reachable without authentication:
+		 * an empty {@code security} requirement, or the {@code x-gateway-public}
+		 * extension. Off by default, so a contract already carrying such declarations
+		 * does not silently open routes the gateway was protecting.
+		 * <p>
+		 * In {@link RouteGenerationMode#PER_OPERATION} mode each route is flagged from
+		 * its own operation; in {@link RouteGenerationMode#AGGREGATED} mode the single
+		 * route covers them all, so it is flagged only when every operation is public.
+		 * The flag is only ever added: a source declaring {@code metadata.public} keeps
+		 * it on every route it generates.
+		 */
+		private boolean publicFromContract;
+
 		public String getId() {
 			return this.id;
 		}
@@ -229,6 +245,14 @@ public class RoutesOpenapiProperties {
 
 		public void setValidate(boolean validate) {
 			this.validate = validate;
+		}
+
+		public boolean isPublicFromContract() {
+			return this.publicFromContract;
+		}
+
+		public void setPublicFromContract(boolean publicFromContract) {
+			this.publicFromContract = publicFromContract;
 		}
 
 	}
