@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Fixes go to the line marked Current in [Compatibility](README.md#compatibility) — `1.17.x`
+Fixes go to the line marked Current in [Compatibility](README.md#compatibility) — `1.18.x`
 today — and to every line that table marks Maintained. A line goes to end of life as soon as a
 new Current line opens on the same Spring Boot version, since moving to it needs no Spring Boot
 upgrade; a line on an older Spring Boot version keeps its own branch.
