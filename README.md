@@ -64,14 +64,14 @@ line and is never moved to another one:
 
 | Line | Spring Boot | Spring Cloud | Status |
 | --- | --- | --- | --- |
-| `1.18.x` | 4.1.Y | 2025.1.x | Current, developed on `main` |
+| `1.19.x` | 4.1.Y | 2025.1.x | Current, developed on `main` |
 | `1.14.x` | 4.0.Y | 2025.1.x | Maintained on `spring_boot_4.0.x` |
-| `1.5.x` – `1.13.x`, `1.15.x` – `1.17.x` | 4.0.Y, 4.1.Y | 2025.1.x | End of life |
+| `1.5.x` – `1.13.x`, `1.15.x` – `1.18.x` | 4.0.Y, 4.1.Y | 2025.1.x | End of life |
 | `1.0.x` – `1.3.x` | 3.5.Y | 2025.0.x | End of life |
 
 ## AOT and native image
 
-Since `1.18.1`, every plugin ships the reachability metadata its own classes need, so an
+Since `1.19.0`, every plugin ships the reachability metadata its own classes need, so an
 application carrying them builds with Spring ahead-of-time processing, against a JDK AOT cache,
 and as a GraalVM native image. One sample stands for each build:
 [gateway-full-cache-aot](spring-cloud-gateway-samples/gateway/gateway-full-cache-aot/README.md),
