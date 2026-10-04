@@ -65,6 +65,12 @@ routes:
 Besides `watch`, the routes are reloaded on `/actuator/refresh` and `/actuator/busrefresh` —
 see [Refreshing routes](../README.md#refreshing-routes).
 
+## Native image
+
+A `classpath:` location is registered as a resource of the image when the application is
+processed ahead of time, so the files it names are embedded. `file:` locations are read off the
+host and need nothing.
+
 ## Sample
 
 [gateway-routes-files](../../spring-cloud-gateway-samples/gateway/gateway-routes-files/README.md)

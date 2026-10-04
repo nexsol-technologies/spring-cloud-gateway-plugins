@@ -19,6 +19,8 @@ package ch.nexsol.gateway.ui.security;
 import java.util.Map;
 import java.util.Set;
 
+import ch.nexsol.gateway.ui.view.KeyValue;
+
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -75,7 +77,7 @@ public class LoginController {
 	@GetMapping("/login")
 	public String login(ServerWebExchange exchange, Model model) {
 		Set<String> markers = exchange.getRequest().getQueryParams().keySet();
-		model.addAttribute("oauth2Providers", this.providers);
+		model.addAttribute("oauth2Providers", KeyValue.of(this.providers));
 		model.addAttribute("credentialsForm", this.credentialsForm);
 		model.addAttribute("loginError", markers.contains("error"));
 		model.addAttribute("oauth2Error", markers.contains("error_oauth2"));

@@ -1,0 +1,135 @@
+name: build native image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-native-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: build-native
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: free disk space
+        continue-on-error: true
+        run: |
+          df -h
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt clean
+          docker rmi $(docker image ls -aq)
+          df -h
+
+      - uses: actions/checkout@v7
+
+      - name: Set up GraalVM 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'graalvm'
+          java-version: '25'
+          cache: 'maven'
+
+      - name: Install the plugins the sample needs
+        run: |
+          mvn -B -DskipTests install --no-transfer-progress -D maven.javadoc.skip=true \
+              -pl spring-cloud-gateway-samples/gateway/gateway-full-native -am
+
+      - name: Build the native image
+        run: |
+          mvn -B -Pnative -DskipTests --no-transfer-progress \
+              -pl spring-cloud-gateway-samples/gateway/gateway-full-native native:compile
+
+      - name: Start it and check the routes it built
+        run: |
+          BIN=spring-cloud-gateway-samples/gateway/gateway-full-native/target/sample-gateway-full-native
+          "$BIN" > native.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+
+          up=
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8223/actuator/health > /dev/null; then up=yes; break; fi
+            sleep 1
+          done
+          if [ -z "$up" ]; then echo "the image never became healthy"; cat native.log; exit 1; fi
+
+          # Every route of the sample carries a filter whose arguments are bound
+          # reflectively: a missing hint shows up as a route the gateway never built. The
+          # actuator sits behind the sample's one user, like everything the plugins put
+          # behind the console's security chain.
+          ROUTES=$(curl -sf -u sample:sample http://localhost:8223/actuator/gateway/routes) || {
+            echo "the routes endpoint did not answer"; cat native.log; exit 1;
+          }
+          echo "$ROUTES" | tr ',' '\n' | grep route_id || true
+          # files_httpbin_route comes from a file on the classpath, which an image embeds
+          # only when it is registered: without the hint the file reads empty and the
+          # route is never built, with nothing logged.
+          for id in authorization convert-http-method maintenance authorization-token audited bookstore files_httpbin_route; do
+            echo "$ROUTES" | grep -q "\"$id\"" || { echo "route $id was not built"; cat native.log; exit 1; }
+          done
+
+          # The passive scanner answers its readings as records Jackson writes reflectively:
+          # one without a hint has no property to find, so the reading does not come back.
+          COVERAGE=$(curl -sf http://localhost:8223/passive-scan/coverage) || {
+            echo "the passive-scan coverage did not answer"; cat native.log; exit 1;
+          }
+          echo "$COVERAGE" | grep -q '"code"' || {
+            echo "the coverage came back without its readings: $COVERAGE"; cat native.log; exit 1;
+          }
+          SUMMARY=$(curl -sf http://localhost:8223/passive-scan/summary) || {
+            echo "the passive-scan summary did not answer"; cat native.log; exit 1;
+          }
+          echo "$SUMMARY" | grep -q '"total"' || {
+            echo "the summary came back without its readings: $SUMMARY"; cat native.log; exit 1;
+          }
+
+          # The contract is read on the first exchange of its route, through the OpenAPI
+          # model and the mix-ins of swagger-core, all reached reflectively: a path the
+          # contract does not declare is refused with a 400 by the filter, whereas a
+          # contract that could not be read is forwarded to the closed port behind it.
+          CONTRACT=$(curl -s -o /dev/null -w '%{http_code}' -u sample:sample http://localhost:8223/bookstore/nope)
+          [ "$CONTRACT" = "400" ] || {
+            echo "the contract was not applied: /bookstore/nope answered $CONTRACT, not 400"; cat native.log; exit 1;
+          }
+
+          # The console's data feeds are records Jackson writes, which needs their
+          # constructors as well as their accessors; the metrics feed always carries this
+          # instance, so its payload is never empty.
+          METRICS=$(curl -sf -u sample:sample http://localhost:8223/ui/metrics/instances/data) || {
+            echo "the metrics feed did not answer"; cat native.log; exit 1;
+          }
+          echo "$METRICS" | grep -q '"instances"' || {
+            echo "the metrics feed came back without its readings: $METRICS"; cat native.log; exit 1;
+          }
+
+          # The console renders its view models through SpEL, which looks an accessor up
+          # with Class.getMethods(): an unregistered one fails the expression, not the
+          # request, so the page is fetched and its rendered markup checked.
+          CONSOLE=$(curl -sf http://localhost:8223/ui) || {
+            echo "the console did not answer"; cat native.log; exit 1;
+          }
+          echo "$CONSOLE" | grep -q 'data-gw-group' || {
+            echo "the console rendered without its navigation; a view model carries no hint"
+            echo "$CONSOLE" | head -40; cat native.log; exit 1;
+          }
+
+      - name: Upload the native build log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-image-build
+          path: |
+            spring-cloud-gateway-samples/gateway/gateway-full-native/target/native/**/*.txt
+            native.log
+          if-no-files-found: warn
+          retention-days: 14

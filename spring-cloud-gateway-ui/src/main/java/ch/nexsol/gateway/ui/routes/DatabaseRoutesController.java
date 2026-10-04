@@ -36,6 +36,7 @@ import ch.nexsol.gateway.database.model.RouteCreateModel;
 import ch.nexsol.gateway.database.service.ApiService;
 import ch.nexsol.gateway.database.service.GatewayConfigService;
 import ch.nexsol.gateway.database.service.PredicateArgsFormatException;
+import ch.nexsol.gateway.ui.view.KeyValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
@@ -233,7 +234,7 @@ public class DatabaseRoutesController {
 				: this.gatewayConfigService.getRequiredArgsForPredicate(name);
 		model.addAttribute("kind", kind);
 		model.addAttribute("index", index);
-		model.addAttribute("args", args);
+		model.addAttribute("args", KeyValue.of(args));
 		model.addAttribute("requiredArgs", required);
 		return Mono.just("dashboard/fragments/route-db-element :: args");
 	}
@@ -451,6 +452,14 @@ public class DatabaseRoutesController {
 	 * @param args the ordered argument name to value map
 	 */
 	public record ElementRowView(long index, String name, Map<String, String> args) {
+
+		/**
+		 * The arguments as the template iterates them.
+		 * @return one entry per argument, in order
+		 */
+		public List<KeyValue> arguments() {
+			return KeyValue.of(this.args);
+		}
 
 	}
 

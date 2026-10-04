@@ -28,6 +28,9 @@
 		<module>gateway-secured</module>
 		<module>gateway-passive-scan</module>
 		<module>gateway-full</module>
+		<module>gateway-full-cache-aot</module>
+		<module>gateway-full-aot-jvm</module>
+		<module>gateway-full-native</module>
 	</modules>
 
 	<dependencies>

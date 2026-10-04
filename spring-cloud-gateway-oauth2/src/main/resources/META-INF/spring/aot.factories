@@ -1,0 +1,2 @@
+org.springframework.aot.hint.RuntimeHintsRegistrar=\
+ch.nexsol.gateway.oauth2.autoconfigure.GatewayOauth2RuntimeHints

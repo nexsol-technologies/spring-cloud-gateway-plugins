@@ -73,10 +73,10 @@
 					as the alternative to the form rather than as a second submit button, so
 					the two ways in do not read as the same one twice.
 				-->
-				<div th:if="${not #maps.isEmpty(oauth2Providers)}">
+				<div th:if="${not #lists.isEmpty(oauth2Providers)}">
 					<a th:each="provider : ${oauth2Providers}" class="btn btn-outline-primary w-100 mb-2"
-							th:href="@{/oauth2/authorization/{id}(id=${provider.key})}"
-							href="#" th:text="'Sign in with ' + ${provider.value}">Sign in with the provider</a>
+							th:href="@{/oauth2/authorization/{id}(id=${provider.key()})}"
+							href="#" th:text="'Sign in with ' + ${provider.value()}">Sign in with the provider</a>
 					<div class="gw-login-divider text-secondary small" th:if="${credentialsForm}">or</div>
 				</div>
 

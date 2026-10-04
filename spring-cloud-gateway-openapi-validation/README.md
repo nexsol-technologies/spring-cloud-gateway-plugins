@@ -187,6 +187,14 @@ spring.cloud.gateway.server.webflux.routes-openapi:
 The filter is given the `spec-url` and `path-prefix` of the source, so they cannot drift apart,
 and it is placed ahead of every other filter of the route.
 
+## Native image
+
+A `classpath:` `specUrl` on a route declared in the properties is registered as a resource of
+the image when the application is processed ahead of time. Routes read from a database or a
+file are not known at that point: a `classpath:` contract they name must be registered by the
+application, with a `RuntimeHintsRegistrar` registering its path as a resource pattern. `file:`
+and `http(s):` contracts need nothing.
+
 ## Sample
 
 [gateway-openapi-validation](../spring-cloud-gateway-samples/gateway/gateway-openapi-validation/README.md)
