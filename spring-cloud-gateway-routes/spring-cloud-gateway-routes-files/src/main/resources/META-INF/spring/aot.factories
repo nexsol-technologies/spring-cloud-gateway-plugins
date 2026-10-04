@@ -1,0 +1,2 @@
+org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor=\
+ch.nexsol.gateway.routes.files.autoconfigure.RoutesFilesResourceHints

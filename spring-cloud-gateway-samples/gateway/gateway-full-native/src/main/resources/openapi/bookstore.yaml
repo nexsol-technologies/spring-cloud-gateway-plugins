@@ -1,0 +1,121 @@
+openapi: 3.0.3
+info:
+  title: Bookstore
+  version: 1.0.0
+paths:
+  /books:
+    get:
+      operationId: listBooks
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [available, borrowed]
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: The books
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Book'
+    post:
+      operationId: createBook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Book'
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+  # Declared alongside /books/{id} on purpose: a concrete path must win over a template.
+  /books/mine:
+    get:
+      operationId: listMyBooks
+      responses:
+        '200':
+          description: The books of the caller
+  /books/{id}:
+    # Declared on the path item rather than the operation, so the merge of both levels is
+    # exercised.
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: getBook
+      parameters:
+        - name: verbose
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: The book
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '404':
+          description: No such book
+  /books/{id}/cover:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      operationId: uploadCover
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '204':
+          description: Uploaded
+components:
+  schemas:
+    Book:
+      type: object
+      required: [title, author]
+      properties:
+        title:
+          type: string
+        author:
+          type: string
+        pages:
+          type: integer
+          minimum: 1

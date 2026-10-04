@@ -18,7 +18,7 @@
 			onclick="gwRemoveRow(this)">&times;</button>
 	</div>
 	<div class="element-args mt-2" th:id="|args-${row.index()}|"
-		th:with="index=${row.index()},args=${row.args()}">
+		th:with="index=${row.index()},args=${row.arguments()}">
 		<th:block th:replace="~{dashboard/fragments/route-db-element :: args}"></th:block>
 	</div>
 </div>
@@ -26,10 +26,10 @@
 <!-- Argument inputs for one element. Expects the context variables kind, index and args. -->
 <th:block th:fragment="args">
 	<div class="mb-2" th:each="arg : ${args}">
-		<label class="form-label small mb-1" th:text="${arg.key}">arg</label>
-		<input class="form-control form-control-sm" th:name="|${kind}s[${index}].args[${arg.key}]|"
-			th:value="${arg.value}"
-			th:attr="required=${requiredArgs != null and requiredArgs.contains(arg.key)} ? 'required' : null">
+		<label class="form-label small mb-1" th:text="${arg.key()}">arg</label>
+		<input class="form-control form-control-sm" th:name="|${kind}s[${index}].args[${arg.key()}]|"
+			th:value="${arg.value()}"
+			th:attr="required=${requiredArgs != null and requiredArgs.contains(arg.key())} ? 'required' : null">
 	</div>
 </th:block>
 

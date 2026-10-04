@@ -1,0 +1,141 @@
+server.port: 8222
+spring.application.name: sample-gateway-full-aot-jvm
+
+# Every plugin this sample carries runs offline: no registry, no Redis, no Kafka, no
+# authorization server. What matters for an ahead-of-time build is that the route
+# definitions below are *built* at startup, since that is what needs the reflection the
+# plugins register — a missing hint shows up here, as a route that will not bind.
+spring.cloud.gateway.server.webflux:
+  webfilter:
+    correlation-id.enabled: true
+  routes:
+
+  # spring-cloud-gateway-filters
+  - id: authorization
+    uri: http://localhost:8080
+    predicates:
+    - Path=/authorization/**
+    filters:
+    - name: Authorization
+      args:
+        authorities: ROLE_READ
+    - StripPrefix=1
+
+  - id: convert-http-method
+    uri: http://localhost:8080
+    predicates:
+    - Path=/convert-method/**
+    - Method=GET
+    filters:
+    - ConvertHttpMethod=POST
+    - StripPrefix=1
+
+  # The maintenance config is the deepest one to bind: a list of nested claim objects and
+  # two enums, all of it read reflectively.
+  - id: maintenance
+    uri: http://localhost:8080
+    predicates:
+    - Path=/maintenance/**
+    filters:
+    - name: Maintenance
+      args:
+        message: The shop is closed until 4am.
+        status: 593
+        allowed-authorities: [ROLE_ADMIN]
+        allowed-claims:
+        - json-path: '$.roles'
+          values: [ADMIN]
+          match: ANY
+        allowed-claims-match: ANY
+    - StripPrefix=1
+
+  # spring-cloud-gateway-oauth2
+  - id: authorization-token
+    uri: http://localhost:8080
+    predicates:
+    - Path=/authorization-token/**
+    filters:
+    - name: AuthorizationToken
+      args:
+        issuers: ''
+        client-ids:
+        grant-accesses:
+        - jsonPath: '$.roles'
+          roles: 'READ'
+    - StripPrefix=1
+
+  # spring-cloud-gateway-audit
+  - id: audited
+    uri: http://localhost:8080
+    predicates:
+    - Path=/audited/**
+    filters:
+    - Audit
+    - StripPrefix=1
+
+  # spring-cloud-gateway-openapi-validation: the contract is on the classpath, so no
+  # network. It is read on the first exchange this route handles, not at start-up, so the
+  # OpenAPI model hints are only exercised by a request to /bookstore/**.
+  - id: bookstore
+    uri: http://localhost:8080
+    predicates:
+    - Path=/bookstore/**
+    filters:
+    - name: OpenapiValidation
+      args:
+        specUrl: classpath:openapi/bookstore.yaml
+        pathPrefix: /bookstore
+    - StripPrefix=1
+
+# spring-cloud-gateway-routes-files
+spring.cloud.gateway.server.webflux.routes-files:
+  enabled: true
+  watch: false
+  locations:
+  # The plugin registers a classpath location as a resource of a native image when the
+  # application is processed ahead of time, so the file is embedded. A named file rather
+  # than a pattern: a pattern also asks the image to list the directory.
+  - classpath:gateway-routes/extra-routes.yaml
+
+# spring-cloud-gateway-routes-openapi is left off: it reads its contract over the network
+# at startup, which this sample must not need. spring-cloud-gateway-hub-openapi is opt-in
+# and needs a service registry to aggregate anything, so it is left off too. Both are on
+# the classpath, so both contribute their hints to the build either way.
+spring.cloud.gateway.server.webflux.routes-openapi.enabled: false
+
+# spring-cloud-gateway-metrics and spring-cloud-gateway-service-graph, both reporting
+# this instance only — no Redis, no registry to consolidate over.
+spring.cloud.gateway.server.webflux.metrics.enabled: true
+spring.cloud.gateway.server.webflux.service-graph.enabled: true
+
+# spring-cloud-gateway-pentest-passive. It observes the traffic the routes handled and
+# raises findings, sending nothing of its own, so it runs offline like the rest of this
+# sample. Body capture is on so the body-aware scanners run too. The scores and the
+# coverage are answered as JSON under /passive-scan, which is where a missing hint on
+# those records would show: Jackson finds no property to write, and the reading does not
+# come back.
+spring.cloud.gateway.server.webflux.pentest.passive:
+  enabled: true
+  body:
+    enabled: true
+
+# spring-cloud-gateway-ui needs no property: carrying the dependency serves the console.
+# The user the actuator and the console's secured paths accept is declared in the
+# application class — sample / sample.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+        - prometheus
+  endpoint:
+    gateway:
+      access: read-only
+
+logging:
+  level:
+    '[ch.nexsol]': info

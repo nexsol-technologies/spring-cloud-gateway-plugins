@@ -237,6 +237,13 @@ applies. A contract of any size is therefore accepted, the memory it takes while
 only bound, and the reactive codec ceiling (`spring.http.codecs.max-in-memory-size`, and the
 OpenAPI hub's `max-document-size`) governs neither the read nor the reload.
 
+## Native image
+
+A `classpath:` sources location is registered as a resource of the image when the application is
+processed ahead of time. The contracts a sources file names are read at run time and are not:
+a `classpath:` contract must be registered by the application, with a `RuntimeHintsRegistrar`
+registering its path as a resource pattern. `file:` and `http(s):` locations need nothing.
+
 ## Sample
 
 [gateway-routes-all](../../spring-cloud-gateway-samples/gateway/gateway-routes-all/README.md)

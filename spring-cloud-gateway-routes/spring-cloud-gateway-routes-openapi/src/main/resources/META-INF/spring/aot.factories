@@ -1,0 +1,4 @@
+org.springframework.aot.hint.RuntimeHintsRegistrar=\
+ch.nexsol.gateway.routes.openapi.autoconfigure.OpenapiRoutesRuntimeHints
+org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor=\
+ch.nexsol.gateway.routes.openapi.autoconfigure.OpenapiSourcesResourceHints

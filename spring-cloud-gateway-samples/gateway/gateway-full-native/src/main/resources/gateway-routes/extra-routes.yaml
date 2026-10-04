@@ -1,0 +1,10 @@
+routes:
+  - id: files_httpbin_route
+    uri: https://httpbin.org
+    predicates:
+      - Path=/files-demo/**
+      - Method=GET
+    filters:
+      - StripPrefix=1
+    metadata:
+      source: files
