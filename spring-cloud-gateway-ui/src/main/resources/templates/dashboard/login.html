@@ -29,8 +29,9 @@
 <body class="bg-body-tertiary">
 	<main class="gw-login">
 		<div class="card border-0 shadow-sm gw-login-card">
-			<div class="card-body p-4 p-sm-5">
-				<div class="text-center mb-4">
+			<!-- Padded less above and below than the forbidden page: this card has far more on it. -->
+			<div class="card-body px-4 px-sm-5 py-4">
+				<div class="text-center mb-3">
 					<!--
 						The lockup of the home page, in the two drawings the themes need — or, when
 						the application configured one, the logo of the organisation running the
@@ -48,7 +49,7 @@
 						<img class="gw-brand-mark gw-logo-dark" th:src="@{${branding.darkLogo()}}" src="#"
 								alt="" aria-hidden="true">
 					</th:block>
-					<p class="text-secondary mb-0 mt-3">Sign in to the gateway console.</p>
+					<p class="text-secondary mb-0 mt-2">Sign in to the gateway console.</p>
 				</div>
 
 				<!--

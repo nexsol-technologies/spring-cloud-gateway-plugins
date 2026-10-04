@@ -792,11 +792,13 @@ body {
 /*
  * The logo configured in place of the lockup, on the login page and on the home page.
  * One box on both, so a file drawn for one reads the same on the other: its size is what
- * the README tells the application to draw for.
+ * the README tells the application to draw for. Tall enough for an emblem stacked over a
+ * wordmark, the common shape of an organisation's logo: at 80px such a drawing came out
+ * 130px wide and unreadable.
  */
 .gw-brand-mark {
 	max-width: 280px;
-	max-height: 80px;
+	max-height: 120px;
 	width: auto;
 	height: auto;
 }
@@ -1503,10 +1505,14 @@ body {
 	margin: 0 auto;
 }
 
-/* The signature of the login card, under a rule at its foot. */
+/*
+ * The signature of the login card, under a rule at its foot. The card has to fit the 800px
+ * a 13-inch laptop leaves a page with a provider button, an alert and the form on it, so
+ * the vertical rhythm of the card is kept tight here and in the divider below.
+ */
 .gw-login-signature {
-	margin-top: 1.5rem;
-	padding-top: 1rem;
+	margin-top: 1rem;
+	padding-top: .75rem;
 	border-top: 1px solid var(--gw-border);
 	text-align: center;
 }
@@ -1523,7 +1529,7 @@ body {
 	display: flex;
 	align-items: center;
 	gap: .6rem;
-	margin: 1rem 0;
+	margin: .75rem 0;
 }
 
 .gw-login-divider::before,

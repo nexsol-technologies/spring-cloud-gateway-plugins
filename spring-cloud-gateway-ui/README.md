@@ -168,12 +168,13 @@ spring.cloud.gateway.server.webflux.ui:
   hosts it. A path is opened in the security chain of the console along with the other
   assets of the login page, since a logo behind the login it illustrates would never be
   drawn; a URL is not the console's to open.
-* **Size.** Both pages scale the drawing to fit a box of **280 × 80 CSS pixels**, so supply a
-  landscape file at twice that, **560 × 160 pixels**, for it to stay sharp on high-density
-  screens. A taller drawing is scaled to 80 pixels high and reads small; a wider one to 280
-  pixels wide. PNG or SVG with a transparent background, under 100 KB. A logo whose text is
-  dark needs a `logo-dark` drawn for a dark page; one that reads on both grounds needs
-  nothing.
+* **Size.** Both pages scale the drawing to fit a box of **280 × 120 CSS pixels**: a wide
+  wordmark takes the width, an emblem stacked over a name takes the height. Supply a file at
+  twice that at most, **560 × 240 pixels**, for it to stay sharp on high-density screens, and
+  crop it to the drawing — padding in the file is padding on the page, and a logo drawn
+  small in a large canvas comes out small. PNG or SVG with a transparent background, under
+  100 KB: an opaque background shows as a rectangle on the card. A logo whose text is dark
+  needs a `logo-dark` drawn for a dark page; one that reads on both grounds needs nothing.
 
 ## Routes
 
