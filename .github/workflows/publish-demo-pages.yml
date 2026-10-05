@@ -1,7 +1,8 @@
 # The pages a README cannot hold: the views of the console that move, published to GitHub
 # Pages so they can be watched moving. Their markup, their stylesheet and their scripts are
 # the module's own files, assembled by tools/demo-site.mjs; only the traffic they draw is
-# invented, and the pages say so.
+# invented, and the pages say so. The READMEs are published beside them under docs/, built by
+# MkDocs from what tools/docs-site.mjs gathers.
 #
 # Called by the release workflow, so a release refreshes what is published, and startable on
 # its own for the times the site has to go out without one — the first publication, or a fix
@@ -47,6 +48,16 @@ jobs:
 
       - name: Assemble the demo pages
         run: node tools/demo-site.mjs --version=${{ inputs.version }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Build the documentation
+        run: |
+          pip install 'mkdocs<2' 'mkdocs-material==9.*'
+          node tools/docs-site.mjs
+          mkdocs build --strict -f tools/mkdocs.yml
 
       - uses: actions/configure-pages@v6
 
