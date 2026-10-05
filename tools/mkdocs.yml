@@ -1,0 +1,45 @@
+# Built from the READMEs gathered by tools/docs-site.mjs, into the docs/ directory of the site
+# tools/demo-site.mjs assembles. Paths are relative to this file. See tools/README.md.
+site_name: Spring Cloud Gateway Plugins
+site_url: https://nexsol-technologies.github.io/spring-cloud-gateway-plugins/docs/
+repo_url: https://github.com/nexsol-technologies/spring-cloud-gateway-plugins
+docs_dir: ../target/docs-src
+site_dir: ../target/demo-site/docs
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.indexes
+    - navigation.sections
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Light mode
+
+# Anchors are written for GitHub, which keeps case-folded words and drops punctuation; the
+# default slugifier of Python-Markdown does not produce the same ids.
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+validation:
+  links:
+    anchors: warn

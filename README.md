@@ -22,7 +22,8 @@ lights up a view per plugin present on the classpath. Each one is activated by c
 alone.
 
 The console's [Flow](https://nexsol-technologies.github.io/spring-cloud-gateway-plugins/flow.html)
-view runs live here, on invented traffic.
+view runs live here, on invented traffic, and these READMEs are published with search and
+navigation at [nexsol-technologies.github.io/spring-cloud-gateway-plugins/docs](https://nexsol-technologies.github.io/spring-cloud-gateway-plugins/docs/).
 
 ```xml
 <dependency>

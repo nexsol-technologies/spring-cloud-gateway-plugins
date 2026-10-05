@@ -120,3 +120,31 @@ They are published by
 workflow calls so that a release refreshes the site, and which can be started on its own when
 the site has to go out without one. A deployment replaces the site whole, so nothing else may
 publish to Pages.
+
+## docs-site.mjs
+
+Gathers the READMEs git tracks into `target/docs-src`, from which MkDocs builds the
+documentation published under
+[docs/](https://nexsol-technologies.github.io/spring-cloud-gateway-plugins/docs/) on the same
+site, with a navigation per module and a search.
+
+```console
+node tools/demo-site.mjs                          # first: it empties target/demo-site
+node tools/docs-site.mjs                          # writes target/docs-src
+pip install 'mkdocs<2' 'mkdocs-material==9.*'
+mkdocs build --strict -f tools/mkdocs.yml         # writes target/demo-site/docs
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `--out` | `target/docs-src` | Where the READMEs are gathered; the directory is emptied first |
+
+A link between READMEs and a link to a screenshot work on the site as they do on GitHub. A link
+to any other file — a `docker-compose.yml`, a sample directory without a README — is pointed at
+that file on GitHub, on `main`. A link to a file that does not exist fails the script, and a
+link to a heading that does not exist fails `mkdocs build --strict`: write anchors the way
+GitHub derives them, and both sides agree.
+
+The site is built by the same
+[publish-demo-pages.yml](../.github/workflows/publish-demo-pages.yml) as the demo pages, since
+a deployment replaces the site whole.
