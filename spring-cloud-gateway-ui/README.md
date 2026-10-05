@@ -450,6 +450,10 @@ middle, the services it reached on the right.
 
 ![The flow view](doc/service-flow-light.png)
 
+A picture of it is a poor likeness of a view whose point is that it moves:
+[watch it running](https://nexsol-technologies.github.io/spring-cloud-gateway-plugins/flow.html)
+on invented traffic, in the console's own stylesheet and under the view's own script.
+
 **Nothing is redrawn between two polls.** Every box, every line and every figure on them is
 created once and kept, so a poll moves the numbers — which count up to the new value, and light
 their box while they do — rather than replacing the picture under the reader.

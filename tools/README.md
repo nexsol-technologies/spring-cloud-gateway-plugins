@@ -86,3 +86,37 @@ For a faithful run, bring the environment up first — the
 [`eureka`](../spring-cloud-gateway-samples/eureka) and
 [`service-a`](../spring-cloud-gateway-samples/service-a) samples, the `eureka` profile, the
 routes in the database — and send some traffic through the gateway before shooting.
+
+## demo-site.mjs
+
+Assembles the pages published to
+[GitHub Pages](https://nexsol-technologies.github.io/spring-cloud-gateway-plugins/) — the views
+of the console that are worth watching rather than photographing. A README can embed a drawing;
+it cannot run one.
+
+```console
+node tools/demo-site.mjs --version=1.19.0        # writes target/demo-site
+open target/demo-site/flow.html
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `--out` | `target/demo-site` | Where the assembled site is written; the directory is emptied first |
+| `--version` | `SNAPSHOT` | The version the pages report at their foot |
+
+**Nothing in those pages is a copy of the console.** The stylesheet and the scripts are the
+module's own files, taken as they are, and the markup of a view is read out of its Thymeleaf
+template with the `th:` attributes dropped — so a view changed in the module is a demo changed
+with it, and there is no second rendering of the console to keep in step. The script fails
+rather than guessing when a template no longer carries the slots it reads.
+
+What the pages supply is the one thing a published page cannot have: a gateway answering.
+`fetch` is stubbed in the page itself, over invented traffic that advances on its own, and each
+page says so where it cannot be missed. Adding a view means adding its page to
+[tools/demo](demo) and its entry to the `PAGES` table of the script.
+
+They are published by
+[publish-demo-pages.yml](../.github/workflows/publish-demo-pages.yml), which the release
+workflow calls so that a release refreshes the site, and which can be started on its own when
+the site has to go out without one. A deployment replaces the site whole, so nothing else may
+publish to Pages.

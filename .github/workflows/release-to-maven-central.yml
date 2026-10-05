@@ -59,6 +59,17 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.OSS_SONATYPE_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
+  # The live views published with the release they show. The permissions are granted here
+  # because a called workflow is given none of its own.
+  publish-demo-pages:
+    needs: publish-central-and-pages
+    permissions:
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/publish-demo-pages.yml
+    with:
+      version: ${{ github.event.inputs.releaseversion }}
+
   publish-github-release:
     needs: publish-central-and-pages
     runs-on: ubuntu-latest

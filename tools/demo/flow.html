@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flow — Spring Cloud Gateway plugins</title>
+<!--
+	The theme before the stylesheets paint, as the console's own shell does it: left to the
+	script at the end of the body, a dark page flashes white first.
+-->
+<script>
+	(function () {
+		var chosen = null;
+		try {
+			chosen = localStorage.getItem('gw-theme');
+		}
+		catch (ignored) {
+			chosen = null;
+		}
+		document.documentElement.setAttribute('data-bs-theme',
+			chosen || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+	})();
+</script>
+<link rel="stylesheet" href="css/bootstrap.min.css">
+<link rel="stylesheet" href="css/gateway-ui.css">
+<style>
+	body {
+		background: var(--gw-body);
+		min-height: 100vh;
+		padding: 1.5rem clamp(1rem, 4vw, 3rem) 3rem;
+	}
+
+	.demo-head {
+		align-items: baseline;
+		display: flex;
+		flex-wrap: wrap;
+		gap: .75rem 1.25rem;
+		margin-bottom: 1rem;
+	}
+</style>
+</head>
+<body>
+	<div class="demo-head">
+		<h1 class="h4 mb-0">Flow</h1>
+		<span class="text-secondary small" id="gf-coverage"></span>
+		<div class="ms-auto d-flex align-items-center gap-2">
+			<a class="btn btn-sm btn-outline-secondary"
+					href="https://github.com/nexsol-technologies/spring-cloud-gateway-plugins">Repository</a>
+			<button type="button" class="btn btn-sm btn-outline-secondary" id="gw-theme"
+					title="Light or dark theme">Theme</button>
+		</div>
+	</div>
+
+	<!--
+		Said once, in the open: a reader who takes these figures for a gateway's would be
+		right to be cross about it.
+	-->
+	<div class="alert alert-warning py-2 px-3 small" role="status">
+		<strong>Nothing is being polled.</strong> The traffic below is invented and advances
+		on its own, so that the view can be watched doing what it does. In a gateway, the same
+		page reads <code>GET /ui/service-graph/data</code> every three seconds and the dots are
+		the calls carried between two of them.
+	</div>
+
+	<!-- flow-view -->
+
+	<p class="text-secondary small mt-4 mb-0">
+		The console of <a
+				href="https://github.com/nexsol-technologies/spring-cloud-gateway-plugins">spring-cloud-gateway-plugins</a>,
+		version <span id="demo-version">{{version}}</span>. This page runs the console's own
+		stylesheet and the view's own script, unchanged; only the data is made up.
+	</p>
+
+	<script src="js/gateway-ui.js"></script>
+	<script>
+		/*
+		 * A gateway with traffic on it, invented. The shape is the payload the view reads from
+		 * /ui/service-graph/data, and the endpoints are the ones the gateway-full sample runs,
+		 * so what is drawn here is what that sample draws.
+		 *
+		 * Every poll adds a burst to each hop. Two of them answer 4xx and one answers 5xx from
+		 * time to time, because a flow where everything is green never shows what the colours
+		 * are for.
+		 */
+		(function () {
+			'use strict';
+
+			var CALLERS = ['frontend', 'service-a', 'mobile-app', 'partner-api', 'checkout-web',
+				'batch-loader'];
+			var SERVICES = ['localhost:8080', 'localhost:8081'];
+			var edges = [];
+			CALLERS.forEach(function (from, index) {
+				SERVICES.forEach(function (to, side) {
+					if ((index + side) % 2 === 0) {
+						edges.push({
+							from: from, to: to, routeId: to.slice(-1) === '0' ? 'service-a' : 'service-b',
+							calls: 40 + Math.round(Math.random() * 120), clientErrors: 0, errors: 0
+						});
+					}
+				});
+			});
+			edges[2].clientErrors = 24;
+			edges[4].clientErrors = 11;
+			edges[3].errors = 3;
+
+			window.fetch = function () {
+				edges.forEach(function (edge) {
+					// Squared, so most polls are quiet and a few are a burst: a flow where every
+					// hop carries the same thing every time reads as a screensaver.
+					var carried = Math.round(Math.random() * Math.random() * 45);
+					edge.calls += carried;
+					if (edge.clientErrors && Math.random() < 0.45) {
+						edge.clientErrors += Math.max(1, Math.round(carried * 0.25));
+					}
+					if (edge.errors && Math.random() < 0.15) {
+						edge.errors += 1;
+					}
+				});
+				return Promise.resolve({
+					json: function () {
+						return Promise.resolve({
+							coverage: 'demo data — nothing is being polled',
+							edges: JSON.parse(JSON.stringify(edges))
+						});
+					}
+				});
+			};
+		})();
+	</script>
+	<script src="js/gateway-service-flow.js"></script>
+</body>
+</html>

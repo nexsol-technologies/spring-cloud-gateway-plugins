@@ -21,6 +21,9 @@ filters, auditing, observability, OWASP analysis of the live traffic, and a web 
 lights up a view per plugin present on the classpath. Each one is activated by configuration
 alone.
 
+The console's [Flow](https://nexsol-technologies.github.io/spring-cloud-gateway-plugins/flow.html)
+view runs live here, on invented traffic.
+
 ```xml
 <dependency>
     <groupId>ch.nexsol-tech.gateway</groupId>

@@ -1,0 +1,58 @@
+# The pages a README cannot hold: the views of the console that move, published to GitHub
+# Pages so they can be watched moving. Their markup, their stylesheet and their scripts are
+# the module's own files, assembled by tools/demo-site.mjs; only the traffic they draw is
+# invented, and the pages say so.
+#
+# Called by the release workflow, so a release refreshes what is published, and startable on
+# its own for the times the site has to go out without one — the first publication, or a fix
+# to the pages themselves.
+#
+# A deployment replaces the site whole. Nothing else may publish to Pages: a second workflow
+# deploying its own artifact would take this one down.
+name: Publish demo pages
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'The version the published pages report'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The version the published pages report'
+        required: true
+        default: 'SNAPSHOT'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Assemble the demo pages
+        run: node tools/demo-site.mjs --version=${{ inputs.version }}
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: target/demo-site
+
+      - id: deployment
+        uses: actions/deploy-pages@v5

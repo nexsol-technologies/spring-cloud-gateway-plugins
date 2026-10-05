@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spring-cloud-gateway-plugins — live views</title>
+<script>
+	(function () {
+		var chosen = null;
+		try {
+			chosen = localStorage.getItem('gw-theme');
+		}
+		catch (ignored) {
+			chosen = null;
+		}
+		document.documentElement.setAttribute('data-bs-theme',
+			chosen || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+	})();
+</script>
+<link rel="stylesheet" href="css/bootstrap.min.css">
+<link rel="stylesheet" href="css/gateway-ui.css">
+<style>
+	body {
+		background: var(--gw-body);
+		min-height: 100vh;
+		padding: 3rem clamp(1rem, 6vw, 4rem);
+	}
+
+	main {
+		margin: 0 auto;
+		max-width: 44rem;
+	}
+</style>
+</head>
+<body>
+	<main>
+		<h1 class="h3">spring-cloud-gateway-plugins</h1>
+		<p class="text-secondary">
+			The views of the gateway console that are worth watching rather than photographing.
+			Each one runs the console's own stylesheet and its own script, unchanged; the traffic
+			they draw is invented, and no gateway is being polled.
+		</p>
+
+		<div class="card border-0 shadow-sm my-4">
+			<div class="card-body">
+				<h2 class="h5"><a href="flow.html">Flow</a></h2>
+				<p class="text-secondary small mb-0">
+					Who reaches the gateway and what the gateway reaches, laid out as the calls run.
+					Dots travel a hop when calls arrive on it, the boxes keep their row and count up,
+					and the halo of the gateway beats when it is carrying something.
+				</p>
+			</div>
+		</div>
+
+		<p class="text-secondary small">
+			Version <span id="demo-version">{{version}}</span> —
+			<a href="https://github.com/nexsol-technologies/spring-cloud-gateway-plugins">the
+			repository</a>, where the console is one plugin among a dozen.
+		</p>
+	</main>
+</body>
+</html>
