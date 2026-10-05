@@ -45,9 +45,11 @@
 						<input type="search" id="psr-query" class="form-control form-control-sm"
 								style="min-width: 16rem" placeholder="route id or path">
 					</div>
-					<div class="form-check form-switch ms-auto">
-						<input class="form-check-input" type="checkbox" id="psr-live" checked>
-						<label class="form-check-label small text-secondary" for="psr-live">Live</label>
+					<span class="gw-live ms-auto pb-1" data-gw-live="psr-auto" hidden><span
+							class="gw-live-dot"></span>Live</span>
+					<div class="form-check form-switch">
+						<input class="form-check-input" type="checkbox" id="psr-auto" checked>
+						<label class="form-check-label small text-secondary" for="psr-auto">Auto</label>
 					</div>
 					<div>
 						<button type="button" id="psr-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>

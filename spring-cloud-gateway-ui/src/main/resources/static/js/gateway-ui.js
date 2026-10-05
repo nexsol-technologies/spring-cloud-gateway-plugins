@@ -341,3 +341,38 @@ window.gatewayUi = (function () {
 		}
 	});
 })();
+
+/*
+ * The Live badge of a view that polls. A view says where its badge goes and which switch it
+ * reports on, through data-gw-live; watching that switch is the shell's business, so no view
+ * carries a line of script for it.
+ *
+ * It is bound once the page has been read rather than on the spot: a remembered switch is
+ * restored by the view that owns it, after this file has run and without firing an event, so
+ * a badge bound any earlier would report the state the page shipped with rather than the one
+ * the reader left it in.
+ */
+(function () {
+	'use strict';
+
+	function bind() {
+		Array.prototype.forEach.call(document.querySelectorAll('[data-gw-live]'), function (badge) {
+			var auto = document.getElementById(badge.getAttribute('data-gw-live'));
+			if (!auto) {
+				return;
+			}
+			var follow = function () {
+				badge.hidden = !auto.checked;
+			};
+			auto.addEventListener('change', follow);
+			follow();
+		});
+	}
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', bind);
+	}
+	else {
+		bind();
+	}
+})();

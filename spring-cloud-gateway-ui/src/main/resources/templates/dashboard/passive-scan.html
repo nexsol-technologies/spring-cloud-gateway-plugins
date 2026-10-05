@@ -70,9 +70,10 @@
 								<li><a class="dropdown-item" th:href="@{/passive-scan/export(format='html')}" href="/passive-scan/export?format=html">HTML</a></li>
 							</ul>
 						</div>
+						<span class="gw-live" data-gw-live="ps-auto" hidden><span class="gw-live-dot"></span>Live</span>
 						<div class="form-check form-switch mb-0">
-							<input class="form-check-input" type="checkbox" role="switch" id="ps-live" checked>
-							<label class="form-check-label small" for="ps-live">Live</label>
+							<input class="form-check-input" type="checkbox" role="switch" id="ps-auto" checked>
+							<label class="form-check-label small" for="ps-auto">Auto</label>
 						</div>
 						<button type="button" id="ps-refresh" class="btn btn-sm btn-outline-primary">Refresh</button>
 					</div>

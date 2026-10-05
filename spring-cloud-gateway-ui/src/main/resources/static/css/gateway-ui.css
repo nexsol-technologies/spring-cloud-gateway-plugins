@@ -1115,31 +1115,138 @@ body {
 	overflow: hidden;
 }
 
+/* Live badge --------------------------------------------------------------- */
+
+/*
+ * Every view that refreshes on its own wears the same one, next to the switch that decides
+ * it: a console whose figures move under the reader has to say so, in the same place and in
+ * the same words wherever it happens. It is hidden rather than dimmed when the view is not
+ * polling, because the question it answers then has no answer.
+ */
+.gw-live {
+	align-items: center;
+	color: var(--gw-accent);
+	display: inline-flex;
+	font-size: .7rem;
+	font-weight: 600;
+	gap: .35rem;
+	letter-spacing: .09em;
+	text-transform: uppercase;
+}
+
+.gw-live-dot {
+	animation: gw-live-pulse 1.8s ease-in-out infinite;
+	background: currentcolor;
+	border-radius: 50%;
+	height: .45rem;
+	width: .45rem;
+}
+
+@keyframes gw-live-pulse {
+	0%,
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+
+	50% {
+		opacity: .3;
+		transform: scale(.7);
+	}
+}
+
+/* Nothing on the console blinks at a reader who asked for stillness. */
+@media (prefers-reduced-motion: reduce) {
+	.gw-live-dot {
+		animation: none;
+	}
+}
+
 /* Flow view ---------------------------------------------------------------- */
 
 /*
  * The picture is laid out in real pixels from the width of this container rather than
  * scaled through a viewBox: a viewBox would grow the labels with the screen, and the names
  * of the endpoints are the one thing on it that has to stay readable at any width.
+ *
+ * Everything drawn on it takes its colour from one pair of variables — the state of what is
+ * being drawn, and the same colour as a triplet for the tints built on it — set on the group
+ * and read by the box, the line and the dots under it. A state is then three declarations
+ * rather than a rule per element, and the two themes are two blocks rather than two of
+ * everything.
  */
 .gw-flow {
 	overflow-x: auto;
+
+	--gf-ok: #198754;
+	--gf-ok-rgb: 25, 135, 84;
+	--gf-warn: #b57206;
+	--gf-warn-rgb: 181, 114, 6;
+	--gf-bad: #c0392f;
+	--gf-bad-rgb: 192, 57, 47;
+	/* The halo of the hub, over a page that is already light, is a hint rather than a lamp. */
+	--gf-halo: .2;
+	--gf-halo-mid: .07;
+	--gf-rings: .3;
+}
+
+[data-bs-theme="dark"] .gw-flow {
+	--gf-ok: #34d068;
+	--gf-ok-rgb: 52, 208, 104;
+	--gf-warn: #ffc107;
+	--gf-warn-rgb: 255, 193, 7;
+	--gf-bad: #ea868f;
+	--gf-bad-rgb: 234, 134, 143;
+	--gf-halo: .42;
+	--gf-halo-mid: .15;
+	--gf-rings: .4;
+}
+
+.gw-flow-ok {
+	--gf-state: var(--gf-ok);
+	--gf-state-rgb: var(--gf-ok-rgb);
+}
+
+.gw-flow-warn {
+	--gf-state: var(--gf-warn);
+	--gf-state-rgb: var(--gf-warn-rgb);
+}
+
+.gw-flow-bad {
+	--gf-state: var(--gf-bad);
+	--gf-state-rgb: var(--gf-bad-rgb);
 }
 
 .gw-flow-svg {
 	display: block;
 }
 
-.gw-flow-node rect {
+/*
+ * A box: a strip carrying what it is and how much of the traffic it took, then the name and
+ * the figure it is there for. Both are tinted by the worst outcome the endpoint has ever
+ * seen, which is why a healthy picture is quietly green and a failing one is not.
+ */
+.gw-flow-box {
 	fill: var(--gw-surface-alt);
-	stroke: var(--gw-border-strong);
+}
+
+.gw-flow-strip {
+	fill: rgba(var(--gf-state-rgb), .15);
+}
+
+.gw-flow-border {
+	fill: none;
+	stroke: rgba(var(--gf-state-rgb), .5);
 	stroke-width: 1;
 }
 
-/* The gateway sits on every hop, so it is the one box drawn in the accent. */
-.gw-flow-hub rect {
-	fill: var(--gw-accent);
-	stroke: var(--gw-accent);
+.gw-flow-kicker,
+.gw-flow-share {
+	fill: var(--gf-state);
+	font-size: 9.5px;
+	font-weight: 600;
+	letter-spacing: .09em;
+	text-transform: uppercase;
 }
 
 .gw-flow-name {
@@ -1148,96 +1255,223 @@ body {
 	font-size: 13px;
 }
 
+/*
+ * Every figure on the picture counts up to its new value rather than jumping to it, and a
+ * proportional digit is a number that shivers while it does. The tabular one is also what
+ * keeps a column of counts aligned on its right edge.
+ */
+.gw-flow-count {
+	fill: var(--gw-text);
+	font-size: 21px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+/* The figure only takes the colour of a state worth answering for. */
+.gw-flow-warn > .gw-flow-count,
+.gw-flow-bad > .gw-flow-count {
+	fill: var(--gf-state);
+}
+
 .gw-flow-detail {
 	fill: var(--gw-text-muted);
-	font-size: 11px;
+	font-size: 10.5px;
+	font-variant-numeric: tabular-nums;
 }
 
-/* Drawn on the accent, the two lines of the hub need the contrast of their own ground. */
-.gw-flow-hub .gw-flow-name {
+/* The gateway sits on every hop, so it is the one box drawn in the accent. */
+.gw-flow-hub .gw-flow-box {
+	fill: var(--gw-surface-solid);
+}
+
+.gw-flow-hub .gw-flow-strip {
+	fill: var(--gw-accent);
+}
+
+.gw-flow-hub .gw-flow-border {
+	stroke: var(--gw-accent);
+	stroke-width: 1.5;
+}
+
+/*
+ * The hub answers for no endpoint, so it carries no state and nothing sets --gf-state on it.
+ * Its flash is given the accent by name: left to the variable it would resolve to nothing,
+ * and a fill that does not resolve is painted black.
+ */
+.gw-flow-hub .gw-flow-flash {
+	fill: var(--gw-accent);
+}
+
+.gw-flow-hub .gw-flow-kicker,
+.gw-flow-hub .gw-flow-share {
 	fill: #fff;
-	font-family: inherit;
-	font-weight: 600;
 }
 
-.gw-flow-hub .gw-flow-detail {
-	fill: rgba(255, 255, 255, .85);
-}
-
-[data-bs-theme="dark"] .gw-flow-hub .gw-flow-name {
+[data-bs-theme="dark"] .gw-flow-hub .gw-flow-kicker,
+[data-bs-theme="dark"] .gw-flow-hub .gw-flow-share {
 	fill: #08150d;
 }
 
-[data-bs-theme="dark"] .gw-flow-hub .gw-flow-detail {
-	fill: rgba(8, 21, 13, .75);
+.gw-flow-title {
+	fill: var(--gw-text);
+	font-size: 20px;
+	font-weight: 600;
 }
 
-.gw-flow-edge {
+.gw-flow-stat {
+	fill: var(--gw-accent);
+	font-size: 15px;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+
+.gw-flow-stat.gw-flow-warn,
+.gw-flow-stat.gw-flow-bad {
+	fill: var(--gf-state);
+}
+
+/* A class of error that has never happened is a fact, not a warning. */
+.gw-flow-stat.gw-flow-zero {
+	fill: var(--gw-text-muted);
+}
+
+.gw-flow-stat-label {
+	fill: var(--gw-text-muted);
+	font-size: 9px;
+	letter-spacing: .08em;
+	text-transform: uppercase;
+}
+
+/*
+ * The halo. A steady glow that says where the gateway is, and a ring leaving it on every
+ * poll that carried something — the same rule the dots obey, so a gateway nobody is calling
+ * is a picture that does not move.
+ */
+.gw-flow-halo {
+	pointer-events: none;
+}
+
+.gw-flow-glow {
+	fill: url(#gf-halo);
+	animation: gw-flow-breathe 7s ease-in-out infinite;
+}
+
+.gw-flow-halo-core {
+	stop-color: var(--gw-accent);
+	stop-opacity: var(--gf-halo);
+}
+
+.gw-flow-halo-mid {
+	stop-color: var(--gw-accent);
+	stop-opacity: var(--gf-halo-mid);
+}
+
+.gw-flow-halo-edge {
+	stop-color: var(--gw-accent);
+	stop-opacity: 0;
+}
+
+.gw-flow-steady {
 	fill: none;
-	stroke: var(--gw-border-strong);
-	stroke-width: 1.6;
+	opacity: var(--gf-rings);
+	stroke: var(--gw-accent);
+	stroke-width: 1;
+}
+
+.gw-flow-steady-2 {
+	opacity: calc(var(--gf-rings) * .62);
+}
+
+.gw-flow-steady-3 {
+	opacity: calc(var(--gf-rings) * .36);
+}
+
+.gw-flow-ring {
+	fill: none;
+	stroke: var(--gw-accent);
+	stroke-width: 1.2;
+	animation: gw-flow-ring 2s ease-out forwards;
+}
+
+@keyframes gw-flow-ring {
+	from {
+		opacity: .5;
+		transform: scale(.7);
+	}
+
+	to {
+		opacity: 0;
+		transform: scale(2.7);
+	}
+}
+
+@keyframes gw-flow-breathe {
+	0%,
+	100% {
+		opacity: .8;
+		transform: scale(1);
+	}
+
+	50% {
+		opacity: 1;
+		transform: scale(1.06);
+	}
 }
 
 /*
  * A hop carries two colours, and they answer different questions. The line is how its last
- * calls came back, so it returns to green as soon as a batch does; the dot resting at its
- * end is everything it has carried, so it stays amber once a 4xx has been seen. The two are
- * therefore keyed apart — the state of the line on the group, the state of the dot on the
- * dot — or the line would drag the dot back with it.
- *
- * Green and red are the semantic colours of the console rather than the Spring green of its
- * accent: a hop answering cleanly is not a hovered control.
+ * calls came back, so it returns to green as soon as a batch does; the box at its end is
+ * everything the endpoint has carried, so it stays amber once a 4xx has been seen. The two
+ * are therefore keyed apart — the state of the line on the link group, the state of the box
+ * on the node group — or the line would drag the box back with it.
  */
-.gw-flow-ok .gw-flow-edge {
-	stroke: var(--bs-success);
+.gw-flow-edge {
+	fill: none;
+	opacity: .42;
+	stroke: var(--gf-state);
+	stroke-width: 1.3;
 }
 
-.gw-flow-warn .gw-flow-edge {
-	stroke: var(--bs-warning);
-}
-
+.gw-flow-warn .gw-flow-edge,
 .gw-flow-bad .gw-flow-edge {
-	stroke: var(--bs-danger);
-}
-
-.gw-flow-dot {
-	stroke: var(--gw-surface);
-	stroke-width: 2;
-}
-
-.gw-flow-dot.gw-flow-rest-ok {
-	fill: var(--bs-success);
-}
-
-.gw-flow-dot.gw-flow-rest-warn {
-	fill: var(--bs-warning);
-}
-
-.gw-flow-dot.gw-flow-rest-bad {
-	fill: var(--bs-danger);
+	opacity: .8;
+	stroke-width: 1.6;
 }
 
 /*
- * The dot travelling a hop, placed on the line by the motion of its own animation: it takes
- * its colour from the calls that produced it rather than from the group it is drawn in, so
- * the two classes are on the element and not on an ancestor.
+ * A dot riding a hop: a bright core for where it is and a soft disc around it for the light
+ * it carries. It takes its colour from the calls that produced it rather than from the line
+ * it runs on — a hop that failed an hour ago and is answering now sends green down an amber
+ * line.
  */
-.gw-flow-travelling {
+.gw-flow-particle {
 	pointer-events: none;
-	stroke: var(--gw-surface);
-	stroke-width: 2;
 }
 
-.gw-flow-travelling.gw-flow-ok {
-	fill: var(--bs-success);
+.gw-flow-particle-halo {
+	fill: rgba(var(--gf-state-rgb), .22);
 }
 
-.gw-flow-travelling.gw-flow-warn {
-	fill: var(--bs-warning);
+.gw-flow-particle-core {
+	fill: var(--gf-state);
 }
 
-.gw-flow-travelling.gw-flow-bad {
-	fill: var(--bs-danger);
+/* The box answering for figures that have just moved, for as long as it takes to look at it. */
+.gw-flow-flash {
+	fill: var(--gf-state);
+	pointer-events: none;
+}
+
+/* Nothing on the picture moves on its own; the halo is the one thing that would. */
+@media (prefers-reduced-motion: reduce) {
+	.gw-flow-glow {
+		animation: none;
+	}
+}
+
+/* The figures above the picture move on the same polls, and shiver on the same digits. */
+.gw-flow-kpi {
+	font-variant-numeric: tabular-nums;
 }
 
 /* Introspection views ------------------------------------------------------ */

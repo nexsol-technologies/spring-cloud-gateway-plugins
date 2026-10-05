@@ -60,7 +60,7 @@ class AuditTailControllerTests {
 			.expectBody(String.class)
 			.value((body) -> assertThat(body).contains("gw-sidebar")
 				.contains("id=\"ga-tbody\"")
-				.contains("id=\"ga-live\"")
+				.contains("id=\"ga-auto\"")
 				.contains(String.valueOf(AuditTailBuffer.CAPACITY))
 				.contains(">Audit</span>"));
 	}

@@ -267,14 +267,14 @@
 	sel('psr-grade').addEventListener('change', render);
 	sel('psr-query').addEventListener('input', render);
 	sel('psr-refresh').addEventListener('click', load);
-	sel('psr-live').addEventListener('change', function () {
-		live(sel('psr-live').checked);
+	sel('psr-auto').addEventListener('change', function () {
+		live(sel('psr-auto').checked);
 	});
 
-	['psr-grade', 'psr-live'].forEach(function (id) {
+	['psr-grade', 'psr-auto'].forEach(function (id) {
 		window.gatewayUi.remember(sel(id));
 	});
 
 	load();
-	live(sel('psr-live').checked);
+	live(sel('psr-auto').checked);
 })();

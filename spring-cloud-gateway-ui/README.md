@@ -42,6 +42,12 @@ what the application actually runs.
 | [Passive scan](#passive-scan) | `/ui/passive-scan` | `spring-cloud-gateway-pentest-passive` is present and `...pentest.passive.enabled` is `true` |
 | [Route scores](#passive-scan) | `/ui/passive-scan/routes` | same as above |
 
+**A view that refreshes on its own says so.** One switch does it everywhere — *Auto*, on
+[Traffic](#traffic), [Runtime](#runtime), [Flow](#flow), [OpenAPI](#openapi), [Audit](#audit),
+[Passive scan](#passive-scan) and [Route scores](#passive-scan) — and the same pulsing **Live**
+badge sits beside it, going away when the switch is turned off. The console does not move
+figures under a reader without saying that it is doing so.
+
 ## Configuration
 
 The console needs no configuration to run. These are the properties it reads, all under
@@ -444,23 +450,44 @@ middle, the services it reached on the right.
 
 ![The flow view](doc/service-flow-light.png)
 
-**A dot travels a hop when calls arrive on it**, coloured by how those calls came back. It is
-the traffic since the last poll, capped at three dots however large. A hop that carried nothing
-stays still. **The two legs run in order**, in from the left and then on to the right: a call is
-counted once at each end, so the dot that reaches the gateway and the dot that leaves it are the
-same traffic.
+**Nothing is redrawn between two polls.** Every box, every line and every figure on them is
+created once and kept, so a poll moves the numbers — which count up to the new value, and light
+their box while they do — rather than replacing the picture under the reader.
 
-**A hop carries two colours.** Its *line* is how its last calls came back: amber or red on a 4xx
-or a 5xx, green again as soon as a batch comes back clean. The *dot resting at its end* is
-everything the hop has carried since the gateway started, and only ever gets worse — the figures
-behind it are Micrometer counters, which never go down. The dot rests at the endpoint end; every
-hop meets the gateway at the same point.
+**A box** carries, on its strip, what the endpoint is to the gateway and what share of the
+picture went through it; under it, its name and the calls it has carried. Strip, border and
+figure are tinted by the worst outcome that endpoint has ever seen: green answered, amber a
+4xx, red a 5xx.
+
+**A box keeps its row** for as long as it is on the picture. Which endpoints are drawn is
+decided by their calls, under *Show*; where they sit is decided once, so a row moves only when
+an endpoint arrives or leaves. Two endpoints a few calls apart would otherwise trade places
+every three seconds, sliding through each other on the way.
+
+**Dots travel a hop when calls arrive on it**, roughly as many as the square root of them and
+capped at fourteen, coloured by how those calls came back. It is the traffic since the last
+poll, not a replay of one request — a dot is not a call. **The two legs run in order**, in from
+the left and then on to the right: a call is counted once at each end, so the dots reaching the
+gateway and the dots leaving it are the same traffic.
+
+**The halo of the gateway beats** once per poll that carried something, and a hop that carried
+nothing stays still. The picture only moves when the gateway is carrying something, which is
+what makes it worth watching.
+
+**A hop carries two colours.** Its *line* is how its last calls came back: amber or red on a
+4xx or a 5xx, green again as soon as a batch comes back clean. The *box at its end* is
+everything that endpoint has carried since the gateway started, and only ever gets worse — the
+figures behind it are Micrometer counters, which never go down. So a hop that has misbehaved
+stays recognisable once its line has gone green again.
 
 **Auto** polls every three seconds and can be turned off; the age beside it says how old the
-figures are. Under `prefers-reduced-motion`, the resting dots are drawn and nothing travels.
+figures are and the *Live* badge says it is still polling. Under `prefers-reduced-motion`
+nothing travels, nothing beats, and the figures are written rather than counted up to.
 
-**The gateway is a node here**, and carries the totals of the picture. The [graph](#service-graph)
-leaves it out: it sits on every edge, which is what lets it count them.
+**The gateway is a node here**, and carries the totals of the picture — calls, 4xx and 5xx.
+Those are what it actually carried, not what is drawn: the cut made by *Show* hides quiet
+endpoints, it does not un-count their calls. The [graph](#service-graph) leaves the gateway
+out: it sits on every edge, which is what lets it count them.
 
 **An endpoint that both calls and is called appears on both sides** — once as what it reached,
 once as what reached through the gateway. The graph view merges the two into one node.
@@ -613,7 +640,7 @@ captured, newest first: time, method, path, status, user, ip and trace id. A row
 
 ![The audit view](doc/audit-light.png)
 
-Filter by status class and search across method, path, user, ip and trace id; the **Live**
+Filter by status class and search across method, path, user, ip and trace id; the **Auto**
 switch polls every 3 seconds.
 
 The events are read on their way to the audit backend — the plugin's `AuditEventPublisher`
@@ -639,7 +666,7 @@ found in the live traffic, grouped under **Security** in the menu.
 occurrence count, newest first: severity, OWASP API category, CWE, scanner, method, route, path
 and title. A row expands into the rule id and confidence, the description, the remediation, a
 link to the reference and the evidence the scanner recorded. Filter by severity and search
-across scanner, title, route, path, category, CWE and description; the **Live** switch polls
+across scanner, title, route, path, category, CWE and description; the **Auto** switch polls
 every 3 seconds. Above the table, a matrix shows which of the OWASP API Top 10 categories
 passive analysis can and cannot reach.
 

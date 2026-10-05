@@ -66,7 +66,9 @@ const VIEWS = [
 	{ name: 'instances', path: '/ui/metrics/instances', themes: ['dark'],
 		prepare: 'for (var i = 0; i < 100; i++) { var fold = document.querySelector("[data-gi-toggle][aria-expanded=false]"); if (!fold) { break; } fold.click(); }' },
 	{ name: 'service-graph', path: '/ui/service-graph' },
-	{ name: 'service-flow', path: '/ui/service-graph/flow' },
+	// The flow is as tall as it has callers, and the gateway sits in the middle of it: a
+	// frame that cuts the hub off cuts off the halo, the totals and the whole right column.
+	{ name: 'service-flow', path: '/ui/service-graph/flow', height: 1240 },
 	{ name: 'insights-configuration', path: '/ui/insights/configuration', themes: ['light'] },
 	// The five that list rows rather than cards: a taller frame so the list is long enough
 	// to read as one.
@@ -90,11 +92,11 @@ const VIEWS = [
 	 * path mid-word.
 	 */
 	{ name: 'passive-scan', path: '/ui/passive-scan', height: 1500,
-		prepare: 'var live = document.getElementById("ps-live"); if (live && live.checked) { live.click(); }' },
+		prepare: 'var live = document.getElementById("ps-auto"); if (live && live.checked) { live.click(); }' },
 	// The narrower frame of the view it belongs with: its table is a score, a grade and a
 	// route, and a wide frame leaves the counts stranded from the name they belong to.
 	{ name: 'passive-scan-routes', path: '/ui/passive-scan/routes', width: 1280,
-		prepare: 'var live = document.getElementById("psr-live"); if (live && live.checked) { live.click(); }' },
+		prepare: 'var live = document.getElementById("psr-auto"); if (live && live.checked) { live.click(); }' },
 	// Shown to a signed-in visitor holding none of the required roles. It renders for any
 	// principal, so it is shot with the same session as the rest.
 	{ name: 'forbidden', path: '/ui/forbidden' },

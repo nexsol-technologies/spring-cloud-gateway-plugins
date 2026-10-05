@@ -160,17 +160,17 @@
 	sel('ga-status').addEventListener('change', load);
 	sel('ga-query').addEventListener('input', load);
 	sel('ga-refresh').addEventListener('click', load);
-	sel('ga-live').addEventListener('change', function () {
-		live(sel('ga-live').checked);
+	sel('ga-auto').addEventListener('change', function () {
+		live(sel('ga-auto').checked);
 	});
 
 	// Restored before the first load, which reads them. The search box is not remembered:
 	// a query kept across page loads would hide every row and read as an empty audit
 	// trail.
-	['ga-status', 'ga-live'].forEach(function (id) {
+	['ga-status', 'ga-auto'].forEach(function (id) {
 		window.gatewayUi.remember(sel(id));
 	});
 
 	load();
-	live(sel('ga-live').checked);
+	live(sel('ga-auto').checked);
 })();

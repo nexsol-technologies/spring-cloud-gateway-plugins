@@ -290,15 +290,15 @@
 	sel('ps-severity').addEventListener('change', load);
 	sel('ps-query').addEventListener('input', load);
 	sel('ps-refresh').addEventListener('click', load);
-	sel('ps-live').addEventListener('change', function () {
-		live(sel('ps-live').checked);
+	sel('ps-auto').addEventListener('change', function () {
+		live(sel('ps-auto').checked);
 	});
 
-	['ps-severity', 'ps-live'].forEach(function (id) {
+	['ps-severity', 'ps-auto'].forEach(function (id) {
 		window.gatewayUi.remember(sel(id));
 	});
 
 	loadCoverage();
 	load();
-	live(sel('ps-live').checked);
+	live(sel('ps-auto').checked);
 })();
