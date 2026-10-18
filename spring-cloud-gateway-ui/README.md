@@ -633,7 +633,7 @@ Which scopes come ticked is read from the `security` requirement of the document
 scheme offers are shown: those an `oauth2` scheme declares under its flow, and for an
 `openIdConnect` scheme the `scopes_supported` of its discovery document.
 
-The Scalar bundle ships with the plugin (`@scalar/api-reference` 1.63.0, 3.6 MB) and its
+The Scalar bundle ships with the plugin (`@scalar/api-reference` 1.75.0, 4.6 MB) and its
 default web fonts are switched off, so the view works on an isolated network.
 
 ## Audit
@@ -1112,9 +1112,9 @@ from a CDN at runtime.
 | Library | Version | File |
 | --- | --- | --- |
 | [Bootstrap](https://getbootstrap.com/) | 5.3.8 | `css/bootstrap.min.css`, `js/bootstrap.bundle.min.js` |
-| [htmx](https://htmx.org/) | 2.0.10 | `js/htmx.min.js` |
+| [htmx](https://htmx.org/) | 4.0.0 | `js/htmx.min.js` |
 | [Apache ECharts](https://echarts.apache.org/) | 6.1.0 | `js/echarts.min.js` |
-| [Scalar API Reference](https://github.com/scalar/scalar) | 1.66.1 | `js/scalar.standalone.js` |
+| [Scalar API Reference](https://github.com/scalar/scalar) | 1.75.0 | `js/scalar.standalone.js` |
 
 ## Credits
 

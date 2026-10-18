@@ -103,6 +103,11 @@
 		// stylesheet the bundle does not inject in this integration. Remove once the bundle
 		// ships those styles.
 		'.scalar-modal-layout, .scalar-modal { opacity: 1 !important; }',
+		// 'Generate SDK', in the toolbar, the client libraries card and the foot of every
+		// request card: shown on a localhost address, like the agent and the MCP entry, and
+		// opening a dialog that sells Scalar's hosted services. The bundle has no switch
+		// for it.
+		'.generate-sdk-button, .selected-client-action { display: none !important; }',
 		'.dark-mode.dark-mode {',
 		'  --scalar-background-1: #0f1929;',
 		'  --scalar-background-2: #1e293b;',

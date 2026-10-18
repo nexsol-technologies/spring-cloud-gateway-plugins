@@ -18,7 +18,7 @@
 
 	input.addEventListener('input', apply);
 	// The refresh and reload buttons replace the table, dropping the previous filtering.
-	document.body.addEventListener('htmx:afterSwap', apply);
+	document.addEventListener('htmx:after:swap', apply);
 })();
 
 /*

@@ -38,8 +38,10 @@
 	</div>
 
 	<script id="routes-scripts" th:inline="none">
-		// Bridge HTMX's HX-Trigger "showToast" events onto a Bootstrap toast.
-		document.body.addEventListener('showToast', function (evt) {
+		// Bridge HTMX's HX-Trigger "showToast" events onto a Bootstrap toast. On the document,
+		// not the body: htmx dispatches the events of an element the swap removed (the Delete
+		// button, the saved form) on the document, where a body listener never sees them.
+		document.addEventListener('showToast', function (evt) {
 			var detail = evt.detail || {};
 			var level = detail.level || 'info';
 			var background = level === 'success' ? 'text-bg-success'
@@ -77,16 +79,7 @@
 		}
 
 		document.addEventListener('DOMContentLoaded', gwSyncPredicateButtons);
-		document.body.addEventListener('htmx:afterSwap', gwSyncPredicateButtons);
-
-		// Rows appended via HTMX (new predicate/filter rows) are not always wired up by the
-		// automatic post-swap processing; re-process the swapped content so their selects
-		// become interactive. htmx.process is idempotent, so this does not double-bind.
-		document.body.addEventListener('htmx:afterSwap', function (evt) {
-			if (window.htmx) {
-				window.htmx.process(evt.target);
-			}
-		});
+		document.addEventListener('htmx:after:swap', gwSyncPredicateButtons);
 
 		// Replace the native window.confirm() (hx-confirm) with a Bootstrap modal.
 		(function () {
@@ -96,25 +89,31 @@
 			var confirmButton = document.getElementById('confirm-modal-ok');
 			var pendingRequest = null;
 
-			document.body.addEventListener('htmx:confirm', function (evt) {
-				if (!evt.detail.question) {
+			document.addEventListener('htmx:confirm', function (evt) {
+				var question = evt.detail.ctx.confirm;
+				if (!question) {
 					return;
 				}
 				evt.preventDefault();
-				messageElement.textContent = evt.detail.question;
-				pendingRequest = evt.detail.issueRequest;
+				messageElement.textContent = question;
+				pendingRequest = evt.detail;
 				modal.show();
 			});
 
 			confirmButton.addEventListener('click', function () {
-				var issue = pendingRequest;
+				var request = pendingRequest;
 				pendingRequest = null;
 				modal.hide();
-				if (issue) { issue(true); }
+				if (request) { request.issueRequest(); }
 			});
 
+			// A request neither issued nor dropped stays in the element's queue, and the next
+			// click on the same button waits behind it forever.
 			modalElement.addEventListener('hidden.bs.modal', function () {
-				pendingRequest = null;
+				if (pendingRequest) {
+					pendingRequest.dropRequest();
+					pendingRequest = null;
+				}
 			});
 		})();
 	</script>

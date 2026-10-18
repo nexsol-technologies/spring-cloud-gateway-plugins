@@ -251,8 +251,8 @@ window.gatewayUi = (function () {
 	if (!token || !header) {
 		return;
 	}
-	document.body.addEventListener('htmx:configRequest', function (event) {
-		event.detail.headers[header.content] = token.content;
+	document.addEventListener('htmx:config:request', function (event) {
+		event.detail.ctx.request.headers[header.content] = token.content;
 	});
 })();
 
