@@ -293,7 +293,8 @@ picks the metrics of both axes:
 | Custom… | re-opens the raw X / Y / bubble-size pickers |
 
 Dashed lines mark the median of both axes and the quadrants are labelled in place, so a
-bubble's position is readable without a legend. **Auto** polls every 5 seconds.
+bubble's position is readable without a legend. **Auto** polls every 5 seconds; the age beside
+it says how old the figures are.
 
 **A gateway with hundreds of routes** — one that discovers its routes plots a bubble per
 discovered service, and they all pile up in the same corner. Three controls take that apart:
@@ -434,10 +435,12 @@ keep theirs, and the description above it folds away. The same button, now readi
 screen*, or Escape, brings the page back. The [traffic](#traffic) and [flow](#flow) views carry
 the same button.
 
-**Freeze layout** keeps the positions the force layout settled on, so a refresh redraws the
-same picture instead of shuffling it. The view is refreshed on demand and never on a timer —
-a graph that moves while it is being read is unreadable, which is the one place this console
-does not offer an auto poll.
+**Auto** polls every 5 seconds and can be turned off; the age beside it says how old the
+figures are and the *Live* badge says it is still polling.
+
+**Freeze layout** keeps the positions the force layout settled on, so a poll or a refresh
+redraws the same picture instead of shuffling it: a node already drawn is pinned where it is,
+and only a node that just appeared is laid out. Off, every poll lays the whole graph out again.
 
 **All calls** — the same edges as a sortable table, with the route each one went through. The
 view is fed by `GET /ui/service-graph/data` (JSON) and states its coverage.
@@ -645,7 +648,7 @@ captured, newest first: time, method, path, status, user, ip and trace id. A row
 ![The audit view](doc/audit-light.png)
 
 Filter by status class and search across method, path, user, ip and trace id; the **Auto**
-switch polls every 3 seconds.
+switch polls every 3 seconds, and the age beside it says how old the rows are.
 
 The events are read on their way to the audit backend — the plugin's `AuditEventPublisher`
 bean is wrapped in a decorator that keeps a copy — so the view works whichever backend is
@@ -671,14 +674,15 @@ occurrence count, newest first: severity, OWASP API category, CWE, scanner, meth
 and title. A row expands into the rule id and confidence, the description, the remediation, a
 link to the reference and the evidence the scanner recorded. Filter by severity and search
 across scanner, title, route, path, category, CWE and description; the **Auto** switch polls
-every 3 seconds. Above the table, a matrix shows which of the OWASP API Top 10 categories
+every 3 seconds, and the age beside it says how old the rows are. Above the table, a matrix shows which of the OWASP API Top 10 categories
 passive analysis can and cannot reach.
 
 ![The route scores view](doc/passive-scan-routes-light.png)
 
 **Route scores** ranks the routes by a security score computed from their findings, worst
 first, with a gauge showing the average of the routes on screen. Filter by grade, route id and
-path; a row expands into the findings that cost the route its points.
+path; a row expands into the findings that cost the route its points. **Auto** polls every 3
+seconds, and the age beside it says how old the scores are.
 
 Both views read the plugin's finding store directly — no scan is ever issued from the console.
 With `...pentest.store=redis` that store is the consolidated view of every instance.

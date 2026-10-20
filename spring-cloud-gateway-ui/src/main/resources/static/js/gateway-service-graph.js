@@ -1,8 +1,9 @@
 /*
  * Service graph view. The picture is the graph the active source reported: nodes are the
  * endpoints, edges the calls between them. Filtering narrows what is drawn without asking
- * the gateway again — the payload is small, and a graph that redraws while it is being
- * read is unreadable, which is also why nothing here polls.
+ * the gateway again — the payload is small. A poll redraws the picture, and a graph that
+ * reshuffles while it is being read is unreadable: with the layout frozen, which is the
+ * default, a node already drawn is pinned where it is and only a new one is laid out.
  */
 (function () {
 	var chartEl = document.getElementById('gg-chart');
@@ -26,6 +27,8 @@
 
 	var IDLE_COLOR = '#7f8c9b';
 
+	var POLL_MS = 5000;
+
 	var dataUrl = chartEl.getAttribute('data-url') || '/ui/service-graph/data';
 	var chart = echarts.init(chartEl, window.gatewayUi.theme() === 'dark' ? 'dark' : null);
 	var nodes = [];
@@ -35,6 +38,7 @@
 	var positions = {};
 	var sortKey = 'calls';
 	var sortDir = -1;
+	var timer = null;
 
 	function sel(id) {
 		return document.getElementById(id);
@@ -251,7 +255,10 @@
 	 * after the layout settles rather than on every frame.
 	 */
 	function rememberPositions() {
-		var series = chart.getModel && chart.getModel().getSeriesByIndex(0);
+		// 'finished' also fires for the resize the observer below reports as soon as it
+		// watches the box, before anything was drawn: there is then no model to read.
+		var model = chart.getModel && chart.getModel();
+		var series = model && model.getSeriesByIndex(0);
 		if (!series || !series.getData) {
 			return;
 		}
@@ -368,13 +375,26 @@
 					coverage.textContent = (json && json.coverage) ? json.coverage : '';
 				}
 				renderFocusOptions();
+				window.gatewayUi.read('gg-age');
 				render();
 			})
 			.catch(function () {
+				// The age is left where it was: a failed poll makes the picture on screen
+				// older, it does not make it younger.
 				nodes = [];
 				edges = [];
 				render();
 			});
+	}
+
+	function schedule() {
+		if (timer) {
+			window.clearInterval(timer);
+			timer = null;
+		}
+		if (sel('gg-auto').checked) {
+			timer = window.setInterval(load, POLL_MS);
+		}
 	}
 
 	// Clicking a node focuses it; clicking the focused one goes back to the whole graph.
@@ -401,6 +421,7 @@
 		}
 		render();
 	});
+	sel('gg-auto').addEventListener('change', schedule);
 	sel('gg-refresh').addEventListener('click', load);
 	Array.prototype.forEach.call(document.querySelectorAll('.gw-sortable'), function (th) {
 		th.addEventListener('click', function () {
@@ -440,9 +461,10 @@
 		});
 	}
 
-	['gg-focus', 'gg-search', 'gg-min-calls', 'gg-4xx', 'gg-5xx', 'gg-freeze'].forEach(function (id) {
+	['gg-focus', 'gg-search', 'gg-min-calls', 'gg-4xx', 'gg-5xx', 'gg-freeze', 'gg-auto'].forEach(function (id) {
 		window.gatewayUi.remember(sel(id));
 	});
 
 	load();
+	schedule();
 })();

@@ -23,7 +23,6 @@
 	}
 
 	var coverageEl = document.getElementById('gi-coverage');
-	var ageEl = document.getElementById('gi-age');
 	var emptyEl = document.getElementById('gi-empty');
 	var autoEl = document.getElementById('gi-auto');
 	var refreshEl = document.getElementById('gi-refresh');
@@ -48,7 +47,6 @@
 	var snapshot = null;
 
 	// When the payload on screen was read, for the age shown in the band.
-	var readAt = null;
 
 	function readExpanded() {
 		try {
@@ -404,28 +402,6 @@
 	}
 
 	/*
-	 * How old the figures on screen are. It ticks on its own rather than being written on
-	 * each refresh: what it is there to reveal is a poll that stopped answering, and a
-	 * label only written by a successful load would then stay reassuringly at "just now".
-	 */
-	function renderAge() {
-		if (readAt === null) {
-			ageEl.textContent = '';
-			return;
-		}
-		var seconds = Math.round((Date.now() - readAt) / 1000);
-		if (seconds < 5) {
-			ageEl.textContent = 'just now';
-			return;
-		}
-		if (seconds < 90) {
-			ageEl.textContent = seconds + 's ago';
-			return;
-		}
-		ageEl.textContent = Math.round(seconds / 60) + 'm ago';
-	}
-
-	/*
 	 * Folding is bound to the container rather than to the buttons: the table is replaced
 	 * wholesale on every refresh, and a listener put on a button would go with it.
 	 */
@@ -455,8 +431,7 @@
 			})
 			.then(function (payload) {
 				render(payload);
-				readAt = Date.now();
-				renderAge();
+				window.gatewayUi.read('gi-age');
 			})
 			.catch(function () {
 				// The age is left where it was: a failed poll makes the figures on screen
@@ -486,5 +461,4 @@
 	}
 	load();
 	schedule();
-	setInterval(renderAge, 1000);
 })();

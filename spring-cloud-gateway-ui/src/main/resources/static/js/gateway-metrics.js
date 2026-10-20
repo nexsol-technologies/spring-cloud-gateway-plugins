@@ -738,6 +738,7 @@
 				if (coverage) {
 					coverage.textContent = (json && json.coverage) ? json.coverage : '';
 				}
+				window.gatewayUi.read('gm-age');
 				render();
 			})
 			.catch(function () {

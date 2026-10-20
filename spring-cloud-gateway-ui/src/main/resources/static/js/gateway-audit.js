@@ -141,6 +141,7 @@
 			})
 			.then(function (json) {
 				render(json || []);
+				window.gatewayUi.read('ga-age');
 			})
 			.catch(function () {
 				render([]);
