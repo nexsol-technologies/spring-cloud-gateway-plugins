@@ -17,11 +17,13 @@
 package ch.nexsol.gateway.mcp.server;
 
 import java.util.Map;
+import java.util.stream.Stream;
 
 import org.springframework.boot.EnvironmentPostProcessor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.env.EnumerablePropertySource;
+import org.springframework.core.env.Environment;
 
 /**
  * Derives the settings of the Spring AI MCP server from the plugin's own switch,
@@ -33,10 +35,18 @@ import org.springframework.core.env.MapPropertySource;
  * with the plugin off would serve an unauthenticated, empty {@code /mcp}. And a server of
  * type {@code SYNC} silently ignores every tool declared with a reactive return type,
  * which is all of them here.
+ * <p>
+ * The switch is read when the server setting is read, not once here: a property source
+ * added after the environment is post-processed — the legacy bootstrap of a Config Server
+ * client adds its own then — must drive the server the same way it drives the tools. And
+ * it is read as the auto-configuration reads it, the string {@code true} in any case: a
+ * {@code yes} that a Boolean conversion would accept switches neither half on.
  */
 public class GatewayMcpEnvironmentPostProcessor implements EnvironmentPostProcessor {
 
 	static final String ENABLED = "spring.cloud.gateway.server.webflux.mcp.enabled";
+
+	static final String SPRING_AI_ENABLED = "spring.ai.mcp.server.enabled";
 
 	static final String PROPERTY_SOURCE = "gatewayMcpDefaults";
 
@@ -47,11 +57,49 @@ public class GatewayMcpEnvironmentPostProcessor implements EnvironmentPostProces
 
 	@Override
 	public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
-		boolean enabled = environment.getProperty(ENABLED, Boolean.class, false);
-		Map<String, Object> defaults = Map.of("spring.ai.mcp.server.enabled", enabled, "spring.ai.mcp.server.protocol",
-				"STATELESS", "spring.ai.mcp.server.type", "ASYNC", "spring.ai.mcp.server.name",
+		environment.getPropertySources().addLast(new Defaults(environment));
+	}
+
+	static boolean enabled(Environment environment) {
+		return "true".equalsIgnoreCase(environment.getProperty(ENABLED));
+	}
+
+	/**
+	 * The defaults, the server switch among them read live from the environment.
+	 * <p>
+	 * The environment is held in a field, not as the source: Spring Boot flattens a
+	 * property source whose source is a {@code ConfigurableEnvironment} into that
+	 * environment's own sources, this one included, and iterates them without end.
+	 */
+	static final class Defaults extends EnumerablePropertySource<Map<String, Object>> {
+
+		private static final Map<String, Object> FIXED = Map.of("spring.ai.mcp.server.protocol", "STATELESS",
+				"spring.ai.mcp.server.type", "ASYNC", "spring.ai.mcp.server.name",
 				"${spring.application.name:spring-cloud-gateway}", "spring.ai.mcp.server.instructions", INSTRUCTIONS);
-		environment.getPropertySources().addLast(new MapPropertySource(PROPERTY_SOURCE, defaults));
+
+		private static final String[] NAMES = Stream.concat(FIXED.keySet().stream(), Stream.of(SPRING_AI_ENABLED))
+			.toArray(String[]::new);
+
+		private final Environment environment;
+
+		Defaults(Environment environment) {
+			super(PROPERTY_SOURCE, FIXED);
+			this.environment = environment;
+		}
+
+		@Override
+		public String[] getPropertyNames() {
+			return NAMES;
+		}
+
+		@Override
+		public Object getProperty(String name) {
+			if (SPRING_AI_ENABLED.equals(name)) {
+				return Boolean.toString(enabled(this.environment));
+			}
+			return FIXED.get(name);
+		}
+
 	}
 
 }

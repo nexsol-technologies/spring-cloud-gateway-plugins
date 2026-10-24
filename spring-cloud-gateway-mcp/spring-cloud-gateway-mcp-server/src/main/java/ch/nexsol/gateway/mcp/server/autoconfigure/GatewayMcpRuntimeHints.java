@@ -31,8 +31,9 @@ class GatewayMcpRuntimeHints implements RuntimeHintsRegistrar {
 
 	@Override
 	public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
-		this.bindingRegistrar.registerReflectionHints(hints.reflection(), RouteTools.RouteDescription.class,
-				RouteTools.Step.class, RouteTools.FactoryDescription.class);
+		this.bindingRegistrar.registerReflectionHints(hints.reflection(), RouteTools.Inventory.class,
+				RouteTools.UnreadableSource.class, RouteTools.RouteDescription.class, RouteTools.Step.class,
+				RouteTools.FactoryDescription.class);
 	}
 
 }

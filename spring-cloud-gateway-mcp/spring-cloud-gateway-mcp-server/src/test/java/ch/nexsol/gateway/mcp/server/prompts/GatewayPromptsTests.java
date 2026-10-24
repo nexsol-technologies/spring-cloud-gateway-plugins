@@ -34,15 +34,28 @@ class GatewayPromptsTests {
 			assertThat(result.messages()).hasSize(1);
 			assertThat(result.messages().get(0).role()).isEqualTo(Role.USER);
 			String text = ((TextContent) result.messages().get(0).content()).text();
-			assertThat(text).contains("get_route with routeId 'books'").contains("list_findings");
+			assertThat(text).contains("get_route with routeId 'books'")
+				.contains("list_filter_factories")
+				.contains("list_findings");
 		}).verifyComplete();
+	}
+
+	@Test
+	void theDiagnosisRefusesABlankRouteId() {
+		StepVerifier.create(this.prompts.diagnoseRoute(" "))
+			.expectErrorSatisfies(
+					(ex) -> assertThat(ex).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("routeId"))
+			.verify();
 	}
 
 	@Test
 	void theReviewWalksThroughTheFindingTools() {
 		StepVerifier.create(this.prompts.securityReview()).assertNext((result) -> {
 			String text = ((TextContent) result.messages().get(0).content()).text();
-			assertThat(text).contains("finding_summary").contains("route_security_scores").contains("scan_coverage");
+			assertThat(text).contains("finding_summary")
+				.contains("limit at least equal to the count")
+				.contains("route_security_scores")
+				.contains("scan_coverage");
 		}).verifyComplete();
 	}
 

@@ -222,18 +222,6 @@ class RouteInventoryServiceTests {
 	}
 
 	@Test
-	void namesASourceAfterItsLocatorClass() {
-		assertThat(RouteInventoryService.sourceName(new ConfigServerRouteDefinitionLocator()))
-			.isEqualTo("Config Server");
-		assertThat(RouteInventoryService.sourceName(new FailingRouteDefinitionLocator())).isEqualTo("Failing");
-	}
-
-	@Test
-	void namesALocatorDeclaredAsALambdaGenerically() {
-		assertThat(RouteInventoryService.sourceName(Flux::empty)).isEqualTo("Custom");
-	}
-
-	@Test
 	void describesAnElementWithoutArgumentsByItsNameAlone() {
 		assertThat(RouteInventoryService.describe("Weight", Map.of())).isEqualTo("Weight");
 		assertThat(RouteInventoryService.describe("Weight", null)).isEqualTo("Weight");

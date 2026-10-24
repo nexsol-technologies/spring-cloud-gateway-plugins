@@ -33,8 +33,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
+import org.springframework.ai.mcp.server.common.autoconfigure.McpServerAutoConfiguration;
+import org.springframework.ai.mcp.server.common.autoconfigure.McpServerJsonMapperAutoConfiguration;
+import org.springframework.ai.mcp.server.common.autoconfigure.McpServerStatelessAutoConfiguration;
+import org.springframework.ai.mcp.server.webflux.autoconfigure.McpServerSseWebFluxAutoConfiguration;
+import org.springframework.ai.mcp.server.webflux.autoconfigure.McpServerStatelessWebFluxAutoConfiguration;
+import org.springframework.ai.mcp.server.webflux.autoconfigure.McpServerStreamableHttpWebFluxAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -44,8 +50,14 @@ class GatewayMcpAutoConfigurationTests {
 
 	private static final String ENABLED = "spring.cloud.gateway.server.webflux.mcp.enabled=true";
 
-	private final ApplicationContextRunner runner = new ApplicationContextRunner()
-		.withConfiguration(AutoConfigurations.of(GatewayMcpAutoConfiguration.class));
+	// The Spring AI server auto-configurations are in the runner for the properties beans
+	// they register, which is where the plugin reads the endpoints of the protocol in
+	// force.
+	private final ReactiveWebApplicationContextRunner runner = new ReactiveWebApplicationContextRunner()
+		.withConfiguration(AutoConfigurations.of(GatewayMcpAutoConfiguration.class,
+				McpServerJsonMapperAutoConfiguration.class, McpServerStatelessAutoConfiguration.class,
+				McpServerStatelessWebFluxAutoConfiguration.class, McpServerAutoConfiguration.class,
+				McpServerStreamableHttpWebFluxAutoConfiguration.class, McpServerSseWebFluxAutoConfiguration.class));
 
 	@Test
 	void registersNothingWhileThePluginIsOff() {
@@ -58,7 +70,7 @@ class GatewayMcpAutoConfigurationTests {
 
 	@Test
 	void registersTheRouteToolsThePromptsAndTheSecuredEndpoint() {
-		this.runner.withPropertyValues(ENABLED).run((context) -> {
+		this.runner.withPropertyValues(ENABLED, "spring.ai.mcp.server.protocol=STATELESS").run((context) -> {
 			assertThat(context).hasSingleBean(RouteTools.class);
 			assertThat(context).hasSingleBean(GatewayPrompts.class);
 			SecuredPaths paths = context.getBean(SecuredPaths.class);
@@ -70,9 +82,24 @@ class GatewayMcpAutoConfigurationTests {
 	}
 
 	@Test
-	void declaresTheEndpointTheServerListensOn() {
-		this.runner.withPropertyValues(ENABLED, "spring.ai.mcp.server.streamable-http.mcp-endpoint=/agent")
+	void declaresTheEndpointTheServerListensOnHoweverItIsSpelled() {
+		this.runner
+			.withPropertyValues(ENABLED, "spring.ai.mcp.server.protocol=STATELESS",
+					"spring.ai.mcp.server.streamable-http.mcpEndpoint=/agent")
 			.run((context) -> assertThat(context.getBean(SecuredPaths.class).writePaths()).containsExactly("/agent"));
+	}
+
+	@Test
+	void declaresBothEndpointsOfTheSseProtocol() {
+		this.runner.withPropertyValues(ENABLED, "spring.ai.mcp.server.protocol=SSE")
+			.run((context) -> assertThat(context.getBean(SecuredPaths.class).writePaths()).containsExactly("/sse",
+					"/mcp/message"));
+	}
+
+	@Test
+	void declaresTheEndpointOfTheStreamableProtocol() {
+		this.runner.withPropertyValues(ENABLED, "spring.ai.mcp.server.protocol=STREAMABLE")
+			.run((context) -> assertThat(context.getBean(SecuredPaths.class).writePaths()).containsExactly("/mcp"));
 	}
 
 	@Test

@@ -25,13 +25,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class GatewayMcpEnvironmentPostProcessorTests {
 
+	private static final String SERVER_ENABLED = GatewayMcpEnvironmentPostProcessor.SPRING_AI_ENABLED;
+
 	private final GatewayMcpEnvironmentPostProcessor processor = new GatewayMcpEnvironmentPostProcessor();
 
 	@Test
 	void keepsTheSpringAiServerOffWhileThePluginIsOff() {
 		MockEnvironment environment = new MockEnvironment();
 		this.processor.postProcessEnvironment(environment, new SpringApplication());
-		assertThat(environment.getProperty("spring.ai.mcp.server.enabled", Boolean.class)).isFalse();
+		assertThat(environment.getProperty(SERVER_ENABLED, Boolean.class)).isFalse();
 	}
 
 	@Test
@@ -40,11 +42,31 @@ class GatewayMcpEnvironmentPostProcessorTests {
 			.withProperty(GatewayMcpEnvironmentPostProcessor.ENABLED, "true")
 			.withProperty("spring.application.name", "edge");
 		this.processor.postProcessEnvironment(environment, new SpringApplication());
-		assertThat(environment.getProperty("spring.ai.mcp.server.enabled", Boolean.class)).isTrue();
+		assertThat(environment.getProperty(SERVER_ENABLED, Boolean.class)).isTrue();
 		assertThat(environment.getProperty("spring.ai.mcp.server.protocol")).isEqualTo("STATELESS");
 		assertThat(environment.getProperty("spring.ai.mcp.server.type")).isEqualTo("ASYNC");
 		assertThat(environment.getProperty("spring.ai.mcp.server.name")).isEqualTo("edge");
 		assertThat(environment.getProperty("spring.ai.mcp.server.instructions")).contains("list_routes");
+	}
+
+	@Test
+	void readsTheSwitchTheWayTheAutoConfigurationDoes() {
+		// @ConditionalOnProperty compares the text 'true', in any case; a 'yes' or a '1'
+		// that a Boolean conversion would accept must switch neither half on.
+		MockEnvironment environment = new MockEnvironment().withProperty(GatewayMcpEnvironmentPostProcessor.ENABLED,
+				"yes");
+		this.processor.postProcessEnvironment(environment, new SpringApplication());
+		assertThat(environment.getProperty(SERVER_ENABLED, Boolean.class)).isFalse();
+		environment.setProperty(GatewayMcpEnvironmentPostProcessor.ENABLED, "TRUE");
+		assertThat(environment.getProperty(SERVER_ENABLED, Boolean.class)).isTrue();
+	}
+
+	@Test
+	void followsASwitchAddedAfterItRan() {
+		MockEnvironment environment = new MockEnvironment();
+		this.processor.postProcessEnvironment(environment, new SpringApplication());
+		environment.setProperty(GatewayMcpEnvironmentPostProcessor.ENABLED, "true");
+		assertThat(environment.getProperty(SERVER_ENABLED, Boolean.class)).isTrue();
 	}
 
 	@Test
@@ -60,10 +82,10 @@ class GatewayMcpEnvironmentPostProcessorTests {
 		MockEnvironment environment = new MockEnvironment()
 			.withProperty(GatewayMcpEnvironmentPostProcessor.ENABLED, "true")
 			.withProperty("spring.ai.mcp.server.name", "my-gateway")
-			.withProperty("spring.ai.mcp.server.enabled", "false");
+			.withProperty(SERVER_ENABLED, "false");
 		this.processor.postProcessEnvironment(environment, new SpringApplication());
 		assertThat(environment.getProperty("spring.ai.mcp.server.name")).isEqualTo("my-gateway");
-		assertThat(environment.getProperty("spring.ai.mcp.server.enabled", Boolean.class)).isFalse();
+		assertThat(environment.getProperty(SERVER_ENABLED, Boolean.class)).isFalse();
 		assertThat(environment.getProperty("spring.ai.mcp.server.type")).isEqualTo("ASYNC");
 	}
 

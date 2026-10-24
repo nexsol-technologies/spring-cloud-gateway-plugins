@@ -25,9 +25,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import ch.nexsol.gateway.commons.routes.RouteDefinitionSources;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -35,20 +35,18 @@ import reactor.core.publisher.Mono;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
-import org.springframework.cloud.gateway.route.CompositeRouteDefinitionLocator;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.cloud.gateway.support.NameUtils;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationListener;
-import org.springframework.util.ClassUtils;
 
 /**
  * Lists the route definitions the gateway actually resolves, attributing each one to the
  * {@link RouteDefinitionLocator} it was read from.
  * <p>
  * Every locator bean is queried individually rather than through the
- * {@link CompositeRouteDefinitionLocator} aggregate, which is what makes the origin of a
+ * {@code CompositeRouteDefinitionLocator} aggregate, which is what makes the origin of a
  * route visible: properties, database, files, OpenAPI contracts, Config Server or any
  * third-party source contributed to the context.
  * <p>
@@ -68,15 +66,6 @@ public class RouteInventoryService implements ApplicationListener<RefreshRoutesE
 	 * dropped from the snapshot, as a source that fails to be read is.
 	 */
 	private static final Duration SOURCE_TIMEOUT = Duration.ofSeconds(5);
-
-	/** Locator class-name suffixes stripped when deriving the displayed source name. */
-	private static final List<String> LOCATOR_SUFFIXES = List.of("RouteDefinitionLocator", "RouteDefinitionRepository",
-			"RouteDefinitionSource");
-
-	/**
-	 * Splits a camel-case class name into words, so {@code ConfigServer} reads as two.
-	 */
-	private static final Pattern CAMEL_CASE_BOUNDARY = Pattern.compile("(?<=[a-z0-9])(?=[A-Z])");
 
 	/** Prefix the gateway gives an argument declared positionally, without a name. */
 	private static final String GENERATED_NAME_PREFIX = NameUtils.GENERATED_NAME_PREFIX;
@@ -204,7 +193,7 @@ public class RouteInventoryService implements ApplicationListener<RefreshRoutesE
 	public Mono<Map<String, List<RouteDefinition>>> definitionsBySource() {
 		return Flux.fromIterable(sourceLocators())
 			.flatMapSequential((locator) -> readDefinitions(locator).collectList()
-				.map((definitions) -> Map.entry(sourceName(locator), definitions)))
+				.map((definitions) -> Map.entry(RouteDefinitionSources.name(locator), definitions)))
 			.collectList()
 			.map(RouteInventoryService::group);
 	}
@@ -218,9 +207,7 @@ public class RouteInventoryService implements ApplicationListener<RefreshRoutesE
 	}
 
 	private List<RouteDefinitionLocator> sourceLocators() {
-		return this.locators.orderedStream()
-			.filter((locator) -> !(locator instanceof CompositeRouteDefinitionLocator))
-			.toList();
+		return RouteDefinitionSources.sources(this.locators);
 	}
 
 	/**
@@ -231,27 +218,6 @@ public class RouteInventoryService implements ApplicationListener<RefreshRoutesE
 	public void reload() {
 		LOG.debug("Publishing RefreshRoutesEvent on behalf of the gateway UI");
 		this.publisher.publishEvent(new RefreshRoutesEvent(this));
-	}
-
-	/**
-	 * Derives the displayed source name from the locator class, so a source contributed
-	 * by any plugin reads correctly without this module knowing about it.
-	 * @param locator the locator to name
-	 * @return the human-readable source name
-	 */
-	static String sourceName(RouteDefinitionLocator locator) {
-		String name = ClassUtils.getUserClass(locator).getSimpleName();
-		if (name.isEmpty() || name.contains("$$Lambda")) {
-			// A locator declared as a lambda has no name worth showing.
-			return "Custom";
-		}
-		for (String suffix : LOCATOR_SUFFIXES) {
-			if (name.length() > suffix.length() && name.endsWith(suffix)) {
-				name = name.substring(0, name.length() - suffix.length());
-				break;
-			}
-		}
-		return CAMEL_CASE_BOUNDARY.matcher(name).replaceAll(" ");
 	}
 
 	/**
@@ -279,15 +245,13 @@ public class RouteInventoryService implements ApplicationListener<RefreshRoutesE
 	}
 
 	private Flux<RouteView> readSource(RouteDefinitionLocator locator) {
-		String source = sourceName(locator);
+		String source = RouteDefinitionSources.name(locator);
 		return readDefinitions(locator).map((definition) -> toView(definition, source));
 	}
 
 	private Flux<RouteDefinition> readDefinitions(RouteDefinitionLocator locator) {
-		// Collected before the timeout is applied, so the delay bounds the whole read of
-		// the source rather than the gap between two of its routes.
-		return locator.getRouteDefinitions().collectList().timeout(SOURCE_TIMEOUT).onErrorResume((ex) -> {
-			LOG.warn("Route definition source {} could not be read", sourceName(locator), ex);
+		return RouteDefinitionSources.read(locator, SOURCE_TIMEOUT).onErrorResume((ex) -> {
+			LOG.warn("Route definition source {} could not be read", RouteDefinitionSources.name(locator), ex);
 			return Mono.just(List.of());
 		}).flatMapMany(Flux::fromIterable);
 	}

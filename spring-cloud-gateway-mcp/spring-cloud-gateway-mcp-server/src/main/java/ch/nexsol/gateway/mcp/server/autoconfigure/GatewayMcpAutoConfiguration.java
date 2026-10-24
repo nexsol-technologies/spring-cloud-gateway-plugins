@@ -16,6 +16,9 @@
 
 package ch.nexsol.gateway.mcp.server.autoconfigure;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import ch.nexsol.gateway.commons.security.SecuredPaths;
 import ch.nexsol.gateway.mcp.server.metrics.MetricsTools;
 import ch.nexsol.gateway.mcp.server.pentest.PentestTools;
@@ -28,10 +31,13 @@ import ch.nexsol.gateway.pentest.core.store.FindingStore;
 import ch.nexsol.gateway.pentest.passive.score.RouteScoreService;
 
 import org.springframework.ai.mcp.annotation.McpTool;
+import org.springframework.ai.mcp.server.common.autoconfigure.McpServerAutoConfiguration;
 import org.springframework.ai.mcp.server.common.autoconfigure.McpServerStatelessAutoConfiguration;
+import org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerSpecificationFactoryAutoConfiguration;
 import org.springframework.ai.mcp.server.common.autoconfigure.annotations.StatelessServerSpecificationFactoryAutoConfiguration;
+import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerSseProperties;
+import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerStreamableHttpProperties;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -51,13 +57,15 @@ import org.springframework.context.annotation.Configuration;
  * specifications of the server. Active only when
  * {@code spring.cloud.gateway.server.webflux.mcp.enabled} is {@code true}.
  * <p>
- * Ordered ahead of the Spring AI server auto-configurations on purpose: the scanner
+ * Ordered ahead of the Spring AI server auto-configurations on purpose, the stateless
+ * ones and the stateful ones alike since the application may switch protocol: the scanner
  * registers a bean when that bean is initialised, and the server reads the registry once,
  * when it is built. A tool bean created after the server is never listed.
  */
 @AutoConfiguration(
 		before = { McpServerStatelessAutoConfiguration.class,
-				StatelessServerSpecificationFactoryAutoConfiguration.class },
+				StatelessServerSpecificationFactoryAutoConfiguration.class, McpServerAutoConfiguration.class,
+				McpServerSpecificationFactoryAutoConfiguration.class },
 		afterName = { "ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration",
 				"ch.nexsol.gateway.pentest.passive.autoconfigure.PassiveScanAutoConfiguration" })
 @ConditionalOnClass(McpTool.class)
@@ -76,11 +84,26 @@ public class GatewayMcpAutoConfiguration {
 		return new GatewayPrompts();
 	}
 
+	/**
+	 * Declares the endpoints of the server as secured, whatever protocol is in force. The
+	 * properties bean of a protocol exists only when its auto-configuration ran, so these
+	 * are the endpoints the server listens on, read the way it reads them: a
+	 * {@code @Value} on one key would miss a relaxed spelling, and the SSE endpoints.
+	 * @param streamable the endpoint of the stateless and streamable protocols
+	 * @param sse the two endpoints of the SSE protocol
+	 * @return the secured paths
+	 */
 	@Bean
 	@ConditionalOnMissingBean(name = "gatewayMcpSecuredPaths")
-	SecuredPaths gatewayMcpSecuredPaths(
-			@Value("${spring.ai.mcp.server.streamable-http.mcp-endpoint:/mcp}") String endpoint) {
-		return SecuredPaths.api(endpoint);
+	SecuredPaths gatewayMcpSecuredPaths(ObjectProvider<McpServerStreamableHttpProperties> streamable,
+			ObjectProvider<McpServerSseProperties> sse) {
+		List<String> endpoints = new ArrayList<>();
+		streamable.ifAvailable((properties) -> endpoints.add(properties.getMcpEndpoint()));
+		sse.ifAvailable((properties) -> {
+			endpoints.add(properties.getSseEndpoint());
+			endpoints.add(properties.getSseMessageEndpoint());
+		});
+		return SecuredPaths.api(endpoints.toArray(String[]::new));
 	}
 
 	/**

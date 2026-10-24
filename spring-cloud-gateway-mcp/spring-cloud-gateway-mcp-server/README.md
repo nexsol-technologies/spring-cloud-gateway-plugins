@@ -28,19 +28,20 @@ spring.cloud.gateway.server.webflux.mcp:
 | --- | --- | --- |
 | `...mcp.enabled` | `false` | Master switch; the Spring AI server follows it |
 
-The server itself is Spring AI's, configured under `spring.ai.mcp.server`. The plugin sets the
-values below as defaults; a value the application sets wins.
+The server itself is Spring AI's, configured under `spring.ai.mcp.server`. The plugin gives
+these properties the defaults below; a value the application sets wins.
 
-| Property | Set to | Why |
+| Property | Default | What it does |
 | --- | --- | --- |
-| `spring.ai.mcp.server.enabled` | `...mcp.enabled` | Spring AI's own default is `true`: without this, a gateway carrying the jar with the plugin off would serve an unauthenticated, empty `/mcp` |
-| `spring.ai.mcp.server.protocol` | `STATELESS` | No session between two calls, so a fleet behind a load balancer needs no affinity |
-| `spring.ai.mcp.server.type` | `ASYNC` | The tools are reactive; a `SYNC` server ignores them silently |
-| `spring.ai.mcp.server.name` | `spring.application.name` | What the client shows |
-| `spring.ai.mcp.server.instructions` | A sentence on what the server holds | Guidance the client reads at connection |
+| `spring.ai.mcp.server.enabled` | the value of `...mcp.enabled` | Runs the Spring AI server; Spring AI alone would run it whenever the jar is present |
+| `spring.ai.mcp.server.protocol` | `STATELESS` | `STATELESS` \| `STREAMABLE` \| `SSE`; stateless keeps no session between two calls |
+| `spring.ai.mcp.server.type` | `ASYNC` | `ASYNC` \| `SYNC`; a `SYNC` server registers none of the tools, which are reactive |
+| `spring.ai.mcp.server.name` | `spring.application.name` | The name the client shows |
+| `spring.ai.mcp.server.instructions` | a sentence on what the server holds | Guidance the client reads at connection |
 
-The endpoint is `spring.ai.mcp.server.streamable-http.mcp-endpoint`, `/mcp` by default; the
-plugin declares as secured whatever it is set to.
+The plugin declares as secured the endpoints of the protocol in force: `/mcp`
+(`spring.ai.mcp.server.streamable-http.mcp-endpoint`) for `STATELESS` and `STREAMABLE`, `/sse`
+and `/mcp/message` (`spring.ai.mcp.server.sse-endpoint`, `...sse-message-endpoint`) for `SSE`.
 
 ## The tools
 
@@ -49,7 +50,7 @@ sees what the gateway runs. Every tool declares itself read-only.
 
 | Tool | Returns | Registers when |
 | --- | --- | --- |
-| `list_routes` | Every route definition: id, target URI, order, predicates and filters with their arguments, metadata, and the source it came from | always |
+| `list_routes` | Every route definition: id, target URI, order, predicates and filters with their arguments, metadata, and the source it came from — plus the sources that could not be read, whose routes are missing | always |
 | `get_route` | One route definition, by id | always |
 | `list_filter_factories` | The filters a route may name, each with the fields of its shorthand form, in order | always |
 | `list_predicate_factories` | The same, for the predicates | always |
@@ -65,8 +66,8 @@ sees what the gateway runs. Every tool declares itself read-only.
 
 | Prompt | Argument | What it asks the client to do |
 | --- | --- | --- |
-| `diagnose-route` | `routeId` | Read the route, its traffic and its findings, and conclude on what to change |
-| `security-review` | — | Summarise the findings worst first, name the weakest routes, say what was not observed |
+| `diagnose-route` | `routeId` | Read the route, check its filters and predicates against the factories, read its traffic and its findings, and conclude on what to change |
+| `security-review` | — | Count the findings, list them in full, name the weakest routes, say what was not observed |
 
 ## Securing the endpoint
 

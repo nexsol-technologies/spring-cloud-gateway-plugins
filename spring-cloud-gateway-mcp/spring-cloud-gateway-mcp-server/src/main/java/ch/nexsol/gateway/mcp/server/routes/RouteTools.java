@@ -17,9 +17,14 @@
 package ch.nexsol.gateway.mcp.server.routes;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+import ch.nexsol.gateway.commons.routes.RouteDefinitionSources;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -29,20 +34,22 @@ import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
-import org.springframework.cloud.gateway.route.CompositeRouteDefinitionLocator;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.cloud.gateway.support.ShortcutConfigurable;
-import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 
 /**
  * The tools over the route table: the definitions every source contributed, named after
- * the source, and the factories a route may name.
+ * the source, and the factories a route may name. A source that cannot be read is
+ * reported next to the routes of the others rather than failing the whole answer: the
+ * client learns which routes it does not see.
  */
 public class RouteTools {
 
 	static final Duration SOURCE_TIMEOUT = Duration.ofSeconds(5);
+
+	private static final Logger LOG = LoggerFactory.getLogger(RouteTools.class);
 
 	private final ObjectProvider<RouteDefinitionLocator> locators;
 
@@ -60,23 +67,31 @@ public class RouteTools {
 
 	@McpTool(name = "list_routes",
 			description = "Every route definition of the gateway: id, target URI, order, predicates and filters with "
-					+ "their arguments, metadata, and the source it came from (configuration, files, database, "
-					+ "OpenAPI contract...). Call it first: the route ids it returns are what the other tools take.",
+					+ "their arguments, metadata, and the source it came from (Properties, Files, Database, "
+					+ "Openapi...). Call it first: the route ids it returns are what the other tools take. A source "
+					+ "that could not be read is listed under unreadableSources with the reason; its routes are "
+					+ "missing from the answer.",
 			annotations = @McpAnnotations(readOnlyHint = true, openWorldHint = false))
-	public Mono<List<RouteDescription>> listRoutes() {
-		return Flux.fromIterable(sources()).flatMapSequential(this::read).collectList();
+	public Mono<Inventory> listRoutes() {
+		return Flux.fromIterable(RouteDefinitionSources.sources(this.locators))
+			.flatMapSequential(this::read)
+			.collectList()
+			.map(RouteTools::inventory);
 	}
 
 	@McpTool(name = "get_route", description = "One route definition, by id.",
 			annotations = @McpAnnotations(readOnlyHint = true, openWorldHint = false))
 	public Mono<RouteDescription> getRoute(
 			@McpToolParam(description = "The route id, as listed by list_routes") String routeId) {
-		return listRoutes().flatMap((routes) -> routes.stream()
+		if (!StringUtils.hasText(routeId)) {
+			return Mono.error(new IllegalArgumentException("routeId is required"));
+		}
+		return listRoutes().flatMap((inventory) -> inventory.routes()
+			.stream()
 			.filter((route) -> routeId.equals(route.routeId()))
 			.findFirst()
 			.map(Mono::just)
-			.orElseGet(
-					() -> Mono.error(new IllegalArgumentException("No route is defined with id '" + routeId + "'"))));
+			.orElseGet(() -> Mono.error(new IllegalArgumentException(notFound(routeId, inventory)))));
 	}
 
 	@McpTool(name = "list_filter_factories",
@@ -98,29 +113,39 @@ public class RouteTools {
 			.toList());
 	}
 
-	private List<RouteDefinitionLocator> sources() {
-		return this.locators.orderedStream()
-			.filter((locator) -> !(locator instanceof CompositeRouteDefinitionLocator))
-			.toList();
+	private Mono<SourceRoutes> read(RouteDefinitionLocator locator) {
+		String source = RouteDefinitionSources.name(locator);
+		return RouteDefinitionSources.read(locator, SOURCE_TIMEOUT)
+			.map((definitions) -> new SourceRoutes(
+					definitions.stream().map((definition) -> describe(definition, source)).toList(), null))
+			.onErrorResume((ex) -> {
+				LOG.warn("Route definition source {} could not be read", source, ex);
+				return Mono.just(new SourceRoutes(List.of(), new UnreadableSource(source, message(ex))));
+			});
 	}
 
-	private Flux<RouteDescription> read(RouteDefinitionLocator locator) {
-		String source = sourceName(locator);
-		// Collected before the timeout is applied, so the delay bounds the whole read of
-		// the source rather than the gap between two of its routes.
-		return locator.getRouteDefinitions()
-			.collectList()
-			.timeout(SOURCE_TIMEOUT)
-			.onErrorMap((ex) -> new IllegalStateException(
-					"Route source " + source + " could not be read: " + message(ex), ex))
-			.flatMapMany(Flux::fromIterable)
-			.map((definition) -> describe(definition, source));
+	private static Inventory inventory(List<SourceRoutes> read) {
+		List<RouteDescription> routes = new ArrayList<>();
+		List<UnreadableSource> unreadable = new ArrayList<>();
+		for (SourceRoutes source : read) {
+			routes.addAll(source.routes());
+			if (source.failure() != null) {
+				unreadable.add(source.failure());
+			}
+		}
+		return new Inventory(routes, unreadable);
 	}
 
-	static String sourceName(RouteDefinitionLocator locator) {
-		String name = ClassUtils.getUserClass(locator).getSimpleName();
-		// A locator declared as a lambda has no name worth showing.
-		return (name.isEmpty() || name.contains("$$Lambda")) ? "Custom" : name;
+	private static String notFound(String routeId, Inventory inventory) {
+		String message = "No route is defined with id '" + routeId + "'";
+		if (inventory.unreadableSources().isEmpty()) {
+			return message;
+		}
+		return message + "; it may belong to a source that could not be read: "
+				+ inventory.unreadableSources()
+					.stream()
+					.map(UnreadableSource::source)
+					.collect(Collectors.joining(", "));
 	}
 
 	private static RouteDescription describe(RouteDefinition definition, String source) {
@@ -137,6 +162,25 @@ public class RouteTools {
 
 	private static String message(Throwable ex) {
 		return StringUtils.hasText(ex.getMessage()) ? ex.getMessage() : ex.getClass().getSimpleName();
+	}
+
+	/**
+	 * The routes every source could contribute, and the sources that could not.
+	 *
+	 * @param routes the route definitions, in source order
+	 * @param unreadableSources the sources that could not be read, empty when every
+	 * source answered
+	 */
+	public record Inventory(List<RouteDescription> routes, List<UnreadableSource> unreadableSources) {
+	}
+
+	/**
+	 * A source that could not be read.
+	 *
+	 * @param source the name of the source
+	 * @param error why it could not be read
+	 */
+	public record UnreadableSource(String source, String error) {
 	}
 
 	/**
@@ -171,6 +215,9 @@ public class RouteTools {
 	 * @param shortcutFields the fields the shorthand form takes, in order
 	 */
 	public record FactoryDescription(String name, List<String> shortcutFields) {
+	}
+
+	private record SourceRoutes(List<RouteDescription> routes, UnreadableSource failure) {
 	}
 
 }

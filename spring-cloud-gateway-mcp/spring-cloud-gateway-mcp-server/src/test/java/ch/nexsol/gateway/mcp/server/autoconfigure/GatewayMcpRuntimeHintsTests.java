@@ -40,8 +40,8 @@ class GatewayMcpRuntimeHintsTests {
 
 	@Test
 	void registersTheRecordsTheToolsAnswerWith() {
-		for (Class<?> type : List.of(RouteTools.RouteDescription.class, RouteTools.Step.class,
-				RouteTools.FactoryDescription.class)) {
+		for (Class<?> type : List.of(RouteTools.Inventory.class, RouteTools.UnreadableSource.class,
+				RouteTools.RouteDescription.class, RouteTools.Step.class, RouteTools.FactoryDescription.class)) {
 			assertThat(RuntimeHintsPredicates.reflection().onType(type))
 				.as("%s is not registered; add it to GatewayMcpRuntimeHints", type.getName())
 				.accepts(this.hints);

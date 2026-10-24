@@ -23,6 +23,7 @@ import java.util.Map;
 import ch.nexsol.gateway.mcp.server.routes.RouteTools.FactoryDescription;
 import ch.nexsol.gateway.mcp.server.routes.RouteTools.RouteDescription;
 import ch.nexsol.gateway.mcp.server.routes.RouteTools.Step;
+import ch.nexsol.gateway.mcp.server.routes.RouteTools.UnreadableSource;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
@@ -44,22 +45,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RouteToolsTests {
 
 	@Test
-	void listsTheRoutesOfEverySourceNamedAfterIt() {
-		RouteDefinitionLocator files = new FilesLocator(route("files-route"));
+	void listsTheRoutesOfEverySourceNamedTheWayTheConsoleNamesIt() {
+		RouteDefinitionLocator files = new FilesRouteDefinitionLocator(route("files-route"));
 		RouteDefinitionLocator custom = () -> Flux.just(route("custom-route"));
-		StepVerifier.create(tools(List.of(files, custom), List.of(), List.of()).listRoutes()).assertNext((routes) -> {
-			assertThat(routes).extracting(RouteDescription::routeId).containsExactly("files-route", "custom-route");
-			assertThat(routes).extracting(RouteDescription::source).containsExactly("FilesLocator", "Custom");
-		}).verifyComplete();
+		StepVerifier.create(tools(List.of(files, custom), List.of(), List.of()).listRoutes())
+			.assertNext((inventory) -> {
+				assertThat(inventory.routes()).extracting(RouteDescription::routeId)
+					.containsExactly("files-route", "custom-route");
+				assertThat(inventory.routes()).extracting(RouteDescription::source).containsExactly("Files", "Custom");
+				assertThat(inventory.unreadableSources()).isEmpty();
+			})
+			.verifyComplete();
 	}
 
 	@Test
 	void leavesOutTheCompositeLocatorThatRepeatsTheSources() {
-		RouteDefinitionLocator files = new FilesLocator(route("files-route"));
+		RouteDefinitionLocator files = new FilesRouteDefinitionLocator(route("files-route"));
 		RouteDefinitionLocator composite = new CompositeRouteDefinitionLocator(Flux.just(files));
 		StepVerifier.create(tools(List.of(composite, files), List.of(), List.of()).listRoutes())
-			.assertNext(
-					(routes) -> assertThat(routes).extracting(RouteDescription::routeId).containsExactly("files-route"))
+			.assertNext((inventory) -> assertThat(inventory.routes()).extracting(RouteDescription::routeId)
+				.containsExactly("files-route"))
 			.verifyComplete();
 	}
 
@@ -70,7 +75,8 @@ class RouteToolsTests {
 		books.setPredicates(List.of(new PredicateDefinition("Path=/books/**")));
 		books.setFilters(List.of(new FilterDefinition("StripPrefix=1")));
 		books.setMetadata(Map.of("public", true));
-		StepVerifier.create(tools(List.of(new FilesLocator(books)), List.of(), List.of()).getRoute("books"))
+		StepVerifier
+			.create(tools(List.of(new FilesRouteDefinitionLocator(books)), List.of(), List.of()).getRoute("books"))
 			.assertNext((route) -> {
 				assertThat(route.uri()).isEqualTo("http://books");
 				assertThat(route.order()).isEqualTo(3);
@@ -79,25 +85,45 @@ class RouteToolsTests {
 				assertThat(route.filters()).extracting(Step::name).containsExactly("StripPrefix");
 				assertThat(route.filters().get(0).args()).containsValue("1");
 				assertThat(route.metadata()).containsEntry("public", true);
-				assertThat(route.source()).isEqualTo("FilesLocator");
+				assertThat(route.source()).isEqualTo("Files");
 			})
 			.verifyComplete();
 	}
 
 	@Test
 	void getRouteFailsNamingTheUnknownId() {
-		StepVerifier.create(tools(List.of(new FilesLocator(route("books"))), List.of(), List.of()).getRoute("nowhere"))
-			.expectErrorSatisfies(
-					(ex) -> assertThat(ex).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("nowhere"))
+		StepVerifier
+			.create(tools(List.of(new FilesRouteDefinitionLocator(route("books"))), List.of(), List.of())
+				.getRoute("nowhere"))
+			.expectErrorSatisfies((ex) -> assertThat(ex).isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("nowhere")
+				.hasMessageNotContaining("could not be read"))
 			.verify();
 	}
 
 	@Test
-	void aSourceThatCannotBeReadFailsTheToolNamingTheSource() {
-		StepVerifier.create(tools(List.of(new BrokenLocator()), List.of(), List.of()).listRoutes())
-			.expectErrorSatisfies((ex) -> assertThat(ex).isInstanceOf(IllegalStateException.class)
-				.hasMessageContaining("BrokenLocator")
-				.hasMessageContaining("database down"))
+	void getRouteRefusesABlankId() {
+		StepVerifier.create(tools(List.of(), List.of(), List.of()).getRoute(" "))
+			.expectErrorSatisfies(
+					(ex) -> assertThat(ex).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("routeId"))
+			.verify();
+	}
+
+	@Test
+	void keepsTheRoutesOfTheOtherSourcesWhenOneCannotBeReadAndSaysSo() {
+		RouteTools tools = tools(
+				List.of(new BrokenRouteDefinitionLocator(), new FilesRouteDefinitionLocator(route("books"))), List.of(),
+				List.of());
+		StepVerifier.create(tools.listRoutes()).assertNext((inventory) -> {
+			assertThat(inventory.routes()).extracting(RouteDescription::routeId).containsExactly("books");
+			assertThat(inventory.unreadableSources()).extracting(UnreadableSource::source).containsExactly("Broken");
+			assertThat(inventory.unreadableSources().get(0).error()).contains("database down");
+		}).verifyComplete();
+		StepVerifier.create(tools.getRoute("books"))
+			.assertNext((route) -> assertThat(route.routeId()).isEqualTo("books"))
+			.verifyComplete();
+		StepVerifier.create(tools.getRoute("orders"))
+			.expectErrorSatisfies((ex) -> assertThat(ex).hasMessageContaining("orders").hasMessageContaining("Broken"))
 			.verify();
 	}
 
@@ -136,11 +162,11 @@ class RouteToolsTests {
 				beanFactory.getBeanProvider(ResolvableType.forClass(RoutePredicateFactory.class)));
 	}
 
-	static class FilesLocator implements RouteDefinitionLocator {
+	static class FilesRouteDefinitionLocator implements RouteDefinitionLocator {
 
 		private final List<RouteDefinition> definitions;
 
-		FilesLocator(RouteDefinition... definitions) {
+		FilesRouteDefinitionLocator(RouteDefinition... definitions) {
 			this.definitions = List.of(definitions);
 		}
 
@@ -151,7 +177,7 @@ class RouteToolsTests {
 
 	}
 
-	static class BrokenLocator implements RouteDefinitionLocator {
+	static class BrokenRouteDefinitionLocator implements RouteDefinitionLocator {
 
 		@Override
 		public Flux<RouteDefinition> getRouteDefinitions() {

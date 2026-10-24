@@ -92,7 +92,9 @@ class GatewayMcpServerIntegrationTests {
 			.jsonPath("$.result.isError")
 			.isEqualTo(false)
 			.jsonPath("$.result.content[0].text")
-			.value(containsString("\"routeId\":\"route-x\"")));
+			.value(containsString("\"routeId\":\"route-x\""))
+			.jsonPath("$.result.content[0].text")
+			.value(containsString("\"unreadableSources\":[]")));
 	}
 
 	@Test

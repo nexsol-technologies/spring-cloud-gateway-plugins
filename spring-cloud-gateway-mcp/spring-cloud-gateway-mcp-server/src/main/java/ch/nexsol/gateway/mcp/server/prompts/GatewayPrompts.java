@@ -26,6 +26,7 @@ import reactor.core.publisher.Mono;
 
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpPrompt;
+import org.springframework.util.StringUtils;
 
 /**
  * The prompts the server offers: workflows over the tools, written once, so a client asks
@@ -39,12 +40,16 @@ public class GatewayPrompts {
 					+ "raised on it and its security score.")
 	public Mono<GetPromptResult> diagnoseRoute(@McpArg(name = "routeId",
 			description = "The id of the route to diagnose", required = true) String routeId) {
+		if (!StringUtils.hasText(routeId)) {
+			return Mono.error(new IllegalArgumentException("routeId is required"));
+		}
 		String text = """
 				Diagnose the route '%1$s' of this gateway.
 				1. Call get_route with routeId '%1$s' and describe what it does: the requests it matches, the filters it applies and the service it targets.
-				2. If route_traffic is available, call it and set this route's requests, latency and error rates against the other routes.
-				3. If list_findings is available, call it with routeId '%1$s' and summarise the findings by severity; read its line in route_security_scores.
-				4. Conclude with what is wrong, if anything, and the change to the route definition that would fix it.
+				2. Call list_filter_factories and list_predicate_factories, and check that every filter and predicate the route names exists and receives the fields its shorthand expects. A name that matches no factory is a configuration error: report it first.
+				3. If route_traffic is available, call it and set this route's requests, latency and error rates against the other routes.
+				4. If list_findings is available, call it with routeId '%1$s' and summarise the findings by severity; read its line in route_security_scores.
+				5. Conclude with what is wrong, if anything, and the change to the route definition that would fix it.
 				"""
 			.formatted(routeId);
 		return Mono.just(prompt("Diagnosis of route " + routeId, text));
@@ -56,10 +61,11 @@ public class GatewayPrompts {
 	public Mono<GetPromptResult> securityReview() {
 		String text = """
 				Review the security posture of this gateway.
-				1. Call finding_summary, then list_findings for the CRITICAL and HIGH severities.
-				2. Call route_security_scores and name the routes with the lowest scores.
-				3. Call scan_coverage and say which OWASP categories this review could not observe.
-				4. Report the findings grouped by route, worst first, each with its remediation, then the categories left unreviewed.
+				1. Call finding_summary and note the count of each severity.
+				2. Call list_findings once per severity, CRITICAL then HIGH, with a limit at least equal to the count finding_summary gave for it: the default limit is 50 and there is no paging, so a smaller limit silently drops findings. For an exhaustive inventory, export_findings with format json returns everything in one call.
+				3. Call route_security_scores and name the routes with the lowest scores.
+				4. Call scan_coverage and say which OWASP categories this review could not observe.
+				5. Report the findings grouped by route, worst first, each with its remediation, then the categories left unreviewed.
 				If the finding tools are absent, say that the passive analyser is not running and stop there.
 				""";
 		return Mono.just(prompt("Security review of the gateway", text));
