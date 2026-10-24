@@ -87,6 +87,19 @@ plugins here are gated on properties — all but the console, which is on whenev
 classpath: build with the profile and the properties the application will run with. A class data sharing archive and an AOT cache are not concerned — they record
 the classes a run loaded and nothing else.
 
+## Software bill of materials
+
+Every published module ships a CycloneDX 1.6 SBOM next to its jar, under the `cyclonedx`
+classifier, in JSON and in XML:
+
+```
+ch/nexsol-tech/gateway/spring-cloud-gateway-ui/<version>/spring-cloud-gateway-ui-<version>-cyclonedx.json
+ch/nexsol-tech/gateway/spring-cloud-gateway-ui/<version>/spring-cloud-gateway-ui-<version>-cyclonedx.xml
+```
+
+`mvn package` writes the same two files to the `target` directory of each module. The samples
+are not published and have none.
+
 ## Reference documentation
 
 [Spring Cloud Gateway reference documentation](https://docs.spring.io/spring-cloud-gateway/reference/)
