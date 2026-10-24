@@ -3,6 +3,12 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<!--
+		htmx 4 swaps every answer but 204 and 304, error pages included. The 401 and 403 the
+		console answers carry HX-Redirect and never reach the swap; this keeps a 405 or a 500
+		out of the fragment slot too, as htmx 2 did.
+	-->
+	<meta name="htmx-config" content='{"noSwap":[204,304,"4xx","5xx"]}'>
 	<title th:text="${title}">Spring Cloud Gateway</title>
 	<link rel="icon" type="image/png" th:href="@{/img/icon.png}" href="/img/icon.png">
 	<link rel="apple-touch-icon" th:href="@{/img/icon.png}" href="/img/icon.png">

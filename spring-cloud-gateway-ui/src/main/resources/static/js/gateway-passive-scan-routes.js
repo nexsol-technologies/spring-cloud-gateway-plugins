@@ -250,16 +250,19 @@
 			fetch(dataUrl, { headers: { Accept: 'application/json' } }).then(function (r) {
 				return r.json();
 			}).catch(function () {
-				return [];
+				return null;
 			}),
 			fetch(findingsUrl + '?limit=1000', { headers: { Accept: 'application/json' } }).then(function (r) {
 				return r.json();
 			}).catch(function () {
-				return [];
+				return null;
 			})
 		]).then(function (results) {
 			all = results[0] || [];
 			findingsByRoute = groupFindings(results[1] || []);
+			if (results[0] && results[1]) {
+				window.gatewayUi.read('psr-age');
+			}
 			render();
 		});
 	}

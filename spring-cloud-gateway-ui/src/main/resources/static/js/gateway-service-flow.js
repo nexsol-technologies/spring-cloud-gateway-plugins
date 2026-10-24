@@ -884,7 +884,7 @@
 				sel('gf-coverage').textContent = (json && json.coverage) ? json.coverage : '';
 				diff();
 				readAt = Date.now();
-				renderAge();
+				window.gatewayUi.read('gf-age');
 				redraw();
 			})
 			.catch(function () {
@@ -892,14 +892,6 @@
 				// older, it does not make it younger.
 				sel('gf-coverage').textContent = 'Could not read the flow.';
 			});
-	}
-
-	function renderAge() {
-		if (!readAt) {
-			return;
-		}
-		var seconds = Math.round((Date.now() - readAt) / 1000);
-		sel('gf-age').textContent = (seconds < 5) ? 'just now' : seconds + 's ago';
 	}
 
 	function schedule() {
@@ -946,5 +938,4 @@
 
 	load();
 	schedule();
-	window.setInterval(renderAge, 1000);
 })();

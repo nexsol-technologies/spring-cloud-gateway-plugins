@@ -70,6 +70,14 @@
 								style="width: 7rem">
 					</div>
 					<div class="ms-auto d-flex align-items-center gap-3">
+						<span class="gw-live" data-gw-live="gg-auto" hidden><span class="gw-live-dot"></span>Live</span>
+						<!-- How long ago the figures were read, ticking on its own between two
+						     polls: a graph left open on a dead poll must not look live. -->
+						<span class="text-secondary small" id="gg-age" data-gw-age></span>
+						<div class="form-check form-switch mb-0">
+							<input class="form-check-input" type="checkbox" role="switch" id="gg-auto" checked>
+							<label class="form-check-label small" for="gg-auto">Auto</label>
+						</div>
 						<!-- One switch per class of error, rather than one "failing" covering both: a
 						     wave of 404 and a backend outage are read by different people. Neither on
 						     draws the whole graph; both on keep an edge that saw either. -->
@@ -101,8 +109,10 @@
 					5xx. A 4xx is counted, reported and filtered on, but never colours an arrow: a caller
 					asking for what it may not have says nothing about the health of the service that
 					refused it.
-					The graph is refreshed on demand, never on a timer, so a layout you are reading does
-					not move under you.
+					With <em>Auto</em> on the figures are read again every 5 seconds. With <em>Freeze
+					layout</em> on, a node already drawn stays where it is and only a new one finds its
+					place, so the picture does not move under you; off, every poll lays the whole graph
+					out again.
 					<br>
 					The gateway itself is not a node: it sits on every edge, which is what lets it count
 					them. A caller it could not name &mdash; no client claim in a token, no caller header

@@ -77,7 +77,43 @@ window.gatewayUi = (function () {
 		return document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
 	}
 
-	return { remember: remember, theme: theme };
+	/*
+	 * How old the figures of a polling view are. The view marks its label with data-gw-age
+	 * and reports each successful read; the label then ticks on its own rather than being
+	 * written on each refresh, since what it is there to reveal is a poll that stopped
+	 * answering, and a label only written by a successful load would stay reassuringly at
+	 * "just now". A failed poll reports nothing: the figures on screen got older, not
+	 * younger.
+	 */
+	var readTimes = {};
+
+	function age(id) {
+		var seconds = Math.round((Date.now() - readTimes[id]) / 1000);
+		if (seconds < 5) {
+			return 'just now';
+		}
+		if (seconds < 90) {
+			return seconds + 's ago';
+		}
+		return Math.round(seconds / 60) + 'm ago';
+	}
+
+	function tick() {
+		Array.prototype.forEach.call(document.querySelectorAll('[data-gw-age]'), function (label) {
+			if (readTimes[label.id]) {
+				label.textContent = age(label.id);
+			}
+		});
+	}
+
+	function recordRead(id) {
+		readTimes[id] = Date.now();
+		tick();
+	}
+
+	setInterval(tick, 1000);
+
+	return { read: recordRead, remember: remember, theme: theme };
 })();
 
 (function () {
@@ -251,8 +287,8 @@ window.gatewayUi = (function () {
 	if (!token || !header) {
 		return;
 	}
-	document.body.addEventListener('htmx:configRequest', function (event) {
-		event.detail.headers[header.content] = token.content;
+	document.addEventListener('htmx:config:request', function (event) {
+		event.detail.ctx.request.headers[header.content] = token.content;
 	});
 })();
 

@@ -263,6 +263,7 @@
 			})
 			.then(function (json) {
 				render(json || []);
+				window.gatewayUi.read('ps-age');
 			})
 			.catch(function () {
 				render([]);
