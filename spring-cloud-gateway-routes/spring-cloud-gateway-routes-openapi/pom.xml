@@ -13,8 +13,6 @@
 	<name>spring-cloud-gateway-routes-openapi</name>
 	<description>Route definition locator generating routes from an OpenAPI contract for Spring Cloud Gateway</description>
 	<properties>
-		<swagger-parser.version>2.1.31</swagger-parser.version>
-		<swagger-core.version>2.2.34</swagger-core.version>
 	</properties>
 	<dependencies>
 		<dependency>

@@ -13,8 +13,6 @@
 	<name>spring-cloud-gateway-openapi-validation</name>
 	<description>Gateway filter validating requests and responses against an OpenAPI contract for Spring Cloud Gateway</description>
 	<properties>
-		<swagger-parser.version>2.1.31</swagger-parser.version>
-		<swagger-core.version>2.2.34</swagger-core.version>
 		<json-schema-validator.version>1.5.9</json-schema-validator.version>
 	</properties>
 	<dependencies>
