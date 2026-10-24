@@ -26,7 +26,7 @@ jobs:
             fi
             df -h
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       
       - id: install-secret-key
         name: Install gpg secret key
@@ -79,7 +79,7 @@ jobs:
       # Full history + tags: the changelog generator diffs against the previous
       # tag, and a shallow clone makes its 'git fetch --tags' fail with
       # "shallow file has changed since we read it".
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -97,13 +97,13 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        uses: metcalfc/changelog-generator@v4.6.2
+        uses: metcalfc/changelog-generator@v4.9.0
         with:
           myToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
         id: create_release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -124,7 +124,7 @@ jobs:
     steps:
       # Push via a write-enabled deploy key so the commit bypasses the branch
       # ruleset on 'main' (deploy keys are on the ruleset bypass list).
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ssh-key: ${{ secrets.COMMIT_SSH_KEY }}
 
@@ -138,6 +138,6 @@ jobs:
             mvn versions:commit
 
       - name: Commit new SNAPSHOT version
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore: update to next SNAPSHOT version"
