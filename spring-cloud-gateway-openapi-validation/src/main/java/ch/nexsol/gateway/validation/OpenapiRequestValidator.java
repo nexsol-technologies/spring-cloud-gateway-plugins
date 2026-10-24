@@ -23,13 +23,13 @@ import java.util.List;
 import java.util.Set;
 
 import ch.nexsol.gateway.validation.OpenapiContract.Resolution;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.networknt.schema.ValidationMessage;
+import com.networknt.schema.Error;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.parameters.RequestBody;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 
 import org.springframework.http.HttpCookie;
 import org.springframework.http.MediaType;
@@ -112,12 +112,12 @@ public class OpenapiRequestValidator {
 				.of(describe(parameter) + " is not a valid " + primaryType(schema) + ": '" + values.get(0) + "'");
 		}
 		String cacheKey = operationKey + "#param:" + parameter.getIn() + ":" + parameter.getName();
-		Set<ValidationMessage> messages = contract.compiledSchema(cacheKey, schema).validate(instance);
+		List<Error> messages = contract.validate(cacheKey, schema, instance);
 		if (messages.isEmpty()) {
 			return ValidationReport.empty();
 		}
 		List<String> errors = new ArrayList<>(messages.size());
-		for (ValidationMessage message : messages) {
+		for (Error message : messages) {
 			errors.add(describe(parameter) + " " + message.getMessage());
 		}
 		return new ValidationReport(errors);
@@ -179,13 +179,13 @@ public class OpenapiRequestValidator {
 
 	private static JsonNode coerceScalar(String value, String type) {
 		if (type == null) {
-			return NODES.textNode(value);
+			return NODES.stringNode(value);
 		}
 		return switch (type) {
 			case "integer" -> NODES.numberNode(Long.parseLong(value));
 			case "number" -> NODES.numberNode(new BigDecimal(value));
 			case "boolean" -> booleanNode(value);
-			default -> NODES.textNode(value);
+			default -> NODES.stringNode(value);
 		};
 	}
 

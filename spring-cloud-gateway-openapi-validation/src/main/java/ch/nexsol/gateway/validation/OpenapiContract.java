@@ -24,17 +24,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.SchemaValidatorsConfig;
-import com.networknt.schema.SpecVersion.VersionFlag;
+import com.networknt.schema.Error;
 import io.swagger.v3.core.util.Json;
 import io.swagger.v3.core.util.Json31;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -42,6 +37,7 @@ import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
+import tools.jackson.databind.JsonNode;
 
 import org.springframework.http.HttpMethod;
 
@@ -61,15 +57,11 @@ public class OpenapiContract {
 
 	private final List<PathTemplate> pathTemplates;
 
-	private final JsonSchemaFactory schemaFactory;
-
-	private final SchemaValidatorsConfig schemaConfig;
+	private final CompiledSchemas schemas;
 
 	private final ObjectMapper schemaMapper;
 
-	private final JsonNode componentsNode;
-
-	private final Map<String, JsonSchema> schemaCache = new ConcurrentHashMap<>();
+	private final ObjectNode componentsNode;
 
 	/**
 	 * Creates a contract from a parsed document.
@@ -81,12 +73,7 @@ public class OpenapiContract {
 		// Schema 2020-12), the 3.0 one the older flavour the draft-04 dialect
 		// understands.
 		this.schemaMapper = openapi31 ? Json31.mapper() : Json.mapper();
-		this.schemaFactory = JsonSchemaFactory.getInstance(openapi31 ? VersionFlag.V202012 : VersionFlag.V4);
-		// 'nullable' is an OpenAPI 3.0 keyword, not a JSON Schema one: without this a
-		// null
-		// value would be rejected by a schema that explicitly allows it. In 3.1 the same
-		// intent is written as a 'null' type, which needs no special handling.
-		this.schemaConfig = SchemaValidatorsConfig.builder().nullableKeywordEnabled(!openapi31).build();
+		this.schemas = new CompiledSchemas(openapi31);
 		this.componentsNode = (document.getComponents() != null)
 				? this.schemaMapper.valueToTree(document.getComponents()) : null;
 		this.pathTemplates = compile(document);
@@ -127,11 +114,24 @@ public class OpenapiContract {
 	 * @param schema the contract schema
 	 * @return the compiled schema
 	 */
-	public JsonSchema compiledSchema(String cacheKey, Schema<?> schema) {
-		return this.schemaCache.computeIfAbsent(cacheKey, (key) -> compile(schema));
+	/**
+	 * Hold an instance against a schema of the contract, compiled once under the given
+	 * key.
+	 * @param cacheKey the key the compiled schema is kept under, unique to the operation
+	 * and the part of the message it describes
+	 * @param schema the schema of the contract
+	 * @param instance the value built from the message, as a Jackson 3 tree
+	 * @return the violations, empty when the instance conforms
+	 */
+	public List<Error> validate(String cacheKey, Schema<?> schema, JsonNode instance) {
+		return this.schemas.validate(cacheKey, () -> schemaJson(schema), instance);
 	}
 
-	private JsonSchema compile(Schema<?> schema) {
+	CompiledSchemas schemas() {
+		return this.schemas;
+	}
+
+	private String schemaJson(Schema<?> schema) {
 		ObjectNode node = this.schemaMapper.valueToTree(schema);
 		if (this.componentsNode != null) {
 			// A resolved document still holds internal '#/components/schemas/...'
@@ -139,7 +139,7 @@ public class OpenapiContract {
 			// validator follow them, and it keeps a self-referential schema finite.
 			node.set("components", this.componentsNode);
 		}
-		return this.schemaFactory.getSchema(node, this.schemaConfig);
+		return node.toString();
 	}
 
 	private static List<PathTemplate> compile(OpenAPI document) {

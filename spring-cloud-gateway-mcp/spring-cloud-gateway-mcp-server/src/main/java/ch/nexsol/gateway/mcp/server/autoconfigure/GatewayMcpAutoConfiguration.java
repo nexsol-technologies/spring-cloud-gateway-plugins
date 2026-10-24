@@ -17,7 +17,6 @@
 package ch.nexsol.gateway.mcp.server.autoconfigure;
 
 import ch.nexsol.gateway.commons.security.SecuredPaths;
-import ch.nexsol.gateway.mcp.server.SchemaValidatorCustomizer;
 import ch.nexsol.gateway.mcp.server.metrics.MetricsTools;
 import ch.nexsol.gateway.mcp.server.pentest.PentestTools;
 import ch.nexsol.gateway.mcp.server.prompts.GatewayPrompts;
@@ -29,7 +28,6 @@ import ch.nexsol.gateway.pentest.core.store.FindingStore;
 import ch.nexsol.gateway.pentest.passive.score.RouteScoreService;
 
 import org.springframework.ai.mcp.annotation.McpTool;
-import org.springframework.ai.mcp.customizer.McpStatelessAsyncServerCustomizer;
 import org.springframework.ai.mcp.server.common.autoconfigure.McpServerStatelessAutoConfiguration;
 import org.springframework.ai.mcp.server.common.autoconfigure.annotations.StatelessServerSpecificationFactoryAutoConfiguration;
 import org.springframework.beans.factory.ObjectProvider;
@@ -76,11 +74,6 @@ public class GatewayMcpAutoConfiguration {
 	@Bean
 	GatewayPrompts gatewayMcpPrompts() {
 		return new GatewayPrompts();
-	}
-
-	@Bean
-	McpStatelessAsyncServerCustomizer gatewayMcpSchemaValidatorCustomizer() {
-		return new SchemaValidatorCustomizer();
 	}
 
 	@Bean

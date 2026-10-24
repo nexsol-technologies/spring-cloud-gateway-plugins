@@ -42,16 +42,6 @@ values below as defaults; a value the application sets wins.
 The endpoint is `spring.ai.mcp.server.streamable-http.mcp-endpoint`, `/mcp` by default; the
 plugin declares as secured whatever it is set to.
 
-## Running next to openapi-validation
-
-[openapi-validation](../../spring-cloud-gateway-openapi-validation/README.md) depends on
-`com.networknt:json-schema-validator` 1.5.x; the validator the MCP SDK ships needs the 3.x line,
-and Maven keeps the nearer of the two. With both plugins in one gateway the SDK's validator
-cannot load, so the plugin replaces it with one that accepts every schema, and says so in a
-warning at start-up. The tools answer exactly the same; what is lost is the check of a tool's
-arguments against its schema before the tool runs — a wrongly typed argument is then reported
-by the tool itself.
-
 ## The tools
 
 Each group registers when its plugin is on the classpath and wired, so a client only ever

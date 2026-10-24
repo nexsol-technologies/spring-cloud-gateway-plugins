@@ -119,3 +119,6 @@ components:
         pages:
           type: integer
           minimum: 1
+        isbn:
+          type: string
+          nullable: true

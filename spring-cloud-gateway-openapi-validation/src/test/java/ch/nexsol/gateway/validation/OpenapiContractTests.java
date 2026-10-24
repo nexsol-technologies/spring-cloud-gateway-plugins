@@ -16,7 +16,10 @@
 
 package ch.nexsol.gateway.validation;
 
+import java.util.function.Supplier;
+
 import ch.nexsol.gateway.validation.OpenapiContract.Resolution;
+import io.swagger.v3.core.util.Json;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.http.HttpMethod;
@@ -90,8 +93,11 @@ class OpenapiContractTests {
 			.get("application/json")
 			.getSchema();
 
-		assertThat(this.contract.compiledSchema("POST /books#request", schema))
-			.isSameAs(this.contract.compiledSchema("POST /books#request", schema));
+		CompiledSchemas schemas = this.contract.schemas();
+		Supplier<String> schemaJson = () -> Json.mapper().valueToTree(schema).toString();
+
+		assertThat(schemas.compiled("POST /books#request", schemaJson))
+			.isSameAs(schemas.compiled("POST /books#request", schemaJson));
 	}
 
 	@Test

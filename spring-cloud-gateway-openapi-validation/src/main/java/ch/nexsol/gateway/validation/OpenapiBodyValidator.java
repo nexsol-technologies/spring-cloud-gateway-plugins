@@ -16,16 +16,15 @@
 
 package ch.nexsol.gateway.validation;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.networknt.schema.ValidationMessage;
+import com.networknt.schema.Error;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.Schema;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
@@ -42,7 +41,7 @@ import org.springframework.util.StringUtils;
  */
 class OpenapiBodyValidator {
 
-	private final ObjectMapper mapper = new ObjectMapper();
+	private final JsonMapper mapper = new JsonMapper();
 
 	/**
 	 * Validates a body against the declared content of an operation.
@@ -78,18 +77,18 @@ class OpenapiBodyValidator {
 		try {
 			instance = this.mapper.readTree(body);
 		}
-		catch (IOException ex) {
+		catch (JacksonException ex) {
 			return ValidationReport.of(role + " body is not valid JSON: " + ex.getMessage());
 		}
-		if (instance == null) {
+		if (instance == null || instance.isMissingNode()) {
 			return ValidationReport.of(role + " body is empty but a " + contentType + " payload is declared");
 		}
-		Set<ValidationMessage> messages = contract.compiledSchema(cacheKey, schema).validate(instance);
+		List<Error> messages = contract.validate(cacheKey, schema, instance);
 		if (messages.isEmpty()) {
 			return ValidationReport.empty();
 		}
 		List<String> errors = new ArrayList<>(messages.size());
-		for (ValidationMessage message : messages) {
+		for (Error message : messages) {
 			errors.add(role + " body " + describe(message));
 		}
 		return new ValidationReport(errors);
@@ -129,7 +128,7 @@ class OpenapiBodyValidator {
 		}
 	}
 
-	private static String describe(ValidationMessage message) {
+	private static String describe(Error message) {
 		String location = message.getInstanceLocation().toString();
 		return StringUtils.hasText(location) ? "at '" + location + "' " + message.getMessage() : message.getMessage();
 	}

@@ -15,7 +15,7 @@
 	<properties>
 		<swagger-parser.version>2.1.31</swagger-parser.version>
 		<swagger-core.version>2.2.34</swagger-core.version>
-		<json-schema-validator.version>1.5.9</json-schema-validator.version>
+		<json-schema-validator.version>3.0.6</json-schema-validator.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -55,6 +55,10 @@
 			<groupId>com.networknt</groupId>
 			<artifactId>json-schema-validator</artifactId>
 			<version>${json-schema-validator.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>tools.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>io.micrometer</groupId>

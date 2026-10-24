@@ -33,7 +33,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
-import org.springframework.ai.mcp.customizer.McpStatelessAsyncServerCustomizer;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -62,7 +61,6 @@ class GatewayMcpAutoConfigurationTests {
 		this.runner.withPropertyValues(ENABLED).run((context) -> {
 			assertThat(context).hasSingleBean(RouteTools.class);
 			assertThat(context).hasSingleBean(GatewayPrompts.class);
-			assertThat(context).hasSingleBean(McpStatelessAsyncServerCustomizer.class);
 			SecuredPaths paths = context.getBean(SecuredPaths.class);
 			assertThat(paths.writePaths()).containsExactly("/mcp");
 			assertThat(paths.csrfExemptPaths()).containsExactly("/mcp");

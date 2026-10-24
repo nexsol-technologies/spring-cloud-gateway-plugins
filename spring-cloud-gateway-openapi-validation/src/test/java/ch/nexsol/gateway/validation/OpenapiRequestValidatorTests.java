@@ -117,6 +117,23 @@ class OpenapiRequestValidatorTests {
 	}
 
 	@Test
+	void acceptsANullWhereA30ContractDeclaresThePropertyNullable() {
+		ValidationReport report = validateBody("/books", HttpMethod.POST,
+				"{\"title\":\"Dune\",\"author\":\"Herbert\",\"isbn\":null}");
+
+		assertThat(report.isValid()).isTrue();
+	}
+
+	@Test
+	void rejectsANullWhereThePropertyIsNotNullable() {
+		ValidationReport report = validateBody("/books", HttpMethod.POST,
+				"{\"title\":\"Dune\",\"author\":\"Herbert\",\"pages\":null}");
+
+		assertThat(report.isValid()).isFalse();
+		assertThat(report.describe()).contains("request body").contains("pages");
+	}
+
+	@Test
 	void rejectsABodyThatIsNotValidJson() {
 		ValidationReport report = validateBody("/books", HttpMethod.POST, "{\"title\":");
 
