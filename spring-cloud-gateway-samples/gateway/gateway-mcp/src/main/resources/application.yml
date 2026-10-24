@@ -1,0 +1,64 @@
+server.port: 8215
+spring.application.name: gateway-mcp
+
+# /mcp hands out the route table, the traffic figures and the findings of this gateway in one
+# call each. The plugin declares it as a secured path, and it is the console's security chain
+# that enforces the declaration once a mode is set: an anonymous call is answered 401, and a
+# client sends the credentials below as HTTP Basic. Anything running this plugin needs this,
+# or an equivalent chain of its own.
+spring.cloud.gateway.server.webflux.ui.security:
+  mode: authenticated
+  user:
+    name: admin
+    password: admin
+    roles: [ADMIN]
+
+spring.cloud.gateway.server.webflux.mcp:
+  # Off by default. The Spring AI server follows this switch, and the plugin runs it stateless
+  # and asynchronous; a spring.ai.mcp.server.* value set here would override those defaults,
+  # the name for instance:
+  #   spring.ai.mcp.server.name: edge-gateway
+  enabled: true
+
+# The passive analyser feeds list_findings, finding_summary, route_security_scores,
+# scan_coverage and export_findings; the metrics plugin on the classpath feeds route_traffic
+# and gateway_instances. Without a plugin, its tools are simply not registered.
+spring.cloud.gateway.server.webflux.pentest.passive:
+  enabled: true
+
+spring.cloud.gateway.server.webflux:
+  routes:
+
+  # httpbin answers without the usual browser-protection headers, so a call to this route
+  # is enough for list_findings to have something to return.
+  - id: httpbin
+    uri: https://httpbin.org
+    predicates:
+    - Path=/httpbin/**
+    filters:
+    - StripPrefix=1
+
+  # A route towards service-a (the sample backend on :8080). It need not be up: a route the
+  # gateway cannot reach still has a definition, and whatever the gateway answers is counted.
+  - id: service_a
+    uri: http://localhost:8080
+    predicates:
+    - Path=/service-a/**
+    filters:
+    - StripPrefix=1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+        - health
+        - info
+        - gateway
+  endpoint:
+    gateway:
+      access: read-only
+
+logging:
+  level:
+    '[ch.nexsol]': info

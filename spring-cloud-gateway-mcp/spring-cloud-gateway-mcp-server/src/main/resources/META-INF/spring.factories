@@ -1,0 +1,2 @@
+org.springframework.boot.EnvironmentPostProcessor=\
+ch.nexsol.gateway.mcp.server.GatewayMcpEnvironmentPostProcessor
