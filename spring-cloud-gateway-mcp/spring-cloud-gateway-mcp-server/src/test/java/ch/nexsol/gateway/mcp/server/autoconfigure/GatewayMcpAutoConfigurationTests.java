@@ -18,11 +18,16 @@ package ch.nexsol.gateway.mcp.server.autoconfigure;
 
 import java.util.List;
 
+import ch.nexsol.gateway.commons.routes.RouteTester;
 import ch.nexsol.gateway.commons.security.SecuredPaths;
 import ch.nexsol.gateway.mcp.server.metrics.MetricsTools;
 import ch.nexsol.gateway.mcp.server.pentest.PentestTools;
+import ch.nexsol.gateway.mcp.server.pentest.PentestWriteTools;
 import ch.nexsol.gateway.mcp.server.prompts.GatewayPrompts;
+import ch.nexsol.gateway.mcp.server.resources.GatewayResources;
+import ch.nexsol.gateway.mcp.server.routes.RouteMatchTools;
 import ch.nexsol.gateway.mcp.server.routes.RouteTools;
+import ch.nexsol.gateway.mcp.server.routes.RouteWriteTools;
 import ch.nexsol.gateway.metrics.RouteMetricsSnapshot;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.pentest.core.report.ReportService;
@@ -41,6 +46,8 @@ import org.springframework.ai.mcp.server.webflux.autoconfigure.McpServerStateles
 import org.springframework.ai.mcp.server.webflux.autoconfigure.McpServerStreamableHttpWebFluxAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
+import org.springframework.cloud.gateway.route.InMemoryRouteDefinitionRepository;
+import org.springframework.cloud.gateway.route.RouteDefinitionWriter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -73,6 +80,10 @@ class GatewayMcpAutoConfigurationTests {
 		this.runner.withPropertyValues(ENABLED, "spring.ai.mcp.server.protocol=STATELESS").run((context) -> {
 			assertThat(context).hasSingleBean(RouteTools.class);
 			assertThat(context).hasSingleBean(GatewayPrompts.class);
+			assertThat(context).hasSingleBean(RouteMatchTools.class);
+			assertThat(context).hasSingleBean(RouteTester.class);
+			assertThat(context).hasSingleBean(GatewayResources.class);
+			assertThat(context).doesNotHaveBean(RouteWriteTools.class);
 			SecuredPaths paths = context.getBean(SecuredPaths.class);
 			assertThat(paths.writePaths()).containsExactly("/mcp");
 			assertThat(paths.csrfExemptPaths()).containsExactly("/mcp");
@@ -110,6 +121,24 @@ class GatewayMcpAutoConfigurationTests {
 				assertThat(context).hasSingleBean(SecuredPaths.class);
 				assertThat(context.getBean(SecuredPaths.class).openPaths()).containsExactly("/mcp");
 			});
+	}
+
+	@Test
+	void registersTheWriteToolsOnlyWhenWritingIsEnabled() {
+		this.runner.withPropertyValues(ENABLED, "spring.cloud.gateway.server.webflux.mcp.write-enabled=true")
+			.withBean(RouteDefinitionWriter.class, InMemoryRouteDefinitionRepository::new)
+			.withUserConfiguration(PassiveScanScaffolding.class)
+			.run((context) -> {
+				assertThat(context).hasSingleBean(RouteWriteTools.class);
+				assertThat(context).hasSingleBean(PentestWriteTools.class);
+			});
+	}
+
+	@Test
+	void leavesTheRouteTesterToTheConsoleWhenItDeclaresOne() {
+		this.runner.withPropertyValues(ENABLED)
+			.withBean("routeTester", RouteTester.class, () -> new RouteTester(null, null, null))
+			.run((context) -> assertThat(context).hasSingleBean(RouteTester.class));
 	}
 
 	@Test

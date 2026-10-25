@@ -21,12 +21,16 @@ All properties are under `spring.cloud.gateway.server.webflux.mcp`.
 
 ```yaml
 spring.cloud.gateway.server.webflux.mcp:
-  enabled: true   # off by default: it hands out the configuration and the findings of the gateway
+  enabled: true          # off by default: it hands out the configuration and the findings of the gateway
+  write-enabled: false   # true adds the tools that change the gateway
+  confirm-writes: true   # those tools do nothing unless the call carries confirm: true
 ```
 
 | Property | Default | What it does |
 | --- | --- | --- |
 | `...mcp.enabled` | `false` | Master switch; the Spring AI server follows it |
+| `...mcp.write-enabled` | `false` | Registers the tools that change the gateway: `save_route`, `delete_route`, `refresh_routes`, `clear_findings` |
+| `...mcp.confirm-writes` | `true` | A write tool called without `confirm: true` describes the change and does nothing |
 
 The server itself is Spring AI's, configured under `spring.ai.mcp.server`. The plugin gives
 these properties the defaults below; a value the application sets wins.
@@ -54,6 +58,7 @@ sees what the gateway runs. Every tool declares itself read-only.
 | `get_route` | One route definition, by id | always |
 | `list_filter_factories` | The filters a route may name, each with the fields of its shorthand form, in order | always |
 | `list_predicate_factories` | The same, for the predicates | always |
+| `match_request` | Which route a described request (method, path, headers) would take, each predicate of each route reported as matched or not | always |
 | `route_traffic` | Requests, latency and error rates per route, with the coverage the figures were computed over | [metrics](../../spring-cloud-gateway-metrics/README.md) has put a route source in the context |
 | `gateway_instances` | Uptime, JVM, CPU, event loops and connection pools of each instance | the same, with an instance source |
 | `list_findings` | The OWASP findings raised on the live traffic, narrowed by severity or route | [pentest-passive](../../spring-cloud-gateway-pentest/spring-cloud-gateway-pentest-passive/README.md) is enabled |
@@ -61,6 +66,26 @@ sees what the gateway runs. Every tool declares itself read-only.
 | `route_security_scores` | A score and a grade per route | the same |
 | `scan_coverage` | The OWASP categories the analyser observes | the same |
 | `export_findings` | The JSON, SARIF or HTML report the console exports | the same |
+| `save_route` ✎ | Creates or replaces a route in the writable source (the database with routes-database, the gateway's in-memory repository otherwise) and rebuilds the route table | `write-enabled` |
+| `delete_route` ✎ | Deletes a route from the writable source and rebuilds the route table | `write-enabled` |
+| `refresh_routes` ✎ | Rebuilds the route table from every source, as `/actuator/gateway/refresh` does | `write-enabled` |
+| `clear_findings` ✎ | Discards the retained findings | `write-enabled` and pentest-passive |
+
+✎ — changes the gateway. With `confirm-writes` on, the tool answers what it would do and does
+nothing until the call carries `confirm: true`; a client that follows the `destructiveHint`
+asks its user before that. A confirmation step, not an access control: whoever may call `/mcp`
+may confirm.
+
+## The resources
+
+What a client can read into its context without a tool call, as JSON.
+
+| Resource | Content |
+| --- | --- |
+| `gateway://routes` | What `list_routes` answers |
+| `gateway://routes/{routeId}` | What `get_route` answers |
+| `gateway://factories` | The filter and predicate factories |
+| `gateway://findings` | What `list_findings` answers without a filter (pentest-passive) |
 
 ## The prompts
 
@@ -94,4 +119,5 @@ The [sample](#sample) shows the HTTP Basic variant, and the same calls over `cur
 ## Sample
 
 [gateway-mcp](../../spring-cloud-gateway-samples/gateway/gateway-mcp/README.md), on port 8215.
-The plugin is not part of the ahead-of-time samples yet.
+The three [ahead-of-time samples](../../spring-cloud-gateway-samples/README.md#ahead-of-time-builds)
+carry the plugin as well.

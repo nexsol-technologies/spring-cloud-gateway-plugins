@@ -21,8 +21,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 
-import io.modelcontextprotocol.server.McpStatelessServerFeatures.AsyncToolSpecification;
+import io.modelcontextprotocol.common.McpTransportContext;
+import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
+import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import io.swagger.v3.oas.models.PathItem;
 import org.junit.jupiter.api.Test;
@@ -38,8 +41,9 @@ class HubToolRegistrarTests {
 
 	private final HubToolRegistrar.ToolRegistry registry = new HubToolRegistrar.ToolRegistry() {
 		@Override
-		public Mono<Void> add(AsyncToolSpecification specification) {
-			return Mono.fromRunnable(() -> HubToolRegistrarTests.this.journal.add("+" + specification.tool().name()));
+		public Mono<Void> add(Tool tool,
+				BiFunction<McpTransportContext, CallToolRequest, Mono<CallToolResult>> handler) {
+			return Mono.fromRunnable(() -> HubToolRegistrarTests.this.journal.add("+" + tool.name()));
 		}
 
 		@Override
@@ -51,7 +55,7 @@ class HubToolRegistrarTests {
 	private final AtomicReference<List<ApiTool>> catalog = new AtomicReference<>(List.of());
 
 	private final HubToolRegistrar registrar = new HubToolRegistrar(() -> Mono.just(this.catalog.get()),
-			new ApiToolInvoker(WebClient.create(), Duration.ofSeconds(1)), this.registry);
+			new ApiToolInvoker(WebClient.create(), Duration.ofSeconds(1), true), this.registry);
 
 	@Test
 	void addsTheToolsThatAppearedRemovesThoseThatWentAndReplacesThoseThatChanged() {

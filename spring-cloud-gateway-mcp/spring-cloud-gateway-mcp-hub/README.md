@@ -32,6 +32,7 @@ spring.cloud.gateway.server.webflux:
     hub:
       enabled: true          # off by default: it hands an agent every API the hub documents
       write-enabled: false   # GET and HEAD only; true adds the operations that change state
+      confirm-writes: true   # those do nothing unless the call carries confirm: true
       timeout: 10s           # one tool call, connection included
       max-response-size: 256KB
   hub-openapi:
@@ -43,12 +44,14 @@ spring.cloud.gateway.server.webflux:
 | --- | --- | --- |
 | `...mcp.hub.enabled` | `false` | Master switch; needs `...mcp.enabled` and `...hub-openapi.enabled` too |
 | `...mcp.hub.write-enabled` | `false` | Registers the operations that change state (`POST`, `PUT`, `PATCH`, `DELETE`) as tools as well |
+| `...mcp.hub.confirm-writes` | `true` | Those tools take a `confirm` argument; called without `confirm: true` they describe the request and send nothing |
 | `...mcp.hub.timeout` | `10s` | Bounds one tool call |
 | `...mcp.hub.max-response-size` | `256KB` | Largest response handed back to the client; a larger one is an error result |
 | `...mcp.hub.concurrency` | `4` | Contracts read at the same time when the catalog refreshes |
 
-The bridge works over the `STATELESS` server the MCP plugin runs by default. Under another
-protocol it stays off.
+The bridge works over whichever server Spring AI runs — stateless by default, streamable or
+SSE when `spring.ai.mcp.server.protocol` says so — and forwards the caller's `Authorization`
+under each.
 
 ## The tools
 
@@ -62,6 +65,7 @@ the documented services are read again and the tools added, removed or replaced 
 | Arguments | One per parameter, named as in the contract, wherever it goes (path, query, header, cookie); the request body as `body`. The JSON Schema is rebuilt from the contract with the keywords a client needs to build a call |
 | Hints | `readOnlyHint` for `GET`/`HEAD`, `destructiveHint` for `DELETE`, `idempotentHint` for `GET`, `PUT` and `DELETE` |
 | Result | The body of the response; `HTTP <status>` and the body, as an error result, from `400` up |
+| Confirmation | With `confirm-writes` on, an operation that changes state called without `confirm: true` answers what it would send and sends nothing — a confirmation step, not an access control |
 
 A call goes to `gateway-uri` + the prefix the hub advertises for the service + the path, which
 is the URL the Swagger UI "Try it out" uses — the gateway routes generated for the same

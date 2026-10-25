@@ -29,6 +29,8 @@ public class McpHubProperties {
 
 	private boolean writeEnabled;
 
+	private boolean confirmWrites = true;
+
 	private Duration timeout = Duration.ofSeconds(10);
 
 	private DataSize maxResponseSize = DataSize.ofKilobytes(256);
@@ -49,6 +51,14 @@ public class McpHubProperties {
 
 	public void setWriteEnabled(boolean writeEnabled) {
 		this.writeEnabled = writeEnabled;
+	}
+
+	public boolean isConfirmWrites() {
+		return this.confirmWrites;
+	}
+
+	public void setConfirmWrites(boolean confirmWrites) {
+		this.confirmWrites = confirmWrites;
 	}
 
 	public Duration getTimeout() {

@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.ui.routes;
+package ch.nexsol.gateway.commons.routes;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -31,9 +32,7 @@ import org.springframework.cloud.gateway.handler.predicate.HostRoutePredicateFac
 import org.springframework.cloud.gateway.handler.predicate.MethodRoutePredicateFactory;
 import org.springframework.cloud.gateway.handler.predicate.PathRoutePredicateFactory;
 import org.springframework.cloud.gateway.route.Route;
-import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.cloud.gateway.route.RouteLocator;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.server.ServerWebExchange;
@@ -42,11 +41,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class RouteTesterServiceTests {
+class RouteTesterTests {
 
 	@Test
 	void picksTheFirstRouteWhosePredicatesAllMatch() {
-		RouteTesterService service = testerOver(route("other", "/other/**", HttpMethod.GET),
+		RouteTester service = testerOver(route("other", "/other/**", HttpMethod.GET),
 				route("alpha", "/alpha/**", HttpMethod.GET), route("alpha-too", "/alpha/**", HttpMethod.GET));
 
 		StepVerifier.create(service.test("GET", "/alpha/orders", null)).assertNext((report) -> {
@@ -63,7 +62,7 @@ class RouteTesterServiceTests {
 
 	@Test
 	void reportsWhichPredicateOfANonMatchingRouteFailed() {
-		RouteTesterService service = testerOver(route("alpha", "/alpha/**", HttpMethod.POST));
+		RouteTester service = testerOver(route("alpha", "/alpha/**", HttpMethod.POST));
 
 		StepVerifier.create(service.test("GET", "/alpha/orders", null)).assertNext((report) -> {
 			assertThat(report.matchedRouteId()).isNull();
@@ -81,7 +80,7 @@ class RouteTesterServiceTests {
 
 	@Test
 	void reportsNoMatchWhenNothingInTheRouteTableAccceptsTheRequest() {
-		RouteTesterService service = testerOver(route("alpha", "/alpha/**", HttpMethod.GET));
+		RouteTester service = testerOver(route("alpha", "/alpha/**", HttpMethod.GET));
 
 		StepVerifier.create(service.test("GET", "/nowhere", null)).assertNext((report) -> {
 			assertThat(report.matchedRouteId()).isNull();
@@ -135,7 +134,7 @@ class RouteTesterServiceTests {
 	@Test
 	void saysSoWhenTheGatewayExposesNoRouteTable() {
 		StepVerifier.create(testerFor(null).test("GET", "/alpha", null)).assertNext((report) -> {
-			assertThat(report.error()).isEqualTo(RouteTesterService.NO_ROUTE_TABLE);
+			assertThat(report.error()).isEqualTo(RouteTester.NO_ROUTE_TABLE);
 			assertThat(report.routes()).isEmpty();
 		}).verifyComplete();
 	}
@@ -157,7 +156,7 @@ class RouteTesterServiceTests {
 
 	@Test
 	void readsOneHeaderPerLineAndSkipsTheLinesThatAreNotHeaders() {
-		HttpHeaders headers = RouteTesterService.parseHeaders("""
+		HttpHeaders headers = RouteTester.parseHeaders("""
 				Host: api.example.com
 				X-Tenant:acme
 
@@ -171,8 +170,8 @@ class RouteTesterServiceTests {
 
 	@Test
 	void readsNoHeaderFromABlankBlock() {
-		assertThat(RouteTesterService.parseHeaders(null).isEmpty()).isTrue();
-		assertThat(RouteTesterService.parseHeaders("   ").isEmpty()).isTrue();
+		assertThat(RouteTester.parseHeaders(null).isEmpty()).isTrue();
+		assertThat(RouteTester.parseHeaders("   ").isEmpty()).isTrue();
 	}
 
 	/**
@@ -198,19 +197,15 @@ class RouteTesterServiceTests {
 			.build();
 	}
 
-	private static RouteTesterService testerOver(Route... routes) {
+	private static RouteTester testerOver(Route... routes) {
 		return testerFor(() -> Flux.just(routes));
 	}
 
 	@SuppressWarnings("unchecked")
-	private static RouteTesterService testerFor(RouteLocator routeLocator) {
+	private static RouteTester testerFor(RouteLocator routeLocator) {
 		ObjectProvider<RouteLocator> locatorProvider = mock(ObjectProvider.class);
 		when(locatorProvider.getIfAvailable()).thenReturn(routeLocator);
-		ObjectProvider<RouteDefinitionLocator> locators = mock(ObjectProvider.class);
-		when(locators.orderedStream()).thenAnswer((invocation) -> Stream.empty());
-		RouteInventoryService inventoryService = new RouteInventoryService(locators,
-				mock(ApplicationEventPublisher.class));
-		return new RouteTesterService(locatorProvider, inventoryService, null);
+		return new RouteTester(locatorProvider, () -> Mono.just(Map.of()), null);
 	}
 
 }

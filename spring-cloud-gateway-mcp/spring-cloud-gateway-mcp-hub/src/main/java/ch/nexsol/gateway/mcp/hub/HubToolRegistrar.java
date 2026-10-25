@@ -22,9 +22,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 
+import io.modelcontextprotocol.common.McpTransportContext;
+import io.modelcontextprotocol.server.McpAsyncServer;
+import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.server.McpStatelessAsyncServer;
-import io.modelcontextprotocol.server.McpStatelessServerFeatures.AsyncToolSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures;
+import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
+import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,9 +119,9 @@ public class HubToolRegistrar implements DisposableBean {
 	private Mono<Void> replace(ApiTool tool) {
 		String name = tool.tool().name();
 		Mono<Void> removal = this.registered.containsKey(name) ? this.registry.remove(name) : Mono.empty();
-		AsyncToolSpecification specification = new AsyncToolSpecification(tool.tool(),
-				(context, request) -> this.invoker.call(tool.operation(), request.arguments(), context));
-		return removal.then(this.registry.add(specification))
+		return removal
+			.then(this.registry.add(tool.tool(),
+					(context, request) -> this.invoker.call(tool.operation(), request.arguments(), context)))
 			.doOnSuccess((v) -> this.registered.put(name, tool.tool()))
 			.onErrorResume((ex) -> {
 				LOG.warn("The tool {} could not be registered: {}", name, ex.getMessage());
@@ -129,16 +135,19 @@ public class HubToolRegistrar implements DisposableBean {
 	}
 
 	/**
-	 * The server the tools are added to and removed from.
+	 * The server the tools are added to and removed from, stateless or stateful: the
+	 * handler of a tool reads the transport context, which both servers carry.
 	 */
 	public interface ToolRegistry {
 
 		/**
 		 * Add a tool.
-		 * @param specification the tool and its handler
+		 * @param tool the tool
+		 * @param handler what a call of it does, given the transport context and the
+		 * request
 		 * @return completion
 		 */
-		Mono<Void> add(AsyncToolSpecification specification);
+		Mono<Void> add(Tool tool, BiFunction<McpTransportContext, CallToolRequest, Mono<CallToolResult>> handler);
 
 		/**
 		 * Remove a tool.
@@ -155,8 +164,30 @@ public class HubToolRegistrar implements DisposableBean {
 		static ToolRegistry of(McpStatelessAsyncServer server) {
 			return new ToolRegistry() {
 				@Override
-				public Mono<Void> add(AsyncToolSpecification specification) {
-					return server.addTool(specification);
+				public Mono<Void> add(Tool tool,
+						BiFunction<McpTransportContext, CallToolRequest, Mono<CallToolResult>> handler) {
+					return server.addTool(new McpStatelessServerFeatures.AsyncToolSpecification(tool, handler));
+				}
+
+				@Override
+				public Mono<Void> remove(String name) {
+					return server.removeTool(name);
+				}
+			};
+		}
+
+		/**
+		 * The registry over a stateful server, streamable or SSE.
+		 * @param server the server
+		 * @return the registry
+		 */
+		static ToolRegistry of(McpAsyncServer server) {
+			return new ToolRegistry() {
+				@Override
+				public Mono<Void> add(Tool tool,
+						BiFunction<McpTransportContext, CallToolRequest, Mono<CallToolResult>> handler) {
+					return server.addTool(new McpServerFeatures.AsyncToolSpecification(tool,
+							(exchange, request) -> handler.apply(exchange.transportContext(), request)));
 				}
 
 				@Override

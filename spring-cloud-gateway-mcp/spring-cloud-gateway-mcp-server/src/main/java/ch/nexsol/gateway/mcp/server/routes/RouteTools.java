@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import ch.nexsol.gateway.commons.routes.RouteDefinitionSources;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -203,9 +204,9 @@ public class RouteTools {
 	 * passes.
 	 *
 	 * @param name the factory name
-	 * @param args the arguments, by name
+	 * @param args the arguments, by name; none when a step is written without any
 	 */
-	public record Step(String name, Map<String, String> args) {
+	public record Step(String name, @Nullable Map<String, String> args) {
 	}
 
 	/**

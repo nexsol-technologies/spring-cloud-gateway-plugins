@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.ui.routes;
+package ch.nexsol.gateway.commons.routes;
 
 import java.security.Principal;
 import java.time.Instant;

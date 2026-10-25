@@ -99,7 +99,7 @@ public class ContractCatalog implements ApiToolSource {
 			.bodyToMono(String.class)
 			.publishOn(Schedulers.boundedElastic())
 			.map((contents) -> OperationTools.of(service.name(), parse(service, contents), service.base(),
-					this.properties.isWriteEnabled()));
+					this.properties.isWriteEnabled(), this.properties.isConfirmWrites()));
 	}
 
 	private static OpenAPI parse(DocumentedService service, String contents) {

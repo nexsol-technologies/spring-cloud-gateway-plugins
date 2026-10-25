@@ -54,6 +54,8 @@ public final class OperationTools {
 
 	static final String BODY = "body";
 
+	static final String CONFIRM = "confirm";
+
 	static final int MAX_NAME_LENGTH = 64;
 
 	private static final int MAX_DEPTH = 8;
@@ -74,9 +76,12 @@ public final class OperationTools {
 	 * @param contract the contract, references resolved
 	 * @param base the URL the operations are served under through the gateway
 	 * @param writeEnabled whether the operations that change state become tools too
+	 * @param confirmWrites whether those take a {@code confirm} argument the call must
+	 * carry
 	 * @return the tools, in contract order
 	 */
-	public static List<ApiTool> of(String service, OpenAPI contract, URI base, boolean writeEnabled) {
+	public static List<ApiTool> of(String service, OpenAPI contract, URI base, boolean writeEnabled,
+			boolean confirmWrites) {
 		List<ApiTool> tools = new ArrayList<>();
 		if (contract.getPaths() == null) {
 			return tools;
@@ -84,14 +89,14 @@ public final class OperationTools {
 		Set<String> names = new HashSet<>();
 		contract.getPaths().forEach((path, item) -> item.readOperationsMap().forEach((method, operation) -> {
 			if (writeEnabled || isReadOnly(method)) {
-				tools.add(tool(service, method, path, operation, base, names));
+				tools.add(tool(service, method, path, operation, base, names, confirmWrites));
 			}
 		}));
 		return tools;
 	}
 
 	private static ApiTool tool(String service, PathItem.HttpMethod method, String path, Operation operation, URI base,
-			Set<String> taken) {
+			Set<String> taken, boolean confirmWrites) {
 		Map<String, Object> properties = new LinkedHashMap<>();
 		List<String> required = new ArrayList<>();
 		Map<String, ApiOperation.Location> locations = new LinkedHashMap<>();
@@ -115,6 +120,10 @@ public final class OperationTools {
 			if (Boolean.TRUE.equals(operation.getRequestBody().getRequired())) {
 				required.add(bodyArgument);
 			}
+		}
+		if (confirmWrites && !isReadOnly(method)) {
+			properties.put(CONFIRM, Map.of("type", "boolean", "description",
+					"true to make the call; without it the call is described and not made"));
 		}
 		Map<String, Object> inputSchema = new LinkedHashMap<>();
 		inputSchema.put("type", "object");

@@ -17,11 +17,14 @@
 package ch.nexsol.gateway.ui.autoconfigure;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import ch.nexsol.gateway.audit.AuditEventPublisher;
 import ch.nexsol.gateway.commons.InstanceIdentity;
+import ch.nexsol.gateway.commons.routes.RouteOrigin;
+import ch.nexsol.gateway.commons.routes.RouteTester;
 import ch.nexsol.gateway.commons.security.SecuredPaths;
 import ch.nexsol.gateway.commons.security.SecuredPathsContribution;
 import ch.nexsol.gateway.database.service.ApiService;
@@ -63,7 +66,7 @@ import ch.nexsol.gateway.ui.routes.RouteInventoryController;
 import ch.nexsol.gateway.ui.routes.RouteInventoryService;
 import ch.nexsol.gateway.ui.routes.RouteOverviewContribution;
 import ch.nexsol.gateway.ui.routes.RouteTesterController;
-import ch.nexsol.gateway.ui.routes.RouteTesterService;
+import ch.nexsol.gateway.ui.routes.RouteView;
 import ch.nexsol.gateway.ui.security.UiSecuredPaths;
 import ch.nexsol.gateway.ui.servicegraph.ServiceGraphController;
 import ch.nexsol.gateway.ui.servicegraph.ServiceGraphOverviewContribution;
@@ -325,9 +328,18 @@ public class GatewayUiAutoConfiguration {
 		 * @return the route tester service
 		 */
 		@Bean
-		RouteTesterService routeTesterService(ObjectProvider<RouteLocator> routeLocator,
-				RouteInventoryService inventoryService, ApplicationContext applicationContext) {
-			return new RouteTesterService(routeLocator, inventoryService, applicationContext);
+		RouteTester routeTester(ObjectProvider<RouteLocator> routeLocator, RouteInventoryService inventoryService,
+				ApplicationContext applicationContext) {
+			return new RouteTester(routeLocator, () -> inventoryService.routes().map(RouteTesterConfiguration::origins),
+					applicationContext);
+		}
+
+		private static Map<String, RouteOrigin> origins(List<RouteView> routes) {
+			Map<String, RouteOrigin> byId = new LinkedHashMap<>();
+			for (RouteView route : routes) {
+				byId.putIfAbsent(route.routeId(), new RouteOrigin(route.source(), route.filters()));
+			}
+			return byId;
 		}
 
 		/**

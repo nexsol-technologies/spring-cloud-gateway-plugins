@@ -19,6 +19,7 @@ package ch.nexsol.gateway.mcp.server.autoconfigure;
 import java.util.List;
 
 import ch.nexsol.gateway.mcp.server.routes.RouteTools;
+import ch.nexsol.gateway.mcp.server.routes.RouteWriteTools;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -41,7 +42,8 @@ class GatewayMcpRuntimeHintsTests {
 	@Test
 	void registersTheRecordsTheToolsAnswerWith() {
 		for (Class<?> type : List.of(RouteTools.Inventory.class, RouteTools.UnreadableSource.class,
-				RouteTools.RouteDescription.class, RouteTools.Step.class, RouteTools.FactoryDescription.class)) {
+				RouteTools.RouteDescription.class, RouteTools.Step.class, RouteTools.FactoryDescription.class,
+				RouteWriteTools.RouteSpec.class)) {
 			assertThat(RuntimeHintsPredicates.reflection().onType(type))
 				.as("%s is not registered; add it to GatewayMcpRuntimeHints", type.getName())
 				.accepts(this.hints);

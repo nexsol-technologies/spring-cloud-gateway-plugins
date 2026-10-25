@@ -19,11 +19,18 @@ package ch.nexsol.gateway.mcp.server.autoconfigure;
 import java.util.ArrayList;
 import java.util.List;
 
+import ch.nexsol.gateway.commons.routes.RouteTester;
 import ch.nexsol.gateway.commons.security.SecuredPaths;
+import ch.nexsol.gateway.mcp.server.GatewayMcpProperties;
+import ch.nexsol.gateway.mcp.server.WriteGuard;
 import ch.nexsol.gateway.mcp.server.metrics.MetricsTools;
 import ch.nexsol.gateway.mcp.server.pentest.PentestTools;
+import ch.nexsol.gateway.mcp.server.pentest.PentestWriteTools;
 import ch.nexsol.gateway.mcp.server.prompts.GatewayPrompts;
+import ch.nexsol.gateway.mcp.server.resources.GatewayResources;
+import ch.nexsol.gateway.mcp.server.routes.RouteMatchTools;
 import ch.nexsol.gateway.mcp.server.routes.RouteTools;
+import ch.nexsol.gateway.mcp.server.routes.RouteWriteTools;
 import ch.nexsol.gateway.metrics.InstanceMetricsSource;
 import ch.nexsol.gateway.metrics.RouteMetricsSource;
 import ch.nexsol.gateway.pentest.core.report.ReportService;
@@ -43,9 +50,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.gateway.filter.factory.GatewayFilterFactory;
 import org.springframework.cloud.gateway.handler.predicate.RoutePredicateFactory;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
+import org.springframework.cloud.gateway.route.RouteDefinitionWriter;
+import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -67,16 +79,48 @@ import org.springframework.context.annotation.Configuration;
 				StatelessServerSpecificationFactoryAutoConfiguration.class, McpServerAutoConfiguration.class,
 				McpServerSpecificationFactoryAutoConfiguration.class },
 		afterName = { "ch.nexsol.gateway.metrics.autoconfigure.MetricsAutoConfiguration",
-				"ch.nexsol.gateway.pentest.passive.autoconfigure.PassiveScanAutoConfiguration" })
+				"ch.nexsol.gateway.pentest.passive.autoconfigure.PassiveScanAutoConfiguration",
+				"ch.nexsol.gateway.ui.autoconfigure.GatewayUiAutoConfiguration" })
 @ConditionalOnClass(McpTool.class)
 @ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.mcp.enabled", havingValue = "true")
 public class GatewayMcpAutoConfiguration {
+
+	@Bean
+	@ConfigurationProperties(prefix = "spring.cloud.gateway.server.webflux.mcp")
+	GatewayMcpProperties gatewayMcpProperties() {
+		return new GatewayMcpProperties();
+	}
 
 	@Bean
 	RouteTools gatewayMcpRouteTools(ObjectProvider<RouteDefinitionLocator> locators,
 			ObjectProvider<GatewayFilterFactory<?>> filterFactories,
 			ObjectProvider<RoutePredicateFactory<?>> predicateFactories) {
 		return new RouteTools(locators, filterFactories, predicateFactories);
+	}
+
+	/**
+	 * The route tester, when the console has not already put its own in the context: the
+	 * console's reads its cached inventory, this one the route sources.
+	 * @param routeLocator the route table
+	 * @param locators the route definition sources
+	 * @param applicationContext the context exposed to the predicates under test
+	 * @return the tester
+	 */
+	@Bean
+	@ConditionalOnMissingBean(RouteTester.class)
+	RouteTester gatewayMcpRouteTester(ObjectProvider<RouteLocator> routeLocator,
+			ObjectProvider<RouteDefinitionLocator> locators, ApplicationContext applicationContext) {
+		return new RouteTester(routeLocator, () -> RouteMatchTools.origins(locators), applicationContext);
+	}
+
+	@Bean
+	RouteMatchTools gatewayMcpRouteMatchTools(RouteTester tester) {
+		return new RouteMatchTools(tester);
+	}
+
+	@Bean
+	GatewayResources gatewayMcpResources(RouteTools routes) {
+		return new GatewayResources(routes);
 	}
 
 	@Bean
@@ -134,6 +178,40 @@ public class GatewayMcpAutoConfiguration {
 		@Bean
 		PentestTools gatewayMcpPentestTools(FindingStore store, ReportService reports, RouteScoreService scores) {
 			return new PentestTools(store, reports, scores);
+		}
+
+	}
+
+	/**
+	 * The tools that change the gateway, behind {@code write-enabled}. Each takes a
+	 * {@code confirm} argument that {@code confirm-writes} makes mandatory.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.mcp.write-enabled", havingValue = "true")
+	static class WriteToolsConfiguration {
+
+		@Bean
+		WriteGuard gatewayMcpWriteGuard(GatewayMcpProperties properties) {
+			return new WriteGuard(properties.isConfirmWrites());
+		}
+
+		@Bean
+		@ConditionalOnBean(RouteDefinitionWriter.class)
+		RouteWriteTools gatewayMcpRouteWriteTools(RouteDefinitionWriter writer, ApplicationEventPublisher publisher,
+				WriteGuard guard) {
+			return new RouteWriteTools(writer, publisher, guard);
+		}
+
+		@Configuration(proxyBeanMethods = false)
+		@ConditionalOnClass(FindingStore.class)
+		@ConditionalOnBean(FindingStore.class)
+		static class PentestWriteToolsConfiguration {
+
+			@Bean
+			PentestWriteTools gatewayMcpPentestWriteTools(FindingStore store, WriteGuard guard) {
+				return new PentestWriteTools(store, guard);
+			}
+
 		}
 
 	}

@@ -95,6 +95,33 @@ class ApiToolInvokerTests {
 	}
 
 	@Test
+	void describesAChangeInsteadOfMakingItUntilTheCallIsConfirmed() {
+		WebClient client = WebClient.builder().exchangeFunction((request) -> {
+			this.sent.set(request);
+			return Mono.just(ClientResponse.create(HttpStatus.CREATED).build());
+		}).build();
+		ApiToolInvoker invoker = new ApiToolInvoker(client, Duration.ofSeconds(5), true);
+		StepVerifier
+			.create(invoker.call(this.createPet, Map.of("body", Map.of("name", "Rex")), McpTransportContext.EMPTY))
+			.assertNext((result) -> {
+				assertThat(result.isError()).isFalse();
+				assertThat(text(result)).contains("POST http://gateway/petstore/pets").contains("confirm=true");
+			})
+			.verifyComplete();
+		assertThat(this.sent.get()).isNull();
+		StepVerifier
+			.create(invoker.call(this.createPet, Map.of("body", Map.of("name", "Rex"), "confirm", true),
+					McpTransportContext.EMPTY))
+			.assertNext((result) -> assertThat(text(result)).isEqualTo("HTTP 201"))
+			.verifyComplete();
+		assertThat(this.sent.get()).isNotNull();
+		// A read is never held back.
+		StepVerifier.create(invoker.call(this.listPets, Map.of(), McpTransportContext.EMPTY))
+			.assertNext((result) -> assertThat(text(result)).isEqualTo("HTTP 201"))
+			.verifyComplete();
+	}
+
+	@Test
 	void reportsARefusalAsAnErrorResultCarryingTheStatusAndTheBody() {
 		ApiToolInvoker invoker = invoker(HttpStatus.FORBIDDEN, "{\"error\":\"nope\"}");
 		StepVerifier.create(invoker.call(this.listPets, Map.of(), McpTransportContext.EMPTY)).assertNext((result) -> {
@@ -108,7 +135,7 @@ class ApiToolInvokerTests {
 		WebClient client = WebClient.builder()
 			.exchangeFunction((request) -> Mono.error(new IllegalStateException("connection refused")))
 			.build();
-		ApiToolInvoker invoker = new ApiToolInvoker(client, Duration.ofSeconds(1));
+		ApiToolInvoker invoker = new ApiToolInvoker(client, Duration.ofSeconds(1), false);
 		StepVerifier.create(invoker.call(this.listPets, Map.of(), McpTransportContext.EMPTY)).assertNext((result) -> {
 			assertThat(result.isError()).isTrue();
 			assertThat(text(result)).contains("connection refused");
@@ -123,7 +150,7 @@ class ApiToolInvokerTests {
 				.body(body)
 				.build()));
 		}).build();
-		return new ApiToolInvoker(client, Duration.ofSeconds(5));
+		return new ApiToolInvoker(client, Duration.ofSeconds(5), false);
 	}
 
 	private Mono<Void> capture(ClientRequest request) {

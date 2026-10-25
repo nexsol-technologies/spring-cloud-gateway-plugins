@@ -119,6 +119,12 @@ spring.cloud.gateway.server.webflux.pentest.passive:
   body:
     enabled: true
 
+# spring-cloud-gateway-mcp-server: the routes, the traffic and the findings as MCP tools on
+# /mcp, behind the console's login. The tool beans are plain beans Spring AI's scanner reads,
+# so the ahead-of-time processing registers them like any other; the environment
+# post-processor that derives the Spring AI settings runs at start-up, not at build time.
+spring.cloud.gateway.server.webflux.mcp.enabled: true
+
 # spring-cloud-gateway-ui needs no property: carrying the dependency serves the console.
 # The user the actuator and the console's secured paths accept is declared in the
 # application class — sample / sample.

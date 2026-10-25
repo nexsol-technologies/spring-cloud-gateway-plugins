@@ -25,8 +25,10 @@ import ch.nexsol.gateway.mcp.hub.HubToolRegistrar;
 import ch.nexsol.gateway.mcp.hub.McpHubProperties;
 import ch.nexsol.gateway.openapi.HubOpenapiProperties;
 import ch.nexsol.gateway.openapi.hub.SpringDocOpenapiRoutes;
+import io.modelcontextprotocol.server.McpAsyncServer;
 import io.modelcontextprotocol.server.McpStatelessAsyncServer;
 
+import org.springframework.ai.mcp.server.common.autoconfigure.McpServerAutoConfiguration;
 import org.springframework.ai.mcp.server.common.autoconfigure.McpServerStatelessAutoConfiguration;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,24 +41,22 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.client.loadbalancer.reactive.ReactorLoadBalancerExchangeFilterFunction;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Auto-configuration of the hub bridge: the catalog over the documentation routes of the
  * OpenAPI hub, the invoker that runs a tool call through the gateway, and the registrar
- * that keeps the tools of the stateless server in step with the contracts. Active when
- * both the bridge and the hub are on, and only over the stateless server the MCP plugin
- * runs by default: the tools are added to the server after it is built, which is what a
- * catalog that changes with the registry needs.
+ * that keeps the tools of the server in step with the contracts, whichever server Spring
+ * AI built, stateless or stateful. Active when both the bridge and the hub are on.
  */
-@AutoConfiguration(after = McpServerStatelessAutoConfiguration.class,
+@AutoConfiguration(after = { McpServerStatelessAutoConfiguration.class, McpServerAutoConfiguration.class },
 		afterName = { "ch.nexsol.gateway.openapi.autoconfigure.HubApiAutoConfiguration",
 				"ch.nexsol.gateway.mcp.server.autoconfigure.GatewayMcpAutoConfiguration" })
 @ConditionalOnClass({ SpringDocOpenapiRoutes.class, McpStatelessAsyncServer.class })
 @ConditionalOnProperty(name = { "spring.cloud.gateway.server.webflux.mcp.hub.enabled",
 		"spring.cloud.gateway.server.webflux.hub-openapi.enabled" }, havingValue = "true")
-@ConditionalOnBean(McpStatelessAsyncServer.class)
 public class GatewayMcpHubAutoConfiguration {
 
 	@Bean
@@ -99,13 +99,37 @@ public class GatewayMcpHubAutoConfiguration {
 
 	@Bean
 	ApiToolInvoker gatewayMcpHubInvoker(WebClient gatewayMcpHubWebClient, McpHubProperties properties) {
-		return new ApiToolInvoker(gatewayMcpHubWebClient, properties.getTimeout());
+		return new ApiToolInvoker(gatewayMcpHubWebClient, properties.getTimeout(), properties.isConfirmWrites());
 	}
 
-	@Bean
-	HubToolRegistrar gatewayMcpHubToolRegistrar(ApiToolSource source, ApiToolInvoker invoker,
-			McpStatelessAsyncServer server) {
-		return new HubToolRegistrar(source, invoker, HubToolRegistrar.ToolRegistry.of(server));
+	/**
+	 * The registrar over the stateless server, the one the MCP plugin runs by default.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnBean(McpStatelessAsyncServer.class)
+	static class StatelessRegistrarConfiguration {
+
+		@Bean
+		HubToolRegistrar gatewayMcpHubToolRegistrar(ApiToolSource source, ApiToolInvoker invoker,
+				McpStatelessAsyncServer server) {
+			return new HubToolRegistrar(source, invoker, HubToolRegistrar.ToolRegistry.of(server));
+		}
+
+	}
+
+	/**
+	 * The registrar over the stateful server of the streamable and SSE protocols.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnBean(McpAsyncServer.class)
+	static class StatefulRegistrarConfiguration {
+
+		@Bean
+		HubToolRegistrar gatewayMcpHubToolRegistrar(ApiToolSource source, ApiToolInvoker invoker,
+				McpAsyncServer server) {
+			return new HubToolRegistrar(source, invoker, HubToolRegistrar.ToolRegistry.of(server));
+		}
+
 	}
 
 }

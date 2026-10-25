@@ -54,11 +54,14 @@ public class ApiToolInvoker {
 
 	private final Duration timeout;
 
+	private final boolean confirmWrites;
+
 	private final JsonMapper json = JsonMapper.builder().build();
 
-	public ApiToolInvoker(WebClient webClient, Duration timeout) {
+	public ApiToolInvoker(WebClient webClient, Duration timeout, boolean confirmWrites) {
 		this.webClient = webClient;
 		this.timeout = timeout;
+		this.confirmWrites = confirmWrites;
 	}
 
 	/**
@@ -73,6 +76,15 @@ public class ApiToolInvoker {
 	public Mono<CallToolResult> call(ApiOperation operation, Map<String, Object> arguments,
 			McpTransportContext context) {
 		Map<String, Object> given = (arguments != null) ? arguments : Map.of();
+		if (this.confirmWrites && !OperationTools.isReadOnly(operation.method())
+				&& !Boolean.TRUE.equals(given.get(OperationTools.CONFIRM))) {
+			return Mono.just(CallToolResult.builder()
+				.addTextContent("This call changes state: " + operation.method() + " " + operation.urlTemplate()
+						+ " of " + operation.service()
+						+ ". Nothing was sent. Call it again with confirm=true to proceed.")
+				.isError(false)
+				.build());
+		}
 		return Mono.defer(() -> request(operation, given, context))
 			.timeout(this.timeout)
 			.onErrorResume((ex) -> Mono.just(error(describe(ex))));

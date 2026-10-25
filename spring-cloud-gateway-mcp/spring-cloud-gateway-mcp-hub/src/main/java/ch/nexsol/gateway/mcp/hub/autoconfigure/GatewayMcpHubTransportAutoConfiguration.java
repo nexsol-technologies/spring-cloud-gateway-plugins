@@ -16,17 +16,19 @@
 
 package ch.nexsol.gateway.mcp.hub.autoconfigure;
 
-import java.util.Map;
-
-import ch.nexsol.gateway.mcp.hub.ApiToolInvoker;
-import io.modelcontextprotocol.common.McpTransportContext;
+import ch.nexsol.gateway.mcp.hub.AuthorizationContextExtractor;
 import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
 import io.modelcontextprotocol.spec.McpSchema;
 import tools.jackson.databind.json.JsonMapper;
 
+import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerSseProperties;
 import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerStreamableHttpProperties;
+import org.springframework.ai.mcp.server.webflux.autoconfigure.McpServerSseWebFluxAutoConfiguration;
 import org.springframework.ai.mcp.server.webflux.autoconfigure.McpServerStatelessWebFluxAutoConfiguration;
+import org.springframework.ai.mcp.server.webflux.autoconfigure.McpServerStreamableHttpWebFluxAutoConfiguration;
+import org.springframework.ai.mcp.server.webflux.transport.WebFluxSseServerTransportProvider;
 import org.springframework.ai.mcp.server.webflux.transport.WebFluxStatelessServerTransport;
+import org.springframework.ai.mcp.server.webflux.transport.WebFluxStreamableServerTransportProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -34,20 +36,20 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.http.HttpHeaders;
 
 /**
- * Hands the stateless transport an extractor that carries the caller's
+ * Hands the transport of the protocol in force an extractor that carries the caller's
  * {@code Authorization} header into the transport context, where the invoker reads it to
- * make the downstream call as the caller. Spring AI builds its transport without one and
+ * make the downstream call as the caller. Spring AI builds its transports without one and
  * backs off when a transport bean is already there, hence this configuration ahead of its
- * own.
+ * own, with the same settings plus the extractor.
  */
-@AutoConfiguration(before = McpServerStatelessWebFluxAutoConfiguration.class)
+@AutoConfiguration(before = { McpServerStatelessWebFluxAutoConfiguration.class,
+		McpServerStreamableHttpWebFluxAutoConfiguration.class, McpServerSseWebFluxAutoConfiguration.class })
 @ConditionalOnClass({ McpSchema.class, WebFluxStatelessServerTransport.class })
 @ConditionalOnProperty(name = { "spring.cloud.gateway.server.webflux.mcp.hub.enabled",
 		"spring.cloud.gateway.server.webflux.hub-openapi.enabled" }, havingValue = "true")
-@EnableConfigurationProperties(McpServerStreamableHttpProperties.class)
+@EnableConfigurationProperties({ McpServerStreamableHttpProperties.class, McpServerSseProperties.class })
 public class GatewayMcpHubTransportAutoConfiguration {
 
 	@Bean
@@ -59,12 +61,37 @@ public class GatewayMcpHubTransportAutoConfiguration {
 		return WebFluxStatelessServerTransport.builder()
 			.jsonMapper(new JacksonMcpJsonMapper(jsonMapper))
 			.messageEndpoint(serverProperties.getMcpEndpoint())
-			.contextExtractor((request) -> {
-				String authorization = request.headers().firstHeader(HttpHeaders.AUTHORIZATION);
-				return (authorization != null)
-						? McpTransportContext.create(Map.of(ApiToolInvoker.AUTHORIZATION, authorization))
-						: McpTransportContext.EMPTY;
-			})
+			.contextExtractor(new AuthorizationContextExtractor())
+			.build();
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	@ConditionalOnProperty(name = "spring.ai.mcp.server.protocol", havingValue = "STREAMABLE", matchIfMissing = true)
+	WebFluxStreamableServerTransportProvider webFluxStreamableServerTransportProvider(
+			@Qualifier("mcpServerJsonMapper") JsonMapper jsonMapper,
+			McpServerStreamableHttpProperties serverProperties) {
+		return WebFluxStreamableServerTransportProvider.builder()
+			.jsonMapper(new JacksonMcpJsonMapper(jsonMapper))
+			.messageEndpoint(serverProperties.getMcpEndpoint())
+			.keepAliveInterval(serverProperties.getKeepAliveInterval())
+			.disallowDelete(serverProperties.isDisallowDelete())
+			.contextExtractor(new AuthorizationContextExtractor())
+			.build();
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	@ConditionalOnProperty(name = "spring.ai.mcp.server.protocol", havingValue = "SSE")
+	WebFluxSseServerTransportProvider webFluxSseServerTransportProvider(
+			@Qualifier("mcpServerJsonMapper") JsonMapper jsonMapper, McpServerSseProperties serverProperties) {
+		return WebFluxSseServerTransportProvider.builder()
+			.jsonMapper(new JacksonMcpJsonMapper(jsonMapper))
+			.basePath(serverProperties.getBaseUrl())
+			.messageEndpoint(serverProperties.getSseMessageEndpoint())
+			.sseEndpoint(serverProperties.getSseEndpoint())
+			.keepAliveInterval(serverProperties.getKeepAliveInterval())
+			.contextExtractor(new AuthorizationContextExtractor())
 			.build();
 	}
 

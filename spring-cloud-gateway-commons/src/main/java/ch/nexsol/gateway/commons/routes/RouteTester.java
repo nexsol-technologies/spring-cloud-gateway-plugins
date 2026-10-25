@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.ui.routes;
+package ch.nexsol.gateway.commons.routes;
 
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -48,7 +48,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  * additionally broken down predicate by predicate, which is what turns a bare "no match"
  * into "the path matched but the method did not".
  */
-public class RouteTesterService {
+public class RouteTester {
 
 	/** Host used when the tested request carries no {@code Host} header. */
 	static final String DEFAULT_HOST = "localhost";
@@ -60,7 +60,7 @@ public class RouteTesterService {
 
 	private final ObjectProvider<RouteLocator> routeLocator;
 
-	private final RouteInventoryService inventoryService;
+	private final Supplier<Mono<Map<String, RouteOrigin>>> origins;
 
 	private final ApplicationContext applicationContext;
 
@@ -71,14 +71,14 @@ public class RouteTesterService {
 	 * is no route table, and the tester reports that instead of failing.
 	 * @param routeLocator the provider over the locator exposing the effective route
 	 * table
-	 * @param inventoryService the service resolving the definition behind a route
+	 * @param origins what is known of each route beyond its predicates, by route id
 	 * @param applicationContext the context exposed to the predicates through the
 	 * exchange
 	 */
-	public RouteTesterService(ObjectProvider<RouteLocator> routeLocator, RouteInventoryService inventoryService,
+	public RouteTester(ObjectProvider<RouteLocator> routeLocator, Supplier<Mono<Map<String, RouteOrigin>>> origins,
 			ApplicationContext applicationContext) {
 		this.routeLocator = routeLocator;
-		this.inventoryService = inventoryService;
+		this.origins = origins;
 		this.applicationContext = applicationContext;
 	}
 
@@ -104,9 +104,7 @@ public class RouteTesterService {
 		if (locator == null) {
 			return Mono.just(new RouteTestReport(httpMethod.name(), uri.toString(), null, List.of(), NO_ROUTE_TABLE));
 		}
-		return this.inventoryService.routes()
-			.map(RouteTesterService::definitionsById)
-			.flatMap((definitions) -> report(locator, httpMethod, uri, headers, definitions));
+		return this.origins.get().flatMap((definitions) -> report(locator, httpMethod, uri, headers, definitions));
 	}
 
 	/**
@@ -135,7 +133,7 @@ public class RouteTesterService {
 	}
 
 	private Mono<RouteTestReport> report(RouteLocator locator, HttpMethod method, URI uri, HttpHeaders headers,
-			Map<String, RouteView> definitions) {
+			Map<String, RouteOrigin> definitions) {
 		return locator.getRoutes()
 			.concatMap((route) -> evaluate(route, method, uri, headers, definitions))
 			.collectList()
@@ -143,13 +141,13 @@ public class RouteTesterService {
 	}
 
 	private Mono<RouteMatch> evaluate(Route route, HttpMethod method, URI uri, HttpHeaders headers,
-			Map<String, RouteView> definitions) {
+			Map<String, RouteOrigin> definitions) {
 		// A fresh exchange per route: predicates may cache state in the attributes,
 		// which no other route must observe.
 		ServerWebExchange exchange = new SyntheticServerWebExchange(
 				new SyntheticServerHttpRequest(method, uri, headers), this.applicationContext);
 		exchange.getAttributes().put(ServerWebExchangeUtils.GATEWAY_PREDICATE_ROUTE_ATTR, route.getId());
-		RouteView definition = definitions.get(route.getId());
+		RouteOrigin definition = definitions.get(route.getId());
 		return Flux.fromIterable(leaves(route))
 			.concatMap((leaf) -> outcome(leaf, exchange))
 			.collectList()
@@ -208,14 +206,6 @@ public class RouteTesterService {
 			.encode()
 			.build()
 			.toUri();
-	}
-
-	private static Map<String, RouteView> definitionsById(List<RouteView> routes) {
-		Map<String, RouteView> byId = new LinkedHashMap<>();
-		for (RouteView route : routes) {
-			byId.putIfAbsent(route.routeId(), route);
-		}
-		return byId;
 	}
 
 	private static String firstMatch(List<RouteMatch> matches) {

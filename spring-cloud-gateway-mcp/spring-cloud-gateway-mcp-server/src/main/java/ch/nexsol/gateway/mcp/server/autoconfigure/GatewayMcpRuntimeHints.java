@@ -17,6 +17,7 @@
 package ch.nexsol.gateway.mcp.server.autoconfigure;
 
 import ch.nexsol.gateway.mcp.server.routes.RouteTools;
+import ch.nexsol.gateway.mcp.server.routes.RouteWriteTools;
 
 import org.springframework.aot.hint.BindingReflectionHintsRegistrar;
 import org.springframework.aot.hint.RuntimeHints;
@@ -33,7 +34,7 @@ class GatewayMcpRuntimeHints implements RuntimeHintsRegistrar {
 	public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
 		this.bindingRegistrar.registerReflectionHints(hints.reflection(), RouteTools.Inventory.class,
 				RouteTools.UnreadableSource.class, RouteTools.RouteDescription.class, RouteTools.Step.class,
-				RouteTools.FactoryDescription.class);
+				RouteTools.FactoryDescription.class, RouteWriteTools.RouteSpec.class);
 	}
 
 }

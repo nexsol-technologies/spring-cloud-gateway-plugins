@@ -31,6 +31,7 @@ import org.springframework.boot.test.context.assertj.AssertableReactiveWebApplic
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
 import org.springframework.boot.webflux.autoconfigure.HttpHandlerAutoConfiguration;
 import org.springframework.boot.webflux.autoconfigure.WebFluxAutoConfiguration;
+import org.springframework.cloud.gateway.route.InMemoryRouteDefinitionRepository;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.context.annotation.Bean;
@@ -55,6 +56,15 @@ class GatewayMcpServerIntegrationTests {
 	private static final String CALL_GET_UNKNOWN_ROUTE = """
 			{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_route","arguments":{"routeId":"nowhere"}}}""";
 
+	private static final String RESOURCES_LIST = """
+			{"jsonrpc":"2.0","id":5,"method":"resources/list"}""";
+
+	private static final String READ_ROUTES = """
+			{"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"gateway://routes"}}""";
+
+	private static final String CALL_SAVE_ROUTE = """
+			{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"save_route","arguments":{"route":{"routeId":"new","uri":"http://new","predicates":[{"name":"Path","args":{"_genkey_0":"/new/**"}}]}}}}""";
+
 	private static final String GET_DIAGNOSE_ROUTE = """
 			{"jsonrpc":"2.0","id":4,"method":"prompts/get","params":{"name":"diagnose-route","arguments":{"routeId":"route-x"}}}""";
 
@@ -67,7 +77,8 @@ class GatewayMcpServerIntegrationTests {
 		// A running application derives the Spring AI settings from the plugin switch
 		// through the environment post-processor; a context runner does not run it.
 		.withPropertyValues("spring.cloud.gateway.server.webflux.mcp.enabled=true",
-				"spring.ai.mcp.server.protocol=STATELESS", "spring.ai.mcp.server.type=ASYNC");
+				"spring.cloud.gateway.server.webflux.mcp.write-enabled=true", "spring.ai.mcp.server.protocol=STATELESS",
+				"spring.ai.mcp.server.type=ASYNC");
 
 	@Test
 	void listsTheRouteToolsAndNoneOfTheAbsentPlugins() {
@@ -77,6 +88,10 @@ class GatewayMcpServerIntegrationTests {
 			.jsonPath("$.result.tools[?(@.name=='list_routes')]")
 			.exists()
 			.jsonPath("$.result.tools[?(@.name=='list_filter_factories')]")
+			.exists()
+			.jsonPath("$.result.tools[?(@.name=='match_request')]")
+			.exists()
+			.jsonPath("$.result.tools[?(@.name=='save_route')]")
 			.exists()
 			.jsonPath("$.result.tools[?(@.name=='route_traffic')]")
 			.doesNotExist()
@@ -109,6 +124,35 @@ class GatewayMcpServerIntegrationTests {
 	}
 
 	@Test
+	void servesTheRoutesAsAResource() {
+		this.runner.run((context) -> {
+			call(context, RESOURCES_LIST).expectStatus()
+				.isOk()
+				.expectBody()
+				.jsonPath("$.result.resources[?(@.uri=='gateway://routes')]")
+				.exists();
+			call(context, READ_ROUTES).expectStatus()
+				.isOk()
+				.expectBody()
+				.jsonPath("$.result.contents[0].mimeType")
+				.isEqualTo("application/json")
+				.jsonPath("$.result.contents[0].text")
+				.value(containsString("\"routeId\":\"route-x\""));
+		});
+	}
+
+	@Test
+	void describesAChangeInsteadOfMakingItUntilItIsConfirmed() {
+		this.runner.run((context) -> call(context, CALL_SAVE_ROUTE).expectStatus()
+			.isOk()
+			.expectBody()
+			.jsonPath("$.result.content[0].text")
+			.value(containsString("confirm=true"))
+			.jsonPath("$.result.isError")
+			.isEqualTo(false));
+	}
+
+	@Test
 	void servesThePromptsWithTheirArgumentsFilledIn() {
 		this.runner.run((context) -> call(context, GET_DIAGNOSE_ROUTE).expectStatus()
 			.isOk()
@@ -132,6 +176,11 @@ class GatewayMcpServerIntegrationTests {
 
 	@Configuration(proxyBeanMethods = false)
 	static class OneRouteConfiguration {
+
+		@Bean
+		InMemoryRouteDefinitionRepository writableRoutes() {
+			return new InMemoryRouteDefinitionRepository();
+		}
 
 		@Bean
 		RouteDefinitionLocator oneRoute() {

@@ -20,9 +20,11 @@ import ch.nexsol.gateway.mcp.hub.HubToolRegistrar;
 import ch.nexsol.gateway.openapi.HubOpenapiProperties;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.ai.mcp.server.common.autoconfigure.McpServerAutoConfiguration;
 import org.springframework.ai.mcp.server.common.autoconfigure.McpServerJsonMapperAutoConfiguration;
 import org.springframework.ai.mcp.server.common.autoconfigure.McpServerStatelessAutoConfiguration;
 import org.springframework.ai.mcp.server.webflux.autoconfigure.McpServerStatelessWebFluxAutoConfiguration;
+import org.springframework.ai.mcp.server.webflux.autoconfigure.McpServerStreamableHttpWebFluxAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -35,6 +37,7 @@ class GatewayMcpHubAutoConfigurationTests {
 	private final ReactiveWebApplicationContextRunner runner = new ReactiveWebApplicationContextRunner()
 		.withConfiguration(AutoConfigurations.of(McpServerJsonMapperAutoConfiguration.class,
 				McpServerStatelessAutoConfiguration.class, McpServerStatelessWebFluxAutoConfiguration.class,
+				McpServerAutoConfiguration.class, McpServerStreamableHttpWebFluxAutoConfiguration.class,
 				GatewayMcpHubTransportAutoConfiguration.class, GatewayMcpHubAutoConfiguration.class))
 		.withUserConfiguration(HubProperties.class)
 		.withPropertyValues("spring.cloud.gateway.server.webflux.hub-openapi.gateway-uri=http://gateway:8181",
@@ -64,12 +67,12 @@ class GatewayMcpHubAutoConfigurationTests {
 	}
 
 	@Test
-	void staysOffOverAServerThatIsNotStateless() {
+	void registersTheBridgeOverAStreamableServerToo() {
 		this.runner
 			.withPropertyValues("spring.cloud.gateway.server.webflux.mcp.hub.enabled=true",
 					"spring.cloud.gateway.server.webflux.hub-openapi.enabled=true",
 					"spring.ai.mcp.server.protocol=STREAMABLE")
-			.run((context) -> assertThat(context).doesNotHaveBean(HubToolRegistrar.class));
+			.run((context) -> assertThat(context).hasSingleBean(HubToolRegistrar.class));
 	}
 
 	@Configuration(proxyBeanMethods = false)

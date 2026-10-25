@@ -14,18 +14,16 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.ui.routes;
+package ch.nexsol.gateway.commons.routes;
+
+import java.util.List;
 
 /**
- * Result of evaluating one predicate of a route against the tested request. The
- * predicates of a route are reported individually, which is what shows why a route did
- * not match.
+ * What is known of a route beyond its predicates: the source that declared it and the
+ * filters it applies, as the tester reports them next to a match.
  *
- * @param description the predicate as the gateway describes it, e.g.
- * {@code Paths: [/api/**], match trailing slash: true}
- * @param matched whether this predicate accepted the request
- * @param error the failure message when the predicate could not be evaluated, otherwise
- * {@code null}
+ * @param source the name of the source the route came from
+ * @param filters the filters of the route, described
  */
-public record PredicateOutcome(String description, boolean matched, String error) {
+public record RouteOrigin(String source, List<String> filters) {
 }

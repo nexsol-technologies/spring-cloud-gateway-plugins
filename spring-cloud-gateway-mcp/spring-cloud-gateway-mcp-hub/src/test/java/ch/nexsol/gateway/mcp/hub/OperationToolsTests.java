@@ -32,7 +32,7 @@ class OperationToolsTests {
 
 	@Test
 	void namesEveryToolAfterTheServiceAndTheOperation() {
-		List<ApiTool> tools = OperationTools.of("petstore", Contracts.petstore(), BASE, true);
+		List<ApiTool> tools = OperationTools.of("petstore", Contracts.petstore(), BASE, true, true);
 		assertThat(tools).extracting((tool) -> tool.tool().name())
 			.containsExactly("petstore__list_pets", "petstore__create_pet", "petstore__get_pets_by",
 					"petstore__delete_pet");
@@ -40,7 +40,7 @@ class OperationToolsTests {
 
 	@Test
 	void leavesOutTheOperationsThatChangeStateUnlessWritingIsEnabled() {
-		List<ApiTool> tools = OperationTools.of("petstore", Contracts.petstore(), BASE, false);
+		List<ApiTool> tools = OperationTools.of("petstore", Contracts.petstore(), BASE, false, true);
 		assertThat(tools).extracting((tool) -> tool.tool().name())
 			.containsExactly("petstore__list_pets", "petstore__get_pets_by");
 	}
@@ -48,7 +48,7 @@ class OperationToolsTests {
 	@Test
 	@SuppressWarnings("unchecked")
 	void buildsTheInputSchemaFromTheParametersKeepingOnlyJsonSchemaKeywords() {
-		ApiTool listPets = OperationTools.of("petstore", Contracts.petstore(), BASE, false).get(0);
+		ApiTool listPets = OperationTools.of("petstore", Contracts.petstore(), BASE, false, true).get(0);
 		Map<String, Object> schema = listPets.tool().inputSchema();
 		assertThat(schema).containsEntry("type", "object").containsEntry("required", List.of("X-Tenant"));
 		Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
@@ -65,7 +65,7 @@ class OperationToolsTests {
 	@Test
 	@SuppressWarnings("unchecked")
 	void carriesTheRequestBodyAsAnArgumentWithItsResolvedSchema() {
-		ApiTool createPet = OperationTools.of("petstore", Contracts.petstore(), BASE, true).get(1);
+		ApiTool createPet = OperationTools.of("petstore", Contracts.petstore(), BASE, true, true).get(1);
 		Map<String, Object> schema = createPet.tool().inputSchema();
 		assertThat(schema).containsEntry("required", List.of("body"));
 		Map<String, Object> body = (Map<String, Object>) ((Map<String, Object>) schema.get("properties")).get("body");
@@ -76,11 +76,17 @@ class OperationToolsTests {
 		assertThat(tag).containsEntry("type", List.of("string", "null")).doesNotContainKey("example");
 		assertThat(createPet.operation().bodyArgument()).isEqualTo("body");
 		assertThat(createPet.operation().method()).isEqualTo(PathItem.HttpMethod.POST);
+		// Changing state asks for a confirmation the schema announces; reading does not.
+		assertThat((Map<String, Object>) schema.get("properties")).containsKey("confirm");
+		ApiTool listPets = OperationTools.of("petstore", Contracts.petstore(), BASE, true, true).get(0);
+		assertThat((Map<String, Object>) listPets.tool().inputSchema().get("properties")).doesNotContainKey("confirm");
+		ApiTool unguarded = OperationTools.of("petstore", Contracts.petstore(), BASE, true, false).get(1);
+		assertThat((Map<String, Object>) unguarded.tool().inputSchema().get("properties")).doesNotContainKey("confirm");
 	}
 
 	@Test
 	void describesWhatEachToolDoesAndHowSafeItIs() {
-		List<ApiTool> tools = OperationTools.of("petstore", Contracts.petstore(), BASE, true);
+		List<ApiTool> tools = OperationTools.of("petstore", Contracts.petstore(), BASE, true, true);
 		Tool listPets = tools.get(0).tool();
 		assertThat(listPets.title()).isEqualTo("List the pets");
 		assertThat(listPets.description()).contains("Every pet of the store").contains("[GET /pets of petstore]");
@@ -97,7 +103,7 @@ class OperationToolsTests {
 		String service = "a-service-with-a-very-long-name-indeed-longer-than-most";
 		assertThat(OperationTools.sanitize("SERVICE-A")).isEqualTo("service-a");
 		assertThat(OperationTools.snake("getUserById")).isEqualTo("get_user_by_id");
-		List<ApiTool> tools = OperationTools.of(service, Contracts.petstore(), BASE, true);
+		List<ApiTool> tools = OperationTools.of(service, Contracts.petstore(), BASE, true, true);
 		assertThat(tools).allSatisfy(
 				(tool) -> assertThat(tool.tool().name()).hasSizeLessThanOrEqualTo(OperationTools.MAX_NAME_LENGTH));
 		assertThat(tools).extracting((tool) -> tool.tool().name()).doesNotHaveDuplicates();
