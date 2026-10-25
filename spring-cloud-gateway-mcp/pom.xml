@@ -15,5 +15,6 @@
 	<packaging>pom</packaging>
 	<modules>
 		<module>spring-cloud-gateway-mcp-server</module>
+		<module>spring-cloud-gateway-mcp-hub</module>
 	</modules>
 </project>

@@ -20,6 +20,16 @@
 		</dependency>
 		<dependency>
 			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-mcp-hub</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
+			<artifactId>spring-cloud-gateway-routes-openapi</artifactId>
+			<version>${revision}</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.nexsol-tech.gateway</groupId>
 			<artifactId>spring-cloud-gateway-metrics-core</artifactId>
 			<version>${revision}</version>
 		</dependency>

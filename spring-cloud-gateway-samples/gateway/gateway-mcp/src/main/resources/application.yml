@@ -19,6 +19,26 @@ spring.cloud.gateway.server.webflux.mcp:
   # the name for instance:
   #   spring.ai.mcp.server.name: edge-gateway
   enabled: true
+  # The bridge: every operation of the contracts the hub below documents becomes a tool,
+  # petstore__get_pet_by_id for instance, and calling it is a request through this gateway
+  # carrying the Authorization the MCP client sent. Read-only until write-enabled is set.
+  hub:
+    enabled: true
+
+# A contract the hub documents without a registry: routes-openapi generates the gateway routes
+# of the petstore from its contract, and the hub proxies that contract under /v3/api-docs/
+# petstore. The bridge reads it from there and routes the tool calls to the generated routes.
+spring.cloud.gateway.server.webflux.routes-openapi:
+  enabled: true
+  sources:
+  - id: petstore
+    uri: https://petstore3.swagger.io
+    spec-url: https://petstore3.swagger.io/api/v3/openapi.json
+    mode: PER_OPERATION
+
+spring.cloud.gateway.server.webflux.hub-openapi:
+  enabled: true
+  gateway-uri: http://localhost:${server.port}
 
 # The passive analyser feeds list_findings, finding_summary, route_security_scores,
 # scan_coverage and export_findings; the metrics plugin on the classpath feeds route_traffic

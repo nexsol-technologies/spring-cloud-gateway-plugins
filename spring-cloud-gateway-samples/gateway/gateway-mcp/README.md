@@ -1,8 +1,9 @@
 # gateway-mcp
 
 Exercises [spring-cloud-gateway-mcp-server](../../../spring-cloud-gateway-mcp/spring-cloud-gateway-mcp-server/README.md)
+and [spring-cloud-gateway-mcp-hub](../../../spring-cloud-gateway-mcp/spring-cloud-gateway-mcp-hub/README.md)
 — port `8215`, with the metrics and passive scan plugins present, so every group of tools is
-registered.
+registered, and the petstore contract documented by the hub, so its operations are tools too.
 
 ## Run it
 
@@ -39,6 +40,11 @@ to say:
 curl http://localhost:8215/httpbin/get
 ```
 
+The petstore tools need the internet: the contract is read from `petstore3.swagger.io`, and a
+call of `petstore__get_pet_by_id` goes through the `/pet/{petId}` route generated from it.
+Without a connection the listing holds the gateway's own tools and a warning says the contract
+could not be read.
+
 ## What to look at
 
 | Url | What it shows |
@@ -47,6 +53,7 @@ curl http://localhost:8215/httpbin/get
 | http://localhost:8215/ui/routes | The routes `list_routes` returns, as the console shows them |
 | http://localhost:8215/ui/metrics | The figures `route_traffic` returns |
 | http://localhost:8215/ui/passive-scan | The findings `list_findings` returns |
+| http://localhost:8215/swagger-ui.html | The petstore contract the `petstore__*` tools come from |
 
 ## Profiles
 

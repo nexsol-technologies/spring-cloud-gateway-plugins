@@ -1,0 +1,2 @@
+ch.nexsol.gateway.mcp.hub.autoconfigure.GatewayMcpHubAutoConfiguration
+ch.nexsol.gateway.mcp.hub.autoconfigure.GatewayMcpHubTransportAutoConfiguration

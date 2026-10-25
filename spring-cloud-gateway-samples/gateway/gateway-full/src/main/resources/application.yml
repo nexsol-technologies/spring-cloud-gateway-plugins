@@ -210,6 +210,9 @@ spring.cloud.gateway.server.webflux.pentest.passive:
 # secured path, so it sits behind the console's login like the other endpoints.
 spring.cloud.gateway.server.webflux.mcp:
   enabled: true
+  # The bridge lights up with the hub, under the eureka profile: every operation of every
+  # registered service becomes a tool, called through this gateway as the MCP caller.
+  hub.enabled: true
 
 spring.cloud.gateway.server.webflux.ui:
   openapi:
@@ -520,6 +523,7 @@ spring.cloud.gateway.server.webflux:
     instance.enabled: false
   pentest.passive.enabled: false
   mcp.enabled: false
+  mcp.hub.enabled: false
   # openapi-validation has no enabled flag, for a reason of its own: it is attached route
   # by route, and both directions on OFF is what neutralises it wherever a route attached
   # it. Quoted, or YAML reads OFF as the boolean false.
