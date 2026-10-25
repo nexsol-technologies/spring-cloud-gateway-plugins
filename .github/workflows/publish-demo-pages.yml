@@ -1,7 +1,7 @@
-# The pages a README cannot hold: the views of the console that move, published to GitHub
-# Pages so they can be watched moving. Their markup, their stylesheet and their scripts are
-# the module's own files, assembled by tools/demo-site.mjs; only the traffic they draw is
-# invented, and the pages say so. The READMEs are published beside them under docs/, built by
+# The console, published to GitHub Pages so it can be tried without a gateway: every view
+# that reads JSON, in the console's own shell. Their markup, their stylesheets and their
+# scripts are the module's own files, assembled by tools/demo-site.mjs; only the gateway they
+# read is simulated, and the pages say so. The READMEs are published beside them under docs/, built by
 # MkDocs from what tools/docs-site.mjs gathers.
 #
 # Called by the release workflow, so a release refreshes what is published, and startable on
