@@ -42,7 +42,9 @@
 
 		<spring-boot.version>4.1.2</spring-boot.version>
 		<spring-cloud.version>2025.1.4</spring-cloud.version>
-		<revision>1.19.1-SNAPSHOT</revision>
+		<swagger-core.version>2.2.55</swagger-core.version>
+		<swagger-parser.version>2.1.48</swagger-parser.version>
+		<revision>1.20.0-SNAPSHOT</revision>
 		
 		<checkstyle.version>12.3.1</checkstyle.version>
 

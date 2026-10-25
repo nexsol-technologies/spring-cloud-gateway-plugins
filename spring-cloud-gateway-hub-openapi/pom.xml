@@ -14,7 +14,7 @@
 	<description>Plugin aggregating downstream OpenAPI documentation into a hub for Spring Cloud Gateway</description>
 	
 	<properties>
-		<springdoc-openapi.version>3.1.1</springdoc-openapi.version>
+		<springdoc-openapi.version>3.2.0</springdoc-openapi.version>
 	</properties>
 	
 	<dependencies>
