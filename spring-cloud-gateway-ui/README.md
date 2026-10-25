@@ -9,6 +9,10 @@ also where the HTTP endpoints of the other plugins are governed.
 Built with Thymeleaf, Bootstrap, HTMX and plain CSS/JS, served as static resources — no CDN,
 offline friendly.
 
+[Try it in your browser](https://nexsol-technologies.github.io/spring-cloud-gateway-plugins/):
+every view that reads JSON, in the console's own shell, over a simulated gateway with invented
+traffic.
+
 ## Install
 
 ```xml

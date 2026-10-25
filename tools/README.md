@@ -89,31 +89,41 @@ routes in the database — and send some traffic through the gateway before shoo
 
 ## demo-site.mjs
 
-Assembles the pages published to
-[GitHub Pages](https://nexsol-technologies.github.io/spring-cloud-gateway-plugins/) — the views
-of the console that are worth watching rather than photographing. A README can embed a drawing;
-it cannot run one.
+Assembles the console published to
+[GitHub Pages](https://nexsol-technologies.github.io/spring-cloud-gateway-plugins/): every view
+that reads JSON — Flow, Traffic, Service graph, Audit, Metrics, the OpenAPI hub, Passive scan,
+Route scores and the six Configuration views — in the console's own shell and side menu, over a
+gateway simulated in the page.
 
 ```console
 node tools/demo-site.mjs --version=1.19.0        # writes target/demo-site
-open target/demo-site/flow.html
+open target/demo-site/index.html
 ```
 
 | Option | Default | What it does |
 | --- | --- | --- |
 | `--out` | `target/demo-site` | Where the assembled site is written; the directory is emptied first |
-| `--version` | `SNAPSHOT` | The version the pages report at their foot |
+| `--version` | `SNAPSHOT` | The version the side menu reports |
 
-**Nothing in those pages is a copy of the console.** The stylesheet and the scripts are the
-module's own files, taken as they are, and the markup of a view is read out of its Thymeleaf
+**Nothing in those pages is a copy of the console.** The static files are the module's own,
+taken as they are. The shell is its layout template, and each view is read out of its own
 template with the `th:` attributes dropped — so a view changed in the module is a demo changed
-with it, and there is no second rendering of the console to keep in step. The script fails
-rather than guessing when a template no longer carries the slots it reads.
+with it. What only a server could fill is supplied by the script: the side menu, the band of
+each view, the model of the Configuration views, the severity row of the passive scan. The
+script fails rather than guessing when a template no longer carries what it reads.
 
 What the pages supply is the one thing a published page cannot have: a gateway answering.
-`fetch` is stubbed in the page itself, over invented traffic that advances on its own, and each
-page says so where it cannot be missed. Adding a view means adding its page to
-[tools/demo](demo) and its entry to the `PAGES` table of the script.
+[tools/demo/gateway.js](demo/gateway.js) stubs `fetch` with one simulated gateway — five
+routes, six callers, two instances — whose traffic advances with the clock, so every view reads
+the same calls: the routes Traffic plots are the ones Flow carries and Audit lists. Each page
+says so where it cannot be missed.
+
+The views a server renders — Routes, Route tester, Database routes and the console's Home — are
+left out: their markup is produced by Thymeleaf and htmx at request time, and there is none to
+read. The export links of the passive scan lead nowhere for the same reason.
+
+Adding a view means an entry in the `VIEWS` table of the script, and an answer in
+`gateway.js` for each endpoint it reads.
 
 They are published by
 [publish-demo-pages.yml](../.github/workflows/publish-demo-pages.yml), which the release
