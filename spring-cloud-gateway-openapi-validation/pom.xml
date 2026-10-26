@@ -13,7 +13,7 @@
 	<name>spring-cloud-gateway-openapi-validation</name>
 	<description>Gateway filter validating requests and responses against an OpenAPI contract for Spring Cloud Gateway</description>
 	<properties>
-		<json-schema-validator.version>1.5.9</json-schema-validator.version>
+		<json-schema-validator.version>3.0.6</json-schema-validator.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -53,6 +53,10 @@
 			<groupId>com.networknt</groupId>
 			<artifactId>json-schema-validator</artifactId>
 			<version>${json-schema-validator.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>tools.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>io.micrometer</groupId>

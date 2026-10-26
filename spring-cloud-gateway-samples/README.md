@@ -29,6 +29,7 @@ so several gateways can run side by side.
 | [gateway-routes-files](gateway/gateway-routes-files/README.md) | 8207 | [routes-files](../spring-cloud-gateway-routes/spring-cloud-gateway-routes-files/README.md) — routes as files | — |
 | [gateway-openapi-validation](gateway/gateway-openapi-validation/README.md) | 8212 | [openapi-validation](../spring-cloud-gateway-openapi-validation/README.md) — requests enforced against a contract | — |
 | [gateway-passive-scan](gateway/gateway-passive-scan/README.md) | 8214 | [pentest-passive](../spring-cloud-gateway-pentest/spring-cloud-gateway-pentest-passive/README.md) — the OWASP traffic analyser and its console views | — |
+| [gateway-mcp](gateway/gateway-mcp/README.md) | 8215 | [mcp-server](../spring-cloud-gateway-mcp/spring-cloud-gateway-mcp-server/README.md) — the routes, traffic and findings served to an MCP client | — |
 
 ### Combinations
 

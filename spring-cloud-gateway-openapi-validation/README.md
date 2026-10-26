@@ -157,8 +157,8 @@ To fail closed, alert on that counter — it is zero on a healthy gateway.
 
 Both are honoured. Bodies are validated by
 [networknt/json-schema-validator](https://github.com/networknt/json-schema-validator), which
-covers draft-04 through 2020-12: a 3.1 document is validated as JSON Schema 2020-12, a 3.0 one
-under the older dialect with its `nullable` keyword understood.
+under its OpenAPI dialects: a 3.1 document is validated as JSON Schema 2020-12 with the OpenAPI
+vocabulary, a 3.0 one under the draft-04 based dialect with its `nullable` keyword understood.
 
 Two limits worth knowing:
 

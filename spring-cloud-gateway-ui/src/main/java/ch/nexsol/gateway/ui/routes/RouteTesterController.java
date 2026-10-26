@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.ui.routes;
 
+import ch.nexsol.gateway.commons.routes.RouteTester;
 import reactor.core.publisher.Mono;
 
 import org.springframework.stereotype.Controller;
@@ -34,13 +35,13 @@ import org.springframework.web.server.ServerWebExchange;
 @RequestMapping("/ui/routes/test")
 public class RouteTesterController {
 
-	private final RouteTesterService testerService;
+	private final RouteTester testerService;
 
 	/**
 	 * Creates the controller with the route tester service.
 	 * @param testerService the service evaluating a request against the route table
 	 */
-	public RouteTesterController(RouteTesterService testerService) {
+	public RouteTesterController(RouteTester testerService) {
 		this.testerService = testerService;
 	}
 

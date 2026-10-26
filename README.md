@@ -47,6 +47,7 @@ navigation at [nexsol-technologies.github.io/spring-cloud-gateway-plugins/docs](
 | [service-graph](spring-cloud-gateway-service-graph/README.md) | Who calls what: one counter per routed exchange, from the client a token was issued to towards the service a route targets. Read back locally, from Redis, from Prometheus, or from the graph Tempo derives from spans |
 | [openapi-validation](spring-cloud-gateway-openapi-validation/README.md) | Holds the requests and responses of a route against an OpenAPI contract, each direction enforced or reported on separately, every outcome counted and audited |
 | [pentest](spring-cloud-gateway-pentest/README.md) | Passively analyses the live traffic for OWASP issues — missing security headers, permissive CORS, weak JWTs, secrets in the URL, verbose errors — raising findings without sending any traffic of its own |
+| [mcp](spring-cloud-gateway-mcp/README.md) | An MCP server an agent reads the gateway through — the routes and their sources, the traffic per route, the OWASP findings and the security score per route — and, with the hub module, every API the OpenAPI hub documents as tools, called through the gateway as the caller. On `/mcp`, governed like the other endpoints |
 | [hub-openapi](spring-cloud-gateway-hub-openapi/README.md) | Aggregates the OpenAPI documentation of the downstream services into a single Swagger UI |
 | [commons](spring-cloud-gateway-commons/README.md) | The contracts the plugins share: how a plugin declares the paths it serves, and how the running instance is named |
 

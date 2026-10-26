@@ -30,6 +30,8 @@ each name what they additionally need.
 | `metrics` | `/ui/metrics` and `/ui/metrics/instances`, both instrumentation switches on |
 | `service-graph` | The `service-a` and `service-b` routes, and the two flows [below](#who-calls-what) |
 | `audit` | `/ui/audit`, with the global web filter on |
+| `mcp-server` | `/mcp`: the routes, the traffic and the findings as MCP tools — [gateway-mcp](../gateway-mcp/README.md) shows how a client connects |
+| `mcp-hub` | The same `/mcp`, under the `eureka` profile: every operation of every registered service as a tool, called through this gateway |
 | `ui` | `/ui` |
 
 ## Profiles
@@ -276,6 +278,8 @@ Most carry their own switch, all under `spring.cloud.gateway.server.webflux`:
 | `hub-openapi` | `hub-openapi.enabled` |
 | `audit` | `audit.enabled`, `audit.web-filter.enabled` |
 | `metrics` | `metrics.enabled`, `metrics.instance.enabled` |
+| `mcp-server` | `mcp.enabled` |
+| `mcp-hub` | `mcp.hub.enabled` |
 
 Two cases differ:
 

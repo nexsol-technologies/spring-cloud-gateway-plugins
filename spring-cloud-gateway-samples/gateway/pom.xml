@@ -27,6 +27,7 @@
 		<module>gateway-routes-all</module>
 		<module>gateway-secured</module>
 		<module>gateway-passive-scan</module>
+		<module>gateway-mcp</module>
 		<module>gateway-full</module>
 		<module>gateway-full-cache-aot</module>
 		<module>gateway-full-aot-jvm</module>

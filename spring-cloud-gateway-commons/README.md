@@ -58,6 +58,22 @@ The paths declared as read or open are also what the console keeps out of the au
 browsing a dashboard is not gateway traffic. The ones that change the gateway are not excluded —
 who created a route, and when, is the very thing an audit trail is kept for.
 
+## Reading the route sources
+
+`RouteDefinitionSources` is how the console, the passive analyser and the MCP server read the
+route definition sources of the gateway, so a source is listed and named alike everywhere:
+
+```java
+for (RouteDefinitionLocator source : RouteDefinitionSources.sources(locators)) {
+    String name = RouteDefinitionSources.name(source);            // "Properties", "Files", "Database", "Custom"
+    Mono<List<RouteDefinition>> read = RouteDefinitionSources.read(source, Duration.ofSeconds(5));
+}
+```
+
+`sources` leaves out the composite locator Spring Cloud Gateway builds over the others, which
+would repeat every route; `read` bounds the whole read of a source and propagates its error,
+so each caller decides whether a source that cannot be read is skipped or reported.
+
 ## Naming the running instance
 
 `InstanceIdentity` resolves, once at startup, the name a locally collected figure is reported

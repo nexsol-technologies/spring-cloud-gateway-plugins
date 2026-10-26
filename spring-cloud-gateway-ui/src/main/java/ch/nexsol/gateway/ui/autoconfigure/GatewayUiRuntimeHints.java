@@ -26,9 +26,6 @@ import ch.nexsol.gateway.ui.nav.NavSection;
 import ch.nexsol.gateway.ui.overview.OverviewStat;
 import ch.nexsol.gateway.ui.passivescan.FindingView;
 import ch.nexsol.gateway.ui.routes.DatabaseRoutesController;
-import ch.nexsol.gateway.ui.routes.PredicateOutcome;
-import ch.nexsol.gateway.ui.routes.RouteMatch;
-import ch.nexsol.gateway.ui.routes.RouteTestReport;
 import ch.nexsol.gateway.ui.routes.RouteView;
 import ch.nexsol.gateway.ui.view.KeyValue;
 import org.thymeleaf.expression.Lists;
@@ -89,8 +86,8 @@ class GatewayUiRuntimeHints implements RuntimeHintsRegistrar {
 
 	private static final Class<?>[] VIEW_MODELS = { AuditEventView.class, ActuatorInstances.Instance.class,
 			InsightsController.View.class, InstanceMetricsView.class, NavItem.class, NavSection.class,
-			OverviewStat.class, FindingView.class, DatabaseRoutesController.ElementRowView.class,
-			PredicateOutcome.class, RouteMatch.class, RouteTestReport.class, RouteView.class, KeyValue.class };
+			OverviewStat.class, FindingView.class, DatabaseRoutesController.ElementRowView.class, RouteView.class,
+			KeyValue.class };
 
 	@Override
 	public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
