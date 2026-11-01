@@ -2,16 +2,13 @@ server.port: 8215
 spring.application.name: gateway-mcp
 
 # /mcp hands out the route table, the traffic figures and the findings of this gateway in one
-# call each. The plugin declares it as a secured path, and it is the console's security chain
-# that enforces the declaration once a mode is set: an anonymous call is answered 401, and a
-# client sends the credentials below as HTTP Basic. Anything running this plugin needs this,
-# or an equivalent chain of its own.
-spring.cloud.gateway.server.webflux.ui.security:
-  mode: authenticated
-  user:
-    name: admin
-    password: admin
-    roles: [ADMIN]
+# call each. No console here: the plugin's own security chain requires a principal on it, an
+# anonymous call is answered 401, and a client sends the user below as HTTP Basic. With an
+# issuer under ...mcp.security.oauth2.resourceserver.jwt.issuer-uri the same chain accepts
+# its Bearer tokens, and tells a client without one where to obtain it.
+spring.cloud.gateway.server.webflux.mcp.security.user:
+  name: admin
+  password: admin
 
 spring.cloud.gateway.server.webflux.mcp:
   # Off by default. The Spring AI server follows this switch, and the plugin runs it stateless

@@ -34,10 +34,10 @@ public class McpGatewayApplication {
 		SpringApplication.run(McpGatewayApplication.class, args);
 	}
 
-	// The console's chain, contributed by the ui plugin and ordered ahead of this one,
-	// governs /ui and the endpoints the plugins declare, /mcp among them. Everything else
-	// is the traffic this gateway routes, open here so that a petstore tool call reaches
-	// the routes generated from the contract. Without a chain of its own the application
+	// The chains of the plugins, ordered ahead of this one, govern their own paths: /mcp
+	// and the metadata next to it, the documentation of the hub. Everything else is the
+	// traffic this gateway routes, open here so that a petstore tool call reaches the
+	// routes generated from the contract. Without a chain of its own the application
 	// would get Spring Boot's default one, which asks every route for a user of its own
 	// and answers the credentials a tool call forwards with a 401.
 	@Bean

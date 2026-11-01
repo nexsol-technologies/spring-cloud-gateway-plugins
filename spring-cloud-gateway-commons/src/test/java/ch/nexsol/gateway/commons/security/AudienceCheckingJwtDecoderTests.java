@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.ui.security;
+package ch.nexsol.gateway.commons.security;
 
 import java.util.List;
 

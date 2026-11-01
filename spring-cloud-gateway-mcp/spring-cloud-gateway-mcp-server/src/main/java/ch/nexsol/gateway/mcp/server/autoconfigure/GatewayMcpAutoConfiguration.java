@@ -152,7 +152,7 @@ public class GatewayMcpAutoConfiguration {
 		return SecuredPaths.api(endpoints(streamable, sse).toArray(String[]::new));
 	}
 
-	private static List<String> endpoints(ObjectProvider<McpServerStreamableHttpProperties> streamable,
+	static List<String> endpoints(ObjectProvider<McpServerStreamableHttpProperties> streamable,
 			ObjectProvider<McpServerSseProperties> sse) {
 		List<String> endpoints = new ArrayList<>();
 		streamable.ifAvailable((properties) -> endpoints.add(properties.getMcpEndpoint()));
@@ -179,7 +179,7 @@ public class GatewayMcpAutoConfiguration {
 		ProtectedResource gatewayMcpProtectedResource(GatewayMcpProperties properties, Environment environment,
 				ObjectProvider<McpServerStreamableHttpProperties> streamable,
 				ObjectProvider<McpServerSseProperties> sse) {
-			GatewayMcpProperties.Oauth2 oauth2 = properties.getOauth2();
+			GatewayMcpProperties.OAuth2 oauth2 = properties.getSecurity().getOauth2();
 			return new ProtectedResource(oauth2.getResource(), endpoints(streamable, sse).get(0),
 					OAuth2DiscoveryCondition.authorizationServers(environment), oauth2.getScopes());
 		}

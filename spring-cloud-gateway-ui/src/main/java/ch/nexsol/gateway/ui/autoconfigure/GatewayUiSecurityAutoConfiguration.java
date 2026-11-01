@@ -26,8 +26,8 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import ch.nexsol.gateway.commons.security.AudienceCheckingJwtDecoder;
 import ch.nexsol.gateway.commons.security.SecuredPathsContribution;
-import ch.nexsol.gateway.ui.security.AudienceCheckingJwtDecoder;
 import ch.nexsol.gateway.ui.security.ClaimRoles;
 import ch.nexsol.gateway.ui.security.GatewayUiSecurityProperties;
 import ch.nexsol.gateway.ui.security.LoginController;

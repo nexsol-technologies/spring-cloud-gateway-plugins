@@ -152,9 +152,9 @@ class GatewayMcpAutoConfigurationTests {
 		this.runner
 			.withPropertyValues(ENABLED,
 					"spring.security.oauth2.resourceserver.jwt.issuer-uri=https://idp/realms/traffic",
-					"spring.cloud.gateway.server.webflux.mcp.oauth2.authorization-servers=https://a,https://b",
-					"spring.cloud.gateway.server.webflux.mcp.oauth2.scopes=gateway.read",
-					"spring.cloud.gateway.server.webflux.mcp.oauth2.resource=https://api.example.com/mcp")
+					"spring.cloud.gateway.server.webflux.mcp.security.oauth2.authorization-servers=https://a,https://b",
+					"spring.cloud.gateway.server.webflux.mcp.security.oauth2.scopes=gateway.read",
+					"spring.cloud.gateway.server.webflux.mcp.security.oauth2.resource=https://api.example.com/mcp")
 			.run((context) -> assertThat(context.getBean(ProtectedResource.class).metadata(URI.create("http://g/mcp")))
 				.containsEntry("resource", "https://api.example.com/mcp")
 				.containsEntry("authorization_servers", List.of("https://a", "https://b"))

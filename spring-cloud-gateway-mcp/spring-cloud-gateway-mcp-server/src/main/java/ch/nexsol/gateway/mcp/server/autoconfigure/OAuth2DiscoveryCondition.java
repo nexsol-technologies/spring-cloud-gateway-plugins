@@ -30,13 +30,15 @@ import org.springframework.util.StringUtils;
 
 /**
  * Matches when an authorization server is known for the MCP endpoint: the ones the plugin
- * is given, else the issuer the console validates its Bearer tokens against, else the
- * issuer of the application. Without one there is nothing to publish, and the endpoint
- * keeps answering a bare {@code 401}.
+ * is given, else the issuer the endpoint validates its tokens against, else the issuer of
+ * the console, else the issuer of the application. Without one there is nothing to
+ * publish, and the endpoint keeps answering a bare {@code 401}.
  */
 class OAuth2DiscoveryCondition extends SpringBootCondition {
 
-	static final String AUTHORIZATION_SERVERS = "spring.cloud.gateway.server.webflux.mcp.oauth2.authorization-servers";
+	static final String AUTHORIZATION_SERVERS = "spring.cloud.gateway.server.webflux.mcp.security.oauth2.authorization-servers";
+
+	static final String MCP_ISSUER = "spring.cloud.gateway.server.webflux.mcp.security.oauth2.resourceserver.jwt.issuer-uri";
 
 	static final String CONSOLE_ISSUER = "spring.cloud.gateway.server.webflux.ui.security.oauth2.resourceserver.jwt.issuer-uri";
 
@@ -64,7 +66,7 @@ class OAuth2DiscoveryCondition extends SpringBootCondition {
 		if (!declared.isEmpty()) {
 			return declared;
 		}
-		for (String key : List.of(CONSOLE_ISSUER, APPLICATION_ISSUER)) {
+		for (String key : List.of(MCP_ISSUER, CONSOLE_ISSUER, APPLICATION_ISSUER)) {
 			String issuer = environment.getProperty(key);
 			if (StringUtils.hasText(issuer)) {
 				return List.of(issuer);
