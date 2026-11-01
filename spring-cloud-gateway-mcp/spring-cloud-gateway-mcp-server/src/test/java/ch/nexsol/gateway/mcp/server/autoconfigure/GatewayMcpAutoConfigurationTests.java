@@ -16,11 +16,14 @@
 
 package ch.nexsol.gateway.mcp.server.autoconfigure;
 
+import java.net.URI;
 import java.util.List;
 
 import ch.nexsol.gateway.commons.routes.RouteTester;
 import ch.nexsol.gateway.commons.security.SecuredPaths;
 import ch.nexsol.gateway.mcp.server.metrics.MetricsTools;
+import ch.nexsol.gateway.mcp.server.oauth2.BearerChallengeWebFilter;
+import ch.nexsol.gateway.mcp.server.oauth2.ProtectedResource;
 import ch.nexsol.gateway.mcp.server.pentest.PentestTools;
 import ch.nexsol.gateway.mcp.server.pentest.PentestWriteTools;
 import ch.nexsol.gateway.mcp.server.prompts.GatewayPrompts;
@@ -111,6 +114,51 @@ class GatewayMcpAutoConfigurationTests {
 	void declaresTheEndpointOfTheStreamableProtocol() {
 		this.runner.withPropertyValues(ENABLED, "spring.ai.mcp.server.protocol=STREAMABLE")
 			.run((context) -> assertThat(context.getBean(SecuredPaths.class).writePaths()).containsExactly("/mcp"));
+	}
+
+	@Test
+	void publishesNothingAboutOAuthWhileNoAuthorizationServerIsKnown() {
+		this.runner.withPropertyValues(ENABLED).run((context) -> {
+			assertThat(context).doesNotHaveBean(ProtectedResource.class);
+			assertThat(context).doesNotHaveBean(BearerChallengeWebFilter.class);
+			assertThat(context).doesNotHaveBean("gatewayMcpMetadataPaths");
+		});
+	}
+
+	@Test
+	void publishesTheIssuerOfTheConsoleAsTheAuthorizationServer() {
+		this.runner.withPropertyValues(ENABLED, "spring.ai.mcp.server.protocol=STATELESS",
+				"spring.cloud.gateway.server.webflux.ui.security.oauth2.resourceserver.jwt.issuer-uri=https://idp/realms/console",
+				"spring.security.oauth2.resourceserver.jwt.issuer-uri=https://idp/realms/traffic")
+			.run((context) -> {
+				assertThat(context).hasSingleBean(BearerChallengeWebFilter.class);
+				ProtectedResource resource = context.getBean(ProtectedResource.class);
+				assertThat(resource.metadata(URI.create("http://gateway/mcp"))).containsEntry("authorization_servers",
+						List.of("https://idp/realms/console"));
+				assertThat(resource.metadataPaths()).containsExactly("/.well-known/oauth-protected-resource",
+						"/.well-known/oauth-protected-resource/mcp");
+				assertThat(context.getBean("gatewayMcpMetadataPaths", SecuredPaths.class).openPaths()).containsExactly(
+						"/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp");
+			});
+	}
+
+	@Test
+	void fallsBackOnTheIssuerOfTheApplicationAndYieldsToTheServersThePluginIsGiven() {
+		this.runner
+			.withPropertyValues(ENABLED,
+					"spring.security.oauth2.resourceserver.jwt.issuer-uri=https://idp/realms/traffic")
+			.run((context) -> assertThat(context.getBean(ProtectedResource.class).metadata(URI.create("http://g/mcp")))
+				.containsEntry("authorization_servers", List.of("https://idp/realms/traffic")));
+		this.runner
+			.withPropertyValues(ENABLED,
+					"spring.security.oauth2.resourceserver.jwt.issuer-uri=https://idp/realms/traffic",
+					"spring.cloud.gateway.server.webflux.mcp.oauth2.authorization-servers=https://a,https://b",
+					"spring.cloud.gateway.server.webflux.mcp.oauth2.scopes=gateway.read",
+					"spring.cloud.gateway.server.webflux.mcp.oauth2.resource=https://api.example.com/mcp")
+			.run((context) -> assertThat(context.getBean(ProtectedResource.class).metadata(URI.create("http://g/mcp")))
+				.containsEntry("resource", "https://api.example.com/mcp")
+				.containsEntry("authorization_servers", List.of("https://a", "https://b"))
+				.containsEntry("scopes_supported", List.of("gateway.read")));
 	}
 
 	@Test

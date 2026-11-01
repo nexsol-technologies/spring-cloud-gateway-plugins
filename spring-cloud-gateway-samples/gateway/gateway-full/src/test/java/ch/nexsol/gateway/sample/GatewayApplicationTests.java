@@ -117,6 +117,32 @@ class GatewayApplicationTests {
 	}
 
 	@Test
+	void shouldTellAnMcpClientWhereToObtainAToken() {
+		WebTestClient client = this.webTestClient.mutate().baseUrl("http://localhost").build();
+		client.post()
+			.uri("/mcp")
+			.accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM)
+			.contentType(MediaType.APPLICATION_JSON)
+			.bodyValue("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")
+			.exchange()
+			.expectStatus()
+			.isUnauthorized()
+			.expectHeader()
+			.valueEquals("WWW-Authenticate",
+					"Bearer resource_metadata=\"http://localhost/.well-known/oauth-protected-resource/mcp\"");
+		client.get()
+			.uri("/.well-known/oauth-protected-resource/mcp")
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody()
+			.jsonPath("$.resource")
+			.isEqualTo("http://localhost/mcp")
+			.jsonPath("$.authorization_servers[0]")
+			.isEqualTo("http://localhost:9090");
+	}
+
+	@Test
 	void shouldKeepTheIssuerOfTheConsoleApartFromTheOneOfTheRoutedTraffic() {
 		/*
 		 * The two resource servers of a gateway are easy to confuse:

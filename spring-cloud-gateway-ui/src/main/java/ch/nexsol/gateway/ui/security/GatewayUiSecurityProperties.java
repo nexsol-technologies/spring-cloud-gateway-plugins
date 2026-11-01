@@ -281,6 +281,12 @@ public class GatewayUiSecurityProperties {
 				private String issuerUri;
 
 				/**
+				 * The audiences a token must carry one of, under the issuer above. Empty,
+				 * any token of the issuer is accepted.
+				 */
+				private List<String> audiences = new ArrayList<>();
+
+				/**
 				 * Returns the issuer the console validates its Bearer tokens against.
 				 * @return the issuer, or {@code null} to use the decoder of the
 				 * application
@@ -295,6 +301,22 @@ public class GatewayUiSecurityProperties {
 				 */
 				public void setIssuerUri(String issuerUri) {
 					this.issuerUri = issuerUri;
+				}
+
+				/**
+				 * Returns the audiences a token must carry one of.
+				 * @return the audiences, empty to accept any
+				 */
+				public List<String> getAudiences() {
+					return this.audiences;
+				}
+
+				/**
+				 * Sets the audiences a token must carry one of.
+				 * @param audiences the audiences
+				 */
+				public void setAudiences(List<String> audiences) {
+					this.audiences = audiences;
 				}
 
 			}
