@@ -24,6 +24,9 @@ spring.cloud.gateway.server.webflux.mcp:
   enabled: true          # off by default: it hands out the configuration and the findings of the gateway
   write-enabled: false   # true adds the tools that change the gateway
   confirm-writes: true   # those tools do nothing unless the call carries confirm: true
+  oauth2:                # what a client without a token is told, see "OAuth discovery"
+    authorization-servers: []   # empty: the issuer of the console, else the application's
+    scopes: []
 ```
 
 | Property | Default | What it does |
@@ -31,6 +34,9 @@ spring.cloud.gateway.server.webflux.mcp:
 | `...mcp.enabled` | `false` | Master switch; the Spring AI server follows it |
 | `...mcp.write-enabled` | `false` | Registers the tools that change the gateway: `save_route`, `delete_route`, `refresh_routes`, `clear_findings` |
 | `...mcp.confirm-writes` | `true` | A write tool called without `confirm: true` describes the change and does nothing |
+| `...mcp.oauth2.authorization-servers` | `[]` | Issuers published to a client without a token; empty publishes the issuer of the console, else `spring.security.oauth2.resourceserver.jwt.issuer-uri`, and with neither nothing is published |
+| `...mcp.oauth2.resource` | — | The URL of the endpoint as the clients reach it; unset, it is derived from each request |
+| `...mcp.oauth2.scopes` | `[]` | Scopes a client may ask for, published as `scopes_supported` |
 
 The server itself is Spring AI's, configured under `spring.ai.mcp.server`. The plugin gives
 these properties the defaults below; a value the application sets wins.
@@ -105,9 +111,71 @@ holds, or a Bearer token once an issuer is configured; see
 and [a Bearer token](../../spring-cloud-gateway-ui/README.md#a-bearer-token). Put the endpoint
 behind one of them before enabling the plugin on anything reachable.
 
+## OAuth discovery
+
+Once an issuer is known — the console's, the application's, or the ones named under
+`...mcp.oauth2.authorization-servers` — a client without a token is told where to obtain one,
+the way the MCP specification says:
+
+1. The `401` of `/mcp` carries `WWW-Authenticate: Bearer resource_metadata="https://<gateway>/.well-known/oauth-protected-resource/mcp"`.
+2. That document (RFC 9728) names the `resource` a token must be issued for, the
+   `authorization_servers`, and the `scopes_supported` when scopes are configured. It is
+   served open, at the root well-known path as well, and the chain answering the `401` is
+   whichever governs `/mcp`.
+3. The client reads the issuer's configuration, opens the browser on its login (PKCE, a
+   redirect to a port of its own), and from then on sends and renews the token itself.
+
+The token is validated by the chain: with the console's, under
+`...ui.security.oauth2.resourceserver.jwt.issuer-uri` plus `...audiences`, so that a token the
+issuer handed out for another service is refused.
+
+### What the issuer must allow
+
+The client registers itself with the issuer (dynamic client registration, RFC 7591) or uses a
+client declared for it. On a Keycloak realm, one or the other:
+
+**A client declared for the IDE** — *Clients › Create client*:
+
+| Setting | Value |
+| --- | --- |
+| Client type / Client ID | OpenID Connect, e.g. `mcp-ide` |
+| Client authentication | Off: a public client, no secret on a developer's machine |
+| Standard flow | On; the other flows off |
+| Valid redirect URIs | Claude Code: `http://localhost:<port>/callback`, with the port fixed by `--callback-port`; otherwise the URI the client names in its documentation |
+| Advanced › Proof Key for Code Exchange Code Challenge Method | `S256` |
+
+Then the client is told which id to use:
+
+```console
+claude mcp add --transport http --client-id mcp-ide --callback-port 8765 \
+  gateway https://gateway.example.com/mcp
+```
+
+In VS Code, `oauth.clientId` in `.vscode/mcp.json` does the same; a confidential client gets its
+secret through the *Set Client Secret* action above that line, never in the file.
+
+**Dynamic registration instead** — *Realm settings › Client registration › Anonymous access
+policies*: the *Trusted Hosts* policy lists the hosts allowed to register (the developers'
+network), the *Allowed Client Scopes* policy the scopes a registered client may ask for. With
+nothing listed, Keycloak refuses anonymous registration and the client reports that the
+authorization server does not support it.
+
+**The audience** — a Keycloak token carries `aud` = the client ids it was issued to, not the
+gateway. Add an *Audience* mapper to the client (or to a client scope the client holds):
+*Included Custom Audience* = the `resource` the gateway publishes, `https://gateway.example.com/mcp`,
+and set the same value under `...ui.security.oauth2.resourceserver.jwt.audiences`. Without the
+mapper, leave `audiences` empty or the gateway refuses every token of the realm.
+
 ## Connecting a client
 
-Any client speaking MCP over Streamable HTTP, with the credentials in a header:
+Any client speaking MCP over Streamable HTTP. With [OAuth discovery](#oauth-discovery) on,
+nothing but the URL: the client obtains its token on the first `401`.
+
+```console
+claude mcp add --transport http gateway https://gateway.example.com/mcp
+```
+
+Without it, the credentials go in a header:
 
 ```console
 claude mcp add --transport http gateway https://gateway.example.com/mcp \

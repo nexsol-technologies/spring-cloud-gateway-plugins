@@ -81,6 +81,30 @@ class GatewayMcpServerIntegrationTests {
 				"spring.ai.mcp.server.type=ASYNC");
 
 	@Test
+	void servesTheProtectedResourceMetadataOnceAnIssuerIsKnown() {
+		this.runner.withPropertyValues(
+				"spring.cloud.gateway.server.webflux.ui.security.oauth2.resourceserver.jwt.issuer-uri=https://idp/realms/x")
+			.run((context) -> WebTestClient.bindToApplicationContext(context)
+				.configureClient()
+				.baseUrl("http://localhost")
+				.build()
+				.get()
+				.uri("/.well-known/oauth-protected-resource/mcp")
+				.exchange()
+				.expectStatus()
+				.isOk()
+				.expectHeader()
+				.contentType(MediaType.APPLICATION_JSON)
+				.expectBody()
+				.jsonPath("$.resource")
+				.isEqualTo("http://localhost/mcp")
+				.jsonPath("$.authorization_servers[0]")
+				.isEqualTo("https://idp/realms/x")
+				.jsonPath("$.bearer_methods_supported[0]")
+				.isEqualTo("header"));
+	}
+
+	@Test
 	void listsTheRouteToolsAndNoneOfTheAbsentPlugins() {
 		this.runner.run((context) -> call(context, TOOLS_LIST).expectStatus()
 			.isOk()
