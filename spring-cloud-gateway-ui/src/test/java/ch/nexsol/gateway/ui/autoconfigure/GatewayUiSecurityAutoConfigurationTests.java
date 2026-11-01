@@ -20,6 +20,7 @@ import ch.nexsol.gateway.audit.AuditEventPublisher;
 import ch.nexsol.gateway.commons.security.SecuredPaths;
 import ch.nexsol.gateway.ui.security.LoginController;
 import ch.nexsol.gateway.ui.security.UiSecurityModelAttributes;
+import ch.nexsol.gateway.ui.security.UiSessionCookieStripper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import reactor.core.publisher.Mono;
@@ -180,6 +181,22 @@ class GatewayUiSecurityAutoConfigurationTests {
 		// business and the warning would be noise.
 		this.runner.withUserConfiguration(InMemorySessionConfiguration.class)
 			.run((context) -> assertThat(output).doesNotContain("keeps the sessions it opens in its own memory"));
+	}
+
+	@Test
+	void stripsTheCookieOfTheConsoleFromTheRequestsItRoutes() {
+		this.runner.withPropertyValues("spring.cloud.gateway.server.webflux.ui.security.mode=authenticated")
+			.run((context) -> {
+				assertThat(context).hasNotFailed();
+				assertThat(context).hasSingleBean(UiSessionCookieStripper.class);
+			});
+	}
+
+	@Test
+	void stripsNothingWhileTheConsoleIsOpen() {
+		// An open console opens no session of its own, so there is no cookie of its own
+		// to keep out of the routed requests.
+		this.runner.run((context) -> assertThat(context).doesNotHaveBean(UiSessionCookieStripper.class));
 	}
 
 	@Test

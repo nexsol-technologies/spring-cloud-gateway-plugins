@@ -38,6 +38,7 @@ import ch.nexsol.gateway.ui.security.UiSecuredPaths;
 import ch.nexsol.gateway.ui.security.UiSecurityCustomizer;
 import ch.nexsol.gateway.ui.security.UiSecurityModelAttributes;
 import ch.nexsol.gateway.ui.security.UiSessionCookieName;
+import ch.nexsol.gateway.ui.security.UiSessionCookieStripper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -53,6 +54,7 @@ import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientProperties;
 import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientPropertiesMapper;
+import org.springframework.cloud.gateway.filter.headers.HttpHeadersFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -873,6 +875,27 @@ public class GatewayUiSecurityAutoConfiguration {
 				return Flux.fromIterable(authorities);
 			});
 			return converter;
+		}
+
+	}
+
+	/**
+	 * Keeps the session cookie of the console out of the requests the gateway sends to
+	 * the services it routes to. Declared only behind the login page, since that is where
+	 * the cookie carries a signed-in operator.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(HttpHeadersFilter.class)
+	@ConditionalOnProperty(prefix = SECURITY_PREFIX, name = "mode", havingValue = "authenticated")
+	static class SessionCookieConfiguration {
+
+		/**
+		 * Registers the filter taking the cookie out of the headers sent downstream.
+		 * @return the header filter
+		 */
+		@Bean
+		UiSessionCookieStripper gatewayUiSessionCookieStripper() {
+			return new UiSessionCookieStripper();
 		}
 
 	}

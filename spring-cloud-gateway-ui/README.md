@@ -986,6 +986,14 @@ An application that decides for itself keeps what it set: `server.reactive.sessi
 and `server.reactive.session.cookie.same-site` are honoured when they carry a value, and
 `server.reactive.session.cookie.secure: true` puts the attribute on whatever the scheme.
 
+The cookie is scoped to the origin, not to `/ui` — the OpenID Connect round trip, the assets of
+the shell and the pages of the hub all sit outside it — so a browser with the console open
+attaches it to every call a routed API serves. `Cookie` is not a hop-by-hop header, so the
+console takes its own cookie out of the requests the gateway sends downstream: the id an
+operator signed in with reaches no service and no access log of theirs, and it stops surfacing
+in penetration tests aimed at the APIs. Every other cookie is handed over untouched, the
+session cookie of a front end included.
+
 ### Running more than one instance
 
 WebFlux keeps sessions in memory, so the session cookie means nothing to an instance that did
