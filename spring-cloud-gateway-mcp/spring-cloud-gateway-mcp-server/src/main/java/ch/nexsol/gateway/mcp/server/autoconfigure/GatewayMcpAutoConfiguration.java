@@ -24,6 +24,8 @@ import ch.nexsol.gateway.commons.security.SecuredPaths;
 import ch.nexsol.gateway.mcp.server.GatewayMcpProperties;
 import ch.nexsol.gateway.mcp.server.WriteGuard;
 import ch.nexsol.gateway.mcp.server.metrics.MetricsTools;
+import ch.nexsol.gateway.mcp.server.oauth2.BearerChallengeWebFilter;
+import ch.nexsol.gateway.mcp.server.oauth2.ProtectedResource;
 import ch.nexsol.gateway.mcp.server.pentest.PentestTools;
 import ch.nexsol.gateway.mcp.server.pentest.PentestWriteTools;
 import ch.nexsol.gateway.mcp.server.prompts.GatewayPrompts;
@@ -59,7 +61,13 @@ import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.http.MediaType;
+import org.springframework.web.reactive.function.server.RouterFunction;
+import org.springframework.web.reactive.function.server.RouterFunctions;
+import org.springframework.web.reactive.function.server.ServerResponse;
 
 /**
  * Auto-configuration registering what the MCP server serves: the tools over the routes,
@@ -141,13 +149,64 @@ public class GatewayMcpAutoConfiguration {
 	@ConditionalOnMissingBean(name = "gatewayMcpSecuredPaths")
 	SecuredPaths gatewayMcpSecuredPaths(ObjectProvider<McpServerStreamableHttpProperties> streamable,
 			ObjectProvider<McpServerSseProperties> sse) {
+		return SecuredPaths.api(endpoints(streamable, sse).toArray(String[]::new));
+	}
+
+	static List<String> endpoints(ObjectProvider<McpServerStreamableHttpProperties> streamable,
+			ObjectProvider<McpServerSseProperties> sse) {
 		List<String> endpoints = new ArrayList<>();
 		streamable.ifAvailable((properties) -> endpoints.add(properties.getMcpEndpoint()));
 		sse.ifAvailable((properties) -> {
 			endpoints.add(properties.getSseEndpoint());
 			endpoints.add(properties.getSseMessageEndpoint());
 		});
-		return SecuredPaths.api(endpoints.toArray(String[]::new));
+		return endpoints;
+	}
+
+	/**
+	 * Publishes the endpoint as an OAuth 2.0 protected resource once an authorization
+	 * server is known, so that a client finding a {@code 401} obtains a token from that
+	 * server on its own instead of being handed one. The {@code 401} itself is answered
+	 * by whichever chain governs the endpoint; this only completes it with the challenge,
+	 * and serves the document the challenge names, open to anyone since it is what a
+	 * client reads before it has a token.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	@Conditional(OAuth2DiscoveryCondition.class)
+	static class OAuth2DiscoveryConfiguration {
+
+		@Bean
+		ProtectedResource gatewayMcpProtectedResource(GatewayMcpProperties properties, Environment environment,
+				ObjectProvider<McpServerStreamableHttpProperties> streamable,
+				ObjectProvider<McpServerSseProperties> sse) {
+			GatewayMcpProperties.OAuth2 oauth2 = properties.getSecurity().getOauth2();
+			return new ProtectedResource(oauth2.getResource(), endpoints(streamable, sse).get(0),
+					OAuth2DiscoveryCondition.authorizationServers(environment), oauth2.getScopes());
+		}
+
+		@Bean
+		BearerChallengeWebFilter gatewayMcpBearerChallengeWebFilter(ProtectedResource resource,
+				ObjectProvider<McpServerStreamableHttpProperties> streamable,
+				ObjectProvider<McpServerSseProperties> sse) {
+			return new BearerChallengeWebFilter(resource, endpoints(streamable, sse));
+		}
+
+		@Bean
+		RouterFunction<ServerResponse> gatewayMcpProtectedResourceMetadata(ProtectedResource resource) {
+			RouterFunctions.Builder routes = RouterFunctions.route();
+			resource.metadataPaths()
+				.forEach((path) -> routes.GET(path,
+						(request) -> ServerResponse.ok()
+							.contentType(MediaType.APPLICATION_JSON)
+							.bodyValue(resource.metadata(request.uri()))));
+			return routes.build();
+		}
+
+		@Bean
+		SecuredPaths gatewayMcpMetadataPaths(ProtectedResource resource) {
+			return SecuredPaths.open(resource.metadataPaths().toArray(String[]::new));
+		}
+
 	}
 
 	/**

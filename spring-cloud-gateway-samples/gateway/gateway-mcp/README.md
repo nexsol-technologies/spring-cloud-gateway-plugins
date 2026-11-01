@@ -11,8 +11,9 @@ registered, and the petstore contract documented by the hub, so its operations a
 mvn spring-boot:run
 ```
 
-No infrastructure is needed. The endpoint sits behind the console's login, `admin` / `admin`,
-and an MCP client sends the same credentials as HTTP Basic:
+No infrastructure, and no console: the plugin's own chain secures `/mcp` against the local user
+it is given, `admin` / `admin` under `...mcp.security.user`, and an MCP client sends it as HTTP
+Basic:
 
 ```console
 claude mcp add --transport http gateway http://localhost:8215/mcp \
@@ -50,10 +51,11 @@ could not be read.
 | Url | What it shows |
 | --- | --- |
 | `POST http://localhost:8215/mcp` | The MCP endpoint: `tools/list`, `tools/call`, `prompts/list`, `prompts/get` |
-| http://localhost:8215/ui/routes | The routes `list_routes` returns, as the console shows them |
-| http://localhost:8215/ui/metrics | The figures `route_traffic` returns |
-| http://localhost:8215/ui/passive-scan | The findings `list_findings` returns |
 | http://localhost:8215/swagger-ui.html | The petstore contract the `petstore__*` tools come from |
+| http://localhost:8215/actuator/gateway/routes | The routes `list_routes` returns |
+
+The console is deliberately absent: [gateway-full](../gateway-full/README.md) runs the same
+plugin next to it, with `/mcp` behind the console's login instead of the plugin's chain.
 
 ## Profiles
 

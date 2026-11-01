@@ -30,7 +30,7 @@ each name what they additionally need.
 | `metrics` | `/ui/metrics` and `/ui/metrics/instances`, both instrumentation switches on |
 | `service-graph` | The `service-a` and `service-b` routes, and the two flows [below](#who-calls-what) |
 | `audit` | `/ui/audit`, with the global web filter on |
-| `mcp-server` | `/mcp`: the routes, the traffic and the findings as MCP tools — [gateway-mcp](../gateway-mcp/README.md) shows how a client connects |
+| `mcp-server` | `/mcp`: the routes, the traffic and the findings as MCP tools — [gateway-mcp](../gateway-mcp/README.md) shows how a client connects. Here the console names an issuer, so a client without a token is pointed at `/.well-known/oauth-protected-resource/mcp` and obtains one from the `auth-server` on its own |
 | `mcp-hub` | The same `/mcp`, under the `eureka` profile: every operation of every registered service as a tool, called through this gateway |
 | `ui` | `/ui` |
 

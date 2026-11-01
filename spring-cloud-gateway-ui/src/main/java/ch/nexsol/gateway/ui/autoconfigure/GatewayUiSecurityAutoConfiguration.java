@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import ch.nexsol.gateway.commons.security.AudienceCheckingJwtDecoder;
 import ch.nexsol.gateway.commons.security.SecuredPathsContribution;
 import ch.nexsol.gateway.ui.security.ClaimRoles;
 import ch.nexsol.gateway.ui.security.GatewayUiSecurityProperties;
@@ -852,14 +853,25 @@ public class GatewayUiSecurityAutoConfiguration {
 		 * <p>
 		 * The issuer is asked for its keys on the first token that arrives rather than at
 		 * start-up, so a gateway comes up whether or not the provider is answering.
+		 * <p>
+		 * The audiences apply to the console's own issuer alone: a decoder the
+		 * application declared already carries the audiences the application gave it.
 		 */
 		private static ReactiveJwtDecoder decoder(GatewayUiSecurityProperties properties,
 				ObjectProvider<ReactiveJwtDecoder> applicationDecoder) {
-			String issuer = properties.getOauth2().getResourceserver().getJwt().getIssuerUri();
-			if (StringUtils.hasText(issuer)) {
-				return new SupplierReactiveJwtDecoder(() -> ReactiveJwtDecoders.fromIssuerLocation(issuer));
+			GatewayUiSecurityProperties.OAuth2.ResourceServer.Jwt jwt = properties.getOauth2()
+				.getResourceserver()
+				.getJwt();
+			String issuer = jwt.getIssuerUri();
+			if (!StringUtils.hasText(issuer)) {
+				return applicationDecoder.getIfAvailable();
 			}
-			return applicationDecoder.getIfAvailable();
+			ReactiveJwtDecoder decoder = new SupplierReactiveJwtDecoder(
+					() -> ReactiveJwtDecoders.fromIssuerLocation(issuer));
+			if (jwt.getAudiences().isEmpty()) {
+				return decoder;
+			}
+			return new AudienceCheckingJwtDecoder(decoder, jwt.getAudiences());
 		}
 
 		/**

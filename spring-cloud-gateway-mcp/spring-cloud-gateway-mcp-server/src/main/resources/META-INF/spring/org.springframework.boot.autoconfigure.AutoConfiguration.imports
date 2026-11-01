@@ -1,1 +1,2 @@
 ch.nexsol.gateway.mcp.server.autoconfigure.GatewayMcpAutoConfiguration
+ch.nexsol.gateway.mcp.server.autoconfigure.GatewayMcpSecurityAutoConfiguration
