@@ -26,7 +26,8 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import ch.nexsol.gateway.commons.security.AudienceCheckingJwtDecoder;
+import ch.nexsol.gateway.commons.security.IssuerJwtDecoders;
+import ch.nexsol.gateway.commons.security.LocalUserAuthentication;
 import ch.nexsol.gateway.commons.security.SecuredPathsContribution;
 import ch.nexsol.gateway.ui.security.ClaimRoles;
 import ch.nexsol.gateway.ui.security.GatewayUiSecurityProperties;
@@ -63,15 +64,9 @@ import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
-import org.springframework.security.authentication.UserDetailsRepositoryReactiveAuthenticationManager;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.crypto.factory.PasswordEncoderFactories;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcReactiveOAuth2UserService;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.web.server.logout.OidcClientInitiatedServerLogoutSuccessHandler;
@@ -83,8 +78,6 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoders;
-import org.springframework.security.oauth2.jwt.SupplierReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverter;
 import org.springframework.security.web.server.SecurityWebFilterChain;
@@ -513,22 +506,7 @@ public class GatewayUiSecurityAutoConfiguration {
 	 * whatever the application configured.
 	 */
 	private static Optional<ReactiveAuthenticationManager> localUser(GatewayUiSecurityProperties.User user) {
-		if (!StringUtils.hasText(user.getPassword())) {
-			return Optional.empty();
-		}
-		PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
-		// A password already carrying the id of the encoder that produced it is taken as
-		// is,
-		// which is how a deployment keeps the clear text out of its configuration.
-		String password = user.getPassword().startsWith("{") ? user.getPassword() : encoder.encode(user.getPassword());
-		UserDetails details = User.withUsername(user.getName())
-			.password(password)
-			.roles(user.getRoles().toArray(String[]::new))
-			.build();
-		UserDetailsRepositoryReactiveAuthenticationManager manager = new UserDetailsRepositoryReactiveAuthenticationManager(
-				new MapReactiveUserDetailsService(details));
-		manager.setPasswordEncoder(encoder);
-		return Optional.of(manager);
+		return LocalUserAuthentication.manager(user.getName(), user.getPassword(), user.getRoles());
 	}
 
 	/**
@@ -850,28 +828,15 @@ public class GatewayUiSecurityAutoConfiguration {
 		 * answer to the same authorization server and wrong when they do not &mdash; and
 		 * {@code spring.security.oauth2.resourceserver} holds one issuer for the whole
 		 * application, so there is no way to say both there.
-		 * <p>
-		 * The issuer is asked for its keys on the first token that arrives rather than at
-		 * start-up, so a gateway comes up whether or not the provider is answering.
-		 * <p>
-		 * The audiences apply to the console's own issuer alone: a decoder the
-		 * application declared already carries the audiences the application gave it.
 		 */
 		private static ReactiveJwtDecoder decoder(GatewayUiSecurityProperties properties,
 				ObjectProvider<ReactiveJwtDecoder> applicationDecoder) {
 			GatewayUiSecurityProperties.OAuth2.ResourceServer.Jwt jwt = properties.getOauth2()
 				.getResourceserver()
 				.getJwt();
-			String issuer = jwt.getIssuerUri();
-			if (!StringUtils.hasText(issuer)) {
-				return applicationDecoder.getIfAvailable();
-			}
-			ReactiveJwtDecoder decoder = new SupplierReactiveJwtDecoder(
-					() -> ReactiveJwtDecoders.fromIssuerLocation(issuer));
-			if (jwt.getAudiences().isEmpty()) {
-				return decoder;
-			}
-			return new AudienceCheckingJwtDecoder(decoder, jwt.getAudiences());
+			return IssuerJwtDecoders
+				.decoder(jwt.getIssuerUri(), jwt.getAudiences(), applicationDecoder.getIfAvailable())
+				.orElse(null);
 		}
 
 		/**

@@ -750,6 +750,8 @@ What the plugins shipped here declare:
 | `/ui/metrics/local`, `/ui/metrics/local/instance` | metrics-discovery | Open — polled by the sibling instances, same reason | Left to the application |
 | `/ui/routes/db` and its fragments | this console, over routes-database | Write, from a browser | The view is not served at all |
 | `/api/gateway/routes` and the rest of the route API | routes-database | Write, from a client | Closed by the plugin's own chain |
+| `/passive-scan/findings`, `/summary`, `/coverage`, `/routes`, `/export` | pentest-passive | Read | Closed by the plugin's own chain |
+| `/passive-scan/findings/clear` | pentest-passive | Write, from a client | Same |
 
 The chain is ordered ahead of the ones those plugins contribute for themselves, so it answers
 first for the paths it takes over. A gateway assembled without this module keeps whatever each

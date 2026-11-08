@@ -18,40 +18,36 @@ package ch.nexsol.gateway.mcp.server.autoconfigure;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
-import ch.nexsol.gateway.commons.security.AudienceCheckingJwtDecoder;
+import ch.nexsol.gateway.commons.security.ConditionalOnPluginAuthentication;
+import ch.nexsol.gateway.commons.security.IssuerJwtDecoders;
+import ch.nexsol.gateway.commons.security.PluginSecurityChain;
 import ch.nexsol.gateway.mcp.server.GatewayMcpProperties;
 import ch.nexsol.gateway.mcp.server.oauth2.ProtectedResource;
 import ch.nexsol.gateway.mcp.server.security.GatewayMcpSecurityCustomizer;
 
+import org.springframework.ai.mcp.server.common.autoconfigure.McpServerStdioDisabledCondition;
 import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerSseProperties;
 import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerStreamableHttpProperties;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.authentication.UserDetailsRepositoryReactiveAuthenticationManager;
+import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.crypto.factory.PasswordEncoderFactories;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoders;
-import org.springframework.security.oauth2.jwt.SupplierReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.web.server.BearerTokenServerAuthenticationEntryPoint;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
-import org.springframework.util.StringUtils;
-
-import static org.springframework.security.config.Customizer.withDefaults;
 
 /**
  * Auto-configuration securing the MCP endpoint on its own, so that the plugin needs no
@@ -66,14 +62,35 @@ import static org.springframework.security.config.Customizer.withDefaults;
  * {@code gatewayMcpSecurityWebFilterChain}, or turns it off with
  * {@code spring.cloud.gateway.server.webflux.mcp.security-chain-enabled=false}.
  * <p>
+ * Two conditions keep the plugin from making a gateway <em>less</em> safe by being added
+ * to it:
+ * <ul>
+ * <li>The chain is only contributed when another {@link SecurityWebFilterChain} already
+ * exists. Spring Security serves its own "everything authenticated" chain as long as
+ * there is none, and that chain already covers the endpoint; replacing it with one that
+ * matches the endpoint alone would leave every other path of the application
+ * unguarded.</li>
+ * <li>It is only contributed when there is something to authenticate against &mdash; the
+ * local user or the issuer the plugin is given, else the user directory, the
+ * authentication manager or the issuer of the application. Closing a door with no key
+ * behind it would leave no way through it at all.</li>
+ * </ul>
+ * <p>
  * The {@code ServerHttpSecurity} it builds from exists only once Boot's reactive security
  * auto-configuration ran, hence the ordering on it rather than on a bean it declares,
  * which is a prototype {@code @ConditionalOnBean} would not find.
  */
 @AutoConfiguration(after = GatewayMcpAutoConfiguration.class,
-		afterName = "org.springframework.boot.security.autoconfigure.web.reactive.ReactiveWebSecurityAutoConfiguration")
+		afterName = {
+				"org.springframework.boot.security.autoconfigure.web.reactive.ReactiveWebSecurityAutoConfiguration",
+				"ch.nexsol.gateway.ui.autoconfigure.GatewayUiSecurityAutoConfiguration",
+				"ch.nexsol.gateway.openapi.autoconfigure.HubApiSecurityAutoConfiguration",
+				"ch.nexsol.gateway.routes.security.autoconfigure.RoutesSecurityAutoConfiguration",
+				"ch.nexsol.gateway.oauth2.autoconfigure.BasicAuthExchangeSecurityAutoConfiguration" })
 @ConditionalOnClass({ SecurityWebFilterChain.class, ServerHttpSecurity.class })
 @ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.mcp.enabled", havingValue = "true")
+// Spring AI's own test for an HTTP transport: over stdio there is no endpoint to secure.
+@Conditional(McpServerStdioDisabledCondition.class)
 public class GatewayMcpSecurityAutoConfiguration {
 
 	/**
@@ -89,111 +106,68 @@ public class GatewayMcpSecurityAutoConfiguration {
 	 * @param streamable the endpoint of the stateless and streamable protocols
 	 * @param sse the two endpoints of the SSE protocol
 	 * @param resource the protected resource, when its metadata is published
-	 * @param customizers the contributions, the Bearer support among them
+	 * @param customizers the contributions, the Bearer challenge among them
+	 * @param userDetailsService the user directory of the application, if it declared one
+	 * @param authenticationManager the authentication manager of the application, if it
+	 * declared one
+	 * @param beanFactory the bean factory, where the decoder of the application is looked
+	 * up when the JWT jars are on the classpath
 	 * @return the chain
 	 */
 	@Bean
 	@Order(GATEWAY_MCP_CHAIN_ORDER)
+	@ConditionalOnBean(SecurityWebFilterChain.class)
+	@ConditionalOnPluginAuthentication(prefix = "spring.cloud.gateway.server.webflux.mcp.security")
 	@ConditionalOnMissingBean(name = "gatewayMcpSecurityWebFilterChain")
 	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.mcp.security-chain-enabled",
 			havingValue = "true", matchIfMissing = true)
 	SecurityWebFilterChain gatewayMcpSecurityWebFilterChain(ServerHttpSecurity http, GatewayMcpProperties properties,
 			ObjectProvider<McpServerStreamableHttpProperties> streamable, ObjectProvider<McpServerSseProperties> sse,
-			ObjectProvider<ProtectedResource> resource, ObjectProvider<GatewayMcpSecurityCustomizer> customizers) {
+			ObjectProvider<ProtectedResource> resource, ObjectProvider<GatewayMcpSecurityCustomizer> customizers,
+			ObjectProvider<ReactiveUserDetailsService> userDetailsService,
+			ObjectProvider<ReactiveAuthenticationManager> authenticationManager, BeanFactory beanFactory) {
 		List<String> endpoints = GatewayMcpAutoConfiguration.endpoints(streamable, sse);
 		List<String> open = new ArrayList<>();
 		resource.ifAvailable((protectedResource) -> open.addAll(protectedResource.metadataPaths()));
 		List<String> all = new ArrayList<>(open);
 		all.addAll(endpoints);
 		http.securityMatcher(ServerWebExchangeMatchers.pathMatchers(all.toArray(String[]::new)));
-		http.csrf(ServerHttpSecurity.CsrfSpec::disable);
 		http.authorizeExchange((spec) -> {
 			if (!open.isEmpty()) {
 				spec.pathMatchers(open.toArray(String[]::new)).permitAll();
 			}
 			spec.anyExchange().authenticated();
 		});
-		http.httpBasic(withDefaults());
-		localUser(properties.getSecurity().getUser()).ifPresent(http::authenticationManager);
-		http.formLogin(ServerHttpSecurity.FormLoginSpec::disable);
-		http.logout(ServerHttpSecurity.LogoutSpec::disable);
+		PluginSecurityChain.basic(http, properties.getSecurity().getUser(), userDetailsService, authenticationManager);
+		PluginSecurityChain.bearer(http, properties.getSecurity().getOauth2().getResourceserver().getJwt(),
+				beanFactory);
 		customizers.orderedStream().forEach((customizer) -> customizer.customize(http));
 		return http.build();
 	}
 
 	/**
-	 * The local user, held by this chain alone rather than published as a
-	 * {@code ReactiveUserDetailsService}, so that it neither competes with nor replaces
-	 * the authentication the rest of the application is built on. Without a password
-	 * there is no local user.
-	 */
-	private static Optional<UserDetailsRepositoryReactiveAuthenticationManager> localUser(
-			GatewayMcpProperties.User user) {
-		if (!StringUtils.hasText(user.getPassword())) {
-			return Optional.empty();
-		}
-		PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
-		// A password already carrying the id of the encoder that produced it is taken as
-		// is, which is how a deployment keeps the clear text out of its configuration.
-		String password = user.getPassword().startsWith("{") ? user.getPassword() : encoder.encode(user.getPassword());
-		UserDetails details = User.withUsername(user.getName())
-			.password(password)
-			.roles(user.getRoles().toArray(String[]::new))
-			.build();
-		UserDetailsRepositoryReactiveAuthenticationManager manager = new UserDetailsRepositoryReactiveAuthenticationManager(
-				new MapReactiveUserDetailsService(details));
-		manager.setPasswordEncoder(encoder);
-		return Optional.of(manager);
-	}
-
-	/**
-	 * The Bearer support, when the resource server classes are present: the token is
-	 * validated against the issuer the plugin is given, else by the decoder the
-	 * application declared. With neither, no Bearer is accepted and the chain answers
-	 * Basic alone.
+	 * The challenge of a {@code 401}, when the resource server classes are present and a
+	 * Bearer token is accepted. Both Basic and Bearer pass; the challenge is the Bearer
+	 * one, which is what an MCP client reads, and the discovery filter adds the metadata
+	 * URL to it. Without a decoder the challenge stays the Basic one.
 	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass({ ReactiveJwtDecoder.class, BearerTokenServerAuthenticationEntryPoint.class })
-	static class BearerConfiguration {
+	static class BearerChallengeConfiguration {
 
 		@Bean
-		GatewayMcpSecurityCustomizer gatewayMcpBearerCustomizer(GatewayMcpProperties properties,
+		GatewayMcpSecurityCustomizer gatewayMcpBearerChallengeCustomizer(GatewayMcpProperties properties,
 				ObjectProvider<ReactiveJwtDecoder> applicationDecoder) {
-			ReactiveJwtDecoder decoder = decoder(properties, applicationDecoder);
+			boolean bearer = IssuerJwtDecoders
+				.decoder(properties.getSecurity().getOauth2().getResourceserver().getJwt(),
+						applicationDecoder.getIfAvailable())
+				.isPresent();
 			return (http) -> {
-				if (decoder == null) {
-					return;
+				if (bearer) {
+					http.exceptionHandling((handling) -> handling
+						.authenticationEntryPoint(new BearerTokenServerAuthenticationEntryPoint()));
 				}
-				http.oauth2ResourceServer((oauth2) -> oauth2.jwt((jwt) -> jwt.jwtDecoder(decoder)));
-				// Both Basic and Bearer are accepted; the challenge of a 401 is the
-				// Bearer
-				// one, which is what an MCP client reads, and the discovery filter adds
-				// the metadata URL to it.
-				http.exceptionHandling((handling) -> handling
-					.authenticationEntryPoint(new BearerTokenServerAuthenticationEntryPoint()));
 			};
-		}
-
-		/**
-		 * The issuer is asked for its keys on the first token that arrives rather than at
-		 * start-up, so a gateway comes up whether or not the provider is answering.
-		 */
-		private static ReactiveJwtDecoder decoder(GatewayMcpProperties properties,
-				ObjectProvider<ReactiveJwtDecoder> applicationDecoder) {
-			GatewayMcpProperties.OAuth2.ResourceServer.Jwt jwt = properties.getSecurity()
-				.getOauth2()
-				.getResourceserver()
-				.getJwt();
-			String issuer = jwt.getIssuerUri();
-			if (!StringUtils.hasText(issuer)) {
-				return applicationDecoder.getIfAvailable();
-			}
-			ReactiveJwtDecoder decoder = new SupplierReactiveJwtDecoder(
-					() -> ReactiveJwtDecoders.fromIssuerLocation(issuer));
-			if (jwt.getAudiences().isEmpty()) {
-				return decoder;
-			}
-			return new AudienceCheckingJwtDecoder(decoder, jwt.getAudiences());
 		}
 
 	}

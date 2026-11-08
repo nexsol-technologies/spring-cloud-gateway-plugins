@@ -141,6 +141,17 @@ covers the endpoints of the protocol in force and the metadata of
 the application. `...mcp.security-chain-enabled=false` turns it off, and a bean named
 `gatewayMcpSecurityWebFilterChain` replaces it.
 
+Two conditions keep this plugin from making a gateway *less* safe by being added to it:
+
+* **It backs off when no other `SecurityWebFilterChain` exists.** Spring Security serves its
+  own "everything authenticated" chain as long as there is none, and that chain already covers
+  `/mcp`. Replacing it with one matching `/mcp` alone would leave every other path unguarded.
+  A gateway relying on that default keeps it, with its user; the local user above applies once
+  the application declares a chain of its own.
+* **It backs off when there is nothing to authenticate against** — no local user or issuer
+  above, and no user directory, authentication manager or issuer in the application. A blank
+  value is no value.
+
 With the [console](../../spring-cloud-gateway-ui/README.md) present, its chain governs `/mcp`
 instead, ordered ahead of this one: the endpoint follows
 [the mode of the console](../../spring-cloud-gateway-ui/README.md#the-endpoints-of-the-other-plugins),

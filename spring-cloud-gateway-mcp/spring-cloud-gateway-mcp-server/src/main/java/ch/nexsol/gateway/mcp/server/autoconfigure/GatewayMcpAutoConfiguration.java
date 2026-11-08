@@ -42,6 +42,7 @@ import ch.nexsol.gateway.pentest.passive.score.RouteScoreService;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.server.common.autoconfigure.McpServerAutoConfiguration;
 import org.springframework.ai.mcp.server.common.autoconfigure.McpServerStatelessAutoConfiguration;
+import org.springframework.ai.mcp.server.common.autoconfigure.McpServerStdioDisabledCondition;
 import org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerSpecificationFactoryAutoConfiguration;
 import org.springframework.ai.mcp.server.common.autoconfigure.annotations.StatelessServerSpecificationFactoryAutoConfiguration;
 import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerSseProperties;
@@ -65,6 +66,7 @@ import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.http.MediaType;
+import org.springframework.util.Assert;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.RouterFunctions;
 import org.springframework.web.reactive.function.server.ServerResponse;
@@ -172,7 +174,9 @@ public class GatewayMcpAutoConfiguration {
 	 * client reads before it has a token.
 	 */
 	@Configuration(proxyBeanMethods = false)
-	@Conditional(OAuth2DiscoveryCondition.class)
+	// Spring AI's own test for an HTTP transport: over stdio there is no endpoint to
+	// publish, and the properties beans read below may be absent.
+	@Conditional({ OAuth2DiscoveryCondition.class, McpServerStdioDisabledCondition.class })
 	static class OAuth2DiscoveryConfiguration {
 
 		@Bean
@@ -180,7 +184,11 @@ public class GatewayMcpAutoConfiguration {
 				ObjectProvider<McpServerStreamableHttpProperties> streamable,
 				ObjectProvider<McpServerSseProperties> sse) {
 			GatewayMcpProperties.OAuth2 oauth2 = properties.getSecurity().getOauth2();
-			return new ProtectedResource(oauth2.getResource(), endpoints(streamable, sse).get(0),
+			List<String> endpoints = endpoints(streamable, sse);
+			Assert.state(!endpoints.isEmpty(),
+					"No MCP endpoint to publish as a protected resource: neither the streamable nor the SSE "
+							+ "properties of the Spring AI server are registered");
+			return new ProtectedResource(oauth2.getResource(), endpoints.get(0),
 					OAuth2DiscoveryCondition.authorizationServers(environment), oauth2.getScopes());
 		}
 

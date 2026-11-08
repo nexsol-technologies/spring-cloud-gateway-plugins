@@ -63,6 +63,12 @@ public final class ProtectedResource {
 	public ProtectedResource(String resource, String endpoint, List<String> authorizationServers, List<String> scopes) {
 		Assert.hasText(endpoint, "endpoint must not be empty");
 		Assert.notEmpty(authorizationServers, "authorizationServers must not be empty");
+		if (StringUtils.hasText(resource)) {
+			URI uri = URI.create(resource);
+			Assert.isTrue(uri.isAbsolute() && uri.getRawAuthority() != null,
+					() -> "resource must be an absolute URL, such as https://gateway.example.com/mcp, got '" + resource
+							+ "'");
+		}
 		this.resource = StringUtils.hasText(resource) ? resource : null;
 		this.endpoint = endpoint;
 		this.authorizationServers = List.copyOf(authorizationServers);

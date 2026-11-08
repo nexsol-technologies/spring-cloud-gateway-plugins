@@ -49,7 +49,7 @@ navigation at [nexsol-technologies.github.io/spring-cloud-gateway-plugins/docs](
 | [pentest](spring-cloud-gateway-pentest/README.md) | Passively analyses the live traffic for OWASP issues — missing security headers, permissive CORS, weak JWTs, secrets in the URL, verbose errors — raising findings without sending any traffic of its own |
 | [mcp](spring-cloud-gateway-mcp/README.md) | An MCP server an agent reads the gateway through — the routes and their sources, the traffic per route, the OWASP findings and the security score per route — and, with the hub module, every API the OpenAPI hub documents as tools, called through the gateway as the caller. On `/mcp`, secured by the plugin itself — Basic or a Bearer token, with OAuth discovery for the client — or by the console when it is there |
 | [hub-openapi](spring-cloud-gateway-hub-openapi/README.md) | Aggregates the OpenAPI documentation of the downstream services into a single Swagger UI |
-| [commons](spring-cloud-gateway-commons/README.md) | The contracts the plugins share: how a plugin declares the paths it serves, and how the running instance is named |
+| [commons](spring-cloud-gateway-commons/README.md) | The contracts the plugins share: how a plugin declares the paths it serves, how it secures them on its own without the console, and how the running instance is named |
 
 ## Samples
 

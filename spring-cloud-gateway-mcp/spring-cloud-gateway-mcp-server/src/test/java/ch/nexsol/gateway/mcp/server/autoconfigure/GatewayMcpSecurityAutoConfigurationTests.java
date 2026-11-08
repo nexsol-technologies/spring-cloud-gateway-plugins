@@ -71,7 +71,8 @@ class GatewayMcpSecurityAutoConfigurationTests {
 				GatewayMcpSecurityAutoConfiguration.class))
 		.withPropertyValues("spring.cloud.gateway.server.webflux.mcp.enabled=true",
 				"spring.ai.mcp.server.protocol=STATELESS", "spring.ai.mcp.server.type=ASYNC",
-				"spring.security.user.name=app-user", "spring.security.user.password=app-secret");
+				"spring.security.user.name=app-user", "spring.security.user.password=app-secret")
+		.withUserConfiguration(ApplicationChainConfiguration.class);
 
 	@Test
 	void requiresAPrincipalAndAcceptsTheLocalUserOverBasic() {
@@ -146,9 +147,73 @@ class GatewayMcpSecurityAutoConfigurationTests {
 	}
 
 	@Test
+	void startsOnBearerAloneWhenTheApplicationHasNoUserDirectory() {
+		// Basic is only offered with something to check the credentials against: Spring
+		// Security cannot build its filter without an authentication manager, and the
+		// gateway would not start.
+		new ReactiveWebApplicationContextRunner()
+			.withConfiguration(AutoConfigurations.of(HttpHandlerAutoConfiguration.class, WebFluxAutoConfiguration.class,
+					ReactiveWebSecurityAutoConfiguration.class, McpServerJsonMapperAutoConfiguration.class,
+					McpServerStatelessAutoConfiguration.class, McpServerStatelessWebFluxAutoConfiguration.class,
+					McpServerAnnotationScannerAutoConfiguration.class,
+					StatelessServerSpecificationFactoryAutoConfiguration.class, GatewayMcpAutoConfiguration.class,
+					GatewayMcpSecurityAutoConfiguration.class))
+			.withPropertyValues("spring.cloud.gateway.server.webflux.mcp.enabled=true",
+					"spring.ai.mcp.server.protocol=STATELESS", "spring.ai.mcp.server.type=ASYNC")
+			.withUserConfiguration(ApplicationChainConfiguration.class, ApplicationDecoderConfiguration.class)
+			.run((context) -> {
+				assertThat(context).hasNotFailed();
+				call(context, "Bearer good").expectStatus().isOk();
+				call(context, basic("admin", "anything")).expectStatus().isUnauthorized();
+			});
+	}
+
+	@Test
 	void acceptsNoBearerWithoutAnIssuerNorADecoder() {
 		this.runner.withPropertyValues(LOCAL_USER)
 			.run((context) -> call(context, "Bearer anything").expectStatus().isUnauthorized());
+	}
+
+	@Test
+	void backsOffWhenItWouldDisplaceTheDefaultChainOfSpringSecurity() {
+		// With no other chain, Spring Security serves its own "everything authenticated"
+		// chain, which already covers /mcp. Replacing it with one matching /mcp alone
+		// would leave every other path of the application open.
+		new ReactiveWebApplicationContextRunner()
+			.withConfiguration(AutoConfigurations.of(HttpHandlerAutoConfiguration.class, WebFluxAutoConfiguration.class,
+					ReactiveWebSecurityAutoConfiguration.class, ReactiveUserDetailsServiceAutoConfiguration.class,
+					McpServerJsonMapperAutoConfiguration.class, McpServerStatelessAutoConfiguration.class,
+					McpServerStatelessWebFluxAutoConfiguration.class, McpServerAnnotationScannerAutoConfiguration.class,
+					StatelessServerSpecificationFactoryAutoConfiguration.class, GatewayMcpAutoConfiguration.class,
+					GatewayMcpSecurityAutoConfiguration.class))
+			.withPropertyValues("spring.cloud.gateway.server.webflux.mcp.enabled=true",
+					"spring.ai.mcp.server.protocol=STATELESS", "spring.ai.mcp.server.type=ASYNC",
+					"spring.security.user.name=app-user", "spring.security.user.password=app-secret", LOCAL_USER)
+			.run((context) -> {
+				assertThat(context).doesNotHaveBean("gatewayMcpSecurityWebFilterChain");
+				// The default chain keeps its CSRF protection, which answers an anonymous
+				// POST before the authentication does: refused either way.
+				call(context, null).expectStatus().is4xxClientError();
+				client(context).get().uri("/elsewhere").exchange().expectStatus().isUnauthorized();
+			});
+	}
+
+	@Test
+	void backsOffWhenThereIsNothingToAuthenticateAgainst() {
+		// Closing a door with no key behind it would leave no way through it at all.
+		new ReactiveWebApplicationContextRunner()
+			.withConfiguration(AutoConfigurations.of(HttpHandlerAutoConfiguration.class, WebFluxAutoConfiguration.class,
+					ReactiveWebSecurityAutoConfiguration.class, McpServerJsonMapperAutoConfiguration.class,
+					McpServerStatelessAutoConfiguration.class, McpServerStatelessWebFluxAutoConfiguration.class,
+					McpServerAnnotationScannerAutoConfiguration.class,
+					StatelessServerSpecificationFactoryAutoConfiguration.class, GatewayMcpAutoConfiguration.class,
+					GatewayMcpSecurityAutoConfiguration.class))
+			.withPropertyValues("spring.cloud.gateway.server.webflux.mcp.enabled=true",
+					"spring.ai.mcp.server.protocol=STATELESS", "spring.ai.mcp.server.type=ASYNC",
+					// A blank value is no value.
+					PREFIX + "user.password=")
+			.withUserConfiguration(ApplicationChainConfiguration.class)
+			.run((context) -> assertThat(context).doesNotHaveBean("gatewayMcpSecurityWebFilterChain"));
 	}
 
 	@Test
@@ -191,6 +256,22 @@ class GatewayMcpSecurityAutoConfigurationTests {
 				.subject("alice")
 				.audience(List.of("gateway"))
 				.build()) : Mono.error(new BadJwtException("bad token"));
+		}
+
+	}
+
+	/**
+	 * An application that has already taken over from the default chain of Spring
+	 * Security, for the paths it routes.
+	 */
+	@Configuration(proxyBeanMethods = false)
+	static class ApplicationChainConfiguration {
+
+		@Bean
+		SecurityWebFilterChain applicationWebFilterChain(ServerHttpSecurity http) {
+			http.securityMatcher(ServerWebExchangeMatchers.pathMatchers("/elsewhere/**"));
+			http.authorizeExchange((spec) -> spec.anyExchange().permitAll());
+			return http.build();
 		}
 
 	}

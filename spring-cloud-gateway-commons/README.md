@@ -5,7 +5,8 @@ front of a gateway is behind a login, what happens to the HTTP endpoints the oth
 serve?** A plugin knows the paths it answers; only the console knows how to authenticate a
 visitor. Neither can depend on the other, so this module is the thin thing in the middle.
 
-It carries no configuration property of its own.
+It carries no configuration property of its own: the credentials a plugin accepts are bound
+under that plugin's prefix.
 
 ## Install
 
@@ -57,6 +58,63 @@ keeps whatever chain it declares on its own. **Declaring paths is never what clo
 The paths declared as read or open are also what the console keeps out of the audit trail:
 browsing a dashboard is not gateway traffic. The ones that change the gateway are not excluded —
 who created a route, and when, is the very thing an audit trail is kept for.
+
+## Securing the paths without the console
+
+A gateway assembled without the console still has to close what changes it or hands out its
+weaknesses. `PluginSecurityProperties` is the block each plugin binds under its own prefix
+for that — `...mcp.security`, `...routes-database.security`, `...pentest.passive.security` —
+spelled as the console spells its own:
+
+```yaml
+<prefix>.security:
+  user:                        # a local user over HTTP Basic, held by that chain alone
+    name: admin
+    password:                  # no password, no local user
+    roles: [ADMIN]
+  oauth2.resourceserver.jwt:
+    issuer-uri:                # the issuer of the Bearer tokens; unset, the application's decoder
+    audiences: []              # what their aud must carry one of
+```
+
+A chain built over it is one condition and two calls, so every plugin answers the same
+credentials the same way:
+
+```java
+@Bean
+@ConditionalOnBean(SecurityWebFilterChain.class)
+@ConditionalOnPluginAuthentication(prefix = "spring.cloud.gateway.server.webflux.my-plugin.security")
+SecurityWebFilterChain myPluginSecurityWebFilterChain(ServerHttpSecurity http, MyPluginProperties properties,
+        ObjectProvider<ReactiveUserDetailsService> userDetailsService,
+        ObjectProvider<ReactiveAuthenticationManager> authenticationManager, BeanFactory beanFactory) {
+    http.securityMatcher(ServerWebExchangeMatchers.pathMatchers(MY_PATHS));
+    http.authorizeExchange((spec) -> spec.anyExchange().authenticated());
+    PluginSecurityChain.basic(http, properties.getSecurity().getUser(), userDetailsService, authenticationManager);
+    PluginSecurityChain.bearer(http, properties.getSecurity().getOauth2().getResourceserver().getJwt(), beanFactory);
+    return http.build();
+}
+```
+
+`@ConditionalOnPluginAuthentication` matches when there is something to authenticate
+against: the local user or the issuer under the prefix, else a `ReactiveUserDetailsService`,
+a `ReactiveAuthenticationManager` or a `ReactiveJwtDecoder` of the application. A blank value
+is no value. Without it a chain would ask for a principal nobody can present.
+`@ConditionalOnBean(SecurityWebFilterChain.class)` is the other half: with no chain at all,
+Spring Security's own "everything authenticated" chain already covers the paths, and a chain
+matching the plugin alone would displace it.
+
+`PluginSecurityChain.basic` configures HTTP Basic over the local user, else over the user
+directory or the authentication manager of the application, and turns off CSRF, the form
+login and the logout. `PluginSecurityChain.bearer` configures the resource server over the
+issuer, else over the decoder the application declared, and says whether it did. It takes
+the bean factory rather than the decoder so that the plugin names no JWT class: a plugin
+declares `spring-security-oauth2-jose` and `spring-security-oauth2-resource-server` as
+optional, and a gateway without them simply accepts no Bearer token on that chain. A clear-text password is encoded at start-up; one already carrying the
+id of its encoder, such as `{bcrypt}...`, is taken as is. The issuer is asked for its keys on
+the first token that arrives, never at start-up, and `AudienceCheckingJwtDecoder` enforces
+the audiences over it. `LocalUserAuthentication` and `IssuerJwtDecoders` are the two helpers
+underneath, for a module with a properties block of its own such as the console. Everything
+here but the properties class needs Spring Security on the classpath.
 
 ## Reading the route sources
 

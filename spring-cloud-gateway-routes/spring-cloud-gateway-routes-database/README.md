@@ -29,6 +29,15 @@ spring.cloud.gateway.server.webflux.routes-database:
   access: read-only
   # Set to false to keep the plugin from contributing its own security chain.
   security-chain-enabled: true
+  # What that chain authenticates against on a gateway without a console, see
+  # "Who may change the routes". Unset, whatever the application declared.
+  security:
+    user:
+      name: admin
+      password:
+    oauth2.resourceserver.jwt:
+      issuer-uri:
+      audiences: []
 ```
 
 | Property | Default | What it does |
@@ -36,6 +45,11 @@ spring.cloud.gateway.server.webflux.routes-database:
 | `...routes-database.enabled` | `true` | Is the plugin there at all; `false` stops the database feeding the gateway |
 | `...routes-database.access` | `unrestricted` | What is published: `unrestricted`, `read-only`, `none` |
 | `...routes-database.security-chain-enabled` | `true` | Whether the plugin contributes its own `SecurityWebFilterChain` |
+| `...routes-database.security.user.name` | `admin` | Name of the local user of that chain |
+| `...routes-database.security.user.password` | — | Password of the local user; unset, no local user is declared and Basic is checked against the user directory of the application |
+| `...routes-database.security.user.roles` | `[ADMIN]` | Roles the local user holds |
+| `...routes-database.security.oauth2.resourceserver.jwt.issuer-uri` | — | Issuer whose Bearer tokens the API accepts; unset, the decoder the application declared |
+| `...routes-database.security.oauth2.resourceserver.jwt.audiences` | `[]` | Audiences a token of that issuer must carry one of; empty accepts any token of the issuer |
 
 Whatever `access` is set to, **the database keeps feeding the gateway its routes**. It governs
 what is published over HTTP, not where the routes come from.
@@ -69,19 +83,37 @@ menu; without it, this plugin exposes its REST API alone.
 
 Reaching this API, or that page, reconfigures the routing table. When Spring Security is
 active, the plugin contributes its own `SecurityWebFilterChain` asking for an authenticated
-principal on its API — HTTP Basic against whatever user directory the application declared,
-and Bearer tokens when it configured an issuer. CSRF is off on that chain, since everything it
-matches is called with a token and a JSON body by a client holding no session.
+principal on its API. CSRF is off on that chain, since everything it matches is called with a
+token and a JSON body by a client holding no session. Two credentials pass:
 
-Two conditions keep this plugin from making a gateway *less* safe by being added to it:
+| Credential | Validated against |
+| --- | --- |
+| HTTP Basic | the local user of the API, `...routes-database.security.user`, held by this chain alone; without a password, the user directory of the application: `spring.security.user`, or the `ReactiveUserDetailsService` it declares |
+| Bearer token | `...routes-database.security.oauth2.resourceserver.jwt.issuer-uri`, with `...audiences` when the token must have been issued for this gateway; unset, the `ReactiveJwtDecoder` the application declared, if any |
+
+```yaml
+spring.cloud.gateway.server.webflux.routes-database.security:
+  user:
+    name: operator
+    password: "{bcrypt}$2a$10$..."    # a clear-text value is encoded at start-up
+  oauth2.resourceserver.jwt:
+    issuer-uri: https://your-idp.example.com/realms/master
+    audiences: [https://gateway.example.com/api/gateway/routes]
+```
+
+The issuer is asked for its keys on the first token that arrives, never at start-up. Bearer
+needs `spring-security-oauth2-jose` and `spring-security-oauth2-resource-server` on the
+classpath, which this plugin does not bring: without them the chain answers Basic alone. Two
+conditions keep this plugin from making a gateway *less* safe by being added to it:
 
 * **It backs off when no other `SecurityWebFilterChain` exists.** Spring Security serves its
   own "everything authenticated" chain as long as there is none, and that chain already covers
   these paths. Replacing it with one matching route management alone would leave every other
   path unguarded.
-* **It backs off when there is nothing to authenticate against** — no user directory, no
-  authentication manager, no issuer. Such a gateway closes these endpoints with `access`
-  instead.
+* **It backs off when there is nothing to authenticate against** — no local user or issuer
+  above, and no user directory, authentication manager or issuer in the application. A blank
+  value is no value. Such a
+  gateway closes these endpoints with `access` instead.
 
 The chain is ordered at `GatewayDatabaseSecurityAutoConfiguration.ROUTE_MANAGEMENT_CHAIN_ORDER`
 (`Ordered.HIGHEST_PRECEDENCE + 350`), behind the one the console contributes. Two escape
