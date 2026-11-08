@@ -16,14 +16,20 @@
 
 package ch.nexsol.gateway.database.autoconfigure;
 
+import java.util.Base64;
+
 import ch.nexsol.gateway.commons.security.SecuredPaths;
 import ch.nexsol.gateway.database.RouteManagementPaths;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.FilteredClassLoader;
+import org.springframework.boot.test.context.assertj.AssertableReactiveWebApplicationContext;
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
+import org.springframework.boot.webflux.autoconfigure.WebFluxAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
@@ -31,6 +37,7 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,6 +47,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * rather than more.
  */
 class GatewayDatabaseSecurityAutoConfigurationTests {
+
+	private static final String PREFIX = "spring.cloud.gateway.server.webflux.routes-database.security.";
 
 	private final ReactiveWebApplicationContextRunner runner = new ReactiveWebApplicationContextRunner()
 		.withConfiguration(AutoConfigurations.of(GatewayDatabaseSecurityAutoConfiguration.class))
@@ -96,6 +105,69 @@ class GatewayDatabaseSecurityAutoConfigurationTests {
 	}
 
 	@Test
+	void closesTheApiWithItsOwnLocalUserWhenTheApplicationHasNothing() {
+		// The same context as above, given a local user: the door now has a key behind
+		// it, held by this chain alone.
+		standalone().withPropertyValues(PREFIX + "user.password=db-secret").run((context) -> {
+			assertThat(context).hasBean("routeManagementSecurityWebFilterChain");
+			call(context, null).expectStatus().isUnauthorized();
+			call(context, basic("admin", "wrong")).expectStatus().isUnauthorized();
+			// Authenticated, and then nobody answers: the controllers are not in this
+			// context.
+			call(context, basic("admin", "db-secret")).expectStatus().isNotFound();
+		});
+	}
+
+	@Test
+	void localUserTakesThePlaceOfTheUserDirectoryOfTheApplication() {
+		this.runner.withConfiguration(AutoConfigurations.of(WebFluxAutoConfiguration.class))
+			.withPropertyValues(PREFIX + "user.name=operator", PREFIX + "user.password={noop}plain")
+			.run((context) -> {
+				call(context, basic("operator", "plain")).expectStatus().isNotFound();
+				call(context, basic("user", "password")).expectStatus().isUnauthorized();
+			});
+	}
+
+	@Test
+	void closesTheApiWithBasicAloneWithoutTheJwtJars() {
+		// The JOSE and resource server jars are optional: without them the chain still
+		// starts and answers Basic, and a Bearer token is just not a credential.
+		standalone().withClassLoader(new FilteredClassLoader("org.springframework.security.oauth2"))
+			.withPropertyValues(PREFIX + "user.password=db-secret",
+					PREFIX + "oauth2.resourceserver.jwt.issuer-uri=http://localhost:59999/realms/absent")
+			.run((context) -> {
+				assertThat(context).hasNotFailed();
+				assertThat(context).hasBean("routeManagementSecurityWebFilterChain");
+				call(context, null).expectStatus().isUnauthorized();
+				call(context, "Bearer anything").expectStatus().isUnauthorized();
+				call(context, basic("admin", "db-secret")).expectStatus().isNotFound();
+			});
+	}
+
+	@Test
+	void aBlankCredentialIsNoCredential() {
+		// The blank password and issuer of a configuration template must not contribute a
+		// chain nobody can pass.
+		standalone().withPropertyValues(PREFIX + "user.password=", PREFIX + "oauth2.resourceserver.jwt.issuer-uri=")
+			.run((context) -> assertThat(context).doesNotHaveBean("routeManagementSecurityWebFilterChain"));
+	}
+
+	@Test
+	void closesTheApiWithItsOwnIssuerWithoutWaitingOnItAtStartUp() {
+		// The issuer answers nothing: the context still starts, and the first token is
+		// what fails - as the gateway's error, since an unreachable issuer is not the
+		// client's fault. Without a user directory no Basic is offered at all.
+		standalone()
+			.withPropertyValues(PREFIX + "oauth2.resourceserver.jwt.issuer-uri=http://localhost:59999/realms/absent")
+			.run((context) -> {
+				assertThat(context).hasBean("routeManagementSecurityWebFilterChain");
+				call(context, null).expectStatus().isUnauthorized();
+				call(context, "Bearer anything").expectStatus().is5xxServerError();
+				call(context, basic("admin", "anything")).expectStatus().isUnauthorized();
+			});
+	}
+
+	@Test
 	void backsOffWhenThePluginPublishesNothing() {
 		this.runner.withPropertyValues("spring.cloud.gateway.server.webflux.routes-database.access=none")
 			.run((context) -> assertThat(context).doesNotHaveBean("routeManagementSecurityWebFilterChain"));
@@ -112,6 +184,34 @@ class GatewayDatabaseSecurityAutoConfigurationTests {
 	void applicationChainWithTheSameNameWins() {
 		this.runner.withUserConfiguration(NamedApplicationChainConfiguration.class)
 			.run((context) -> assertThat(context.getBeansOfType(SecurityWebFilterChain.class)).hasSize(2));
+	}
+
+	/**
+	 * A gateway with another chain and nothing to authenticate against: the one the
+	 * plugin's own credentials are for.
+	 */
+	private static ReactiveWebApplicationContextRunner standalone() {
+		return new ReactiveWebApplicationContextRunner()
+			.withConfiguration(AutoConfigurations.of(WebFluxAutoConfiguration.class,
+					GatewayDatabaseSecurityAutoConfiguration.class))
+			.withUserConfiguration(RouteApiDeclarationConfiguration.class, WebFluxSecurityConfiguration.class,
+					ApplicationChainConfiguration.class);
+	}
+
+	private static WebTestClient.ResponseSpec call(AssertableReactiveWebApplicationContext context,
+			String authorization) {
+		WebTestClient.RequestHeadersSpec<?> request = WebTestClient.bindToApplicationContext(context)
+			.build()
+			.get()
+			.uri("/api/gateway/routes");
+		if (authorization != null) {
+			request.header(HttpHeaders.AUTHORIZATION, authorization);
+		}
+		return request.exchange();
+	}
+
+	private static String basic(String user, String password) {
+		return "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes());
 	}
 
 	private static boolean matches(SecurityWebFilterChain chain, String path) {

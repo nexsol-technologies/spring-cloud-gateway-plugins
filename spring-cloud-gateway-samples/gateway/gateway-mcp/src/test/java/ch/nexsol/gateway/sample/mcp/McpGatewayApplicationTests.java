@@ -56,9 +56,8 @@ class McpGatewayApplicationTests {
 
 	@Test
 	void refusesAnAnonymousClient() {
-		// The plugin declares /mcp as an API path and the console's chain enforces it: no
-		// principal, no answer — and a 401 rather than the login page, since the client
-		// does not accept HTML.
+		// No console here: the plugin's own chain requires a principal on /mcp and
+		// answers an anonymous client 401.
 		this.webTestClient.post()
 			.uri("/mcp")
 			.contentType(MediaType.APPLICATION_JSON)

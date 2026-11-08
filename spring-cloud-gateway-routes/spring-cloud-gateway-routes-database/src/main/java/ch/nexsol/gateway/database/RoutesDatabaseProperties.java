@@ -16,6 +16,8 @@
 
 package ch.nexsol.gateway.database;
 
+import ch.nexsol.gateway.commons.security.PluginSecurityProperties;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -80,6 +82,14 @@ public class RoutesDatabaseProperties {
 	private boolean securityChainEnabled = true;
 
 	/**
+	 * How that chain authenticates its callers on a gateway without a console: a local
+	 * user over HTTP Basic, an issuer for the Bearer tokens. Unset, the chain
+	 * authenticates against whatever the application declared, and is not contributed
+	 * when the application declared nothing.
+	 */
+	private final PluginSecurityProperties security = new PluginSecurityProperties();
+
+	/**
 	 * Returns whether the plugin is wired at all.
 	 * @return whether the plugin is wired
 	 */
@@ -125,6 +135,14 @@ public class RoutesDatabaseProperties {
 	 */
 	public void setSecurityChainEnabled(boolean securityChainEnabled) {
 		this.securityChainEnabled = securityChainEnabled;
+	}
+
+	/**
+	 * Returns how the chain authenticates its callers on its own.
+	 * @return the credentials of the chain
+	 */
+	public PluginSecurityProperties getSecurity() {
+		return this.security;
 	}
 
 }

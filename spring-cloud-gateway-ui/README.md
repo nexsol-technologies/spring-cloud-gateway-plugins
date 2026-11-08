@@ -750,6 +750,8 @@ What the plugins shipped here declare:
 | `/ui/metrics/local`, `/ui/metrics/local/instance` | metrics-discovery | Open — polled by the sibling instances, same reason | Left to the application |
 | `/ui/routes/db` and its fragments | this console, over routes-database | Write, from a browser | The view is not served at all |
 | `/api/gateway/routes` and the rest of the route API | routes-database | Write, from a client | Closed by the plugin's own chain |
+| `/passive-scan/findings`, `/summary`, `/coverage`, `/routes`, `/export` | pentest-passive | Read | Closed by the plugin's own chain |
+| `/passive-scan/findings/clear` | pentest-passive | Write, from a client | Same |
 
 The chain is ordered ahead of the ones those plugins contribute for themselves, so it answers
 first for the paths it takes over. A gateway assembled without this module keeps whatever each
@@ -815,6 +817,7 @@ All properties are under `spring.cloud.gateway.server.webflux.ui.security`.
 | `...ui.security.required-roles` | `[]` | Roles a principal must hold; empty lets any authenticated principal through |
 | `...ui.security.post-logout-redirect-uri` | `{baseUrl}/ui/login?logout` | Where the provider sends the browser back to after signing it out |
 | `...ui.security.oauth2.resourceserver.jwt.issuer-uri` | — | Issuer whose Bearer tokens the console accepts |
+| `...ui.security.oauth2.resourceserver.jwt.audiences` | `[]` | Audiences a token of that issuer must carry one of; empty accepts any token of the issuer |
 | `...ui.security.spring.security.oauth2.client.use` | `[]` | Registration ids the login page offers, out of the ones the application declared; empty offers all of them |
 | `...ui.security.spring.security.oauth2.client.registration` / `.provider` | — | Client registrations of the console's own, read as the Spring Security keys they spell out; declared, they replace those of the application |
 
@@ -901,6 +904,17 @@ spring.cloud.gateway.server.webflux.ui.security.oauth2.resourceserver.jwt:
 This is deliberately *not* `spring.security.oauth2.resourceserver`. That property holds a
 single issuer for the whole application, and on a gateway it belongs to the traffic being
 routed — setting it would replace the issuer the routes depend on.
+
+A valid token of the issuer is not necessarily one meant for this gateway: `audiences` lists
+what its `aud` must carry one of, and a token the issuer handed out for another service is
+refused. It applies to the issuer named here; a decoder the application declared keeps the
+audiences the application gave it.
+
+```yaml
+spring.cloud.gateway.server.webflux.ui.security.oauth2.resourceserver.jwt:
+  issuer-uri: https://your-idp.example.com/realms/master
+  audiences: [https://gateway.example.com/mcp]
+```
 
 Left unset, the console falls back on whatever `ReactiveJwtDecoder` the application already
 declared. An application configuring **only** the multi-tenant issuers of the
