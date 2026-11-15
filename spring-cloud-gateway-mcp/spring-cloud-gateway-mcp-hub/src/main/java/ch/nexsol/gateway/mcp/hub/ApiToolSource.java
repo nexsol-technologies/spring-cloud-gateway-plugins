@@ -32,4 +32,13 @@ public interface ApiToolSource {
 	 */
 	Mono<List<ApiTool>> load();
 
+	/**
+	 * The tools, read afresh, with what could not be read. A source that cannot tell says
+	 * it read everything, and a tool missing from its answer is removed.
+	 * @return the catalog
+	 */
+	default Mono<ApiCatalog> catalog() {
+		return load().map(ApiCatalog::complete);
+	}
+
 }

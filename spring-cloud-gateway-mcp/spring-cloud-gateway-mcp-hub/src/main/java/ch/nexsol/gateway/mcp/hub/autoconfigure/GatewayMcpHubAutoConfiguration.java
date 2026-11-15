@@ -30,7 +30,9 @@ import io.modelcontextprotocol.server.McpStatelessAsyncServer;
 
 import org.springframework.ai.mcp.server.common.autoconfigure.McpServerAutoConfiguration;
 import org.springframework.ai.mcp.server.common.autoconfigure.McpServerStatelessAutoConfiguration;
+import org.springframework.ai.mcp.server.common.autoconfigure.McpServerStdioDisabledCondition;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -41,6 +43,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.client.loadbalancer.reactive.ReactorLoadBalancerExchangeFilterFunction;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -57,6 +60,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 @ConditionalOnClass({ SpringDocOpenapiRoutes.class, McpStatelessAsyncServer.class })
 @ConditionalOnProperty(name = { "spring.cloud.gateway.server.webflux.mcp.hub.enabled",
 		"spring.cloud.gateway.server.webflux.hub-openapi.enabled" }, havingValue = "true")
+// Spring AI's own test for a server over HTTP: without one there is nothing to bridge to.
+@Conditional(McpServerStdioDisabledCondition.class)
 public class GatewayMcpHubAutoConfiguration {
 
 	@Bean
@@ -74,7 +79,9 @@ public class GatewayMcpHubAutoConfiguration {
 	 * @param loadBalancer the load balancer filter, when the application has one
 	 * @return the client
 	 */
-	@Bean
+	// Out of the injection by type: an application declaring one WebClient must keep
+	// receiving it wherever it asks for a WebClient.
+	@Bean(defaultCandidate = false)
 	@ConditionalOnMissingBean(name = "gatewayMcpHubWebClient")
 	WebClient gatewayMcpHubWebClient(McpHubProperties properties, HubOpenapiProperties hubProperties,
 			ObjectProvider<ReactorLoadBalancerExchangeFilterFunction> loadBalancer) {
@@ -91,14 +98,15 @@ public class GatewayMcpHubAutoConfiguration {
 	@Bean
 	@ConditionalOnMissingBean(ApiToolSource.class)
 	ContractCatalog gatewayMcpHubContractCatalog(ObjectProvider<RouteDefinitionLocator> locators,
-			WebClient gatewayMcpHubWebClient,
+			@Qualifier("gatewayMcpHubWebClient") WebClient gatewayMcpHubWebClient,
 			@Value("${spring.cloud.gateway.server.webflux.hub-openapi.gateway-uri}") URI gatewayUri,
 			McpHubProperties properties) {
 		return new ContractCatalog(locators, gatewayMcpHubWebClient, gatewayUri, properties);
 	}
 
 	@Bean
-	ApiToolInvoker gatewayMcpHubInvoker(WebClient gatewayMcpHubWebClient, McpHubProperties properties) {
+	ApiToolInvoker gatewayMcpHubInvoker(@Qualifier("gatewayMcpHubWebClient") WebClient gatewayMcpHubWebClient,
+			McpHubProperties properties) {
 		return new ApiToolInvoker(gatewayMcpHubWebClient, properties.getTimeout(), properties.isConfirmWrites());
 	}
 

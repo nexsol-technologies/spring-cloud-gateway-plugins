@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
@@ -30,8 +31,9 @@ import org.springframework.util.StringUtils;
  * is served, and the {@code WWW-Authenticate} challenge pointing a client at it.
  * <p>
  * The resource identifier is the URL the clients connect to. Unless the application names
- * it, it is derived from the request: a gateway behind a proxy that rewrites the host
- * either configures {@code server.forward-headers-strategy} or names the resource.
+ * it, it is derived from the request, base path of the application included: a gateway
+ * behind a proxy that rewrites the host or the path either configures
+ * {@code server.forward-headers-strategy} or names the resource.
  */
 public final class ProtectedResource {
 
@@ -91,7 +93,11 @@ public final class ProtectedResource {
 	 * the request
 	 */
 	public String resource(URI request) {
-		return (this.resource != null) ? this.resource : origin(request) + this.endpoint;
+		return resource(request, "");
+	}
+
+	private String resource(URI request, String basePath) {
+		return (this.resource != null) ? this.resource : origin(request) + basePath + this.endpoint;
 	}
 
 	/**
@@ -100,8 +106,15 @@ public final class ProtectedResource {
 	 * @return the URL the challenge names
 	 */
 	public String metadataUrl(URI request) {
-		String origin = (this.resource != null) ? origin(URI.create(this.resource)) : origin(request);
-		return origin + WELL_KNOWN_PATH + path();
+		return metadataUrl(request, "");
+	}
+
+	private String metadataUrl(URI request, String basePath) {
+		// A named resource is published where RFC 9728 puts it, which is for whatever
+		// stands in front of the gateway to route. A derived one is published where the
+		// application serves it, under its base path.
+		String base = (this.resource != null) ? origin(URI.create(this.resource)) : origin(request) + basePath;
+		return base + WELL_KNOWN_PATH + path();
 	}
 
 	/**
@@ -110,8 +123,21 @@ public final class ProtectedResource {
 	 * @return the claims of RFC 9728, in the order they are listed there
 	 */
 	public Map<String, Object> metadata(URI request) {
+		return metadata(request, "");
+	}
+
+	/**
+	 * Returns the metadata document, for an application served under a base path.
+	 * @param request the request being answered
+	 * @return the claims of RFC 9728, in the order they are listed there
+	 */
+	public Map<String, Object> metadata(ServerHttpRequest request) {
+		return metadata(request.getURI(), request.getPath().contextPath().value());
+	}
+
+	private Map<String, Object> metadata(URI request, String basePath) {
 		Map<String, Object> metadata = new LinkedHashMap<>();
-		metadata.put("resource", resource(request));
+		metadata.put("resource", resource(request, basePath));
 		metadata.put("authorization_servers", this.authorizationServers);
 		if (!this.scopes.isEmpty()) {
 			metadata.put("scopes_supported", this.scopes);
@@ -128,7 +154,22 @@ public final class ProtectedResource {
 	 * @return a Bearer challenge naming the metadata URL
 	 */
 	public String challenge(String existing, URI request) {
-		String parameter = RESOURCE_METADATA + "=\"" + metadataUrl(request) + "\"";
+		return challenge(existing, request, "");
+	}
+
+	/**
+	 * Returns the {@code WWW-Authenticate} value of a {@code 401}, for an application
+	 * served under a base path.
+	 * @param existing the value the chain set, or {@code null}
+	 * @param request the request being answered
+	 * @return a Bearer challenge naming the metadata URL
+	 */
+	public String challenge(String existing, ServerHttpRequest request) {
+		return challenge(existing, request.getURI(), request.getPath().contextPath().value());
+	}
+
+	private String challenge(String existing, URI request, String basePath) {
+		String parameter = RESOURCE_METADATA + "=\"" + metadataUrl(request, basePath) + "\"";
 		if (existing == null || !existing.startsWith("Bearer")) {
 			return "Bearer " + parameter;
 		}
@@ -144,7 +185,8 @@ public final class ProtectedResource {
 			return this.endpoint;
 		}
 		String path = URI.create(this.resource).getRawPath();
-		return (path != null) ? path : "";
+		// A resource that is the origin itself has no path, written with a slash or not.
+		return (path != null && !path.equals("/")) ? path : "";
 	}
 
 	private static String origin(URI uri) {

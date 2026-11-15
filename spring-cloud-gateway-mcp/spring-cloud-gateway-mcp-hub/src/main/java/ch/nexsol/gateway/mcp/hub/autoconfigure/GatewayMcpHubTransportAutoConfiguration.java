@@ -21,6 +21,7 @@ import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
 import io.modelcontextprotocol.spec.McpSchema;
 import tools.jackson.databind.json.JsonMapper;
 
+import org.springframework.ai.mcp.server.common.autoconfigure.McpServerStdioDisabledCondition;
 import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerSseProperties;
 import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerStreamableHttpProperties;
 import org.springframework.ai.mcp.server.webflux.autoconfigure.McpServerSseWebFluxAutoConfiguration;
@@ -36,6 +37,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 
 /**
  * Hands the transport of the protocol in force an extractor that carries the caller's
@@ -50,6 +52,10 @@ import org.springframework.context.annotation.Bean;
 @ConditionalOnProperty(name = { "spring.cloud.gateway.server.webflux.mcp.hub.enabled",
 		"spring.cloud.gateway.server.webflux.hub-openapi.enabled" }, havingValue = "true")
 @EnableConfigurationProperties({ McpServerStreamableHttpProperties.class, McpServerSseProperties.class })
+// Spring AI's own test for a server over HTTP, the one its transports are declared under:
+// with the server off, the JSON mapper the transports below are built with does not
+// exist.
+@Conditional(McpServerStdioDisabledCondition.class)
 public class GatewayMcpHubTransportAutoConfiguration {
 
 	@Bean

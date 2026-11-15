@@ -40,13 +40,14 @@ import org.springframework.web.util.UriComponentsBuilder;
 /**
  * Executes a tool call as the HTTP request the operation describes, through the gateway:
  * the call enters the gateway like any other, so its routes, filters, audit and metrics
- * see it. The {@code Authorization} header the MCP client sent is forwarded, so the
- * downstream request is made as the caller, not as the gateway.
+ * see it. The Bearer token the MCP client sent is forwarded, so the downstream request is
+ * made as the caller, not as the gateway.
  */
 public class ApiToolInvoker {
 
 	/**
-	 * The key the transport context carries the caller's {@code Authorization} under.
+	 * The key the transport context carries the caller's Bearer {@code Authorization}
+	 * under.
 	 */
 	public static final String AUTHORIZATION = "authorization";
 

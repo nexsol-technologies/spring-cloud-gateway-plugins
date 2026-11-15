@@ -17,6 +17,7 @@
 package ch.nexsol.gateway.mcp.hub;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -64,6 +65,8 @@ public final class OperationTools {
 
 	private static final Pattern PATH_VARIABLE = Pattern.compile("\\{[^/}]+}");
 
+	private static final Set<String> IGNORED_HEADERS = Set.of("accept", "content-type", "authorization");
+
 	private static final Set<String> KEPT = Set.of("type", "description", "enum", "format", "default", "minimum",
 			"maximum", "minLength", "maxLength", "pattern", "minItems", "maxItems");
 
@@ -104,6 +107,12 @@ public final class OperationTools {
 				: List.<Parameter>of()) {
 			ApiOperation.Location location = location(parameter.getIn());
 			if (location == null || !StringUtils.hasText(parameter.getName())) {
+				continue;
+			}
+			// OpenAPI has a contract's definition of these three ignored. As an argument,
+			// Authorization would also join the caller's own in the request.
+			if (location == ApiOperation.Location.HEADER
+					&& IGNORED_HEADERS.contains(parameter.getName().toLowerCase(Locale.ROOT))) {
 				continue;
 			}
 			locations.put(parameter.getName(), location);
@@ -272,8 +281,11 @@ public final class OperationTools {
 	private static Object plain(Object value) {
 		// Swagger reads every bound as a BigDecimal; a client expects the JSON number.
 		if (value instanceof BigDecimal decimal) {
-			return (decimal.stripTrailingZeros().scale() <= 0) ? (Object) decimal.longValueExact()
-					: (Object) decimal.doubleValue();
+			if (decimal.stripTrailingZeros().scale() > 0) {
+				return decimal.doubleValue();
+			}
+			BigInteger integer = decimal.toBigInteger();
+			return (integer.bitLength() < Long.SIZE) ? (Object) integer.longValue() : (Object) integer;
 		}
 		return value;
 	}

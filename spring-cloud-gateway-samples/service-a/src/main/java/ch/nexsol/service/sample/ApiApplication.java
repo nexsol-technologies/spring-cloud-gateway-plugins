@@ -16,6 +16,8 @@
 
 package ch.nexsol.service.sample;
 
+import java.util.Map;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.extensions.Extension;
 import io.swagger.v3.oas.annotations.extensions.ExtensionProperty;
@@ -25,11 +27,13 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.support.WebExchangeBindException;
@@ -58,6 +62,20 @@ public class ApiApplication {
 				properties = { @ExtensionProperty(name = "role-name", value = "role-value") }) })
 		public ResponseEntity<Void> samples() {
 			return ResponseEntity.ok().build();
+		}
+
+		/**
+		 * Says which credentials the call arrived with, by their scheme alone. The
+		 * gateway-mcp sample calls it as a tool, to show what a service receives of the
+		 * credentials presented to {@code /mcp}.
+		 * @param authorization the {@code Authorization} header, if any
+		 * @return the scheme of the credentials, {@code none} without any
+		 */
+		@GetMapping("/whoami")
+		@Operation(description = "The scheme of the credentials the call arrived with")
+		public Map<String, String> whoami(
+				@RequestHeader(name = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+			return Map.of("authorization", (authorization != null) ? authorization.split(" ", 2)[0] : "none");
 		}
 
 	}

@@ -89,8 +89,11 @@ SecurityWebFilterChain myPluginSecurityWebFilterChain(ServerHttpSecurity http, M
         ObjectProvider<ReactiveAuthenticationManager> authenticationManager, BeanFactory beanFactory) {
     http.securityMatcher(ServerWebExchangeMatchers.pathMatchers(MY_PATHS));
     http.authorizeExchange((spec) -> spec.anyExchange().authenticated());
-    PluginSecurityChain.basic(http, properties.getSecurity().getUser(), userDetailsService, authenticationManager);
-    PluginSecurityChain.bearer(http, properties.getSecurity().getOauth2().getResourceserver().getJwt(), beanFactory);
+    boolean basic = PluginSecurityChain.basic(http, properties.getSecurity().getUser(), userDetailsService,
+            authenticationManager);
+    boolean bearer = PluginSecurityChain.bearer(http, properties.getSecurity().getOauth2().getResourceserver().getJwt(),
+            beanFactory);
+    PluginSecurityChain.requireCredentials(basic, bearer, "spring.cloud.gateway.server.webflux.my-plugin.security");
     return http.build();
 }
 ```
@@ -109,7 +112,12 @@ login and the logout. `PluginSecurityChain.bearer` configures the resource serve
 issuer, else over the decoder the application declared, and says whether it did. It takes
 the bean factory rather than the decoder so that the plugin names no JWT class: a plugin
 declares `spring-security-oauth2-jose` and `spring-security-oauth2-resource-server` as
-optional, and a gateway without them simply accepts no Bearer token on that chain. A clear-text password is encoded at start-up; one already carrying the
+optional, and a gateway without them simply accepts no Bearer token on that chain. Both say
+whether they configured anything, and `PluginSecurityChain.requireCredentials(basic, bearer,
+prefix)` refuses to start a chain that accepts neither: the issuer without the JWT jars, or
+several `ReactiveJwtDecoder` beans with no `@Primary` to choose.
+Left out, such a chain would leave its paths to chains that seldom cover them. A clear-text
+password is encoded at start-up; one already carrying the
 id of its encoder, such as `{bcrypt}...`, is taken as is. The issuer is asked for its keys on
 the first token that arrives, never at start-up, and `AudienceCheckingJwtDecoder` enforces
 the audiences over it. `LocalUserAuthentication` and `IssuerJwtDecoders` are the two helpers

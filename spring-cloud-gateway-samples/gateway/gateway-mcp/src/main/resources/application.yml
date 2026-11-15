@@ -6,9 +6,17 @@ spring.application.name: gateway-mcp
 # anonymous call is answered 401, and a client sends the user below as HTTP Basic. With an
 # issuer under ...mcp.security.oauth2.resourceserver.jwt.issuer-uri the same chain accepts
 # its Bearer tokens, and tells a client without one where to obtain it.
-spring.cloud.gateway.server.webflux.mcp.security.user:
-  name: admin
-  password: admin
+spring.cloud.gateway.server.webflux.mcp.security:
+  user:
+    name: admin
+    password: admin
+    # What the local user holds. ADMIN is the default, spelled out because required-roles
+    # below asks for it.
+    roles: [ADMIN]
+  # Whoever may call /mcp may call every tool it serves, so the chain asks for a role rather
+  # than for any principal: a caller holding none of these is answered 403. For a Bearer
+  # token, roles-claim says where its roles are (realm_access.roles on Keycloak).
+  required-roles: [ADMIN]
 
 spring.cloud.gateway.server.webflux.mcp:
   # Off by default. The Spring AI server follows this switch, and the plugin runs it stateless
@@ -18,7 +26,9 @@ spring.cloud.gateway.server.webflux.mcp:
   enabled: true
   # The bridge: every operation of the contracts the hub below documents becomes a tool,
   # petstore__get_pet_by_id for instance, and calling it is a request through this gateway
-  # carrying the Authorization the MCP client sent. Read-only until write-enabled is set.
+  # carrying the Bearer token the MCP client sent. The Basic credentials of the user above
+  # are those of /mcp and stay here: a service is called anonymously, which the tool
+  # service-a__whoami shows. Read-only until write-enabled is set.
   hub:
     enabled: true
 
@@ -31,6 +41,14 @@ spring.cloud.gateway.server.webflux.routes-openapi:
   - id: petstore
     uri: https://petstore3.swagger.io
     spec-url: https://petstore3.swagger.io/api/v3/openapi.json
+    mode: PER_OPERATION
+  # The sample backend, when it runs on :8080: its operations become service-a__* tools.
+  # /whoami answers the scheme of the credentials it received, and although its contract
+  # declares the Authorization header as a parameter, the tool takes no such argument:
+  # which credentials a call carries is not for a contract to say.
+  - id: service-a
+    uri: http://localhost:8080
+    spec-url: http://localhost:8080/v3/api-docs
     mode: PER_OPERATION
 
 spring.cloud.gateway.server.webflux.hub-openapi:

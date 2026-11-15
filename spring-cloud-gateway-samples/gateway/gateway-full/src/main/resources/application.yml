@@ -206,13 +206,24 @@ spring.cloud.gateway.server.webflux.pentest.passive:
     enabled: true
 
 # The MCP server (spring-cloud-gateway-mcp-server): the routes, the traffic and the findings
-# above, read by an agent through /mcp — what the console shows, as tools. Declared as a
-# secured path, so it sits behind the console's login like the other endpoints.
+# above, read by an agent through /mcp — what the console shows, as tools.
 spring.cloud.gateway.server.webflux.mcp:
   enabled: true
   # The bridge lights up with the hub, under the eureka profile: every operation of every
-  # registered service becomes a tool, called through this gateway as the MCP caller.
+  # registered service becomes a tool, called through this gateway with the Bearer token of
+  # the MCP caller.
   hub.enabled: true
+  # An MCP client signs in on its own: VS Code or Claude Code obtains a token from the
+  # authorization server and presents it, and never goes through the login of the console.
+  # So /mcp gets a chain of its own, which answers ahead of the console's as soon as an
+  # issuer or a local user is named here: the session and the user of the console do not
+  # open /mcp, and required-roles, audiences and roles-claim under this block apply to MCP
+  # alone. Without this block, the console governs /mcp like any of its own endpoints.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${MCP_ISSUER_URI:http://localhost:9090}
 
 spring.cloud.gateway.server.webflux.ui:
   openapi:

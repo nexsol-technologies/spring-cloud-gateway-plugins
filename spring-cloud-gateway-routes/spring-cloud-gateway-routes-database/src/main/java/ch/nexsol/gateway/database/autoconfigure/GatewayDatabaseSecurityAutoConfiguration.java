@@ -121,9 +121,12 @@ public class GatewayDatabaseSecurityAutoConfiguration {
 		http.cors(withDefaults());
 		http.securityMatcher(ServerWebExchangeMatchers.pathMatchers(RouteManagementPaths.API.toArray(String[]::new)));
 		http.authorizeExchange((spec) -> spec.anyExchange().authenticated());
-		PluginSecurityChain.basic(http, properties.getSecurity().getUser(), userDetailsService, authenticationManager);
-		PluginSecurityChain.bearer(http, properties.getSecurity().getOauth2().getResourceserver().getJwt(),
-				beanFactory);
+		boolean basic = PluginSecurityChain.basic(http, properties.getSecurity().getUser(), userDetailsService,
+				authenticationManager);
+		boolean bearer = PluginSecurityChain.bearer(http,
+				properties.getSecurity().getOauth2().getResourceserver().getJwt(), beanFactory);
+		PluginSecurityChain.requireCredentials(basic, bearer,
+				"spring.cloud.gateway.server.webflux.routes-database.security");
 		return http.build();
 	}
 

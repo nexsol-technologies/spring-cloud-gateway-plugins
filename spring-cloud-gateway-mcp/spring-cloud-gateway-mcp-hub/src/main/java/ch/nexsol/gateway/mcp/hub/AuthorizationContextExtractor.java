@@ -25,15 +25,22 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.web.reactive.function.server.ServerRequest;
 
 /**
- * Carries the {@code Authorization} header of the MCP request into the transport context,
- * under the key the invoker reads it from, so a tool call is made as the caller.
+ * Carries the Bearer token of the MCP request into the transport context, under the key
+ * the invoker reads it from, so a tool call is made as the caller.
+ * <p>
+ * Only a Bearer token is carried. Basic credentials are those of the MCP endpoint itself,
+ * its local user or the directory of the gateway: relayed, they would hand that password
+ * to every service a tool reaches.
  */
 public final class AuthorizationContextExtractor implements McpTransportContextExtractor<ServerRequest> {
+
+	private static final String BEARER = "Bearer ";
 
 	@Override
 	public McpTransportContext extract(ServerRequest request) {
 		String authorization = request.headers().firstHeader(HttpHeaders.AUTHORIZATION);
-		return (authorization != null) ? McpTransportContext.create(Map.of(ApiToolInvoker.AUTHORIZATION, authorization))
+		return (authorization != null && authorization.regionMatches(true, 0, BEARER, 0, BEARER.length()))
+				? McpTransportContext.create(Map.of(ApiToolInvoker.AUTHORIZATION, authorization))
 				: McpTransportContext.EMPTY;
 	}
 
