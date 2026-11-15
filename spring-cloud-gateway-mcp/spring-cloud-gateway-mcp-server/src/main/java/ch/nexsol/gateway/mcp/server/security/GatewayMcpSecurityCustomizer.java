@@ -19,9 +19,9 @@ package ch.nexsol.gateway.mcp.server.security;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 
 /**
- * A contribution to the security chain of the MCP endpoint, applied once the chain has
- * declared what it governs. The Bearer support is one, declared only when the classes it
- * needs are on the classpath: the chain itself names none of them.
+ * A contribution of the application to the security chain of the MCP endpoint, applied
+ * last: the chain has by then declared what it governs, whom it lets through and how it
+ * authenticates them, so a contribution may override any of it.
  */
 @FunctionalInterface
 public interface GatewayMcpSecurityCustomizer {

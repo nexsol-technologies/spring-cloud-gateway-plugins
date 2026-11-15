@@ -24,6 +24,7 @@ import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
+import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 
 import static org.springframework.security.config.Customizer.withDefaults;
@@ -65,19 +66,22 @@ public final class PluginSecurityChain {
 	 * @param userDetailsService the user directory of the application, if it declared one
 	 * @param authenticationManager the authentication manager of the application, if it
 	 * declared one
+	 * @return whether the chain accepts HTTP Basic
 	 */
-	public static void basic(ServerHttpSecurity http, PluginSecurityProperties.User user,
+	public static boolean basic(ServerHttpSecurity http, PluginSecurityProperties.User user,
 			ObjectProvider<ReactiveUserDetailsService> userDetailsService,
 			ObjectProvider<ReactiveAuthenticationManager> authenticationManager) {
 		http.csrf(ServerHttpSecurity.CsrfSpec::disable);
 		Optional<ReactiveAuthenticationManager> localUser = LocalUserAuthentication.manager(user);
 		localUser.ifPresent(http::authenticationManager);
-		if (localUser.isPresent() || userDetailsService.getIfAvailable() != null
-				|| authenticationManager.getIfAvailable() != null) {
+		boolean basic = localUser.isPresent() || userDetailsService.getIfAvailable() != null
+				|| authenticationManager.getIfAvailable() != null;
+		if (basic) {
 			http.httpBasic(withDefaults());
 		}
 		http.formLogin(ServerHttpSecurity.FormLoginSpec::disable);
 		http.logout(ServerHttpSecurity.LogoutSpec::disable);
+		return basic;
 	}
 
 	/**
@@ -97,6 +101,28 @@ public final class PluginSecurityChain {
 		}
 		// Resolved here and nowhere above, so that this class links without the JWT jars.
 		return PluginBearerSupport.configure(http, jwt, beanFactory);
+	}
+
+	/**
+	 * Refuses a chain that accepts no credential at all.
+	 * <p>
+	 * {@link ConditionalOnPluginAuthentication} contributes the chain on what the
+	 * configuration names, and two of those names can still leave it with no way through:
+	 * an issuer without the JWT jars to validate its tokens, and several
+	 * {@code ReactiveJwtDecoder} beans with no primary one to choose. Built anyway, the
+	 * chain answers {@code 401} to every caller; left out, the paths fall to the chains
+	 * of the application, which seldom cover them, and are open. Neither is what the
+	 * configuration asked for.
+	 * @param basic whether the chain accepts HTTP Basic, as {@link #basic} answered
+	 * @param bearer whether it accepts Bearer tokens, as {@link #bearer} answered
+	 * @param prefix the prefix the security of the plugin is configured under
+	 * @throws IllegalStateException when the chain accepts neither
+	 */
+	public static void requireCredentials(boolean basic, boolean bearer, String prefix) {
+		Assert.state(basic || bearer, () -> "No credential can pass the security chain configured under " + prefix
+				+ ": set " + prefix + ".user.password; or keep " + prefix + ".oauth2.resourceserver.jwt.issuer-uri "
+				+ "with spring-security-oauth2-resource-server and spring-security-oauth2-jose on the classpath; "
+				+ "or mark @Primary one of the ReactiveJwtDecoder beans of the application");
 	}
 
 }

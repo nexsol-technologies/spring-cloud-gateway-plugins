@@ -18,13 +18,18 @@ package ch.nexsol.gateway.mcp.server.autoconfigure;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import ch.nexsol.gateway.commons.security.ConditionalOnPluginAuthentication;
-import ch.nexsol.gateway.commons.security.IssuerJwtDecoders;
 import ch.nexsol.gateway.commons.security.PluginSecurityChain;
 import ch.nexsol.gateway.mcp.server.GatewayMcpProperties;
 import ch.nexsol.gateway.mcp.server.oauth2.ProtectedResource;
 import ch.nexsol.gateway.mcp.server.security.GatewayMcpSecurityCustomizer;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import org.springframework.ai.mcp.server.common.autoconfigure.McpServerStdioDisabledCondition;
 import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerSseProperties;
@@ -38,16 +43,21 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.ReactiveAuthorizationManager;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
-import org.springframework.security.oauth2.server.resource.web.server.BearerTokenServerAuthenticationEntryPoint;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.authorization.AuthorizationContext;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
+import org.springframework.util.StringUtils;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
 
 /**
  * Auto-configuration securing the MCP endpoint on its own, so that the plugin needs no
@@ -56,11 +66,18 @@ import org.springframework.security.web.server.util.matcher.ServerWebExchangeMat
  * validated against the issuer the plugin is given, else by the decoder the application
  * declared. The metadata of the protected resource, when published, stays open.
  * <p>
- * Ordered after the chain of the console, which governs the same paths when the console
- * is present and therefore answers first: with a console, this chain is never reached;
- * without one, it is the chain. An application replaces it by declaring a bean named
- * {@code gatewayMcpSecurityWebFilterChain}, or turns it off with
+ * An MCP client presents credentials of its own, a token it obtained or a user it was
+ * configured with, and never goes through the login of the console. Given credentials of
+ * its own &mdash; a local user or an issuer under {@code ...mcp.security} &mdash; the
+ * chain therefore answers ahead of the chain of the console, which declares the same
+ * paths. Given none, it stays behind it: with a console, the console governs the
+ * endpoint; without one, this is the chain. An application replaces it by declaring a
+ * bean named {@code gatewayMcpSecurityWebFilterChain}, or turns it off with
  * {@code spring.cloud.gateway.server.webflux.mcp.security-chain-enabled=false}.
+ * <p>
+ * The chain answers ahead of the chains of the application, so a rule the application
+ * wrote for the endpoint in its own chain is no longer reached: what it asked of a caller
+ * there is said here, as {@code security.required-roles}, or the chain is turned off.
  * <p>
  * Two conditions keep the plugin from making a gateway <em>less</em> safe by being added
  * to it:
@@ -94,19 +111,30 @@ import org.springframework.security.web.server.util.matcher.ServerWebExchangeMat
 public class GatewayMcpSecurityAutoConfiguration {
 
 	/**
-	 * Order of the chain, after the console's and the OpenAPI hub's.
+	 * Order of the chain given no credentials of its own, after the console's and the
+	 * OpenAPI hub's.
 	 */
 	public static final int GATEWAY_MCP_CHAIN_ORDER = Ordered.HIGHEST_PRECEDENCE + 450;
 
 	/**
+	 * Order of the chain given credentials of its own, ahead of the console's.
+	 */
+	public static final int GATEWAY_MCP_OWN_CHAIN_ORDER = Ordered.HIGHEST_PRECEDENCE + 250;
+
+	private static final String SECURITY_PREFIX = "spring.cloud.gateway.server.webflux.mcp.security";
+
+	private static final String ROLE_PREFIX = "ROLE_";
+
+	/**
 	 * Builds the chain over the paths of the plugin: the endpoints require a principal,
-	 * the metadata of the protected resource does not.
+	 * holding one of the required roles when some are named, the metadata of the
+	 * protected resource does not.
 	 * @param http the reactive security builder
 	 * @param properties the settings of the plugin
 	 * @param streamable the endpoint of the stateless and streamable protocols
 	 * @param sse the two endpoints of the SSE protocol
 	 * @param resource the protected resource, when its metadata is published
-	 * @param customizers the contributions, the Bearer challenge among them
+	 * @param customizers the contributions of the application
 	 * @param userDetailsService the user directory of the application, if it declared one
 	 * @param authenticationManager the authentication manager of the application, if it
 	 * declared one
@@ -114,10 +142,11 @@ public class GatewayMcpSecurityAutoConfiguration {
 	 * up when the JWT jars are on the classpath
 	 * @return the chain
 	 */
+	// No @Order here: Spring reads the one of the method before asking the bean, and the
+	// order depends on the configuration.
 	@Bean
-	@Order(GATEWAY_MCP_CHAIN_ORDER)
 	@ConditionalOnBean(SecurityWebFilterChain.class)
-	@ConditionalOnPluginAuthentication(prefix = "spring.cloud.gateway.server.webflux.mcp.security")
+	@ConditionalOnPluginAuthentication(prefix = SECURITY_PREFIX)
 	@ConditionalOnMissingBean(name = "gatewayMcpSecurityWebFilterChain")
 	@ConditionalOnProperty(name = "spring.cloud.gateway.server.webflux.mcp.security-chain-enabled",
 			havingValue = "true", matchIfMissing = true)
@@ -126,48 +155,89 @@ public class GatewayMcpSecurityAutoConfiguration {
 			ObjectProvider<ProtectedResource> resource, ObjectProvider<GatewayMcpSecurityCustomizer> customizers,
 			ObjectProvider<ReactiveUserDetailsService> userDetailsService,
 			ObjectProvider<ReactiveAuthenticationManager> authenticationManager, BeanFactory beanFactory) {
-		List<String> endpoints = GatewayMcpAutoConfiguration.endpoints(streamable, sse);
+		List<String> all = new ArrayList<>(GatewayMcpAutoConfiguration.endpoints(streamable, sse));
 		List<String> open = new ArrayList<>();
 		resource.ifAvailable((protectedResource) -> open.addAll(protectedResource.metadataPaths()));
-		List<String> all = new ArrayList<>(open);
-		all.addAll(endpoints);
-		http.securityMatcher(ServerWebExchangeMatchers.pathMatchers(all.toArray(String[]::new)));
+		all.addAll(open);
+		// A path matcher over no path does not build, and the server serves none when the
+		// application kept its HTTP transport out: the chain then governs nothing.
+		http.securityMatcher(all.isEmpty() ? (exchange) -> ServerWebExchangeMatcher.MatchResult.notMatch()
+				: ServerWebExchangeMatchers.pathMatchers(all.toArray(String[]::new)));
+		GatewayMcpProperties.Security security = properties.getSecurity();
 		http.authorizeExchange((spec) -> {
 			if (!open.isEmpty()) {
 				spec.pathMatchers(open.toArray(String[]::new)).permitAll();
 			}
-			spec.anyExchange().authenticated();
+			List<String> roles = security.getRequiredRoles();
+			if (roles.isEmpty()) {
+				spec.anyExchange().authenticated();
+			}
+			else {
+				spec.anyExchange().access(anyRole(roles));
+			}
 		});
-		PluginSecurityChain.basic(http, properties.getSecurity().getUser(), userDetailsService, authenticationManager);
-		PluginSecurityChain.bearer(http, properties.getSecurity().getOauth2().getResourceserver().getJwt(),
+		boolean basic = PluginSecurityChain.basic(http, security.getUser(), userDetailsService, authenticationManager);
+		boolean bearer = PluginSecurityChain.bearer(http, security.getOauth2().getResourceserver().getJwt(),
 				beanFactory);
+		PluginSecurityChain.requireCredentials(basic, bearer, SECURITY_PREFIX);
+		if (bearer) {
+			// Resolved here and nowhere above, so that this class links without the
+			// resource server jar.
+			McpBearerSupport.configure(http, security.getRolesClaim());
+		}
 		customizers.orderedStream().forEach((customizer) -> customizer.customize(http));
-		return http.build();
+		return new OrderedChain(http.build(),
+				ownCredentials(security) ? GATEWAY_MCP_OWN_CHAIN_ORDER : GATEWAY_MCP_CHAIN_ORDER);
+	}
+
+	private static boolean ownCredentials(GatewayMcpProperties.Security security) {
+		return StringUtils.hasText(security.getUser().getPassword())
+				|| StringUtils.hasText(security.getOauth2().getResourceserver().getJwt().getIssuerUri());
 	}
 
 	/**
-	 * The challenge of a {@code 401}, when the resource server classes are present and a
-	 * Bearer token is accepted. Both Basic and Bearer pass; the challenge is the Bearer
-	 * one, which is what an MCP client reads, and the discovery filter adds the metadata
-	 * URL to it. Without a decoder the challenge stays the Basic one.
+	 * Grants a principal holding one of the roles, whatever their case: the roles of a
+	 * token are read upper-cased while those of a user are kept as written, so the same
+	 * role compared as is would pass from one credential and not from the other. The
+	 * {@code ROLE_} prefix is added to what is required and never to what is held: an
+	 * authority without it is not a role.
 	 */
-	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnClass({ ReactiveJwtDecoder.class, BearerTokenServerAuthenticationEntryPoint.class })
-	static class BearerChallengeConfiguration {
+	private static ReactiveAuthorizationManager<AuthorizationContext> anyRole(List<String> roles) {
+		Set<String> wanted = roles.stream()
+			.map((role) -> role.toUpperCase(Locale.ROOT))
+			.map((role) -> role.startsWith(ROLE_PREFIX) ? role : ROLE_PREFIX + role)
+			.collect(Collectors.toSet());
+		return (authentication, context) -> authentication.filter(Authentication::isAuthenticated)
+			.map((principal) -> principal.getAuthorities()
+				.stream()
+				.map(GrantedAuthority::getAuthority)
+				.filter(Objects::nonNull)
+				.anyMatch((held) -> wanted.contains(held.toUpperCase(Locale.ROOT))))
+			.defaultIfEmpty(false)
+			.map(AuthorizationDecision::new);
+	}
 
-		@Bean
-		GatewayMcpSecurityCustomizer gatewayMcpBearerChallengeCustomizer(GatewayMcpProperties properties,
-				ObjectProvider<ReactiveJwtDecoder> applicationDecoder) {
-			boolean bearer = IssuerJwtDecoders
-				.decoder(properties.getSecurity().getOauth2().getResourceserver().getJwt(),
-						applicationDecoder.getIfAvailable())
-				.isPresent();
-			return (http) -> {
-				if (bearer) {
-					http.exceptionHandling((handling) -> handling
-						.authenticationEntryPoint(new BearerTokenServerAuthenticationEntryPoint()));
-				}
-			};
+	/**
+	 * The chain, carrying its order.
+	 *
+	 * @param chain the chain
+	 * @param order its order among the chains of the application
+	 */
+	private record OrderedChain(SecurityWebFilterChain chain, int order) implements SecurityWebFilterChain, Ordered {
+
+		@Override
+		public Mono<Boolean> matches(ServerWebExchange exchange) {
+			return this.chain.matches(exchange);
+		}
+
+		@Override
+		public Flux<WebFilter> getWebFilters() {
+			return this.chain.getWebFilters();
+		}
+
+		@Override
+		public int getOrder() {
+			return this.order;
 		}
 
 	}

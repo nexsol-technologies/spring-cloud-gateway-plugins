@@ -16,14 +16,12 @@
 
 package ch.nexsol.gateway.ui.security;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
+import ch.nexsol.gateway.commons.security.RolesClaim;
+
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 /**
  * Reads the roles an identity provider put in a token, wherever it put them.
@@ -36,8 +34,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
  */
 public final class ClaimRoles {
 
-	private static final String ROLE_PREFIX = "ROLE_";
-
 	private ClaimRoles() {
 	}
 
@@ -49,33 +45,7 @@ public final class ClaimRoles {
 	 * @return the authorities, empty when the path leads to no list of roles
 	 */
 	public static Collection<GrantedAuthority> from(Map<String, Object> claims, String path) {
-		Object value = claims;
-		for (String segment : path.split("\\.")) {
-			if (!(value instanceof Map<?, ?> map)) {
-				return List.of();
-			}
-			value = map.get(segment);
-		}
-		if (!(value instanceof Collection<?> roles)) {
-			return List.of();
-		}
-		Collection<GrantedAuthority> authorities = new ArrayList<>();
-		for (Object role : roles) {
-			if (role instanceof String name && !name.isBlank()) {
-				authorities.add(new SimpleGrantedAuthority(prefixed(name)));
-			}
-		}
-		return authorities;
-	}
-
-	/**
-	 * Authorities are matched on their {@code ROLE_} prefix, and a provider may or may
-	 * not already carry it: prefixing blindly would turn {@code ROLE_ADMIN} into
-	 * {@code ROLE_ROLE_ADMIN}.
-	 */
-	private static String prefixed(String role) {
-		String name = role.toUpperCase(Locale.ROOT);
-		return name.startsWith(ROLE_PREFIX) ? name : ROLE_PREFIX + name;
+		return RolesClaim.authorities(claims, path);
 	}
 
 }

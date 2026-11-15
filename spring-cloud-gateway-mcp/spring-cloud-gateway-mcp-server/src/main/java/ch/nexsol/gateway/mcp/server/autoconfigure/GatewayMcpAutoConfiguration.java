@@ -206,7 +206,7 @@ public class GatewayMcpAutoConfiguration {
 				.forEach((path) -> routes.GET(path,
 						(request) -> ServerResponse.ok()
 							.contentType(MediaType.APPLICATION_JSON)
-							.bodyValue(resource.metadata(request.uri()))));
+							.bodyValue(resource.metadata(request.exchange().getRequest()))));
 			return routes.build();
 		}
 

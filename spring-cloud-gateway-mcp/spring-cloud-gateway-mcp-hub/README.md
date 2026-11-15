@@ -5,7 +5,7 @@ Serves the APIs behind the gateway as MCP tools. Every operation of every contra
 the same `/mcp` endpoint as the [server](../spring-cloud-gateway-mcp-server/README.md)'s own,
 named after its service, and a call of it is an HTTP request **through the gateway**: the
 routes, filters, audit, metrics and passive analysis see it as any other request, and it is
-made with the `Authorization` the MCP client sent, so the service answers the caller, not the
+made with the Bearer token the MCP client sent, so the service answers the caller, not the
 gateway.
 
 ## Install
@@ -50,19 +50,24 @@ spring.cloud.gateway.server.webflux:
 | `...mcp.hub.concurrency` | `4` | Contracts read at the same time when the catalog refreshes |
 
 The bridge works over whichever server Spring AI runs — stateless by default, streamable or
-SSE when `spring.ai.mcp.server.protocol` says so — and forwards the caller's `Authorization`
-under each.
+SSE when `spring.ai.mcp.server.protocol` says so — and forwards the caller's Bearer token
+under each. With the server off (`...mcp.enabled=false`), the bridge registers nothing.
 
 ## The tools
 
 The catalog follows the hub: each time the gateway rebuilds its route table, the contracts of
 the documented services are read again and the tools added, removed or replaced accordingly.
+A service whose contract cannot be read keeps its tools until it answers again; the tools the
+other services dropped are removed on the same pass. While a route source cannot be read, no
+tool is removed, since the services it documents are not known. A source of tools of the
+application's own, an `ApiToolSource` bean, overrides `catalog()` to say what it could not
+read; one that only implements `load()` is taken to have read everything.
 
 | | |
 | --- | --- |
 | Name | `<service>__<operationId>` in snake case — `service-a__get_book_by_id`; without an `operationId`, the method and the path |
 | Title, description | The `summary` and `description` of the operation, then `[GET /books/{id} of service-a]` |
-| Arguments | One per parameter, named as in the contract, wherever it goes (path, query, header, cookie); the request body as `body`. The JSON Schema is rebuilt from the contract with the keywords a client needs to build a call |
+| Arguments | One per parameter, named as in the contract, wherever it goes (path, query, header, cookie) — except the `Accept`, `Content-Type` and `Authorization` headers, which a contract has no say over; the request body as `body`. The JSON Schema is rebuilt from the contract with the keywords a client needs to build a call |
 | Hints | `readOnlyHint` for `GET`/`HEAD`, `destructiveHint` for `DELETE`, `idempotentHint` for `GET`, `PUT` and `DELETE` |
 | Result | The body of the response; `HTTP <status>` and the body, as an error result, from `400` up |
 | Confirmation | With `confirm-writes` on, an operation that changes state called without `confirm: true` answers what it would send and sends nothing — a confirmation step, not an access control |
@@ -73,9 +78,11 @@ contract answer it.
 
 ## Securing the endpoint
 
-The tools make requests **as the MCP caller**: the `Authorization` header of the call to `/mcp`
-is forwarded unchanged, so what the caller may do downstream is what its token allows, under
-the gateway's own `AuthorizationToken` and security chains. `/mcp` itself is declared as an
+The tools make requests **as the MCP caller**: the Bearer token of the call to `/mcp` is
+forwarded unchanged, so what the caller may do downstream is what its token allows, under
+the gateway's own `AuthorizationToken` and security chains. Basic credentials are not
+forwarded: they are those of `/mcp` itself, and a caller presenting them reaches the services
+anonymously. `/mcp` itself is declared as an
 API path by the server plugin; see [its README](../spring-cloud-gateway-mcp-server/README.md#securing-the-endpoint).
 
 ## Sample

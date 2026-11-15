@@ -29,6 +29,8 @@ spring.cloud.gateway.server.webflux.mcp:
     user:                  # the local user accepted over HTTP Basic; no password, no local user
       name: admin
       password:
+    required-roles: []     # roles a caller must hold one of; empty: any authenticated caller
+    roles-claim:           # where a Bearer token carries its roles, e.g. realm_access.roles
     oauth2:
       resourceserver.jwt:
         issuer-uri:        # issuer of the Bearer tokens the endpoint accepts
@@ -46,10 +48,12 @@ spring.cloud.gateway.server.webflux.mcp:
 | `...mcp.security.user.name` | `admin` | Name of the local user |
 | `...mcp.security.user.password` | — | Password of the local user; unset, no local user is declared and Basic is checked against the user directory of the application |
 | `...mcp.security.user.roles` | `[ADMIN]` | Roles the local user holds |
+| `...mcp.security.required-roles` | `[]` | Roles a caller must hold one of, in any case, with or without their `ROLE_` prefix; empty accepts any authenticated caller |
+| `...mcp.security.roles-claim` | — | Claim of a Bearer token its roles are read from, as a dotted path (`realm_access.roles`); unset, a token carries its scopes and no role |
 | `...mcp.security.oauth2.resourceserver.jwt.issuer-uri` | — | Issuer whose Bearer tokens the endpoint accepts; unset, the decoder the application declared |
 | `...mcp.security.oauth2.resourceserver.jwt.audiences` | `[]` | Audiences a token of that issuer must carry one of; empty accepts any token of the issuer |
 | `...mcp.security.oauth2.authorization-servers` | `[]` | Issuers published to a client without a token; empty publishes the issuer above, else the console's, else `spring.security.oauth2.resourceserver.jwt.issuer-uri`, and with none nothing is published |
-| `...mcp.security.oauth2.resource` | — | The URL of the endpoint as the clients reach it; unset, it is derived from each request |
+| `...mcp.security.oauth2.resource` | — | The URL of the endpoint as the clients reach it; unset, it is derived from each request, `spring.webflux.base-path` included |
 | `...mcp.security.oauth2.scopes` | `[]` | Scopes a client may ask for, published as `scopes_supported` |
 
 The server itself is Spring AI's, configured under `spring.ai.mcp.server`. The plugin gives
@@ -135,11 +139,29 @@ spring.cloud.gateway.server.webflux.mcp.security:
     audiences: [https://gateway.example.com/mcp]
 ```
 
-The issuer is asked for its keys on the first token that arrives, never at start-up. The chain
-covers the endpoints of the protocol in force and the metadata of
+The issuer is asked for its keys on the first token that arrives, never at start-up. A Bearer
+token needs `spring-security-oauth2-resource-server` and `spring-security-oauth2-jose` on the
+classpath: without them the chain answers Basic alone, and does not start when the issuer was
+all it had to authenticate against. The
+chain covers the endpoints of the protocol in force and the metadata of
 [OAuth discovery](#oauth-discovery), which stays open; everything else is left to the chains of
 the application. `...mcp.security-chain-enabled=false` turns it off, and a bean named
 `gatewayMcpSecurityWebFilterChain` replaces it.
+
+The chain answers ahead of the chains of the application: a rule the application wrote for
+`/mcp` in a chain of its own is no longer reached. Whoever may call `/mcp` may call every tool
+it serves, the ones that change the gateway included, so say here which callers those are:
+
+```yaml
+spring.cloud.gateway.server.webflux.mcp.security:
+  required-roles: [GATEWAY_ADMIN]
+  roles-claim: realm_access.roles   # a Bearer token; a Basic user holds the roles of its directory
+  user:
+    password: "{bcrypt}$2a$10$..."
+    roles: [GATEWAY_ADMIN]          # the local user holds ADMIN unless told otherwise
+```
+
+A caller holding none of them is answered `403`.
 
 Two conditions keep this plugin from making a gateway *less* safe by being added to it:
 
@@ -149,15 +171,28 @@ Two conditions keep this plugin from making a gateway *less* safe by being added
   A gateway relying on that default keeps it, with its user; the local user above applies once
   the application declares a chain of its own.
 * **It backs off when there is nothing to authenticate against** — no local user or issuer
-  above, and no user directory, authentication manager or issuer in the application. A blank
+  above, and no user directory, authentication manager or decoder in the application. A blank
   value is no value.
 
-With the [console](../../spring-cloud-gateway-ui/README.md) present, its chain governs `/mcp`
-instead, ordered ahead of this one: the endpoint follows
-[the mode of the console](../../spring-cloud-gateway-ui/README.md#the-endpoints-of-the-other-plugins),
-and a Bearer token is the console's
-[issuer](../../spring-cloud-gateway-ui/README.md#a-bearer-token). Without Spring Security at
-all, nothing secures the endpoint: do not enable the plugin on anything reachable.
+What is named can still leave the chain with no way through: an issuer without the JWT jars,
+or several `ReactiveJwtDecoder` beans with no `@Primary` among them, which the chain cannot
+choose between. With nothing else to authenticate against, the gateway does not start and says
+what to fix, rather than answer `401` to everyone or leave `/mcp` to chains that do not cover
+it. With a local user as well, it starts and accepts Basic alone.
+
+### With the console
+
+An MCP client presents credentials of its own — a token it obtained, a user it was configured
+with — and never goes through the login of the [console](../../spring-cloud-gateway-ui/README.md).
+So on a gateway running both, who answers `/mcp` depends on what this plugin is given:
+
+| `...mcp.security` names | Chain answering `/mcp` | What applies |
+| --- | --- | --- |
+| a local user (`user.password`) or an issuer (`...jwt.issuer-uri`) | the plugin's, ahead of the console's | everything under `...mcp.security`: its user, its issuer and audiences, `required-roles`, `roles-claim`. The session and the user of the console do not open `/mcp` |
+| neither | the console's | [the mode of the console](../../spring-cloud-gateway-ui/README.md#the-endpoints-of-the-other-plugins), its user, its [issuer](../../spring-cloud-gateway-ui/README.md#a-bearer-token) and its `required-roles`; `...mcp.security.required-roles` and `roles-claim` are not read |
+
+Without Spring Security at all, nothing secures the endpoint: do not enable the plugin on
+anything reachable.
 
 ## OAuth discovery
 
@@ -166,12 +201,20 @@ the ones named under `...mcp.security.oauth2.authorization-servers` — a client
 where to obtain one, the way the MCP specification says:
 
 1. The `401` of `/mcp` carries `WWW-Authenticate: Bearer resource_metadata="https://<gateway>/.well-known/oauth-protected-resource/mcp"`.
+   A chain that challenged for Basic keeps that challenge, after the Bearer one.
 2. That document (RFC 9728) names the `resource` a token must be issued for, the
    `authorization_servers`, and the `scopes_supported` when scopes are configured. It is
    served open, at the root well-known path as well, and the chain answering the `401` is
    whichever governs `/mcp`.
 3. The client reads the issuer's configuration, opens the browser on its login (PKCE, a
    redirect to a port of its own), and from then on sends and renews the token itself.
+
+Under `spring.webflux.base-path`, the `resource` and the URL of the document are derived with
+it: `https://<gateway>/<base-path>/mcp` and
+`https://<gateway>/<base-path>/.well-known/oauth-protected-resource/mcp`. A `resource` named
+under `...mcp.security.oauth2.resource` is published at the place RFC 9728 gives it, the
+well-known path inserted between its host and its path, which is for whatever stands in front
+of the gateway to route.
 
 The token is validated by the chain governing `/mcp`: the plugin's, under
 `...mcp.security.oauth2.resourceserver.jwt.issuer-uri` plus `...audiences`, or the console's under

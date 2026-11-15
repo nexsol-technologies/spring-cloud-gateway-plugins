@@ -19,6 +19,9 @@ package ch.nexsol.gateway.mcp.hub;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import ch.nexsol.gateway.commons.routes.RouteDefinitionSources;
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
@@ -76,20 +79,32 @@ public class ContractCatalog implements ApiToolSource {
 
 	@Override
 	public Mono<List<ApiTool>> load() {
-		return Flux.fromIterable(RouteDefinitionSources.sources(this.locators))
-			.flatMap((locator) -> RouteDefinitionSources.read(locator, SOURCE_TIMEOUT).onErrorResume((ex) -> {
-				LOG.warn("Route definition source {} could not be read", RouteDefinitionSources.name(locator), ex);
-				return Mono.just(List.of());
-			}))
-			.flatMapIterable((definitions) -> definitions)
-			.mapNotNull((definition) -> service(definition, this.gatewayUri))
-			.flatMap((service) -> tools(service).onErrorResume((ex) -> {
-				LOG.warn("The contract of {} could not be read from {}: {}", service.name(), service.contractUrl(),
-						ex.getMessage());
-				return Mono.just(List.<ApiTool>of());
-			}), this.properties.getConcurrency())
-			.flatMapIterable((tools) -> tools)
-			.collectList();
+		return catalog().map(ApiCatalog::tools);
+	}
+
+	@Override
+	public Mono<ApiCatalog> catalog() {
+		return Mono.defer(() -> {
+			AtomicBoolean sourcesRead = new AtomicBoolean(true);
+			Set<String> unread = ConcurrentHashMap.newKeySet();
+			return Flux.fromIterable(RouteDefinitionSources.sources(this.locators))
+				.flatMap((locator) -> RouteDefinitionSources.read(locator, SOURCE_TIMEOUT).onErrorResume((ex) -> {
+					LOG.warn("Route definition source {} could not be read", RouteDefinitionSources.name(locator), ex);
+					sourcesRead.set(false);
+					return Mono.just(List.of());
+				}))
+				.flatMapIterable((definitions) -> definitions)
+				.mapNotNull((definition) -> service(definition, this.gatewayUri))
+				.flatMap((service) -> tools(service).onErrorResume((ex) -> {
+					LOG.warn("The contract of {} could not be read from {}: {}", service.name(), service.contractUrl(),
+							ex.getMessage());
+					unread.add(service.name());
+					return Mono.just(List.<ApiTool>of());
+				}), this.properties.getConcurrency())
+				.flatMapIterable((tools) -> tools)
+				.collectList()
+				.map((tools) -> new ApiCatalog(tools, unread, sourcesRead.get()));
+		});
 	}
 
 	private Mono<List<ApiTool>> tools(DocumentedService service) {

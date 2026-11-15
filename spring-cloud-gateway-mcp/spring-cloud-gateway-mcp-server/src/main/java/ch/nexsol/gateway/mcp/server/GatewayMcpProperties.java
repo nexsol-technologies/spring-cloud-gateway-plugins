@@ -80,10 +80,38 @@ public class GatewayMcpProperties {
 
 		private final PluginSecurityProperties.User user = new PluginSecurityProperties.User();
 
+		/**
+		 * The roles a caller must hold one of, without their {@code ROLE_} prefix. Empty,
+		 * any authenticated caller is accepted.
+		 */
+		private List<String> requiredRoles = new ArrayList<>();
+
+		/**
+		 * The claim of a Bearer token its roles are read from, as a dotted path such as
+		 * {@code realm_access.roles}. Unset, a token carries its scopes and no role.
+		 */
+		private String rolesClaim;
+
 		private final OAuth2 oauth2 = new OAuth2();
 
 		public PluginSecurityProperties.User getUser() {
 			return this.user;
+		}
+
+		public List<String> getRequiredRoles() {
+			return this.requiredRoles;
+		}
+
+		public void setRequiredRoles(List<String> requiredRoles) {
+			this.requiredRoles = requiredRoles;
+		}
+
+		public String getRolesClaim() {
+			return this.rolesClaim;
+		}
+
+		public void setRolesClaim(String rolesClaim) {
+			this.rolesClaim = rolesClaim;
 		}
 
 		public OAuth2 getOauth2() {

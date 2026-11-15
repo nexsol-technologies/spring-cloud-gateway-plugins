@@ -18,7 +18,6 @@ package ch.nexsol.gateway.mcp.hub;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,6 +47,11 @@ import org.springframework.context.event.EventListener;
  * rebuilt its route table, the catalog is read again and the server gains the tools that
  * appeared, loses those that went, and has those that changed replaced. The syncs run one
  * at a time, in order, whatever the pace of the refreshes.
+ * <p>
+ * A tool missing from the catalog is only removed once its service answered: one whose
+ * contract could not be read has not lost its operations, and its tools would otherwise
+ * be gone until the next rebuild of the route table. A route source that could not be
+ * read leaves every tool in place, since the services it documents are not known.
  */
 public class HubToolRegistrar implements DisposableBean {
 
@@ -59,7 +63,7 @@ public class HubToolRegistrar implements DisposableBean {
 
 	private final ToolRegistry registry;
 
-	private final Map<String, Tool> registered = new ConcurrentHashMap<>();
+	private final Map<String, ApiTool> registered = new ConcurrentHashMap<>();
 
 	private final Sinks.Many<Boolean> refreshes = Sinks.many().unicast().onBackpressureBuffer();
 
@@ -88,7 +92,7 @@ public class HubToolRegistrar implements DisposableBean {
 	 * @return completion of the sync
 	 */
 	public Mono<Void> sync() {
-		return this.source.load().flatMap(this::apply);
+		return this.source.catalog().flatMap(this::apply);
 	}
 
 	/**
@@ -99,18 +103,24 @@ public class HubToolRegistrar implements DisposableBean {
 		return Set.copyOf(this.registered.keySet());
 	}
 
-	private Mono<Void> apply(List<ApiTool> tools) {
+	private Mono<Void> apply(ApiCatalog catalog) {
 		Map<String, ApiTool> wanted = new LinkedHashMap<>();
-		tools.forEach((tool) -> wanted.put(tool.tool().name(), tool));
-		Set<String> gone = new LinkedHashSet<>(this.registered.keySet());
-		gone.removeAll(wanted.keySet());
+		catalog.tools().forEach((tool) -> wanted.put(tool.tool().name(), tool));
+		Set<String> gone = new LinkedHashSet<>();
+		this.registered.forEach((name, tool) -> {
+			if (!wanted.containsKey(name) && !catalog.mayStillServe(tool)) {
+				gone.add(name);
+			}
+		});
 		Flux<Void> removals = Flux.fromIterable(gone)
 			.concatMap((name) -> this.registry.remove(name).doOnSuccess((v) -> this.registered.remove(name)));
+		// The operation is compared with the tool: a service served under another prefix
+		// keeps its schema and changes the URL its calls are sent to.
 		Flux<Void> additions = Flux.fromIterable(wanted.values())
-			.filter((tool) -> !tool.tool().equals(this.registered.get(tool.tool().name())))
+			.filter((tool) -> !tool.equals(this.registered.get(tool.tool().name())))
 			.concatMap(this::replace);
 		return removals.thenMany(additions).then().doOnSuccess((v) -> {
-			if (!gone.isEmpty() || !tools.isEmpty()) {
+			if (!gone.isEmpty() || !wanted.isEmpty()) {
 				LOG.info("The MCP server serves {} tool(s) of the OpenAPI hub", this.registered.size());
 			}
 		});
@@ -122,7 +132,7 @@ public class HubToolRegistrar implements DisposableBean {
 		return removal
 			.then(this.registry.add(tool.tool(),
 					(context, request) -> this.invoker.call(tool.operation(), request.arguments(), context)))
-			.doOnSuccess((v) -> this.registered.put(name, tool.tool()))
+			.doOnSuccess((v) -> this.registered.put(name, tool))
 			.onErrorResume((ex) -> {
 				LOG.warn("The tool {} could not be registered: {}", name, ex.getMessage());
 				return Mono.empty();

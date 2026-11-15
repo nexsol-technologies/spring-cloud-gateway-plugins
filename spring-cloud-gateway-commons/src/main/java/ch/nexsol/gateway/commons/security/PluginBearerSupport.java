@@ -34,7 +34,7 @@ final class PluginBearerSupport {
 
 	static boolean configure(ServerHttpSecurity http, PluginSecurityProperties.Jwt jwt, BeanFactory beanFactory) {
 		Optional<ReactiveJwtDecoder> decoder = IssuerJwtDecoders.decoder(jwt,
-				beanFactory.getBeanProvider(ReactiveJwtDecoder.class).getIfAvailable());
+				beanFactory.getBeanProvider(ReactiveJwtDecoder.class).getIfUnique());
 		decoder.ifPresent(
 				(resolved) -> http.oauth2ResourceServer((oauth2) -> oauth2.jwt((spec) -> spec.jwtDecoder(resolved))));
 		return decoder.isPresent();

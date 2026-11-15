@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.mcp.server.oauth2;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -68,8 +69,17 @@ public final class BearerChallengeWebFilter implements WebFilter, Ordered {
 		response.beforeCommit(() -> Mono.fromRunnable(() -> {
 			if (HttpStatus.UNAUTHORIZED.equals(response.getStatusCode())) {
 				HttpHeaders headers = response.getHeaders();
-				headers.set(HttpHeaders.WWW_AUTHENTICATE, this.resource
-					.challenge(headers.getFirst(HttpHeaders.WWW_AUTHENTICATE), exchange.getRequest().getURI()));
+				List<String> existing = headers.getOrEmpty(HttpHeaders.WWW_AUTHENTICATE);
+				String first = existing.isEmpty() ? null : existing.get(0);
+				List<String> challenges = new ArrayList<>();
+				challenges.add(this.resource.challenge(first, exchange.getRequest()));
+				// The other challenges of the chain stay, behind the Bearer one:
+				// an MCP client reads the header as one value, and must find
+				// the Bearer scheme first.
+				existing.stream()
+					.filter((challenge) -> !challenge.trim().startsWith("Bearer"))
+					.forEach(challenges::add);
+				headers.put(HttpHeaders.WWW_AUTHENTICATE, challenges);
 			}
 		}));
 		return chain.filter(exchange);

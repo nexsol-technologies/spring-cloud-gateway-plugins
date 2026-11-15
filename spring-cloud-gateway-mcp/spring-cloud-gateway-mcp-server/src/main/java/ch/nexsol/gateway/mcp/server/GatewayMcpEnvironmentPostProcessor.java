@@ -50,7 +50,7 @@ public class GatewayMcpEnvironmentPostProcessor implements EnvironmentPostProces
 
 	static final String PROPERTY_SOURCE = "gatewayMcpDefaults";
 
-	static final String INSTRUCTIONS = "Read-only view of a Spring Cloud Gateway: its routes and the source each "
+	static final String INSTRUCTIONS = "A Spring Cloud Gateway: its routes and the source each "
 			+ "came from, the filter and predicate factories available to write one, and, when the plugins are "
 			+ "present, the traffic per route and the OWASP findings observed on the live traffic. "
 			+ "Start with list_routes.";
