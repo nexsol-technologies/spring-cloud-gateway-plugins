@@ -16,6 +16,10 @@
 
 package ch.nexsol.gateway.validation;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 
@@ -55,6 +59,13 @@ public class ValidationMetrics {
 	private final MeterRegistry registry;
 
 	/**
+	 * The counters already looked up, by what they count. Asking the registry for a
+	 * counter builds its tags and its id before finding it, and this runs for every
+	 * message; the keys are as bounded as the tags are.
+	 */
+	private final Map<Object, Counter> counters = new ConcurrentHashMap<>();
+
+	/**
 	 * Creates the meters.
 	 * @param registry the registry the meters are published to, or {@code null} to record
 	 * nothing
@@ -75,9 +86,10 @@ public class ValidationMetrics {
 		if (this.registry == null) {
 			return;
 		}
-		this.registry
-			.counter(VALIDATIONS, Tags.of("direction", direction, "route", routeId, "operation", operation, "mode",
-					mode.name(), "outcome", valid ? "valid" : "invalid"))
+		this.counters
+			.computeIfAbsent(new Validated(direction, routeId, operation, mode, valid),
+					(key) -> this.registry.counter(VALIDATIONS, Tags.of("direction", direction, "route", routeId,
+							"operation", operation, "mode", mode.name(), "outcome", valid ? "valid" : "invalid")))
 			.increment();
 	}
 
@@ -91,9 +103,10 @@ public class ValidationMetrics {
 		if (this.registry == null) {
 			return;
 		}
-		this.registry
-			.counter(BODIES_SKIPPED,
-					Tags.of("direction", direction, "route", routeId, "reason", reason.name().toLowerCase()))
+		this.counters
+			.computeIfAbsent(new Skipped(direction, routeId, reason),
+					(key) -> this.registry.counter(BODIES_SKIPPED,
+							Tags.of("direction", direction, "route", routeId, "reason", reason.name().toLowerCase())))
 			.increment();
 	}
 
@@ -105,7 +118,18 @@ public class ValidationMetrics {
 		if (this.registry == null) {
 			return;
 		}
-		this.registry.counter(CONTRACTS_UNAVAILABLE, Tags.of("contract", location)).increment();
+		this.counters
+			.computeIfAbsent(location,
+					(key) -> this.registry.counter(CONTRACTS_UNAVAILABLE, Tags.of("contract", location)))
+			.increment();
+	}
+
+	private record Validated(String direction, String routeId, String operation, ValidationMode mode, boolean valid) {
+
+	}
+
+	private record Skipped(String direction, String routeId, SkipReason reason) {
+
 	}
 
 	/**

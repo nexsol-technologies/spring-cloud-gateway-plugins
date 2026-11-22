@@ -95,6 +95,14 @@ public class HubOpenapiProperties {
 		 */
 		private Duration cacheTtl = Duration.ofMinutes(5);
 
+		/**
+		 * How long a service that could not be reached is left alone before it is probed
+		 * again: probed on every refresh, each service that stays unreachable costs every
+		 * refresh a full timeout. It appears that much later once it is back; zero probes
+		 * it on every refresh.
+		 */
+		private Duration failureCacheTtl = Duration.ofSeconds(30);
+
 		public Duration getTimeout() {
 			return this.timeout;
 		}
@@ -125,6 +133,14 @@ public class HubOpenapiProperties {
 
 		public void setCacheTtl(Duration cacheTtl) {
 			this.cacheTtl = cacheTtl;
+		}
+
+		public Duration getFailureCacheTtl() {
+			return this.failureCacheTtl;
+		}
+
+		public void setFailureCacheTtl(Duration failureCacheTtl) {
+			this.failureCacheTtl = failureCacheTtl;
 		}
 
 	}

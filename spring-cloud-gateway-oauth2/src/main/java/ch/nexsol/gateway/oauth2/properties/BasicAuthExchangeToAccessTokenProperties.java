@@ -17,6 +17,7 @@
 package ch.nexsol.gateway.oauth2.properties;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,6 +53,8 @@ public class BasicAuthExchangeToAccessTokenProperties {
 	private boolean credentialsInQueryParam;
 
 	private String credentialsQueryParamName = "_auth";
+
+	private Duration tokenTimeout = Duration.ofSeconds(10);
 
 	/**
 	 * Whether the given user (client id) has a configured token endpoint, under either
@@ -181,6 +184,24 @@ public class BasicAuthExchangeToAccessTokenProperties {
 	 */
 	public void setCredentialsQueryParamName(String credentialsQueryParamName) {
 		this.credentialsQueryParamName = credentialsQueryParamName;
+	}
+
+	/**
+	 * How long the token endpoint is given to answer, retries included, before the
+	 * exchange is refused. A request waiting for a token holds its connection, so the
+	 * wait has to end.
+	 * @return the time the token endpoint is given
+	 */
+	public Duration getTokenTimeout() {
+		return this.tokenTimeout;
+	}
+
+	/**
+	 * Set how long the token endpoint is given to answer.
+	 * @param tokenTimeout the time the token endpoint is given
+	 */
+	public void setTokenTimeout(Duration tokenTimeout) {
+		this.tokenTimeout = tokenTimeout;
 	}
 
 	/**

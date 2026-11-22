@@ -18,7 +18,11 @@ package ch.nexsol.gateway.servicegraph;
 
 import java.net.URI;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+import ch.nexsol.gateway.commons.ExchangeStatus;
+import ch.nexsol.gateway.commons.routes.RouteExclusions;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,11 +82,17 @@ public class ServiceGraphFilter implements GlobalFilter, Ordered {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ServiceGraphFilter.class);
 
+	private static final int MAX_KNOWN_EDGES = 10_000;
+
 	private final ObjectProvider<MeterRegistry> meterRegistry;
 
 	private final CallerResolver callerResolver;
 
 	private final RouteExclusions excludedRoutes;
+
+	private final Map<Edge, Counter> counters = new ConcurrentHashMap<>();
+
+	private volatile MeterRegistry registry;
 
 	/**
 	 * Creates the filter.
@@ -95,7 +105,7 @@ public class ServiceGraphFilter implements GlobalFilter, Ordered {
 			ServiceGraphProperties properties) {
 		this.meterRegistry = meterRegistry;
 		this.callerResolver = callerResolver;
-		this.excludedRoutes = new RouteExclusions(properties.getExcludedRoutes());
+		this.excludedRoutes = new RouteExclusions("service graph", properties.getExcludedRoutes());
 	}
 
 	/**
@@ -114,7 +124,9 @@ public class ServiceGraphFilter implements GlobalFilter, Ordered {
 		// A call that failed is still a call: an upstream that refused the connection or
 		// timed out is exactly the edge worth seeing, so it is counted before the failure
 		// is propagated.
-		return chain.filter(exchange).then(count(exchange)).onErrorResume((ex) -> count(exchange).then(Mono.error(ex)));
+		return chain.filter(exchange)
+			.then(count(exchange, null))
+			.onErrorResume((ex) -> count(exchange, ex).then(Mono.error(ex)));
 	}
 
 	/*
@@ -124,9 +136,9 @@ public class ServiceGraphFilter implements GlobalFilter, Ordered {
 	 * before anything wrote to it, which is 200, and every call is then counted as a
 	 * success whatever it answered.
 	 */
-	private Mono<Void> count(ServerWebExchange exchange) {
+	private Mono<Void> count(ServerWebExchange exchange, Throwable failure) {
 		return Mono.defer(() -> {
-			MeterRegistry registry = this.meterRegistry.getIfAvailable();
+			MeterRegistry registry = registry();
 			Route route = exchange.getAttribute(GATEWAY_ROUTE_ATTR);
 			// An excluded route is dropped here rather than when the graph is read, so it
 			// never becomes a series at all. A route with no id is excluded by the same
@@ -136,12 +148,9 @@ public class ServiceGraphFilter implements GlobalFilter, Ordered {
 			}
 			String routeId = route.getId();
 			String service = targetService(route);
-			String outcome = outcome(exchange);
+			String outcome = outcome(ExchangeStatus.of(exchange, failure));
 			return this.callerResolver.resolve(exchange)
-				.doOnNext((caller) -> registry
-					.counter(CALLS_METER, CALLER_TAG, caller, SERVICE_TAG, service, ROUTE_TAG, routeId, OUTCOME_TAG,
-							outcome)
-					.increment())
+				.doOnNext((caller) -> counter(registry, new Edge(caller, service, routeId, outcome)).increment())
 				.onErrorResume((ex) -> {
 					// The graph is an observation: losing an edge must never cost the
 					// response the gateway is about to return.
@@ -150,6 +159,36 @@ public class ServiceGraphFilter implements GlobalFilter, Ordered {
 				})
 				.then();
 		});
+	}
+
+	/*
+	 * Kept once found. An ObjectProvider goes back to the bean factory on every call, and
+	 * resolving a dependency there — among the several registries an application usually
+	 * holds — is far too much to pay per request. Looked up again while absent, so a
+	 * registry that is not there for the very first requests is still picked up.
+	 */
+	private MeterRegistry registry() {
+		MeterRegistry resolved = this.registry;
+		if (resolved == null) {
+			resolved = this.meterRegistry.getIfAvailable();
+			this.registry = resolved;
+		}
+		return resolved;
+	}
+
+	private Counter counter(MeterRegistry registry, Edge edge) {
+		Counter counter = this.counters.get(edge);
+		if (counter == null) {
+			// Route ids come and go with the routing table, and an id-less route gets a
+			// new one at each refresh: emptied rather than left to grow with them. The
+			// registry still holds the meters, so nothing is lost but the shortcut.
+			if (this.counters.size() >= MAX_KNOWN_EDGES) {
+				this.counters.clear();
+			}
+			counter = this.counters.computeIfAbsent(edge, (key) -> registry.counter(CALLS_METER, CALLER_TAG,
+					key.caller(), SERVICE_TAG, key.service(), ROUTE_TAG, key.routeId(), OUTCOME_TAG, key.outcome()));
+		}
+		return counter;
 	}
 
 	/**
@@ -180,8 +219,7 @@ public class ServiceGraphFilter implements GlobalFilter, Ordered {
 		return uri.getHost() + ":" + uri.getPort();
 	}
 
-	private static String outcome(ServerWebExchange exchange) {
-		HttpStatusCode status = exchange.getResponse().getStatusCode();
+	private static String outcome(HttpStatusCode status) {
 		if (status == null) {
 			return UNKNOWN_OUTCOME;
 		}
@@ -192,6 +230,9 @@ public class ServiceGraphFilter implements GlobalFilter, Ordered {
 			return CLIENT_ERROR;
 		}
 		return SUCCESS;
+	}
+
+	private record Edge(String caller, String service, String routeId, String outcome) {
 	}
 
 }

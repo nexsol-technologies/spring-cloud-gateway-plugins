@@ -16,11 +16,11 @@
 
 package ch.nexsol.gateway.database.model;
 
-import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
@@ -55,13 +55,13 @@ public record RouteCreateModel(@NotEmpty String routeId, @NotNull URI uri, Integ
 			@NotEmpty List<@NotNull PredicateCreateModel> predicates, List<FilterCreateModel> filters,
 			boolean publicRoute) {
 		this.routeId = routeId;
-		try {
-			// this.uri = new URL(uri.toASCIIString()).toURI();
-			this.uri = new URI(uri.toASCIIString()).toURL().toURI();
+		// Only the scheme is required, never a URL the JDK can open: a route targets
+		// lb://, ws://, wss:// and forward: as well, none of which has a stream handler,
+		// so going through URL would refuse them all.
+		if (uri != null && !uri.isAbsolute()) {
+			throw new UnsupportedOperationException("URI not valid");
 		}
-		catch (MalformedURLException | URISyntaxException ex) {
-			throw new UnsupportedOperationException("URI not valid", ex);
-		}
+		this.uri = (uri != null) ? URI.create(uri.toASCIIString()) : null;
 		this.order = order;
 		this.predicates = predicates;
 		this.filters = filters;
@@ -79,6 +79,29 @@ public record RouteCreateModel(@NotEmpty String routeId, @NotNull URI uri, Integ
 	public RouteCreateModel(String routeId, URI uri, Integer order, List<PredicateCreateModel> predicates,
 			List<FilterCreateModel> filters) {
 		this(routeId, uri, order, predicates, filters, false);
+	}
+
+	/**
+	 * Reads the payload of a request, in which {@code publicRoute} may be left out.
+	 * <p>
+	 * Jackson refuses to map a missing property onto a primitive, so reading through the
+	 * canonical constructor answers {@code 400} to a request that merely leaves the flag
+	 * to its default.
+	 * @param routeId the business route id
+	 * @param uri the target URI
+	 * @param order the resolution order
+	 * @param predicates the predicates to attach
+	 * @param filters the filters to attach
+	 * @param publicRoute whether the route is public, {@code null} standing for
+	 * {@code false}
+	 * @return the creation payload
+	 */
+	@JsonCreator
+	static RouteCreateModel fromJson(@JsonProperty("routeId") String routeId, @JsonProperty("uri") URI uri,
+			@JsonProperty("order") Integer order, @JsonProperty("predicates") List<PredicateCreateModel> predicates,
+			@JsonProperty("filters") List<FilterCreateModel> filters,
+			@JsonProperty("publicRoute") Boolean publicRoute) {
+		return new RouteCreateModel(routeId, uri, order, predicates, filters, Boolean.TRUE.equals(publicRoute));
 	}
 
 }

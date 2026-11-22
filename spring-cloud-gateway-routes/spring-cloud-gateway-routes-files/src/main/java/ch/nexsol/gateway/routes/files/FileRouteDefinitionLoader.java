@@ -87,20 +87,33 @@ public class FileRouteDefinitionLoader {
 	 */
 	public Set<Path> watchableDirectories() {
 		Set<Path> directories = new LinkedHashSet<>();
+		for (Path file : routeFiles()) {
+			Path parent = file.getParent();
+			if (parent != null) {
+				directories.add(parent);
+			}
+		}
+		return directories;
+	}
+
+	/**
+	 * Resolves the route files that live on the file system, the only ones a change can
+	 * be watched on.
+	 * @return the absolute paths of the route files found on the file system
+	 */
+	public Set<Path> routeFiles() {
+		Set<Path> files = new LinkedHashSet<>();
 		for (Resource resource : resolveResources()) {
 			try {
 				if (resource.isFile()) {
-					Path parent = resource.getFile().toPath().toAbsolutePath().getParent();
-					if (parent != null) {
-						directories.add(parent);
-					}
+					files.add(resource.getFile().toPath().toAbsolutePath());
 				}
 			}
 			catch (IOException ex) {
 				LOG.debug("Skipping non-watchable resource {}", resource, ex);
 			}
 		}
-		return directories;
+		return files;
 	}
 
 	private List<Resource> resolveResources() {

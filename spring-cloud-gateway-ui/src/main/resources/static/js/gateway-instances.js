@@ -27,7 +27,6 @@
 	var autoEl = document.getElementById('gi-auto');
 	var refreshEl = document.getElementById('gi-refresh');
 	var url = container.getAttribute('data-url');
-	var timer = null;
 
 	// The routes behind each downstream address, resolved once per snapshot rather than
 	// per row: the same address means the same routes on every instance.
@@ -76,14 +75,7 @@
 	var POOL_PROPERTY = 'spring.cloud.gateway.server.webflux.httpclient.pool.metrics';
 	var CLIENT_PROPERTY = 'spring.cloud.gateway.server.webflux.metrics.instance.instrument-http-client';
 
-	function escape(value) {
-		if (value === null || value === undefined) {
-			return '';
-		}
-		return String(value).replace(/[&<>"']/g, function (character) {
-			return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character];
-		});
-	}
+	var escape = window.gatewayUi.escape;
 
 	/** A figure the JVM does not publish is reported as -1 and shown as a dash. */
 	function missing(value) {
@@ -398,7 +390,11 @@
 			return String(left.instanceId).localeCompare(String(right.instanceId));
 		});
 		emptyEl.style.display = instances.length ? 'none' : '';
-		container.innerHTML = instances.length ? table(instances) : '';
+		// The table is replaced wholesale: the button a keyboard was on is given the focus
+		// back, or folding a row — and every poll after it — would drop it to the page.
+		window.gatewayUi.keepFocus(container, 'data-gi-toggle', function () {
+			container.innerHTML = instances.length ? table(instances) : '';
+		});
 	}
 
 	/*
@@ -425,34 +421,25 @@
 	});
 
 	function load() {
-		fetch(url, { headers: { Accept: 'application/json' } })
-			.then(function (response) {
-				return response.ok ? response.json() : Promise.reject(response.status);
-			})
+		window.gatewayUi.getJson(url)
 			.then(function (payload) {
 				render(payload);
 				window.gatewayUi.read('gi-age');
 			})
 			.catch(function () {
-				// The age is left where it was: a failed poll makes the figures on screen
-				// older, it does not make them younger.
+				// The figures on screen stay, and their age says the read failed.
 				coverageEl.textContent = 'Could not read the instance figures.';
+				window.gatewayUi.failed('gi-age');
 			});
 	}
 
+	var live = window.gatewayUi.poller(load, 5000);
+
 	function schedule() {
-		if (timer) {
-			clearInterval(timer);
-			timer = null;
-		}
-		if (autoEl && autoEl.checked) {
-			timer = setInterval(load, 5000);
-		}
+		live(!!autoEl && autoEl.checked);
 	}
 
-	if (window.gatewayUi) {
-		window.gatewayUi.remember(autoEl);
-	}
+	window.gatewayUi.remember(autoEl);
 	if (autoEl) {
 		autoEl.addEventListener('change', schedule);
 	}

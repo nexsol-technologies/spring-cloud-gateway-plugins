@@ -90,6 +90,9 @@ spring.cloud.gateway.server.webflux.routes-files:
 spring.cloud.gateway.server.webflux.routes-openapi:
   enabled: true
   update-interval: 5m
+  # A contract read is kept for an hour: the reloads in between regenerate the routes from
+  # it instead of fetching and parsing it again. /actuator/refresh reads it again at once.
+  contract-ttl: 1h
   sources:
    - id: petstore
      uri: https://petstore3.swagger.io

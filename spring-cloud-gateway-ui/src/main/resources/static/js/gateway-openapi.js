@@ -31,7 +31,6 @@
 
 	var instance = null;
 	var signature = null;
-	var pollTimer = null;
 
 	var tryIt = mount.dataset.tryIt !== 'false';
 
@@ -146,8 +145,9 @@
 			// allowed to reach.
 			telemetry: false,
 			// Off by default. The token and the ticked scopes are kept in the local
-			// storage of the console origin, which outlives the console session: signing
-			// out of the console does not clear them.
+			// storage of the console origin, under 'scalar-reference-auth-<document>'.
+			// That storage outlives the console session, so signing out removes them:
+			// see the sign-out handler of gateway-ui.js.
 			persistAuth: true,
 			// The only entry into the request client from this layout, and the flag the
 			// bundle also gates the authentication panel on.
@@ -219,7 +219,11 @@
 				return response.ok ? response.json() : null;
 			})
 			.then(function (config) {
-				var urls = config && Array.isArray(config.urls) ? config.urls : [];
+				if (!config) {
+					unread();
+					return;
+				}
+				var urls = Array.isArray(config.urls) ? config.urls : [];
 				var sources = urls
 					.filter(function (entry) {
 						return entry && entry.url;
@@ -229,28 +233,29 @@
 					});
 				apply(sources.length ? sources : fallbackSources());
 			})
-			.catch(function () {
-				apply(fallbackSources());
-			});
+			.catch(unread);
 	}
 
-	function startPolling() {
-		if (!pollTimer) {
-			pollTimer = setInterval(load, POLL_MS);
+	/*
+	 * A list that could not be read. On the first load the contract of the gateway itself
+	 * is shown in its place. Later it changes nothing: swapping the page to that single
+	 * contract for one failed poll, and back on the next, loses the reader their place
+	 * twice.
+	 */
+	function unread() {
+		if (signature === null) {
+			apply(fallbackSources());
 		}
 	}
 
-	function stopPolling() {
-		clearInterval(pollTimer);
-		pollTimer = null;
-	}
+	var live = window.gatewayUi.poller(load, POLL_MS);
 
 	if (refresh) {
 		refresh.addEventListener('click', load);
 	}
 	if (auto) {
 		auto.addEventListener('change', function () {
-			return auto.checked ? startPolling() : stopPolling();
+			live(auto.checked);
 		});
 	}
 
@@ -258,7 +263,5 @@
 	window.gatewayUi.remember(auto);
 
 	load();
-	if (!auto || auto.checked) {
-		startPolling();
-	}
+	live(!auto || auto.checked);
 })();

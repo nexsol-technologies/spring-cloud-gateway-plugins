@@ -98,6 +98,7 @@ spring.cloud.gateway.server.webflux.webfilter.basicauth-exchange-oauth2:
 | `...basicauth-exchange-oauth2.credentials-in-query-param` | `false` | Whether Basic credentials are also read from a query parameter |
 | `...basicauth-exchange-oauth2.credentials-query-param-name` | `_auth` | Name of that query parameter |
 | `...basicauth-exchange-oauth2.security-chain-enabled` | `true` | Whether the plugin contributes its own `SecurityWebFilterChain` |
+| `...basicauth-exchange-oauth2.token-timeout` | `10s` | How long the token endpoint is given to answer, retries included, before the request is answered `401` |
 
 Declare a user under `token-uris` or under `clients`, not both; `clients` wins over `token-uris`
 for a user that ends up in the two. The forms are equivalent for a user needing no scope. Both
@@ -106,10 +107,24 @@ than every one of its requests. An empty `scopes` list is not an empty
 `scope` parameter: the exchange sends none, where an authorization server would answer
 `invalid_scope` instead of granting the client its default scopes.
 
-Tokens are cached in memory and evicted on their JWT `exp` claim, so an expired token is never
-reused and the authorization server is not called on every request. The application
-`CacheManager` is used when there is one, otherwise the filter falls back to its own cache —
-the host application needs no caching setup.
+Tokens are cached and evicted on their JWT `exp` claim, so an expired token is never reused and
+the authorization server is not called on every request. The cache is the one named
+`basicauth-token-exchange.cache` in the application `CacheManager` when there is one, otherwise
+the filter keeps the tokens in memory — the host application needs no caching setup. A
+`CacheManager` given its cache names (`spring.cache.cache-names`) has to list
+`basicauth-token-exchange.cache` for its cache to be used; left out, the filter keeps the
+tokens itself.
+
+A `CacheManager` backed by Redis, or by any store other than the memory of the gateway, shares
+the tokens between the instances: one exchanges, the others reuse. Such a cache is read and
+written with blocking calls, so the filter reaches it from a worker thread rather than from the
+one serving the request, which then carries on from that worker thread. An in-memory cache is
+read where the request is. A cache that fails is logged and ignored: the credentials are
+exchanged again.
+
+The token endpoint is given `token-timeout` to answer. A connection that cannot be made is
+retried twice, within a second or so; a refusal is not retried. Past either, the request is
+answered `401`.
 
 **Credentials in a query parameter.** A caller that cannot set an `Authorization` header can
 carry the same Base64 `client-id:client-secret` pair in a query parameter, once
@@ -138,8 +153,11 @@ configuration and are not secrets.
 
 The chain is ordered at
 `BasicAuthExchangeSecurityAutoConfiguration.BASIC_AUTH_EXCHANGE_CHAIN_ORDER`
-(`Ordered.HIGHEST_PRECEDENCE + 200`), ahead of the chains an application usually declares from
-`@Order(1)`. Two escape hatches, for a gateway that would rather validate the resulting token
+(`Ordered.HIGHEST_PRECEDENCE + 500`), ahead of the chains an application usually declares from
+`@Order(1)` and behind the chains the other plugins contribute over their own paths: an
+exchanged request reaching the console, the route management API, the passive scan, the
+OpenAPI hub or the MCP endpoint is answered by the chain guarding them, not let through.
+Two escape hatches, for a gateway that would rather validate the resulting token
 itself or keep its own rules over these requests: declare your own bean named
 `basicAuthExchangeSecurityWebFilterChain`, or set `security-chain-enabled: false` — the
 exchange still happens, only the letting through is gone.

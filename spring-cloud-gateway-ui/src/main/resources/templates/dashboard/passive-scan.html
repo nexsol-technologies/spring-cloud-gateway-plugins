@@ -65,9 +65,9 @@
 							<button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
 									data-bs-toggle="dropdown" aria-expanded="false">Export</button>
 							<ul class="dropdown-menu dropdown-menu-end">
-								<li><a class="dropdown-item" th:href="@{/passive-scan/export(format='sarif')}" href="/passive-scan/export?format=sarif">SARIF</a></li>
-								<li><a class="dropdown-item" th:href="@{/passive-scan/export(format='json')}" href="/passive-scan/export?format=json">JSON</a></li>
-								<li><a class="dropdown-item" th:href="@{/passive-scan/export(format='html')}" href="/passive-scan/export?format=html">HTML</a></li>
+								<li><a class="dropdown-item" download th:href="@{/passive-scan/export(format='sarif')}" href="/passive-scan/export?format=sarif">SARIF</a></li>
+								<li><a class="dropdown-item" download th:href="@{/passive-scan/export(format='json')}" href="/passive-scan/export?format=json">JSON</a></li>
+								<li><a class="dropdown-item" download th:href="@{/passive-scan/export(format='html')}" href="/passive-scan/export?format=html">HTML</a></li>
 							</ul>
 						</div>
 						<span class="gw-live" data-gw-live="ps-auto" hidden><span class="gw-live-dot"></span>Live</span>

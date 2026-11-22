@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.servicegraph.redis;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -27,9 +28,10 @@ import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import org.springframework.data.domain.Range;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.data.redis.core.ReactiveValueOperations;
-import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.ReactiveZSetOperations;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,16 +48,20 @@ class RedisServiceGraphSourceTests {
 
 	private ReactiveStringRedisTemplate redisTemplate;
 
+	private ReactiveZSetOperations<String, String> zSetOperations;
+
 	@BeforeEach
 	@SuppressWarnings("unchecked")
 	void setUp() {
 		this.redisTemplate = mock(ReactiveStringRedisTemplate.class);
 		ReactiveValueOperations<String, String> valueOperations = mock(ReactiveValueOperations.class);
-		when(this.redisTemplate.scan(any(ScanOptions.class)))
+		this.zSetOperations = mock(ReactiveZSetOperations.class);
+		when(this.redisTemplate.opsForZSet()).thenReturn(this.zSetOperations);
+		when(this.zSetOperations.rangeByScore(anyString(), any(Range.class)))
 			.thenAnswer((invocation) -> Flux.fromIterable(this.keyspace.keySet()));
 		when(this.redisTemplate.opsForValue()).thenReturn(valueOperations);
-		when(valueOperations.get(anyString()))
-			.thenAnswer((invocation) -> Mono.justOrEmpty(this.keyspace.get(invocation.getArgument(0).toString())));
+		when(valueOperations.multiGet(any())).thenAnswer((invocation) -> Mono
+			.just(invocation.<Collection<String>>getArgument(0).stream().map(this.keyspace::get).toList()));
 	}
 
 	@Test
@@ -94,7 +100,7 @@ class RedisServiceGraphSourceTests {
 
 	@Test
 	void reportsRedisUnavailableRatherThanFailing() {
-		when(this.redisTemplate.scan(any(ScanOptions.class)))
+		when(this.zSetOperations.rangeByScore(anyString(), any(Range.class)))
 			.thenReturn(Flux.error(new IllegalStateException("redis is down")));
 
 		ServiceGraphSnapshot snapshot = source().collect().block();

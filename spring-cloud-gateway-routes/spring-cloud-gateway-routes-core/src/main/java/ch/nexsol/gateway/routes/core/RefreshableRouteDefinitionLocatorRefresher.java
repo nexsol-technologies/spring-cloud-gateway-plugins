@@ -48,7 +48,7 @@ public class RefreshableRouteDefinitionLocatorRefresher implements ApplicationLi
 	@Override
 	public void onApplicationEvent(RefreshScopeRefreshedEvent event) {
 		Flux.fromStream(this.locators.orderedStream())
-			.flatMap(AbstractRefreshableRouteDefinitionLocator::refresh)
+			.flatMap(AbstractRefreshableRouteDefinitionLocator::reload)
 			.subscribe();
 	}
 

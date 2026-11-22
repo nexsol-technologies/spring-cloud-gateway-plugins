@@ -37,7 +37,7 @@ spring.cloud.gateway.server.webflux.routes-configserver:
     uri: http://localhost:8888        # Config Server base URI
     name: gateway                     # {name}    (application)
     profile: default                  # {profile}
-    label: main                       # {label}   (git branch or tag)
+    label: main                       # {label}   (git branch or tag) - set it, see below
     files:                            # each resolved as /{name}/{profile}/{label}/{file}
       - routes/orders.yaml
       - routes/billing.yaml
@@ -53,8 +53,9 @@ spring.cloud.gateway.server.webflux.routes-configserver:
 | `...routes-configserver.config-server.uri` | — | Config Server base URI |
 | `...routes-configserver.config-server.name` | — | The `{name}` coordinate (application) |
 | `...routes-configserver.config-server.profile` | `default` | The `{profile}` coordinate |
-| `...routes-configserver.config-server.label` | — | The `{label}` coordinate (git branch or tag) |
+| `...routes-configserver.config-server.label` | — | The `{label}` coordinate (git branch or tag). Set it whenever `files` is: without a label the Config Server answers the request with its environment endpoint, not with the file, and no route is read |
 | `...routes-configserver.config-server.files` | — | Files fetched under that coordinate, one request each |
+| `...routes-configserver.timeout` | `30s` | How long a route file is given to be served; past it the read fails and the previous routes are kept |
 | `...routes-configserver.max-response-size` | — | Largest route file read; unset keeps the ceiling of `spring.http.codecs.max-in-memory-size` |
 
 > The Config Server has **no directory-listing API** — its plain-text endpoint serves one file

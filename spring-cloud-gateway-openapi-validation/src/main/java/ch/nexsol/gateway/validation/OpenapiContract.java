@@ -16,11 +16,13 @@
 
 package ch.nexsol.gateway.validation;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -28,7 +30,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import com.networknt.schema.Error;
 import io.swagger.v3.core.util.Json;
 import io.swagger.v3.core.util.Json31;
@@ -40,6 +44,7 @@ import io.swagger.v3.oas.models.parameters.Parameter;
 import tools.jackson.databind.JsonNode;
 
 import org.springframework.http.HttpMethod;
+import org.springframework.web.util.UriUtils;
 
 /**
  * A parsed OpenAPI document, ready to validate an exchange against.
@@ -55,13 +60,30 @@ import org.springframework.http.HttpMethod;
  */
 public class OpenapiContract {
 
-	private final List<PathTemplate> pathTemplates;
+	/**
+	 * Keywords holding a value of the instance rather than a schema: what looks like a
+	 * reference in there is data.
+	 */
+	private static final Set<String> DATA_KEYWORDS = Set.of("enum", "const", "default", "example", "examples");
+
+	private static final Set<String> SCHEMAS_BY_NAME_KEYWORDS = Set.of("properties", "patternProperties", "definitions",
+			"$defs", "dependentSchemas");
+
+	/**
+	 * The paths the contract declares without any variable, by the path they match.
+	 */
+	private final Map<String, PathTemplate> concretePaths = new LinkedHashMap<>();
+
+	/**
+	 * The templated paths, by the number of {@code /} they hold. A variable never spans
+	 * one, so a template only ever matches a path holding as many: the others need not be
+	 * tried.
+	 */
+	private final Map<Integer, List<PathTemplate>> templatedPaths = new LinkedHashMap<>();
 
 	private final CompiledSchemas schemas;
 
 	private final ObjectMapper schemaMapper;
-
-	private final ObjectNode componentsNode;
 
 	/**
 	 * Creates a contract from a parsed document.
@@ -73,10 +95,8 @@ public class OpenapiContract {
 		// Schema 2020-12), the 3.0 one the older flavour the draft-04 dialect
 		// understands.
 		this.schemaMapper = openapi31 ? Json31.mapper() : Json.mapper();
-		this.schemas = new CompiledSchemas(openapi31);
-		this.componentsNode = (document.getComponents() != null)
-				? this.schemaMapper.valueToTree(document.getComponents()) : null;
-		this.pathTemplates = compile(document);
+		this.schemas = new CompiledSchemas(openapi31, componentsDocument(document));
+		compile(document);
 	}
 
 	/**
@@ -86,22 +106,17 @@ public class OpenapiContract {
 	 * @return what the contract has to say about that path and method
 	 */
 	public Resolution resolve(String path, HttpMethod method) {
-		for (PathTemplate template : this.pathTemplates) {
+		// A concrete path takes precedence over a templated one, so that /books/mine is
+		// resolved as itself rather than as /books/{id} when the contract declares both.
+		PathTemplate concrete = this.concretePaths.get(path);
+		if (concrete != null) {
+			return concrete.resolution(method, Map.of());
+		}
+		for (PathTemplate template : this.templatedPaths.getOrDefault(slashes(path), List.of())) {
 			Optional<Map<String, String>> variables = template.match(path);
-			if (variables.isEmpty()) {
-				continue;
+			if (variables.isPresent()) {
+				return template.resolution(method, variables.get());
 			}
-			PathItem pathItem = template.pathItem();
-			Map<PathItem.HttpMethod, Operation> operations = pathItem.readOperationsMap();
-			PathItem.HttpMethod contractMethod = contractMethod(method);
-			Operation operation = (contractMethod != null) ? operations.get(contractMethod) : null;
-			if (operation == null) {
-				Set<String> allowed = new LinkedHashSet<>();
-				operations.keySet().forEach((allowedMethod) -> allowed.add(allowedMethod.name()));
-				return new Resolution.MethodNotAllowed(template.template(), allowed);
-			}
-			return new Resolution.Found(template.template(), operation, parameters(pathItem, operation),
-					variables.get());
 		}
 		return new Resolution.PathNotFound();
 	}
@@ -133,39 +148,86 @@ public class OpenapiContract {
 
 	private String schemaJson(Schema<?> schema) {
 		ObjectNode node = this.schemaMapper.valueToTree(schema);
-		if (this.componentsNode != null) {
-			// A resolved document still holds internal '#/components/schemas/...'
-			// references: carrying the components inside the schema node is what lets the
-			// validator follow them, and it keeps a self-referential schema finite.
-			node.set("components", this.componentsNode);
-		}
+		// A resolved document still holds internal '#/components/schemas/...'
+		// references. They are pointed at the one document the components are
+		// registered under, rather than carried along as a copy of the whole section
+		// inside every schema: that copy is parsed and kept once per parameter, per body
+		// and per response.
+		pointAtTheComponents(node);
 		return node.toString();
 	}
 
-	private static List<PathTemplate> compile(OpenAPI document) {
+	private String componentsDocument(OpenAPI document) {
+		if (document.getComponents() == null) {
+			return null;
+		}
+		ObjectNode root = this.schemaMapper.createObjectNode();
+		root.set("components", this.schemaMapper.valueToTree(document.getComponents()));
+		return root.toString();
+	}
+
+	private static void pointAtTheComponents(ObjectNode schema) {
+		if (schema.get("$ref") instanceof TextNode reference && reference.textValue().startsWith("#/")) {
+			schema.put("$ref", CompiledSchemas.COMPONENTS_DOCUMENT + reference.textValue());
+		}
+		for (var keyword : schema.properties()) {
+			if (DATA_KEYWORDS.contains(keyword.getKey())) {
+				continue;
+			}
+			if (keyword.getValue() instanceof ObjectNode value) {
+				if (SCHEMAS_BY_NAME_KEYWORDS.contains(keyword.getKey())) {
+					// The keys are names the contract chose, and one of them may read
+					// like a keyword: a property called 'default' is a schema like any
+					// other.
+					value.forEach(OpenapiContract::pointAtTheComponentsIfSchema);
+				}
+				else {
+					pointAtTheComponents(value);
+				}
+			}
+			else if (keyword.getValue() instanceof ArrayNode values) {
+				values.forEach(OpenapiContract::pointAtTheComponentsIfSchema);
+			}
+		}
+	}
+
+	private static void pointAtTheComponentsIfSchema(Object node) {
+		if (node instanceof ObjectNode schema) {
+			pointAtTheComponents(schema);
+		}
+	}
+
+	private void compile(OpenAPI document) {
 		if (document.getPaths() == null) {
-			return List.of();
+			return;
 		}
 		List<PathTemplate> templates = new ArrayList<>();
 		document.getPaths().forEach((template, pathItem) -> templates.add(PathTemplate.of(template, pathItem)));
-		// A concrete path takes precedence over a templated one, so that /books/mine is
-		// resolved as itself rather than as /books/{id} when the contract declares both.
+		// Among the templates matching a path, the one with the fewest variables wins,
+		// then the one the contract declares first: the sort is stable.
 		templates.sort(Comparator.comparingInt((template) -> template.variableNames().size()));
-		return List.copyOf(templates);
+		for (PathTemplate template : templates) {
+			if (template.variableNames().isEmpty()) {
+				this.concretePaths.putIfAbsent(template.template(), template);
+			}
+			else {
+				this.templatedPaths.computeIfAbsent(slashes(template.template()), (count) -> new ArrayList<>())
+					.add(template);
+			}
+		}
+	}
+
+	private static int slashes(String path) {
+		int count = 0;
+		for (int index = path.indexOf('/'); index >= 0; index = path.indexOf('/', index + 1)) {
+			count++;
+		}
+		return count;
 	}
 
 	private static boolean isOpenapi31(OpenAPI document) {
 		String version = document.getOpenapi();
 		return version != null && version.startsWith("3.1");
-	}
-
-	private static PathItem.HttpMethod contractMethod(HttpMethod method) {
-		for (PathItem.HttpMethod candidate : PathItem.HttpMethod.values()) {
-			if (candidate.name().equalsIgnoreCase(method.name())) {
-				return candidate;
-			}
-		}
-		return null;
 	}
 
 	/**
@@ -230,9 +292,22 @@ public class OpenapiContract {
 	}
 
 	/**
-	 * A path template of the contract, compiled to a regular expression.
+	 * An operation the contract declares on a path, with its parameters merged with those
+	 * of the path.
+	 *
+	 * @param operation the declared operation
+	 * @param parameters its parameters
 	 */
-	private record PathTemplate(String template, PathItem pathItem, Pattern pattern, List<String> variableNames) {
+	private record Declared(Operation operation, List<Parameter> parameters) {
+
+	}
+
+	/**
+	 * A path template of the contract, compiled to a regular expression, with what the
+	 * contract declares on it by method.
+	 */
+	private record PathTemplate(String template, Pattern pattern, List<String> variableNames,
+			Map<String, Declared> operations, Set<String> allowedMethods) {
 
 		private static final Pattern VARIABLE = Pattern.compile("\\{([^/}]+)}");
 
@@ -250,7 +325,22 @@ public class OpenapiContract {
 				literalStart = matcher.end();
 			}
 			regex.append(Pattern.quote(template.substring(literalStart))).append("$");
-			return new PathTemplate(template, pathItem, Pattern.compile(regex.toString()), List.copyOf(names));
+			// Read once, here: the model builds a new map of its operations on every
+			// call, and merging the parameters is the same work for every request.
+			Map<String, Declared> operations = new LinkedHashMap<>();
+			pathItem.readOperationsMap()
+				.forEach((method, operation) -> operations.put(method.name(),
+						new Declared(operation, parameters(pathItem, operation))));
+			return new PathTemplate(template, Pattern.compile(regex.toString()), List.copyOf(names), operations,
+					Collections.unmodifiableSet(operations.keySet()));
+		}
+
+		Resolution resolution(HttpMethod method, Map<String, String> variables) {
+			Declared declared = this.operations.get(method.name().toUpperCase(Locale.ROOT));
+			if (declared == null) {
+				return new Resolution.MethodNotAllowed(this.template, this.allowedMethods);
+			}
+			return new Resolution.Found(this.template, declared.operation(), declared.parameters(), variables);
 		}
 
 		Optional<Map<String, String>> match(String path) {
@@ -260,9 +350,24 @@ public class OpenapiContract {
 			}
 			Map<String, String> variables = new LinkedHashMap<>();
 			for (int i = 0; i < this.variableNames.size(); i++) {
-				variables.put(this.variableNames.get(i), matcher.group(i + 1));
+				variables.put(this.variableNames.get(i), decode(matcher.group(i + 1)));
 			}
 			return Optional.of(variables);
+		}
+
+		/*
+		 * The template is matched against the path as it travels, so that an encoded
+		 * slash stays inside the variable it was sent in; the value is then decoded,
+		 * because the upstream service reads it decoded. Held against its schema still
+		 * encoded, %2e%2e satisfies a pattern forbidding dots and arrives as '..'.
+		 */
+		private static String decode(String value) {
+			try {
+				return UriUtils.decode(value, StandardCharsets.UTF_8);
+			}
+			catch (IllegalArgumentException ex) {
+				return value;
+			}
 		}
 
 	}

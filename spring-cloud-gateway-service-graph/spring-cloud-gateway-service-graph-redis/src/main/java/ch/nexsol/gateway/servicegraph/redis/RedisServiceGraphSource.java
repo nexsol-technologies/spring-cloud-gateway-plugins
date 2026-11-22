@@ -19,6 +19,7 @@ package ch.nexsol.gateway.servicegraph.redis;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import ch.nexsol.gateway.commons.redis.InstanceIndex;
 import ch.nexsol.gateway.servicegraph.GraphEdge;
 import ch.nexsol.gateway.servicegraph.ServiceGraphSnapshot;
 import ch.nexsol.gateway.servicegraph.ServiceGraphSource;
@@ -30,7 +31,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
-import org.springframework.data.redis.core.ScanOptions;
 
 /**
  * Consolidates the edges every instance published into Redis.
@@ -39,8 +39,8 @@ import org.springframework.data.redis.core.ScanOptions;
  * behind a closed network, still counts through what it last published. The graph lags by
  * at most one publish interval, which is the trade for not calling anyone.
  * <p>
- * Keys are listed with {@code SCAN} rather than {@code KEYS}, so a large keyspace is not
- * blocked while the graph refreshes.
+ * The keys are read from the index the instances register in &mdash; see
+ * {@link InstanceIndex} &mdash; so what else Redis holds costs a reading nothing.
  */
 public class RedisServiceGraphSource implements ServiceGraphSource {
 
@@ -49,11 +49,9 @@ public class RedisServiceGraphSource implements ServiceGraphSource {
 	private static final TypeReference<List<GraphEdge>> EDGE_LIST = new TypeReference<>() {
 	};
 
-	private final ReactiveStringRedisTemplate redisTemplate;
-
-	private final RedisServiceGraphProperties properties;
-
 	private final ObjectMapper objectMapper;
+
+	private final InstanceIndex index;
 
 	/**
 	 * Creates the source reading the published edges.
@@ -63,9 +61,8 @@ public class RedisServiceGraphSource implements ServiceGraphSource {
 	 */
 	public RedisServiceGraphSource(ReactiveStringRedisTemplate redisTemplate, RedisServiceGraphProperties properties,
 			ObjectMapper objectMapper) {
-		this.redisTemplate = redisTemplate;
-		this.properties = properties;
 		this.objectMapper = objectMapper;
+		this.index = new InstanceIndex(redisTemplate, properties.getKeyPrefix(), properties.getTimeToLive());
 	}
 
 	@Override
@@ -75,12 +72,8 @@ public class RedisServiceGraphSource implements ServiceGraphSource {
 		// would report twice the instances.
 		return Mono.defer(() -> {
 			AtomicInteger instances = new AtomicInteger();
-			ScanOptions options = ScanOptions.scanOptions()
-				.match(this.properties.getKeyPrefix() + "*")
-				.count(100)
-				.build();
-			return this.redisTemplate.scan(options)
-				.flatMap((key) -> this.redisTemplate.opsForValue().get(key))
+			return this.index.values()
+				.flatMapMany(Flux::fromIterable)
 				.flatMap((payload) -> read(payload).doOnNext((edges) -> instances.incrementAndGet()))
 				.flatMapIterable((edges) -> edges)
 				.collectList()

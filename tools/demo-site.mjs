@@ -192,10 +192,10 @@ const HOME = { page: 'index.html', label: 'Home', icon: 'icon-home' };
 function band([icon, title, subtitle, coverage]) {
 	let markup = outer(read(`${TEMPLATES}/fragments/view-band.html`), 'th:fragment="band(');
 	markup = once(markup, '<use th:attr="href=\'#\' + ${icon}" href="#icon-plugin">', `<use href="#${icon}">`);
-	markup = once(markup, 'th:utext="${title}">View<', `>${title}<`);
+	markup = once(markup, 'th:text="${title}">View<', `>${title}<`);
 	markup = subtitle
-		? once(markup, 'th:utext="${subtitle}">What it shows.<', `>${subtitle}<`)
-		: replaceElement(markup, 'th:utext="${subtitle}"', '');
+		? once(markup, 'th:text="${subtitle}">What it shows.<', `>${subtitle}<`)
+		: replaceElement(markup, 'th:text="${subtitle}"', '');
 	return coverage
 		? once(markup, 'th:id="${coverage}">', `id="${coverage}">`)
 		: replaceElement(markup, 'th:id="${coverage}"', '');

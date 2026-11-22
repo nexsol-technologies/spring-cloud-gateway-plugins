@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.metrics.redis;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,20 +26,22 @@ import ch.nexsol.gateway.metrics.RouteMetricsSnapshot;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import org.springframework.data.domain.Range;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.data.redis.core.ReactiveValueOperations;
+import org.springframework.data.redis.core.ReactiveZSetOperations;
 import org.springframework.data.redis.core.ScanOptions;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -53,21 +56,26 @@ class RedisRouteMetricsSourceTests {
 
 	private ReactiveValueOperations<String, String> valueOperations;
 
+	private ReactiveZSetOperations<String, String> zSetOperations;
+
 	@BeforeEach
 	@SuppressWarnings("unchecked")
 	void setUp() {
 		this.redisTemplate = mock(ReactiveStringRedisTemplate.class);
 		this.valueOperations = mock(ReactiveValueOperations.class);
 		when(this.redisTemplate.opsForValue()).thenReturn(this.valueOperations);
+		this.zSetOperations = mock(ReactiveZSetOperations.class);
+		when(this.redisTemplate.opsForZSet()).thenReturn(this.zSetOperations);
 	}
 
 	/**
-	 * Wires the mock so scanning returns the given keys and each key its payload.
+	 * Wires the mock so the index lists the given keys and each key its payload.
 	 */
 	private void published(Map<String, String> byKey) {
-		when(this.redisTemplate.scan(any(ScanOptions.class))).thenReturn(Flux.fromIterable(byKey.keySet()));
-		when(this.valueOperations.get(anyString()))
-			.thenAnswer((invocation) -> Mono.justOrEmpty(byKey.get(invocation.getArgument(0, String.class))));
+		when(this.zSetOperations.rangeByScore(anyString(), any(Range.class)))
+			.thenReturn(Flux.fromIterable(byKey.keySet()));
+		when(this.valueOperations.multiGet(any())).thenAnswer((invocation) -> Mono
+			.just(invocation.<Collection<String>>getArgument(0).stream().map(byKey::get).toList()));
 	}
 
 	private String payload(RouteMetric... metrics) throws Exception {
@@ -145,7 +153,7 @@ class RedisRouteMetricsSourceTests {
 
 	@Test
 	void reportsNothingRatherThanFailingWhenRedisIsDown() {
-		when(this.redisTemplate.scan(any(ScanOptions.class)))
+		when(this.zSetOperations.rangeByScore(anyString(), any(Range.class)))
 			.thenReturn(Flux.error(new IllegalStateException("connection refused")));
 
 		RouteMetricsSnapshot snapshot = source().collect().block();
@@ -155,17 +163,17 @@ class RedisRouteMetricsSourceTests {
 	}
 
 	@Test
-	void scansTheConfiguredPrefixRatherThanTheWholeKeyspace() {
+	void readsTheIndexUnderTheConfiguredPrefixRatherThanWalkingTheKeyspace() {
 		published(Map.of());
 		RedisMetricsProperties properties = new RedisMetricsProperties();
 		properties.setKeyPrefix("custom:prefix:");
 
 		new RedisRouteMetricsSource(this.redisTemplate, properties, this.objectMapper).collect().block();
 
-		// KEYS would block the server; the pattern must be scoped to this gateway.
-		ArgumentCaptor<ScanOptions> options = ArgumentCaptor.forClass(ScanOptions.class);
-		verify(this.redisTemplate, atLeastOnce()).scan(options.capture());
-		assertThat(options.getValue().getPattern()).isEqualTo("custom:prefix:*");
+		// KEYS would block the server and a SCAN walks every key it holds: the instances
+		// are listed by the index kept under the prefix of this gateway.
+		verify(this.zSetOperations).rangeByScore(eq("custom:prefix:@index"), any(Range.class));
+		verify(this.redisTemplate, never()).scan(any(ScanOptions.class));
 	}
 
 }

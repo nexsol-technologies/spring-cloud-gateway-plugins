@@ -45,6 +45,7 @@ spring.cloud.gateway.server.webflux.routes-database:
 | `...routes-database.enabled` | `true` | Is the plugin there at all; `false` stops the database feeding the gateway |
 | `...routes-database.access` | `unrestricted` | What is published: `unrestricted`, `read-only`, `none` |
 | `...routes-database.security-chain-enabled` | `true` | Whether the plugin contributes its own `SecurityWebFilterChain` |
+| `...routes-database.load-timeout` | `30s` | How long the database is given to hand over the routes on a refresh; past it the gateway keeps the route table it has |
 | `...routes-database.security.user.name` | `admin` | Name of the local user of that chain |
 | `...routes-database.security.user.password` | — | Password of the local user; unset, no local user is declared and Basic is checked against the user directory of the application |
 | `...routes-database.security.user.roles` | `[ADMIN]` | Roles the local user holds |
@@ -68,6 +69,19 @@ authenticating anybody.
 
 A reactive API under `/api/gateway/routes`: CRUD on route definitions at runtime, each route
 carrying its predicates and its filters in the same form the gateway configuration uses.
+
+```json
+{
+  "routeId": "orders",
+  "uri": "lb://orders",
+  "predicates": [ { "name": "Path", "args": { "patterns": "/orders/**" } } ],
+  "filters": [ { "name": "StripPrefix", "args": { "parts": "1" } } ]
+}
+```
+
+`uri` takes any scheme a route can target — `http`, `https`, `lb`, `ws`, `wss`, `forward`.
+`order`, `filters` and `publicRoute` may be left out. A predicate or a filter takes the
+arguments of its shortcut form and any other property its configuration declares.
 
 ## Management view
 

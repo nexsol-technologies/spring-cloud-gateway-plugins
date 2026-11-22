@@ -16,7 +16,9 @@
 
 package ch.nexsol.gateway.database.service;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import ch.nexsol.gateway.database.entity.FilterEntity;
 import ch.nexsol.gateway.database.entity.PredicateEntity;
@@ -74,7 +76,21 @@ public class ApiService {
 	 * @return the route response models
 	 */
 	public Flux<RouteResponseModel> getAllRoutes() {
-		return this.routeService.getAllRoutes().flatMap(this::toRouteResponseModel);
+		// Three statements whatever the number of routes: read route by route, the
+		// predicates and the filters cost two statements each, all in flight at once.
+		Mono<Map<Long, Collection<PredicateEntity>>> predicates = this.predicateService.findAll()
+			.collectMultimap(PredicateEntity::getRouteRefId);
+		Mono<Map<Long, Collection<FilterEntity>>> filters = this.filterService.findAll()
+			.collectMultimap(FilterEntity::getRouteRefId);
+		return this.routeService.getAllRoutes()
+			.collectList()
+			.zipWith(Mono.zip(predicates, filters))
+			.flatMapIterable((tuple) -> tuple.getT1()
+				.stream()
+				.map((route) -> toRouteResponseModel(route,
+						tuple.getT2().getT1().getOrDefault(route.getId(), List.of()),
+						tuple.getT2().getT2().getOrDefault(route.getId(), List.of())))
+				.toList());
 	}
 
 	/**
@@ -106,27 +122,26 @@ public class ApiService {
 	}
 
 	private Mono<RouteResponseModel> toRouteResponseModel(RouteEntity route) {
-		Mono<List<PredicateResponseModel>> predicates = this.predicateService.findByRouteId(route.getId())
-			.flatMap(this::toPredicateResponseModel)
-			.collectList();
-		Mono<List<FilterResponseModel>> filters = this.filterService.findByRouteId(route.getId())
-			.flatMap(this::toFilterResponseModel)
-			.collectList();
-		return Mono.zip(predicates, filters)
-			.map((tuple) -> new RouteResponseModel(route.getId(), route.getRouteId(), route.getUri(), route.getOrder(),
-					tuple.getT1(), tuple.getT2(), route.isPublicRoute()));
+		Mono<List<PredicateEntity>> predicates = this.predicateService.findByRouteId(route.getId()).collectList();
+		Mono<List<FilterEntity>> filters = this.filterService.findByRouteId(route.getId()).collectList();
+		return Mono.zip(predicates, filters).map((tuple) -> toRouteResponseModel(route, tuple.getT1(), tuple.getT2()));
 	}
 
-	private Mono<PredicateResponseModel> toPredicateResponseModel(PredicateEntity predicate) {
-		PredicateResponseModel model = new PredicateResponseModel(predicate.getId(), predicate.getName(),
+	private RouteResponseModel toRouteResponseModel(RouteEntity route, Collection<PredicateEntity> predicates,
+			Collection<FilterEntity> filters) {
+		return new RouteResponseModel(route.getId(), route.getRouteId(), route.getUri(), route.getOrder(),
+				predicates.stream().map(this::toPredicateResponseModel).toList(),
+				filters.stream().map(this::toFilterResponseModel).toList(), route.isPublicRoute());
+	}
+
+	private PredicateResponseModel toPredicateResponseModel(PredicateEntity predicate) {
+		return new PredicateResponseModel(predicate.getId(), predicate.getName(),
 				this.argumentService.jsonStringArgumentsToMap(predicate.getArgs()), predicate.getRouteRefId());
-		return Mono.just(model);
 	}
 
-	private Mono<FilterResponseModel> toFilterResponseModel(FilterEntity filter) {
-		FilterResponseModel model = new FilterResponseModel(filter.getId(), filter.getName(),
+	private FilterResponseModel toFilterResponseModel(FilterEntity filter) {
+		return new FilterResponseModel(filter.getId(), filter.getName(),
 				this.argumentService.jsonStringArgumentsToMap(filter.getArgs()), filter.getRouteRefId());
-		return Mono.just(model);
 	}
 
 }

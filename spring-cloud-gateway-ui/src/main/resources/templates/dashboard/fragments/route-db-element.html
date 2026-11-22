@@ -8,7 +8,7 @@
 	<div class="d-flex gap-2 align-items-center">
 		<select class="form-select form-select-sm" th:name="|${kind}s[${row.index()}].name|"
 			hx-trigger="change" hx-swap="innerHTML"
-			th:attr="hx-get=|/ui/routes/db/element-args/${kind}/${row.index()}|,hx-target=|#args-${row.index()}|">
+			th:attr="hx-get=@{/ui/routes/db/element-args/{kind}/{index}(kind=${kind},index=${row.index()})},hx-target=|#args-${row.index()}|,aria-label=${#strings.capitalize(kind)}">
 			<option value="" th:selected="${row.name() == null}"
 				th:text="'Choose a ' + ${kind} + '...'">Choose...</option>
 			<option th:each="name : ${names}" th:value="${name}" th:text="${name}"
@@ -26,8 +26,9 @@
 <!-- Argument inputs for one element. Expects the context variables kind, index and args. -->
 <th:block th:fragment="args">
 	<div class="mb-2" th:each="arg : ${args}">
-		<label class="form-label small mb-1" th:text="${arg.key()}">arg</label>
-		<input class="form-control form-control-sm" th:name="|${kind}s[${index}].args[${arg.key()}]|"
+		<label class="form-label small mb-1" th:for="|${kind}-${index}-${arg.key()}|" th:text="${arg.key()}">arg</label>
+		<input class="form-control form-control-sm" th:id="|${kind}-${index}-${arg.key()}|"
+			th:name="|${kind}s[${index}].args[${arg.key()}]|"
 			th:value="${arg.value()}"
 			th:attr="required=${requiredArgs != null and requiredArgs.contains(arg.key())} ? 'required' : null">
 	</div>

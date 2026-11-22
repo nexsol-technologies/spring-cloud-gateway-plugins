@@ -68,9 +68,14 @@ public class BasicAuthExchangeSecurityAutoConfiguration {
 
 	/**
 	 * Order of the contributed chain: ahead of the chains an application usually declares
-	 * from {@code 1}, so the Basic credentials to exchange are let through first.
+	 * from {@code 1}, so the Basic credentials to exchange are let through first, and
+	 * behind every chain a plugin contributes over its own paths &mdash; the console, the
+	 * route management API, the passive scan, the OpenAPI hub and the MCP endpoint, the
+	 * last of them at {@code HIGHEST_PRECEDENCE + 450}. This chain permits whatever it
+	 * matches and matches on every path, so ahead of them it would hand the endpoints
+	 * that administer the gateway to any client whose credentials were exchanged.
 	 */
-	public static final int BASIC_AUTH_EXCHANGE_CHAIN_ORDER = Ordered.HIGHEST_PRECEDENCE + 200;
+	public static final int BASIC_AUTH_EXCHANGE_CHAIN_ORDER = Ordered.HIGHEST_PRECEDENCE + 500;
 
 	/**
 	 * Registers the chain letting the requests the exchange authorized through.

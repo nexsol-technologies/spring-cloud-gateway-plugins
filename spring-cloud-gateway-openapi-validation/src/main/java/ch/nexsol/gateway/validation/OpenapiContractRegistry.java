@@ -19,6 +19,7 @@ package ch.nexsol.gateway.validation;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -26,6 +27,8 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import io.swagger.v3.parser.core.models.ParseOptions;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -40,15 +43,24 @@ import org.springframework.util.StringUtils;
  * <p>
  * Reading and parsing a document blocks, so it happens on the bounded elastic scheduler
  * and only once per location: the first request through a route pays for it, every later
- * one gets the parsed contract straight away. A load that failed is not remembered, so a
- * contract that became reachable again is picked up by the next request rather than
- * needing a restart.
+ * one gets the parsed contract straight away. A load that failed is remembered for
+ * {@value #FAILURE_TTL_SECONDS} seconds and no longer, so a contract that became
+ * reachable again is picked up without a restart, while the requests arriving in between
+ * are told at once instead of each waiting for a read of their own to fail.
  */
 public class OpenapiContractRegistry {
+
+	private static final Logger LOG = LoggerFactory.getLogger(OpenapiContractRegistry.class);
+
+	static final long FAILURE_TTL_SECONDS = 30;
+
+	private static final Duration FOREVER = Duration.ofMillis(Long.MAX_VALUE);
 
 	private final Map<String, Mono<OpenapiContract>> contracts = new ConcurrentHashMap<>();
 
 	private final ResourceLoader resourceLoader;
+
+	private final Duration failureTtl;
 
 	/**
 	 * Creates the registry.
@@ -56,7 +68,13 @@ public class OpenapiContractRegistry {
 	 * an {@code http(s)} URL
 	 */
 	public OpenapiContractRegistry(ResourceLoader resourceLoader) {
+		this(resourceLoader, Duration.ofSeconds(FAILURE_TTL_SECONDS));
+	}
+
+	// Visible for testing: a failure that is not remembered at all.
+	OpenapiContractRegistry(ResourceLoader resourceLoader, Duration failureTtl) {
 		this.resourceLoader = resourceLoader;
+		this.failureTtl = failureTtl;
 	}
 
 	/**
@@ -70,10 +88,17 @@ public class OpenapiContractRegistry {
 		return this.contracts.computeIfAbsent(location,
 				(key) -> Mono.fromCallable(() -> new OpenapiContract(read(key)))
 					.subscribeOn(Schedulers.boundedElastic())
-					// Keep the parsed contract for every later request, but forget a
-					// failure so a transient one does not disable validation for good.
-					.cache()
-					.doOnError((ex) -> this.contracts.remove(key)));
+					// Logged here, once per read, rather than by every request the
+					// failure is then replayed to.
+					.doOnError((ex) -> LOG.error(
+							"The OpenAPI contract '{}' could not be read: what is validated against it is "
+									+ "forwarded unvalidated, and it is read again in {} at the earliest",
+							key, this.failureTtl, ex))
+					// The parsed contract is kept for good. A failure is kept for a while
+					// only, so a transient one does not disable validation for good; not
+					// kept at all, it would be paid again by every request, each waiting
+					// for its own read to fail.
+					.cache((contract) -> FOREVER, (failure) -> this.failureTtl, () -> Duration.ZERO));
 	}
 
 	private OpenAPI read(String location) {

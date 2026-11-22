@@ -65,6 +65,9 @@ routes:
 Besides `watch`, the routes are reloaded on `/actuator/refresh` and `/actuator/busrefresh` —
 see [Refreshing routes](../README.md#refreshing-routes).
 
+`watch` reacts to the route files alone — the ones the locations resolve to, a file created
+later included. Anything else written in the same directory reloads nothing.
+
 ## Native image
 
 A `classpath:` location is registered as a resource of the image when the application is

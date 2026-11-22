@@ -119,7 +119,9 @@ Absent values are rendered as `_none_`; an expected but unresolved content type 
 * `validation` carries the outcome published by
   [spring-cloud-gateway-openapi-validation](../../spring-cloud-gateway-openapi-validation/README.md).
   Neither plugin depends on the other; nothing is added for an exchange no contract was
-  applied to, and an `errors` attribute only appears when there were violations.
+  applied to, and an `errors` attribute only appears when there were violations. Each value is
+  audited up to 2 000 characters, followed by how many were left out: the error text grows
+  with the number of violations, and one request can make megabytes of it.
 
 Global `metadata.*` and route `route.metadata.*` are distinct namespaces, so the two may share
 a key name without either overwriting the other.
@@ -146,11 +148,23 @@ AuditEventPublisher customAuditEventPublisher() {
 
 Publishing happens once the exchange is over, whatever its outcome: an exchange that failed —
 an upstream that refused the connection or timed out — is audited too, and the failure is
-propagated afterwards. The `response` group of such an event reports what the response carried
-at that moment, which is before the error handler wrote the status.
+propagated afterwards. The `response.status` of such an event is the status the client is
+answered with: the one the failure carries — `403` for a refused request, `404` when no route
+matched, `504` for an upstream that timed out — and `500` when it carries none.
 
 **An `AuditEventPublisher` must not block the event loop**; offload blocking backends to their
-own scheduler.
+own scheduler. It must not hold events without limit either: `AuditBacklog` bounds the ones
+pending for a backend slower than the traffic, drops and counts what exceeds the limit, and
+reports it in the log at most every 30 seconds.
+
+```java
+private final AuditBacklog backlog = new AuditBacklog("my backend", 10_000);
+
+@Override
+public void publish(AuditEvent event) {
+    this.backlog.submit(() -> this.client.send(event), Duration.ofSeconds(30));
+}
+```
 
 ## Sample
 

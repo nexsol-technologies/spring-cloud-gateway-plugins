@@ -16,22 +16,22 @@
 
 package ch.nexsol.gateway.audit.redis;
 
+import java.time.Duration;
+
+import ch.nexsol.gateway.audit.AuditBacklog;
 import ch.nexsol.gateway.audit.AuditEvent;
 import ch.nexsol.gateway.audit.AuditEventPublisher;
 import ch.nexsol.gateway.audit.AuditEventSerializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 
 /**
  * {@link AuditEventPublisher} publishing the audit event, rendered as JSON, to a Redis
  * pub/sub channel. Publication is asynchronous and failures are logged without disrupting
- * the request.
+ * the request. The events pending for a Redis that stopped answering are bounded &mdash;
+ * see {@link AuditBacklog}.
  */
 public class RedisAuditEventPublisher implements AuditEventPublisher {
-
-	private static final Logger LOG = LoggerFactory.getLogger(RedisAuditEventPublisher.class);
 
 	private final ReactiveStringRedisTemplate redisTemplate;
 
@@ -39,24 +39,53 @@ public class RedisAuditEventPublisher implements AuditEventPublisher {
 
 	private final AuditEventSerializer serializer;
 
+	private final AuditBacklog backlog;
+
+	private final Duration sendTimeout;
+
 	/**
-	 * Create a new publisher.
+	 * Create a new publisher, bounded by the defaults of {@link RedisAuditProperties}.
 	 * @param redisTemplate the reactive Redis template
 	 * @param channel the destination pub/sub channel
 	 * @param serializer the audit event serializer
 	 */
 	public RedisAuditEventPublisher(ReactiveStringRedisTemplate redisTemplate, String channel,
 			AuditEventSerializer serializer) {
+		this(redisTemplate, serializer, defaults(channel));
+	}
+
+	/**
+	 * Create a new publisher.
+	 * @param redisTemplate the reactive Redis template
+	 * @param serializer the audit event serializer
+	 * @param properties the channel, and the bounds on the events pending
+	 */
+	public RedisAuditEventPublisher(ReactiveStringRedisTemplate redisTemplate, AuditEventSerializer serializer,
+			RedisAuditProperties properties) {
 		this.redisTemplate = redisTemplate;
-		this.channel = channel;
+		this.channel = properties.getChannel();
 		this.serializer = serializer;
+		this.backlog = new AuditBacklog("the redis channel " + this.channel, properties.getMaxPending());
+		this.sendTimeout = properties.getSendTimeout();
+	}
+
+	private static RedisAuditProperties defaults(String channel) {
+		RedisAuditProperties properties = new RedisAuditProperties();
+		properties.setChannel(channel);
+		return properties;
 	}
 
 	@Override
 	public void publish(AuditEvent event) {
-		String payload = this.serializer.toJson(event);
-		this.redisTemplate.convertAndSend(this.channel, payload)
-			.subscribe(null, (ex) -> LOG.warn("failed to publish audit event to redis channel {}", this.channel, ex));
+		this.backlog.submit(() -> this.redisTemplate.convertAndSend(this.channel, this.serializer.toJson(event)),
+				this.sendTimeout);
+	}
+
+	/**
+	 * @return the events pending, dropped and failed
+	 */
+	public AuditBacklog backlog() {
+		return this.backlog;
 	}
 
 }

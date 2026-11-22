@@ -68,6 +68,8 @@ public class OpenapiService implements DisposableBean {
 
 	private final Duration cacheTtl;
 
+	private final Duration failureCacheTtl;
+
 	private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
 
 	/**
@@ -97,6 +99,7 @@ public class OpenapiService implements DisposableBean {
 	public OpenapiService(ReactiveDiscoveryClient discoveryClient, HubOpenapiProperties.Discovery properties) {
 		this.discoveryClient = discoveryClient;
 		this.cacheTtl = properties.getCacheTtl();
+		this.failureCacheTtl = properties.getFailureCacheTtl();
 		// A pool of its own: probing must never take the connections the gateway proxies
 		// its traffic on, and the default pool is sized for a handful of connections.
 		this.connectionProvider = ConnectionProvider.builder("hub-openapi-discovery")
@@ -112,9 +115,15 @@ public class OpenapiService implements DisposableBean {
 	// Visible for testing: drives the probes through a stubbed exchange, without a
 	// network stack nor a connection pool to dispose of.
 	OpenapiService(ReactiveDiscoveryClient discoveryClient, WebClient webClient, Duration cacheTtl) {
+		this(discoveryClient, webClient, cacheTtl, Duration.ZERO);
+	}
+
+	OpenapiService(ReactiveDiscoveryClient discoveryClient, WebClient webClient, Duration cacheTtl,
+			Duration failureCacheTtl) {
 		this.discoveryClient = discoveryClient;
 		this.webClient = webClient;
 		this.cacheTtl = cacheTtl;
+		this.failureCacheTtl = failureCacheTtl;
 		this.connectionProvider = null;
 	}
 
@@ -196,6 +205,11 @@ public class OpenapiService implements DisposableBean {
 			return Mono.empty();
 		}
 		report(uri, unresolved, routeId);
+		if (unresolved.outcome() == Probe.Outcome.FAILED && this.failureCacheTtl.isPositive()) {
+			// Asked for: an instance out of reach costs a full timeout every time it is
+			// probed, and the refresh waits for it.
+			this.cache.put(uri.toString(), new CacheEntry(null, Instant.now().plus(this.failureCacheTtl)));
+		}
 		return Mono.empty();
 	}
 
@@ -217,6 +231,10 @@ public class OpenapiService implements DisposableBean {
 		if (probe.outcome() == Probe.Outcome.DENIED) {
 			LOG.warn("Route {} is left out of the OpenAPI hub: {} answered {}. Its document is protected, and the hub "
 					+ "reads it anonymously.", routeId, uri + probe.path(), probe.reason());
+		}
+		else if (probe.outcome() == Probe.Outcome.UNAVAILABLE) {
+			LOG.warn("Route {} is left out of the OpenAPI hub for now: {} answered {}. It is probed again on the next "
+					+ "refresh.", routeId, uri + probe.path(), probe.reason());
 		}
 		else {
 			LOG.warn("Route {} is left out of the OpenAPI hub: {} could not be reached ({})", routeId,
@@ -255,9 +273,6 @@ public class OpenapiService implements DisposableBean {
 	}
 
 	private CacheEntry lookUpCache(URI uri) {
-		if (!this.cacheTtl.isPositive()) {
-			return null;
-		}
 		CacheEntry entry = this.cache.get(uri.toString());
 		if (entry == null) {
 			return null;
@@ -291,10 +306,11 @@ public class OpenapiService implements DisposableBean {
 	}
 
 	/**
-	 * Outcome of a single probe. Three ways of yielding no document, which the hub must
+	 * Outcome of a single probe. Four ways of yielding no document, which the hub must
 	 * not confuse: a service that answered "not there" has no document and is remembered
-	 * as such, while one that refused to hand it over and one that could not be reached
-	 * have said nothing about it and are reported instead.
+	 * as such, while one that refused to hand it over, one that answered a server error
+	 * and one that could not be reached have said nothing about it and are reported
+	 * instead.
 	 *
 	 * @param path the probed path
 	 * @param outcome what the probe found
@@ -305,7 +321,7 @@ public class OpenapiService implements DisposableBean {
 
 		private enum Outcome {
 
-			FOUND, ABSENT, DENIED, FAILED
+			FOUND, ABSENT, DENIED, UNAVAILABLE, FAILED
 
 		}
 
@@ -317,6 +333,12 @@ public class OpenapiService implements DisposableBean {
 			else if (status.value() == HttpStatus.UNAUTHORIZED.value()
 					|| status.value() == HttpStatus.FORBIDDEN.value()) {
 				outcome = Outcome.DENIED;
+			}
+			else if (status.is5xxServerError()) {
+				// A service that is starting or failing has not said it has no document.
+				// It answered, though, and may well serve the next path: unlike an
+				// instance out of reach, this does not settle the question.
+				outcome = Outcome.UNAVAILABLE;
 			}
 			else {
 				outcome = Outcome.ABSENT;
@@ -360,7 +382,8 @@ public class OpenapiService implements DisposableBean {
 	 * What the last probing of a service instance found.
 	 *
 	 * @param path the path the document was found at, or {@code null} when the instance
-	 * confirmed it has none
+	 * confirmed it has none &mdash; or could not be reached, where the configuration asks
+	 * for that to be remembered
 	 * @param expiresAt the instant the entry stops being trusted
 	 */
 	private record CacheEntry(String path, Instant expiresAt) {

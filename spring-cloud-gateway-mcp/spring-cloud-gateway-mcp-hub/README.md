@@ -33,7 +33,7 @@ spring.cloud.gateway.server.webflux:
       enabled: true          # off by default: it hands an agent every API the hub documents
       write-enabled: false   # GET and HEAD only; true adds the operations that change state
       confirm-writes: true   # those do nothing unless the call carries confirm: true
-      timeout: 10s           # one tool call, connection included
+      timeout: 10s           # one tool call, connection included; one contract read too
       max-response-size: 256KB
   hub-openapi:
     enabled: true
@@ -45,7 +45,7 @@ spring.cloud.gateway.server.webflux:
 | `...mcp.hub.enabled` | `false` | Master switch; needs `...mcp.enabled` and `...hub-openapi.enabled` too |
 | `...mcp.hub.write-enabled` | `false` | Registers the operations that change state (`POST`, `PUT`, `PATCH`, `DELETE`) as tools as well |
 | `...mcp.hub.confirm-writes` | `true` | Those tools take a `confirm` argument; called without `confirm: true` they describe the request and send nothing |
-| `...mcp.hub.timeout` | `10s` | Bounds one tool call |
+| `...mcp.hub.timeout` | `10s` | Bounds one tool call, and the read of one contract when the catalog refreshes |
 | `...mcp.hub.max-response-size` | `256KB` | Largest response handed back to the client; a larger one is an error result |
 | `...mcp.hub.concurrency` | `4` | Contracts read at the same time when the catalog refreshes |
 
@@ -57,7 +57,9 @@ under each. With the server off (`...mcp.enabled=false`), the bridge registers n
 
 The catalog follows the hub: each time the gateway rebuilds its route table, the contracts of
 the documented services are read again and the tools added, removed or replaced accordingly.
-A service whose contract cannot be read keeps its tools until it answers again; the tools the
+A contract whose text did not change is not parsed again, unless it refers to another document.
+A service whose contract cannot be read, or does not answer within `timeout`, keeps its tools
+until it answers again; the tools the
 other services dropped are removed on the same pass. While a route source cannot be read, no
 tool is removed, since the services it documents are not known. A source of tools of the
 application's own, an `ApiToolSource` bean, overrides `catalog()` to say what it could not

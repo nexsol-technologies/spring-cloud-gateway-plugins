@@ -129,7 +129,8 @@
 	var extents = null;
 	var sortKey = 'count';
 	var sortDir = -1;
-	var pollTimer = null;
+	// Set while a poll redraws the map, so the window the reader zoomed into survives it.
+	var keepZoom = false;
 
 	function sel(id) {
 		return document.getElementById(id);
@@ -376,10 +377,12 @@
 
 	function tooltip(params) {
 		var row = findRoute(params.name);
+		// A tooltip is assigned as markup, and a route is named by whoever declared it.
+		var escape = window.gatewayUi.escape;
 		if (!row) {
-			return params.name;
+			return escape(params.name);
 		}
-		return '<strong>' + row.routeId + '</strong>' + (row.uri ? '<br>' + row.uri : '')
+		return '<strong>' + escape(row.routeId) + '</strong>' + (row.uri ? '<br>' + escape(row.uri) : '')
 			+ '<br>Calls: ' + row.count
 			+ '<br>Avg: ' + row.avgMs.toFixed(1) + ' ms'
 			+ '<br>Max: ' + row.maxMs.toFixed(1) + ' ms'
@@ -468,6 +471,17 @@
 		var xAxis = axis(xk, xLog, xb);
 		xAxis.nameLocation = 'middle';
 		xAxis.nameGap = 32;
+		// Replacing the option is what resets the zoom, which is right for a new question
+		// and wrong for a poll: the window being read is carried over to the new figures.
+		var zoomed = (keepZoom && chart.getOption() && chart.getOption().dataZoom) || [];
+
+		function zoom(index, spec) {
+			if (zoomed[index]) {
+				spec.start = zoomed[index].start;
+				spec.end = zoomed[index].end;
+			}
+			return spec;
+		}
 
 		chart.setOption({
 			// The bundled dark theme paints a canvas of its own, dropped so the chart keeps
@@ -488,13 +502,13 @@
 			// Locked, the controller only registers the drag that pans; the wheel is read
 			// below instead.
 			dataZoom: [
-				{ type: 'inside', xAxisIndex: 0, filterMode: 'none', zoomLock: true },
-				{ type: 'inside', yAxisIndex: 0, filterMode: 'none', zoomLock: true },
-				{ type: 'slider', xAxisIndex: 0, filterMode: 'none', bottom: 10, height: 18 },
-				{
+				zoom(0, { type: 'inside', xAxisIndex: 0, filterMode: 'none', zoomLock: true }),
+				zoom(1, { type: 'inside', yAxisIndex: 0, filterMode: 'none', zoomLock: true }),
+				zoom(2, { type: 'slider', xAxisIndex: 0, filterMode: 'none', bottom: 10, height: 18 }),
+				zoom(3, {
 					type: 'slider', yAxisIndex: 0, filterMode: 'none', right: 10, width: 18,
 					top: 24, bottom: 78
-				}
+				})
 			],
 			series: [{
 				type: 'scatter',
@@ -696,7 +710,9 @@
 			sel('gm-y').value = config.y;
 			sel('gm-size').value = config.size;
 		}
-		sel('gm-custom').style.display = isCustom ? 'flex' : 'none';
+		// A class rather than an inline display: the row is a Bootstrap flex utility, whose
+		// !important wins over any inline style.
+		sel('gm-custom').classList.toggle('d-none', !isCustom);
 		sel('gm-help').style.display = config.help ? '' : 'none';
 		sel('gm-help').textContent = config.help;
 
@@ -725,10 +741,7 @@
 	}
 
 	function load() {
-		fetch(dataUrl, { headers: { Accept: 'application/json' } })
-			.then(function (response) {
-				return response.json();
-			})
+		window.gatewayUi.getJson(dataUrl)
 			.then(function (json) {
 				rows = (json && json.metrics) || [];
 				// What these figures cover: one instance, or every instance consolidated
@@ -739,13 +752,22 @@
 					coverage.textContent = (json && json.coverage) ? json.coverage : '';
 				}
 				window.gatewayUi.read('gm-age');
-				render();
+				keepZoom = true;
+				try {
+					render();
+				}
+				finally {
+					keepZoom = false;
+				}
 			})
 			.catch(function () {
-				rows = [];
-				render();
+				// The figures on screen stay: a read that failed is not a gateway without
+				// traffic.
+				window.gatewayUi.failed('gm-age');
 			});
 	}
+
+	var live = window.gatewayUi.poller(load, 5000);
 
 	['gm-preset', 'gm-x', 'gm-y', 'gm-size', 'gm-top', 'gm-scale'].forEach(function (id) {
 		sel(id).addEventListener('change', render);
@@ -759,22 +781,14 @@
 	sel('gm-reset-zoom').addEventListener('click', render);
 	sel('gm-refresh').addEventListener('click', load);
 	sel('gm-auto').addEventListener('change', function () {
-		if (sel('gm-auto').checked) {
-			pollTimer = setInterval(load, 5000);
-		}
-		else if (pollTimer) {
-			clearInterval(pollTimer);
-			pollTimer = null;
-		}
+		live(sel('gm-auto').checked);
 	});
-	Array.prototype.forEach.call(document.querySelectorAll('.gw-sortable'), function (th) {
-		th.addEventListener('click', function () {
-			var key = th.getAttribute('data-sort');
-			sortDir = (key === sortKey) ? -sortDir : -1;
-			sortKey = key;
-			renderTable();
-		});
-	});
+	window.gatewayUi.sortable(document.querySelectorAll('.gw-sortable'), function (key) {
+		sortDir = (key === sortKey) ? -sortDir : -1;
+		sortKey = key;
+		renderTable();
+		return sortDir;
+	})(sortKey, sortDir);
 	/*
 	 * The plot follows its box whatever moved it — the window, the expand button, the menu
 	 * folding beside it. Only the first of those resizes the window, which is what the bars
@@ -802,9 +816,7 @@
 		});
 	// The auto switch drives a timer started by its change handler, which restoring the
 	// switch does not fire.
-	if (sel('gm-auto').checked) {
-		pollTimer = setInterval(load, 5000);
-	}
+	live(sel('gm-auto').checked);
 
 	load();
 })();

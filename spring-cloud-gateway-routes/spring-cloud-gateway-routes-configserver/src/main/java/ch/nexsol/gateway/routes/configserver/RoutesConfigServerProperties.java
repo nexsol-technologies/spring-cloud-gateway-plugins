@@ -62,6 +62,13 @@ public class RoutesConfigServerProperties {
 	 */
 	private DataSize maxResponseSize;
 
+	/**
+	 * How long a route file is given to be served. The files are read one at a time, and
+	 * the poll one tick at a time: a server that accepts the request and never answers
+	 * would otherwise stop the polling for good, and keep the gateway from starting.
+	 */
+	private Duration timeout = Duration.ofSeconds(30);
+
 	public boolean isEnabled() {
 		return this.enabled;
 	}
@@ -92,6 +99,14 @@ public class RoutesConfigServerProperties {
 
 	public void setMaxResponseSize(DataSize maxResponseSize) {
 		this.maxResponseSize = maxResponseSize;
+	}
+
+	public Duration getTimeout() {
+		return this.timeout;
+	}
+
+	public void setTimeout(Duration timeout) {
+		this.timeout = timeout;
 	}
 
 	public ConfigServer getConfigServer() {

@@ -43,6 +43,14 @@ public class RoutesOpenapiProperties {
 	private Duration updateInterval;
 
 	/**
+	 * How long a contract is kept once read. Until then an automatic reload generates the
+	 * routes from the contract it already holds instead of fetching and parsing it again;
+	 * an explicit refresh always reads it again. Unset or zero, every reload reads every
+	 * contract.
+	 */
+	private Duration contractTtl;
+
+	/**
 	 * The OpenAPI sources to turn into gateway routes.
 	 */
 	private List<Source> sources = new ArrayList<>();
@@ -69,6 +77,14 @@ public class RoutesOpenapiProperties {
 
 	public void setUpdateInterval(Duration updateInterval) {
 		this.updateInterval = updateInterval;
+	}
+
+	public Duration getContractTtl() {
+		return this.contractTtl;
+	}
+
+	public void setContractTtl(Duration contractTtl) {
+		this.contractTtl = contractTtl;
 	}
 
 	public List<Source> getSources() {

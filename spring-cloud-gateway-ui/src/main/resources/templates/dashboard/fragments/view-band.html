@@ -21,9 +21,9 @@
 					<svg class="gw-icon"><use th:attr="href='#' + ${icon}" href="#icon-plugin"></use></svg>
 				</span>
 				<div>
-					<h1 class="h4 fw-bold mb-0" th:utext="${title}">View</h1>
+					<h1 class="h4 fw-bold mb-0" th:text="${title}">View</h1>
 					<p class="text-secondary small mb-0" th:if="${!#strings.isEmpty(subtitle)}"
-							th:utext="${subtitle}">What it shows.</p>
+							th:text="${subtitle}">What it shows.</p>
 					<p class="text-secondary small mb-0" th:if="${!#strings.isEmpty(coverage)}"
 							th:id="${coverage}">&mdash;</p>
 				</div>

@@ -26,6 +26,7 @@ import java.util.Base64;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 
 import ch.nexsol.gateway.oauth2.properties.BasicAuthExchangeToAccessTokenProperties;
 import ch.nexsol.gateway.oauth2.properties.BasicAuthExchangeToAccessTokenProperties.Client;
@@ -39,10 +40,12 @@ import io.micrometer.observation.contextpropagation.ObservationThreadLocalAccess
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
 
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.concurrent.ConcurrentMapCache;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -50,12 +53,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ReactiveHttpInputMessage;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
 import org.springframework.security.oauth2.core.web.reactive.function.OAuth2BodyExtractors;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.reactive.function.BodyExtractor;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
@@ -90,9 +95,13 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 
 	private static final Logger LOG = LoggerFactory.getLogger(BasicAuthExchangeToAccessTokenGatewayWebFilter.class);
 
+	private static final String TOKEN_CACHE = "basicauth-token-exchange.cache";
+
 	private final BasicAuthExchangeToAccessTokenProperties properties;
 
 	private final Cache tokenCache;
+
+	private final boolean tokenCacheInMemory;
 
 	private final ObservationRegistry registry;
 
@@ -101,6 +110,8 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 	// Coalesces concurrent token exchanges for the same client so a cache miss triggers a
 	// single call to the OAuth server instead of one per in-flight request.
 	private final ConcurrentHashMap<String, Mono<String>> inFlightExchanges = new ConcurrentHashMap<>();
+
+	private final ConcurrentHashMap<String, TokenExpiration> expirations = new ConcurrentHashMap<>();
 
 	/**
 	 * Create a new filter.
@@ -124,11 +135,27 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 		this.registry = registry;
 		this.webClient = webClientBuilder
 			.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+			// A connection that could not be made is worth a second try, a moment later:
+			// every request sharing these credentials waits for the outcome, holding its
+			// own connection, so the wait is kept well under what a caller will sit
+			// through. The failure itself is passed on, rather than the exhaustion.
 			.filter((request, next) -> next.exchange(request)
-				.retryWhen(Retry.backoff(3, Duration.ofSeconds(5))
-					.doAfterRetry((retry) -> LOG.debug("Retry calling {} : {}", request.url(), retry.totalRetries()))))
+				.retryWhen(Retry.backoff(2, Duration.ofMillis(200))
+					.maxBackoff(Duration.ofSeconds(1))
+					.filter(WebClientRequestException.class::isInstance)
+					.doAfterRetry((retry) -> LOG.debug("Retry calling {} : {}", request.url(), retry.totalRetries()))
+					.onRetryExhaustedThrow((spec, signal) -> signal.failure())))
 			.build();
-		this.tokenCache = cacheManager.getCache("basicauth-token-exchange.cache");
+		// A cache manager declaring its caches by name answers null for one it was not
+		// told about. Without a cache every request would exchange its credentials
+		// again, so the filter then keeps the tokens itself.
+		Cache cache = cacheManager.getCache(TOKEN_CACHE);
+		this.tokenCache = (cache != null) ? cache : new ConcurrentMapCache(TOKEN_CACHE);
+		// The cache is whatever the application declared, and Cache is a blocking
+		// contract: get, put and evict return once the store has answered. Only a cache
+		// known to be a map in this JVM is used where the request is; any other one may
+		// be a network round-trip, and is reached from a thread allowed to wait for it.
+		this.tokenCacheInMemory = this.tokenCache instanceof ConcurrentMapCache;
 	}
 
 	/**
@@ -144,14 +171,20 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 	 */
 	@Override
 	public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-
+		ServerHttpRequest request = exchange.getRequest();
+		if (!SecurityUtils.isCandidateForExchange(request)) {
+			return chain.filter(exchange);
+		}
+		// Settled before anything is started: this filter sees every request of the
+		// gateway, and nearly all of them carry no Basic credentials of a configured
+		// client. Observing those would report one exchange per request.
+		Optional<BasicValue> credentials = SecurityUtils.resolveBasicValue(request, this.properties)
+			.filter((basicValue) -> this.properties.isUserConfigured(basicValue.getClientId()));
+		if (credentials.isEmpty()) {
+			return chain.filter(exchange);
+		}
+		BasicValue basicValue = credentials.get();
 		return Mono.deferContextual((contextView) -> {
-
-			ServerHttpRequest request = exchange.getRequest();
-			if (!SecurityUtils.isCandidateForExchange(request)) {
-				return chain.filter(exchange);
-			}
-
 			Observation observation = Observation.createNotStarted("BasicAuthExchange", this.registry)
 				.parentObservation(contextView.getOrDefault(ObservationThreadLocalAccessor.KEY, null))
 				.start();
@@ -160,19 +193,10 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 			// through would send the raw Basic credentials to a downstream service that
 			// expects a bearer token, and would turn a refused credential or an
 			// unreachable authorization server into a request served as if it had been
-			// authorized. Requests this filter has nothing to do with — no Basic
-			// credentials, or a client id it is not configured for — complete empty and
-			// are forwarded untouched.
-			return Mono.justOrEmpty(SecurityUtils.resolveBasicValue(request, this.properties))
-				.filter((basicValue) -> this.properties.isUserConfigured(basicValue.getClientId()))
-				.flatMap((basicValue) -> {
-					LOG.debug("BasicAuth exchange is starting");
-					return this.exchangeBasicToJwt(basicValue)
-						.doOnError((error) -> LOG.error(
-								"Exchange basicAuth to access token : error when initate the OAuth 2.0 client credentials flow",
-								error))
-						.map((token) -> withBearerAuth(exchange, basicValue, token));
-				})
+			// authorized.
+			LOG.debug("BasicAuth exchange is starting");
+			return this.exchangeBasicToJwt(basicValue)
+				.map((token) -> withBearerAuth(exchange, basicValue, token))
 				.defaultIfEmpty(exchange)
 				.doOnSuccess((result) -> observation.stop())
 				.doOnCancel(observation::stop)
@@ -189,16 +213,33 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 		String key = basicValue.getKey();
 		return this.getFromCache(key)
 			.switchIfEmpty(Mono.defer(() -> this.inFlightExchanges.computeIfAbsent(key,
-					(k) -> this.getToken(basicValue).doOnNext((newAuthToken) -> {
-						if (this.tokenCache != null && newAuthToken != null) {
-							try {
-								this.tokenCache.put(k, newAuthToken);
-							}
-							catch (Exception ex) {
-								LOG.warn("Error on accessing to token cache", ex);
-							}
-						}
-					}).doFinally((signal) -> this.inFlightExchanges.remove(k)).cache())));
+					(k) -> this.getToken(basicValue)
+						.flatMap((newAuthToken) -> putInCache(k, newAuthToken))
+						.doFinally((signal) -> this.inFlightExchanges.remove(k))
+						.cache())));
+	}
+
+	/*
+	 * The token is handed on once it is stored, as it always was: a request arriving
+	 * right behind this one finds it rather than exchanging the same credentials again.
+	 */
+	private Mono<String> putInCache(String cacheKey, String token) {
+		if (this.tokenCacheInMemory) {
+			writeCache(cacheKey, token);
+			return Mono.just(token);
+		}
+		return Mono.fromRunnable(() -> writeCache(cacheKey, token))
+			.subscribeOn(Schedulers.boundedElastic())
+			.thenReturn(token);
+	}
+
+	private void writeCache(String cacheKey, String token) {
+		try {
+			this.tokenCache.put(cacheKey, token);
+		}
+		catch (Exception ex) {
+			LOG.warn("Error on accessing to token cache", ex);
+		}
 	}
 
 	private BodyExtractor<Mono<OAuth2AccessTokenResponse>, ReactiveHttpInputMessage> bodyExtractor = OAuth2BodyExtractors
@@ -213,10 +254,28 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 				.exchangeToMono((response) -> response.body(this.bodyExtractor)
 					.map((tokenResponse) -> populateTokenResponse(tokenResponse)))
 				.map((accessToken) -> accessToken.getAccessToken().getTokenValue())
-				.doOnError((error) -> LOG.error("error when calling token uri {} for client {}", client.getTokenUri(),
-						basicValue.getClientId(), error)))
+				// Bounded here, inside what the concurrent exchanges share: a cached mono
+				// does not cancel its source when its subscribers leave, so a call that
+				// never ended would keep its entry, and every later request of these
+				// credentials with it.
+				.timeout(this.properties.getTokenTimeout())
+				.doOnError((error) -> logFailure(client, basicValue, error)))
 			.onErrorResume((ex) -> Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED)));
 
+	}
+
+	private static void logFailure(Client client, BasicValue basicValue, Throwable error) {
+		// Refused credentials and an authorization server out of reach are outcomes a
+		// caller, or an outage, produces at will: one line each, and the stack trace is
+		// kept for what was not expected.
+		if (error instanceof OAuth2AuthorizationException || error instanceof WebClientRequestException
+				|| error instanceof TimeoutException) {
+			LOG.warn("Token uri {} issued no token for client {}: {}", client.getTokenUri(), basicValue.getClientId(),
+					error.toString());
+			return;
+		}
+		LOG.error("error when calling token uri {} for client {}", client.getTokenUri(), basicValue.getClientId(),
+				error);
 	}
 
 	private BodyInserters.FormInserter<String> tokenRequest(BasicValue basicValue, Client client) {
@@ -268,37 +327,62 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 	}
 
 	private Mono<String> getFromCache(String cacheKey) {
+		if (this.tokenCacheInMemory) {
+			return Mono.justOrEmpty(readCache(cacheKey));
+		}
+		// The rest of the request then runs on the thread that read the cache.
+		return Mono.fromCallable(() -> readCache(cacheKey)).subscribeOn(Schedulers.boundedElastic());
+	}
+
+	/**
+	 * Reads the token kept for these credentials, evicting it when its time is up.
+	 * @param cacheKey the key the token is kept under
+	 * @return the token, or {@code null} when there is none worth using
+	 */
+	private String readCache(String cacheKey) {
 		try {
 			Cache.ValueWrapper wrapper = this.tokenCache.get(cacheKey);
 			if (wrapper != null && wrapper.get() != null) {
 				String tokenExchangeCache = (String) wrapper.get();
 				LOG.debug("token found in cache for key [{}]", cacheKey);
-				if (isTokenAvailable(tokenExchangeCache)) {
-					return Mono.just(tokenExchangeCache);
+				if (isTokenAvailable(cacheKey, tokenExchangeCache)) {
+					return tokenExchangeCache;
 				}
 				else {
 					LOG.debug("token is expired");
 					this.tokenCache.evict(cacheKey);
+					this.expirations.remove(cacheKey);
 				}
 			}
 		}
 		catch (Exception ex) {
 			LOG.warn("Error on accessing to token cache", ex);
 		}
-		return Mono.empty();
+		return null;
 	}
 
-	private boolean isTokenAvailable(String token) {
-		JWT jwt = parse(token);
-		JWTClaimsSet claims = null;
-		try {
-			claims = jwt.getJWTClaimsSet();
-			if (claims.getExpirationTime() != null) {
-				Instant now = Instant.now().plusSeconds(30);
-				LOG.debug("token Expiration Time {} / now {} ", claims.getExpirationTime().toInstant(), now);
-				return claims.getExpirationTime().toInstant().isAfter(now);
-			}
+	private boolean isTokenAvailable(String cacheKey, String token) {
+		// Decoding a token to read its expiry on every request is what this avoids: it is
+		// read once per token, and kept under the key the token is cached under, which
+		// only exists for credentials the authorization server accepted.
+		TokenExpiration known = this.expirations.get(cacheKey);
+		if (known == null || !known.token().equals(token)) {
+			known = new TokenExpiration(token, expirationOf(token));
+			this.expirations.put(cacheKey, known);
+		}
+		if (known.expiresAt() == null) {
 			return false;
+		}
+		Instant now = Instant.now().plusSeconds(30);
+		LOG.debug("token Expiration Time {} / now {} ", known.expiresAt(), now);
+		return known.expiresAt().isAfter(now);
+	}
+
+	private Instant expirationOf(String token) {
+		JWT jwt = parse(token);
+		try {
+			JWTClaimsSet claims = jwt.getJWTClaimsSet();
+			return (claims.getExpirationTime() != null) ? claims.getExpirationTime().toInstant() : null;
 		}
 		catch (ParseException ex) {
 			LOG.error("claims parsing error", ex);
@@ -316,6 +400,9 @@ public class BasicAuthExchangeToAccessTokenGatewayWebFilter implements WebFilter
 			throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
 					"Not Authorized to access to this internal resource due to an internal error");
 		}
+	}
+
+	private record TokenExpiration(String token, Instant expiresAt) {
 	}
 
 	/**

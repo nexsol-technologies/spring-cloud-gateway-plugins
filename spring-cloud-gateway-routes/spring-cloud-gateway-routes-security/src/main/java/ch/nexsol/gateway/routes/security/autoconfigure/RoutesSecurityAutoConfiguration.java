@@ -18,8 +18,10 @@ package ch.nexsol.gateway.routes.security.autoconfigure;
 
 import ch.nexsol.gateway.routes.security.PublicRouteMatcher;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.context.annotation.Bean;
@@ -27,6 +29,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.web.reactive.HandlerMapping;
 
 /**
  * Auto-configuration registering a high-priority {@link SecurityWebFilterChain} that lets
@@ -52,16 +55,36 @@ public class RoutesSecurityAutoConfiguration {
 	public static final int PUBLIC_ROUTES_CHAIN_ORDER = Ordered.HIGHEST_PRECEDENCE + 100;
 
 	/**
+	 * Registers the matcher resolving the public routes. A bean, so that it receives the
+	 * refresh events of the gateway and can remember which routes are worth replaying.
+	 * @param routeLocator the locator used to resolve the targeted route
+	 * @param handlerMappings the handler mappings of the application, so that the
+	 * endpoints the gateway serves itself stay out of the chain
+	 * @return the public route matcher
+	 */
+	@Bean
+	@ConditionalOnMissingBean
+	PublicRouteMatcher publicRouteMatcher(ObjectProvider<RouteLocator> routeLocator,
+			ObjectProvider<HandlerMapping> handlerMappings) {
+		// The locator is looked up on the first request, never while the context starts.
+		// This matcher listens to the route refreshes, and a listener is instantiated as
+		// soon as any bean publishes an event: the database of the routes does so while
+		// the locator it feeds is still being built, and asking for that locator here
+		// fails the context on a circular reference.
+		return new PublicRouteMatcher(() -> routeLocator.getObject().getRoutes(), handlerMappings);
+	}
+
+	/**
 	 * Registers the security chain matching public routes and permitting them without any
 	 * authentication.
 	 * @param http the reactive security builder
-	 * @param routeLocator the locator used to resolve the targeted route
+	 * @param publicRouteMatcher the matcher resolving the public routes
 	 * @return the public-routes security web filter chain
 	 */
 	@Bean
 	@Order(PUBLIC_ROUTES_CHAIN_ORDER)
-	SecurityWebFilterChain publicRoutesWebFilterChain(ServerHttpSecurity http, RouteLocator routeLocator) {
-		http.securityMatcher(new PublicRouteMatcher(routeLocator));
+	SecurityWebFilterChain publicRoutesWebFilterChain(ServerHttpSecurity http, PublicRouteMatcher publicRouteMatcher) {
+		http.securityMatcher(publicRouteMatcher);
 		http.authorizeExchange((spec) -> spec.anyExchange().permitAll());
 		http.httpBasic(ServerHttpSecurity.HttpBasicSpec::disable);
 		http.formLogin(ServerHttpSecurity.FormLoginSpec::disable);

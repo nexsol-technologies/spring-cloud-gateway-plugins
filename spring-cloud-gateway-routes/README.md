@@ -57,6 +57,9 @@ rather than rebuilding the gateway from a cached snapshot. It is wired only when
 `spring-cloud-context` is on the classpath — i.e. whenever the gateway is itself a Config
 Server client — and degrades gracefully otherwise.
 
+A reload that reads the same definitions changes nothing: the gateway does not rebuild its
+route table, and a route declared without an `id` keeps the one it was given.
+
 > The `database` source is not cached: it reads on demand and always reflects the latest
 > state, so it needs none of this.
 

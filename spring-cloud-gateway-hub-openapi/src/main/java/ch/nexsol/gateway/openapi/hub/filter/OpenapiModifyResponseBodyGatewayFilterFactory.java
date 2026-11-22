@@ -23,10 +23,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -138,8 +140,31 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 		return this.delegate.new ModifyResponseGatewayFilter(c);
 	}
 
-	private RewriteFunction<byte[], byte[]> rewriteServersWithGatewayUrl(String path) {
-		return (serverWebExchange, body) -> Mono.justOrEmpty(rewrite(body, path));
+	/**
+	 * Returns the function rewriting the documents of one route.
+	 * <p>
+	 * Rewriting is a full parse and a full rendering of a document of up to megabytes, on
+	 * endpoints open to anybody: it runs on the bounded elastic scheduler rather than on
+	 * the thread routing the traffic, and the last document rewritten is kept, so the one
+	 * a service keeps serving is rewritten once. The function is built again with its
+	 * route, which is what lets go of the document of a service that left.
+	 */
+	RewriteFunction<byte[], byte[]> rewriteServersWithGatewayUrl(String path) {
+		AtomicReference<Rewritten> last = new AtomicReference<>();
+		return (serverWebExchange, body) -> {
+			if (body == null || body.length == 0) {
+				return Mono.justOrEmpty(body);
+			}
+			Rewritten known = last.get();
+			if (known != null && Arrays.equals(known.source(), body)) {
+				return Mono.just(known.document());
+			}
+			return Mono.fromCallable(() -> {
+				byte[] document = rewrite(body, path);
+				last.set(new Rewritten(body, document));
+				return document;
+			}).subscribeOn(Schedulers.boundedElastic());
+		};
 	}
 
 	/**
@@ -291,6 +316,16 @@ public class OpenapiModifyResponseBodyGatewayFilterFactory
 		catch (JacksonException ex) {
 			return null;
 		}
+	}
+
+	/**
+	 * A document as its service served it and as the hub rewrote it.
+	 *
+	 * @param source the document the service served
+	 * @param document the document the hub answers with
+	 */
+	private record Rewritten(byte[] source, byte[] document) {
+
 	}
 
 	/**

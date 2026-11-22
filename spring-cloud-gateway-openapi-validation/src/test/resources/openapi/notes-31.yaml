@@ -1,0 +1,37 @@
+openapi: 3.1.0
+info:
+  title: Notes
+  version: 1.0.0
+paths:
+  /notes:
+    post:
+      operationId: createNote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Note'
+      responses:
+        '204':
+          description: Created
+components:
+  schemas:
+    Note:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+        default:
+          $ref: '#/components/schemas/Label'
+        label:
+          anyOf:
+            - $ref: '#/components/schemas/Label'
+            - type: 'null'
+    Label:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string

@@ -16,6 +16,8 @@
 
 package ch.nexsol.gateway.audit.redis;
 
+import java.time.Duration;
+
 /**
  * Configuration properties for the Redis audit provider, bound under
  * {@code spring.cloud.gateway.server.webflux.audit.redis}.
@@ -26,6 +28,19 @@ public class RedisAuditProperties {
 	 * Pub/sub channel the audit events are published to.
 	 */
 	private String channel = "gateway-audit";
+
+	/**
+	 * How many audit events may be pending at once. Past it an event is dropped, counted
+	 * and reported in the log, rather than held until the heap is gone. Zero or less sets
+	 * no limit.
+	 */
+	private int maxPending = 10_000;
+
+	/**
+	 * How long publishing one event may take before it is given up and counted as failed.
+	 * Zero or less sets no timeout.
+	 */
+	private Duration sendTimeout = Duration.ofSeconds(30);
 
 	/**
 	 * @return the channel
@@ -39,6 +54,34 @@ public class RedisAuditProperties {
 	 */
 	public void setChannel(String channel) {
 		this.channel = channel;
+	}
+
+	/**
+	 * @return how many audit events may be pending at once
+	 */
+	public int getMaxPending() {
+		return this.maxPending;
+	}
+
+	/**
+	 * @param maxPending how many audit events may be pending at once
+	 */
+	public void setMaxPending(int maxPending) {
+		this.maxPending = maxPending;
+	}
+
+	/**
+	 * @return how long a send may take
+	 */
+	public Duration getSendTimeout() {
+		return this.sendTimeout;
+	}
+
+	/**
+	 * @param sendTimeout how long a send may take
+	 */
+	public void setSendTimeout(Duration sendTimeout) {
+		this.sendTimeout = sendTimeout;
 	}
 
 }

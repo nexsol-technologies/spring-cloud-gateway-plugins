@@ -16,9 +16,13 @@
 
 package ch.nexsol.gateway.database.locator;
 
+import java.time.Duration;
+
+import ch.nexsol.gateway.database.RoutesDatabaseProperties;
 import ch.nexsol.gateway.database.service.RouteService;
 import reactor.core.publisher.Flux;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.stereotype.Component;
@@ -32,12 +36,26 @@ public class DatabaseRouteDefinitionLocator implements RouteDefinitionLocator {
 
 	private final RouteService routeService;
 
+	private final Duration loadTimeout;
+
 	/**
-	 * Creates the locator with the route service supplying the definitions.
+	 * Creates the locator with the route service supplying the definitions, giving the
+	 * database the default time to answer.
 	 * @param routeService the route service
 	 */
 	public DatabaseRouteDefinitionLocator(RouteService routeService) {
+		this(routeService, new RoutesDatabaseProperties());
+	}
+
+	/**
+	 * Creates the locator with the route service supplying the definitions.
+	 * @param routeService the route service
+	 * @param properties the plugin configuration, holding the time the database is given
+	 */
+	@Autowired
+	public DatabaseRouteDefinitionLocator(RouteService routeService, RoutesDatabaseProperties properties) {
 		this.routeService = routeService;
+		this.loadTimeout = properties.getLoadTimeout();
 	}
 
 	/**
@@ -45,7 +63,9 @@ public class DatabaseRouteDefinitionLocator implements RouteDefinitionLocator {
 	 */
 	@Override
 	public Flux<RouteDefinition> getRouteDefinitions() {
-		return this.routeService.loadSpringCloudGatewayRouteDefinition();
+		// Every refresh of the route table reads the database: one that stops answering
+		// would hold each of them open, the connections they wait for piling up.
+		return this.routeService.loadSpringCloudGatewayRouteDefinition().timeout(this.loadTimeout);
 	}
 
 }

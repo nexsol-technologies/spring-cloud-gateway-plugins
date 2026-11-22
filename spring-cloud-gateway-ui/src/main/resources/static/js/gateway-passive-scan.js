@@ -18,8 +18,8 @@
 	var POLL_MS = 3000;
 	var SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
 	var COLSPAN = 10;
-	var pollTimer = null;
 	var expanded = {};
+	var request = window.gatewayUi.sequence();
 
 	function sel(id) {
 		return document.getElementById(id);
@@ -81,9 +81,8 @@
 		parent.appendChild(wrap);
 	}
 
-	function detailRow(finding, key) {
+	function detailRow(finding) {
 		var row = document.createElement('tr');
-		row.style.display = expanded[key] ? '' : 'none';
 		var td = document.createElement('td');
 		td.colSpan = COLSPAN;
 		td.className = 'bg-body-tertiary';
@@ -139,7 +138,6 @@
 		findings.forEach(function (finding) {
 			var key = keyOf(finding);
 			var row = document.createElement('tr');
-			row.style.cursor = 'pointer';
 			cell(row, time(finding.lastSeen), 'text-nowrap');
 
 			var countCell = document.createElement('td');
@@ -165,11 +163,8 @@
 			cell(row, finding.path, 'text-break');
 			cell(row, finding.title, 'text-break');
 
-			var detail = detailRow(finding, key);
-			row.addEventListener('click', function () {
-				expanded[key] = !expanded[key];
-				detail.style.display = expanded[key] ? '' : 'none';
-			});
+			var detail = detailRow(finding);
+			window.gatewayUi.expandable(row, detail, key, expanded);
 			tbody.appendChild(row);
 			tbody.appendChild(detail);
 		});
@@ -239,10 +234,7 @@
 		if (!coverageUrl) {
 			return;
 		}
-		fetch(coverageUrl, { headers: { Accept: 'application/json' } })
-			.then(function (response) {
-				return response.json();
-			})
+		window.gatewayUi.getJson(coverageUrl)
 			.then(function (json) {
 				renderCoverage(json || []);
 			})
@@ -257,39 +249,32 @@
 			query: sel('ps-query').value,
 			limit: String(LIMIT)
 		});
-		fetch(dataUrl + '?' + params.toString(), { headers: { Accept: 'application/json' } })
-			.then(function (response) {
-				return response.json();
-			})
-			.then(function (json) {
-				render(json || []);
+		var latest = request();
+		// The findings and the tiles above them are one reading: both are drawn or neither
+		// is, and a read that failed leaves on screen what the last one found rather than
+		// a row of zeroes that reads as a clean scan.
+		Promise.all([window.gatewayUi.getJson(dataUrl + '?' + params.toString()), window.gatewayUi.getJson(summaryUrl)])
+			.then(function (results) {
+				if (!latest()) {
+					return;
+				}
+				window.gatewayUi.keepFocus(tbody, 'data-gw-expander', function () {
+					render(results[0] || []);
+				});
+				renderSummary(results[1]);
 				window.gatewayUi.read('ps-age');
 			})
 			.catch(function () {
-				render([]);
-			});
-		fetch(summaryUrl, { headers: { Accept: 'application/json' } })
-			.then(function (response) {
-				return response.json();
-			})
-			.then(renderSummary)
-			.catch(function () {
-				renderSummary(null);
+				if (latest()) {
+					window.gatewayUi.failed('ps-age');
+				}
 			});
 	}
 
-	function live(enabled) {
-		if (pollTimer) {
-			clearInterval(pollTimer);
-			pollTimer = null;
-		}
-		if (enabled) {
-			pollTimer = setInterval(load, POLL_MS);
-		}
-	}
+	var live = window.gatewayUi.poller(load, POLL_MS);
 
 	sel('ps-severity').addEventListener('change', load);
-	sel('ps-query').addEventListener('input', load);
+	sel('ps-query').addEventListener('input', window.gatewayUi.debounce(load, 250));
 	sel('ps-refresh').addEventListener('click', load);
 	sel('ps-auto').addEventListener('change', function () {
 		live(sel('ps-auto').checked);

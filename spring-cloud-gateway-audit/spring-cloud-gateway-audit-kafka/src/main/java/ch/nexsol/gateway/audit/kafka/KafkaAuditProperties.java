@@ -28,6 +28,13 @@ public class KafkaAuditProperties {
 	private String topic = "gateway-audit";
 
 	/**
+	 * How many audit events may wait to be handed to the producer at once. Past it an
+	 * event is dropped, counted and reported in the log, rather than held until the heap
+	 * is gone. Zero or less sets no limit.
+	 */
+	private int maxPending = 10_000;
+
+	/**
 	 * @return the topic
 	 */
 	public String getTopic() {
@@ -39,6 +46,21 @@ public class KafkaAuditProperties {
 	 */
 	public void setTopic(String topic) {
 		this.topic = topic;
+	}
+
+	/**
+	 * @return how many audit events may wait to be handed to the producer at once
+	 */
+	public int getMaxPending() {
+		return this.maxPending;
+	}
+
+	/**
+	 * @param maxPending how many audit events may wait to be handed to the producer at
+	 * once
+	 */
+	public void setMaxPending(int maxPending) {
+		this.maxPending = maxPending;
 	}
 
 }

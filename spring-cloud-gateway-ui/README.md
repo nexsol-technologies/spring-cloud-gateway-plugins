@@ -351,6 +351,11 @@ written above the table instead, next to the controls that read them again. That
 counting between two refreshes: a poll that stopped answering must not leave a view looking
 live.
 
+Every polling view behaves the same way. A read that fails leaves the figures of the last one
+on screen and turns the age red — *read failed · figures from 40s ago* — rather than drawing
+an empty view; a read refused because the session ended loads the page again, which lands on
+the login page. A tab that is hidden stops polling and reads once when it is shown again.
+
 ![The runtime view](doc/instances-light.png)
 
 **One table, one row per instance, and no summary above it.** Behind a load balancer every
@@ -633,7 +638,8 @@ own security.
 
 **Authentication.** The scopes ticked and the token obtained are kept in the local storage of
 the console origin, so a reload does not throw them away. That storage outlives the console
-session: signing out of the console does not clear them.
+session, so signing out of the console removes them. A session that merely expires leaves them
+in place until the next sign-out.
 
 Which scopes come ticked is read from the `security` requirement of the document —
 `security: [{ bearer-oidc: [openid, profile, email] }]` ticks those three. Only the scopes the

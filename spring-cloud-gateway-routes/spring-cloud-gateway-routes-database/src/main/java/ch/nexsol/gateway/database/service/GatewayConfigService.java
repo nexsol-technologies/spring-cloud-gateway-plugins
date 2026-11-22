@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.database.service;
 
+import java.beans.PropertyDescriptor;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import jakarta.validation.constraints.NotBlank;
@@ -35,6 +37,7 @@ import jakarta.validation.constraints.NotNull;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.boot.context.properties.bind.BindException;
@@ -52,6 +55,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class GatewayConfigService {
+
+	private static final Pattern NESTED_PATH = Pattern.compile("[\\[.]");
 
 	private final Map<String, RoutePredicateFactory> predicates = new LinkedHashMap<>();
 
@@ -283,25 +288,40 @@ public class GatewayConfigService {
 	 */
 	/**
 	 * Checks that the supplied arguments only use known argument names and cover the
-	 * strictly required ones. A field is considered required only when it carries a bean
-	 * validation constraint ({@link NotNull}, {@link NotEmpty} or {@link NotBlank}); the
-	 * other fields are optional and fall back to their configuration default. When no
-	 * field is strictly required, at least one argument is still expected for an element
-	 * that accepts some, to avoid creating an empty predicate or filter.
+	 * strictly required ones. A name is known when the shortcut notation of the element
+	 * lists it or when its configuration class has a property of that name: a factory may
+	 * declare no shortcut at all, or fewer names than its configuration holds, and what
+	 * it leaves out is still something a route sets. A field is considered required only
+	 * when it carries a bean validation constraint ({@link NotNull}, {@link NotEmpty} or
+	 * {@link NotBlank}); the other fields are optional and fall back to their
+	 * configuration default. When no field is strictly required, at least one argument is
+	 * still expected for an element that accepts some, to avoid creating an empty
+	 * predicate or filter.
 	 * @param configClass the predicate or filter configuration class
 	 * @param fieldOrder the accepted argument names
 	 * @param args the supplied arguments
 	 * @return {@code true} when the arguments are acceptable
 	 */
 	private boolean coversRequiredArgs(Class<?> configClass, List<String> fieldOrder, Map<String, String> args) {
-		if (!fieldOrder.containsAll(args.keySet())) {
-			return false;
+		for (String name : args.keySet()) {
+			if (!fieldOrder.contains(name) && !isConfigProperty(configClass, name)) {
+				return false;
+			}
 		}
 		Set<String> required = requiredArgs(configClass, fieldOrder);
 		if (required.isEmpty()) {
 			return fieldOrder.isEmpty() || !args.isEmpty();
 		}
 		return args.keySet().containsAll(required);
+	}
+
+	private static boolean isConfigProperty(Class<?> configClass, String name) {
+		// An argument may address a nested or an indexed value, claims[0].path: what has
+		// to exist is the property it starts from. The write method is required because
+		// every object has a readable "class" property, which is no argument.
+		String property = NESTED_PATH.split(name, 2)[0];
+		PropertyDescriptor descriptor = BeanUtils.getPropertyDescriptor(configClass, property);
+		return descriptor != null && descriptor.getWriteMethod() != null;
 	}
 
 	private static Set<String> requiredArgs(Class<?> configClass, List<String> fieldOrder) {

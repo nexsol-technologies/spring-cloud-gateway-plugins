@@ -48,11 +48,18 @@ later request is validated against the parsed document with no IO and no parsing
 **On the request:** the path and method resolve to a declared operation (a concrete path wins
 over a templated one, and a path variable never spans a `/`); the declared path, query, header
 and cookie parameters are present when required, each value read as its declared type before
-being held against its schema; the body honours the schema of the declared `requestBody`.
+being held against its schema — a path variable percent-decoded first, the way the upstream
+service reads it; the body honours the schema of the declared `requestBody`. A `number`
+parameter of more than 1000 digits, or whose exponent is beyond 1000, is refused as not being a
+number.
 
 **On the response:** the status is one the contract declares (exact code, then the range such
 as `2XX`, then `default`); the required headers are there; the body honours the schema
 declared for that status.
+
+The violations of a message are listed up to the first 20 per parameter and per body, in the
+`400` and `502` answers, in the log and in the audit attributes alike: a body broken on every
+element of a large array is refused on the first of them, the others only say how.
 
 ## Configuration
 
@@ -107,8 +114,12 @@ announces a length within `max-body-size`. Everything else streams straight thro
 | The body is larger than `max-body-size` | A large payload must not be able to exhaust the gateway |
 
 Each skip increments `gateway.openapi.validation.bodies.skipped`, tagged with the reason, so
-what is *not* being validated stays visible instead of looking like a clean bill of health.
-`validate-body: false` keeps every other check while never buffering anything.
+what is *not* being validated stays visible instead of looking like a clean bill of health. It
+is also logged at `INFO` the first time it happens on a route for a given reason, and at `DEBUG`
+from then on. `validate-body: false` keeps every other check while never buffering anything.
+
+A body of up to 64 KB is validated on the thread the exchange is served by. A larger one is
+validated on the bounded elastic scheduler, and the rest of the exchange then runs there.
 
 ## Metrics
 
@@ -147,9 +158,11 @@ contract was applied to.
 
 A contract that is missing, unreachable or unparseable is a gateway misconfiguration, not a
 defect of the traffic. The exchange is **forwarded unvalidated** rather than turned into an
-outage, and the failure is logged at `ERROR`, recorded in the audit attributes and counted in
-`gateway.openapi.validation.contracts.unavailable`. A failed read is not remembered, so a
-contract that becomes reachable again is picked up by the next request without a restart.
+outage, and the failure is recorded in the audit attributes and counted in
+`gateway.openapi.validation.contracts.unavailable`. It is logged at `ERROR` once per failed
+read, not per request: a failed read is remembered for 30 seconds, during which the requests
+through the route are forwarded at once instead of each waiting for a read of their own to
+fail. A contract that becomes reachable again is picked up after that delay, without a restart.
 
 To fail closed, alert on that counter — it is zero on a healthy gateway.
 

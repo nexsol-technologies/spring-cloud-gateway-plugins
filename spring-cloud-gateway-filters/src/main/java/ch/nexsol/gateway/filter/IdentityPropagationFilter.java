@@ -19,6 +19,7 @@ package ch.nexsol.gateway.filter;
 import java.security.Principal;
 import java.util.Set;
 
+import ch.nexsol.gateway.commons.security.PrincipalJwt;
 import ch.nexsol.gateway.filter.IdentityPropagationProperties.Headers;
 import reactor.core.publisher.Mono;
 
@@ -26,9 +27,7 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.AbstractOAuth2TokenAuthenticationToken;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 
@@ -150,7 +149,7 @@ public class IdentityPropagationFilter implements GlobalFilter, Ordered {
 	}
 
 	private static Identity identityOf(Principal principal) {
-		Jwt jwt = extractJwt(principal);
+		Jwt jwt = PrincipalJwt.of(principal);
 		if (jwt == null) {
 			return null;
 		}
@@ -158,17 +157,6 @@ public class IdentityPropagationFilter implements GlobalFilter, Ordered {
 		String client = firstWithText(jwt.getClaimAsString("azp"), jwt.getClaimAsString("client_id"));
 		String user = firstWithText(jwt.getClaimAsString("preferred_username"), jwt.getSubject());
 		return new Identity(issuer, client, user);
-	}
-
-	private static Jwt extractJwt(Principal principal) {
-		if (principal instanceof AbstractOAuth2TokenAuthenticationToken<?> token
-				&& token.getToken() instanceof Jwt jwt) {
-			return jwt;
-		}
-		if (principal instanceof Authentication authentication && authentication.getPrincipal() instanceof Jwt jwt) {
-			return jwt;
-		}
-		return null;
 	}
 
 	private static String firstWithText(String first, String second) {

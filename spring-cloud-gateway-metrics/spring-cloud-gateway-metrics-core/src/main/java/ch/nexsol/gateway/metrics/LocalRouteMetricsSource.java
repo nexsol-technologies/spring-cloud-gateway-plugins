@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import ch.nexsol.gateway.commons.InstanceIdentity;
+import ch.nexsol.gateway.commons.routes.RouteExclusions;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import reactor.core.publisher.Mono;
@@ -57,7 +58,7 @@ public class LocalRouteMetricsSource implements RouteMetricsSource {
 	public LocalRouteMetricsSource(ObjectProvider<MeterRegistry> meterRegistry, MetricsProperties properties,
 			InstanceIdentity identity) {
 		this.meterRegistry = meterRegistry;
-		this.excludedRoutes = new RouteExclusions(properties.getExcludedRoutes());
+		this.excludedRoutes = new RouteExclusions("metrics", properties.getExcludedRoutes());
 		this.coverage = "this instance only (" + identity.id() + ")";
 	}
 

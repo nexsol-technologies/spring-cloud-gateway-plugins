@@ -36,6 +36,15 @@ public class GatewayUiMenu {
 
 	private final ObjectProvider<NavItem> items;
 
+	/*
+	 * Built on the first request and kept: the entries are beans, which do not change
+	 * once the gateway has started, and the menu is put in the model of every request an
+	 * annotated controller serves, the JSON a view polls every few seconds included.
+	 */
+	private volatile List<NavItem> sorted;
+
+	private volatile List<NavSection> grouped;
+
 	/**
 	 * Creates the menu backed by the lazily-resolved collection of contributed entries.
 	 * @param items the provider over every {@link NavItem} bean in the context
@@ -49,9 +58,14 @@ public class GatewayUiMenu {
 	 * @return the immutable, ordered list of menu entries
 	 */
 	public List<NavItem> items() {
-		return this.items.orderedStream()
-			.sorted(Comparator.comparingInt(NavItem::order).thenComparing(NavItem::label))
-			.toList();
+		List<NavItem> known = this.sorted;
+		if (known == null) {
+			known = this.items.orderedStream()
+				.sorted(Comparator.comparingInt(NavItem::order).thenComparing(NavItem::label))
+				.toList();
+			this.sorted = known;
+		}
+		return known;
 	}
 
 	/**
@@ -64,9 +78,18 @@ public class GatewayUiMenu {
 	 * @return the immutable, ordered list of sections
 	 */
 	public List<NavSection> sections() {
+		List<NavSection> known = this.grouped;
+		if (known == null) {
+			known = group(items());
+			this.grouped = known;
+		}
+		return known;
+	}
+
+	private static List<NavSection> group(List<NavItem> items) {
 		Map<String, List<NavItem>> groups = new LinkedHashMap<>();
 		List<NavSection> sections = new ArrayList<>();
-		for (NavItem item : items()) {
+		for (NavItem item : items) {
 			if (item.group() == null) {
 				sections.add(new NavSection(null, List.of(item)));
 				continue;

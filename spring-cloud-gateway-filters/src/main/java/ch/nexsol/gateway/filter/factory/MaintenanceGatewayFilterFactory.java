@@ -34,6 +34,8 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import ch.nexsol.gateway.commons.security.PrincipalJwt;
+import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
 import jakarta.validation.Valid;
@@ -59,7 +61,6 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.AbstractOAuth2TokenAuthenticationToken;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.server.ServerWebExchange;
@@ -144,6 +145,10 @@ public class MaintenanceGatewayFilterFactory
 	private static final Logger LOG = LoggerFactory.getLogger(MaintenanceGatewayFilterFactory.class);
 
 	private static final Pattern DELIMITER = Pattern.compile("[\\s,]+");
+
+	// Read with a configuration held once: JsonPath.read(Object, String) looks the path
+	// up in a cache shared by the whole JVM, behind a single lock, on every request.
+	private static final Configuration JSON_PATH_CONFIGURATION = Configuration.defaultConfiguration();
 
 	private final JsonMapper mapper = JsonMapper.builder().build();
 
@@ -265,7 +270,7 @@ public class MaintenanceGatewayFilterFactory
 		if (config.getAllowedClaims().isEmpty()) {
 			return false;
 		}
-		Jwt jwt = extractJwt(principal);
+		Jwt jwt = PrincipalJwt.of(principal);
 		// The emptiness of the list is settled above on purpose: allMatch answers true on
 		// an empty stream, so an ALL mode with no claim configured would exempt every
 		// caller carrying a token.
@@ -288,7 +293,9 @@ public class MaintenanceGatewayFilterFactory
 	private static boolean hasClaimValue(Map<String, Object> claims, AllowedClaim allowed) {
 		Object claim;
 		try {
-			claim = JsonPath.read(claims, allowed.getJsonPath());
+			JsonPath compiled = allowed.compiledJsonPath();
+			claim = (compiled != null) ? compiled.read(claims, JSON_PATH_CONFIGURATION)
+					: JsonPath.read(claims, allowed.getJsonPath());
 		}
 		catch (PathNotFoundException ex) {
 			return false;
@@ -328,17 +335,6 @@ public class MaintenanceGatewayFilterFactory
 				.toList();
 		}
 		return List.of(String.valueOf(claim));
-	}
-
-	private static Jwt extractJwt(Principal principal) {
-		if (principal instanceof AbstractOAuth2TokenAuthenticationToken<?> token
-				&& token.getToken() instanceof Jwt jwt) {
-			return jwt;
-		}
-		if (principal instanceof Authentication authentication && authentication.getPrincipal() instanceof Jwt jwt) {
-			return jwt;
-		}
-		return null;
 	}
 
 	/**
@@ -612,6 +608,8 @@ public class MaintenanceGatewayFilterFactory
 		@NotNull
 		private MatchMode match = MatchMode.ANY;
 
+		private JsonPath compiledJsonPath;
+
 		/**
 		 * Returns the JSON path locating the claim.
 		 * @return the json path
@@ -631,10 +629,12 @@ public class MaintenanceGatewayFilterFactory
 		 * parse
 		 */
 		public void setJsonPath(String jsonPath) {
-			if (StringUtils.hasText(jsonPath)) {
-				JsonPath.compile(jsonPath);
-			}
+			this.compiledJsonPath = StringUtils.hasText(jsonPath) ? JsonPath.compile(jsonPath) : null;
 			this.jsonPath = jsonPath;
+		}
+
+		JsonPath compiledJsonPath() {
+			return this.compiledJsonPath;
 		}
 
 		/**

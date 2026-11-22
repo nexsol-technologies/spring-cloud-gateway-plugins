@@ -128,8 +128,11 @@ public class RecaptchaGatewayFilterFactory extends AbstractGatewayFilterFactory<
 			return extractRecaptchaToken(request, config).flatMap((recaptcha) -> verify(config, recaptcha))
 				// Fail closed: if validation produced no result, deny rather than let the
 				// request through unverified.
-				.switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN,
-						"reCAPTCHA validation could not be completed")))
+				// Deferred, so the exception — and its stack trace — is only built for
+				// the
+				// request that is actually denied, not for every request passing through.
+				.switchIfEmpty(Mono.defer(() -> Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN,
+						"reCAPTCHA validation could not be completed"))))
 				.flatMap((recaptchaResponse) -> chain.filter(exchange));
 		};
 	}

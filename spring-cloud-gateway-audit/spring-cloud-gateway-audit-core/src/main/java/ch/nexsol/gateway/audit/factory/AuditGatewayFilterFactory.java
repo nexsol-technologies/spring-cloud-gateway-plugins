@@ -55,12 +55,12 @@ public class AuditGatewayFilterFactory extends AbstractGatewayFilterFactory<Audi
 		// connection or timed out is exactly what an audit trail has to keep, so the
 		// event is published before the failure is propagated.
 		return (exchange, chain) -> chain.filter(exchange)
-			.then(audit(exchange))
-			.onErrorResume((ex) -> audit(exchange).then(Mono.error(ex)));
+			.then(audit(exchange, null))
+			.onErrorResume((ex) -> audit(exchange, ex).then(Mono.error(ex)));
 	}
 
-	private Mono<Void> audit(ServerWebExchange exchange) {
-		return Mono.defer(() -> this.eventFactory.create(exchange))
+	private Mono<Void> audit(ServerWebExchange exchange, Throwable failure) {
+		return Mono.defer(() -> this.eventFactory.create(exchange, failure))
 			.doOnNext(this.publisher::publish)
 			.onErrorResume((ex) -> {
 				LOG.warn("audit event publication failed", ex);

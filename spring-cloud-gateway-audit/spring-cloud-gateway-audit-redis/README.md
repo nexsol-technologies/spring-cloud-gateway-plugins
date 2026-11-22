@@ -24,6 +24,8 @@ spring.cloud.gateway.server.webflux.audit:
   provider: redis
   redis:
     channel: gateway-audit
+    max-pending: 10000           # events held while Redis does not answer; past it they are dropped
+    send-timeout: 30s            # how long one publication may take
 
 spring.data.redis:
   host: localhost
@@ -37,11 +39,30 @@ spring.data.redis:
 | Property | Default | What it does |
 | --- | --- | --- |
 | `...audit.redis.channel` | `gateway-audit` | Pub/sub channel |
+| `...audit.redis.max-pending` | `10000` | How many events may be pending at once; past it an event is dropped and reported. `0` sets no limit |
+| `...audit.redis.send-timeout` | `30s` | How long one publication may take before it is given up and counted as failed. `0` sets no timeout |
 
 The plugin declares no connection property of its own, `database` included — it would give
 the same setting two places to disagree. That index is shared with everything else reusing
 the connection (the metrics plugin, your cache, your sessions), and Redis Cluster only has
 database 0, where the setting is ignored.
+
+## When the Redis does not keep up
+
+Publishing never waits, so a Redis slower than the traffic does not slow a request down:
+the events pile up instead, each holding its payload. `max-pending` bounds them. Past it an
+event is **dropped**, and the gateway says so in the log — one `WARN` at most every 30
+seconds, carrying how many events were dropped and how many the Redis did not take since
+startup:
+
+```
+audit events are being lost towards the redis channel gateway-audit: 124 dropped over the limit of 10000 pending, 3 failed (totals since startup, reported at most every 30 s)
+```
+
+The Redis client queues every command while it is disconnected, without limit; this bound is
+what keeps an outage from growing the heap by one event per request. `send-timeout` gives the
+place of an event back when Redis never answers, so the events that follow are not dropped
+for good.
 
 ## Pub/sub, not a queue
 

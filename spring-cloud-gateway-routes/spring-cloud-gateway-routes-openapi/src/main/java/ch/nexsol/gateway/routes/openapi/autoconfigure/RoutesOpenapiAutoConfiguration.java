@@ -85,8 +85,9 @@ public class RoutesOpenapiAutoConfiguration {
 
 	@Bean
 	OpenApiRouteDefinitionLoader openApiRouteDefinitionLoader(OpenApiSpecLoader specLoader,
-			OpenApiRouteDefinitionMapper mapper, OpenapiSourcesLoader sourcesLoader) {
-		return new OpenApiRouteDefinitionLoader(specLoader, mapper, sourcesLoader);
+			OpenApiRouteDefinitionMapper mapper, OpenapiSourcesLoader sourcesLoader,
+			RoutesOpenapiProperties properties) {
+		return new OpenApiRouteDefinitionLoader(specLoader, mapper, sourcesLoader, properties.getContractTtl());
 	}
 
 	/**

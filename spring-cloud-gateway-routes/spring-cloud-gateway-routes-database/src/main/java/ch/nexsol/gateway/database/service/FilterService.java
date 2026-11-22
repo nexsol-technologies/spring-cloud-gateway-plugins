@@ -78,6 +78,14 @@ public class FilterService
 		return loadDefinitionsByRouteIds(routeIds);
 	}
 
+	/**
+	 * Loads the filter definitions of every route in a single statement.
+	 * @return the filter definitions of every route, by route reference id
+	 */
+	public Mono<Map<Long, List<FilterDefinition>>> loadAllFilterDefinitions() {
+		return loadAllDefinitions();
+	}
+
 	@Override
 	protected FilterEntity newEntity() {
 		return new FilterEntity();
