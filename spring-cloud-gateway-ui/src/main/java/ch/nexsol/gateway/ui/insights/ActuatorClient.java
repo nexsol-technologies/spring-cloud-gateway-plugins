@@ -22,6 +22,10 @@ import ch.nexsol.gateway.ui.insights.ActuatorInstances.Instance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.BodyInserters;
@@ -46,11 +50,16 @@ public class ActuatorClient {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ActuatorClient.class);
 
+	private static final TypeReference<Map<String, Object>> PAYLOAD = new TypeReference<>() {
+	};
+
 	private final WebClient webClient;
 
 	private final InsightsProperties properties;
 
 	private final LocalActuator local;
+
+	private final ObjectMapper mapper = JsonMapper.builder().build();
 
 	/**
 	 * Creates the client.
@@ -82,7 +91,14 @@ public class ActuatorClient {
 			.uri(url)
 			.accept(MediaType.APPLICATION_JSON)
 			.retrieve()
-			.bodyToMono(new ParameterizedMap())
+			.bodyToMono(byte[].class)
+			// The thread delivering the bytes is an event loop the proxied traffic
+			// shares,
+			// Reactor Netty giving its client and its server the same ones. A bean or a
+			// condition report runs past a megabyte: it is parsed, and encoded again for
+			// the browser, away from it.
+			.publishOn(Schedulers.boundedElastic())
+			.map(this::parse)
 			.timeout(this.properties.getTimeout())
 			.onErrorResume((ex) -> {
 				LOG.debug("Could not read the {} endpoint of {}", endpoint, instance.id(), ex);
@@ -138,6 +154,10 @@ public class ActuatorClient {
 		return trimmed(instance.uri()) + this.properties.basePathOr(this.local.basePath()) + "/" + endpoint;
 	}
 
+	private Map<String, Object> parse(byte[] payload) {
+		return this.mapper.readValue(payload, PAYLOAD);
+	}
+
 	private static String trimmed(String uri) {
 		return uri.endsWith("/") ? uri.substring(0, uri.length() - 1) : uri;
 	}
@@ -166,16 +186,6 @@ public class ActuatorClient {
 		public String endpoint() {
 			return this.endpoint;
 		}
-
-	}
-
-	/**
-	 * The shape every Actuator endpoint this console reads answers with. Declared once
-	 * rather than inline, since a parameterized type reference cannot be written as a
-	 * class literal.
-	 */
-	private static final class ParameterizedMap
-			extends org.springframework.core.ParameterizedTypeReference<Map<String, Object>> {
 
 	}
 

@@ -34,10 +34,10 @@ public class RedisMetricsProperties {
 	 * Prefix of the key each instance publishes its technical figures under. The instance
 	 * id is appended, so one key exists per live instance.
 	 * <p>
-	 * A separate namespace rather than a suffix under {@link #keyPrefix}: the route
-	 * source scans that prefix with a wildcard, so anything nested below it would come
-	 * back in its scan and be discarded one entry at a time, with a warning, on every
-	 * single refresh.
+	 * It must differ from {@link #keyPrefix}: each prefix holds its own index, and under
+	 * one prefix the two kinds of figures would be listed together, each source
+	 * discarding the entries of the other one at a time, with a warning, on every single
+	 * refresh.
 	 */
 	private String instanceKeyPrefix = "gateway:instances:";
 

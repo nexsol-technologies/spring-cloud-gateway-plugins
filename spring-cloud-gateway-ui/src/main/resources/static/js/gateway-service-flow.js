@@ -54,7 +54,6 @@
 	var dataUrl = flowEl.getAttribute('data-url') || '/ui/service-graph/data';
 	var edges = [];
 	var readAt = 0;
-	var timer = null;
 	// What each hop had carried at the previous poll, and what it carried since. The second
 	// is filled by a load and emptied by the render that draws it, so redrawing for a filter
 	// or a resize never replays traffic that has already been shown.
@@ -120,7 +119,9 @@
 	 * something, on the other it was reached, and the two are different figures.
 	 */
 	function hops(shown, key) {
-		var totals = {};
+		// Keyed by endpoint name, which is whatever a caller called itself: an object
+		// with a prototype would take '__proto__' or 'constructor' for one of its own.
+		var totals = Object.create(null);
 		var order = [];
 		shown.forEach(function (edge) {
 			var id = edge[key];
@@ -792,6 +793,10 @@
 		renderKpis(shown, allCallers, allServices);
 		if (!callers.length) {
 			prune({});
+			// A remembered filter that hides everything must not read as a gateway
+			// without traffic.
+			sel('gf-empty').textContent = edges.length ? 'No call matches these filters.'
+				: 'Nothing to draw yet \u2014 send some traffic through the gateway, then refresh.';
 			sel('gf-empty').style.display = '';
 			sel('gf-legend').textContent = '';
 			if (svg) {
@@ -875,10 +880,7 @@
 	/* ------------------------------------------------------------------ the poll */
 
 	function load() {
-		fetch(dataUrl, { headers: { Accept: 'application/json' } })
-			.then(function (response) {
-				return response.json();
-			})
+		window.gatewayUi.getJson(dataUrl)
 			.then(function (json) {
 				edges = (json && json.edges) || [];
 				sel('gf-coverage').textContent = (json && json.coverage) ? json.coverage : '';
@@ -888,21 +890,16 @@
 				redraw();
 			})
 			.catch(function () {
-				// The age is left where it was: a failed poll makes the picture on screen
-				// older, it does not make it younger.
-				sel('gf-coverage').textContent = 'Could not read the flow.';
+				// The picture on screen stays, and its age says the read failed.
+				window.gatewayUi.failed('gf-age');
 			});
 	}
 
+	var live = window.gatewayUi.poller(load, POLL_MS);
+
 	function schedule() {
-		if (timer) {
-			window.clearInterval(timer);
-			timer = null;
-		}
 		liveTag();
-		if (sel('gf-auto').checked) {
-			timer = window.setInterval(load, POLL_MS);
-		}
+		live(sel('gf-auto').checked);
 	}
 
 	['gf-search', 'gf-top', 'gf-4xx', 'gf-5xx'].forEach(function (id) {
@@ -926,7 +923,12 @@
 		new ResizeObserver(function () {
 			if (flowEl.clientWidth !== drawnAt) {
 				drawnAt = flowEl.clientWidth;
-				render(true);
+				// An observer reports once as soon as it watches a box, which is before
+				// the first read: drawing then would show an empty flow, and set every
+				// tile to a zero the first real figures would count up from.
+				if (readAt) {
+					render(true);
+				}
 			}
 		}).observe(flowEl);
 	}

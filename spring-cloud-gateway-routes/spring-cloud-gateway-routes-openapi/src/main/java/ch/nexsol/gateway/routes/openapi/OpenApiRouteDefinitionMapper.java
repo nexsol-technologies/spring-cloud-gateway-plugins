@@ -18,6 +18,7 @@ package ch.nexsol.gateway.routes.openapi;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -95,7 +96,14 @@ public class OpenApiRouteDefinitionMapper {
 
 	private List<RouteDefinition> perOperation(Source source, Paths paths, String basePath, String pathPrefix) {
 		List<RouteDefinition> routes = new ArrayList<>();
-		for (Map.Entry<String, PathItem> pathEntry : paths.entrySet()) {
+		// The gateway serves a request with the first route matching it, and a template
+		// matches the concrete paths it covers: /users/{id} declared ahead of /users/me
+		// would serve both, lending its metadata — the public flag above all — to an
+		// operation the contract protects. Fewer variables first; the sort is stable, so
+		// the contract order is kept among paths of the same shape.
+		List<Map.Entry<String, PathItem>> ordered = new ArrayList<>(paths.entrySet());
+		ordered.sort(Comparator.comparingInt((entry) -> StringUtils.countOccurrencesOf(entry.getKey(), "{")));
+		for (Map.Entry<String, PathItem> pathEntry : ordered) {
 			String path = pathEntry.getKey();
 			for (Map.Entry<HttpMethod, Operation> operationEntry : pathEntry.getValue()
 				.readOperationsMap()

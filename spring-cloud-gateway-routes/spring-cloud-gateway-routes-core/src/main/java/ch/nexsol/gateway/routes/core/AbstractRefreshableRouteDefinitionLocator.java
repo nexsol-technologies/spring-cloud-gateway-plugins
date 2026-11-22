@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
 import org.springframework.cloud.gateway.route.RouteDefinition;
@@ -45,7 +46,7 @@ public abstract class AbstractRefreshableRouteDefinitionLocator implements Route
 
 	private final ApplicationEventPublisher publisher;
 
-	private final AtomicReference<List<RouteDefinition>> cache = new AtomicReference<>(List.of());
+	private final AtomicReference<Snapshot> cache = new AtomicReference<>(new Snapshot(List.of(), List.of()));
 
 	/**
 	 * Creates the locator with the publisher used to notify the gateway of route changes.
@@ -62,7 +63,7 @@ public abstract class AbstractRefreshableRouteDefinitionLocator implements Route
 	 */
 	@Override
 	public Flux<RouteDefinition> getRouteDefinitions() {
-		return Flux.fromIterable(this.cache.get());
+		return Flux.fromIterable(this.cache.get().served());
 	}
 
 	/**
@@ -78,24 +79,69 @@ public abstract class AbstractRefreshableRouteDefinitionLocator implements Route
 	 * @return a completion signal
 	 */
 	public Mono<Void> refresh() {
-		return loadRouteDefinitions().collectList().doOnNext(this::updateCacheAndPublish).onErrorResume((ex) -> {
-			LOG.error("Failed to refresh route definitions, keeping the previous snapshot", ex);
-			return Mono.empty();
-		}).then();
+		return loadRouteDefinitions().collectList()
+			// Publishing the event makes the gateway rebuild its route table on the
+			// publishing thread, and the definitions of a remote source arrive on the
+			// event loop of the client that fetched them — one that also serves requests.
+			.publishOn(Schedulers.boundedElastic())
+			.doOnNext(this::updateCacheAndPublish)
+			.onErrorResume((ex) -> {
+				LOG.error("Failed to refresh route definitions, keeping the previous snapshot", ex);
+				return Mono.empty();
+			})
+			.then();
+	}
+
+	/**
+	 * Reloads the definitions on an explicit request &mdash; {@code /actuator/refresh}, a
+	 * bus refresh &mdash; rather than on the trigger of the source. A locator that keeps
+	 * something between two reads overrides this to let go of it first: whoever asks for
+	 * a refresh expects the source itself to be read again.
+	 * @return a {@link Mono} completing once the reload has been processed
+	 */
+	public Mono<Void> reload() {
+		return refresh();
 	}
 
 	private void updateCacheAndPublish(List<RouteDefinition> definitions) {
 		List<RouteDefinition> loaded = List.copyOf(definitions);
-		List<RouteDefinition> previous = this.cache.getAndSet(loaded);
+		List<RouteDefinition> asRead = loaded.stream().map(AbstractRefreshableRouteDefinitionLocator::copyOf).toList();
 		LOG.debug("Loaded {} route definition(s)", loaded.size());
 		// A poll that read the same definitions changes nothing, and publishing anyway
 		// makes the gateway rebuild its whole route table — every predicate and every
-		// filter of every route — on every single tick.
-		if (loaded.equals(previous)) {
+		// filter of every route — on every single tick. The snapshot being served is
+		// then left in place too, so a route declared without an id keeps the one the
+		// gateway gave it.
+		if (asRead.equals(this.cache.get().asRead())) {
 			LOG.debug("Route definitions unchanged, not publishing a refresh event");
 			return;
 		}
+		this.cache.set(new Snapshot(loaded, asRead));
 		this.publisher.publishEvent(new RefreshRoutesEvent(this));
+	}
+
+	private static RouteDefinition copyOf(RouteDefinition definition) {
+		RouteDefinition copy = new RouteDefinition();
+		copy.setId(definition.getId());
+		copy.setUri(definition.getUri());
+		copy.setOrder(definition.getOrder());
+		copy.setEnabled(definition.isEnabled());
+		copy.setPredicates(definition.getPredicates());
+		copy.setFilters(definition.getFilters());
+		copy.setMetadata(definition.getMetadata());
+		return copy;
+	}
+
+	/**
+	 * What the source declared, held twice. The gateway writes on the definitions it is
+	 * served: a route declared without an id is given a random one, in place. Comparing
+	 * the next read with those definitions would find a difference on every read, so the
+	 * comparison is made against copies nobody else holds.
+	 *
+	 * @param served the definitions handed to the gateway
+	 * @param asRead the same definitions as the source declared them
+	 */
+	private record Snapshot(List<RouteDefinition> served, List<RouteDefinition> asRead) {
 	}
 
 }

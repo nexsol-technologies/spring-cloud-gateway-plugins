@@ -19,6 +19,7 @@ package ch.nexsol.gateway.database.service;
 import java.util.Map;
 
 import org.apache.commons.text.StringEscapeUtils;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -28,9 +29,10 @@ import tools.jackson.databind.ObjectMapper;
  * Written as plain JSON. It used to be escaped a second time on the way in and unescaped
  * on the way out, which bought nothing &mdash; the value is already a JSON document, and
  * a column holds it fine &mdash; while turning every backslash of an argument into a
- * round-trip through two escaping rules. Reading still unescapes, so the rows written by
- * the previous versions are read back unchanged: unescaping plain JSON leaves it as it
- * is.
+ * round-trip through two escaping rules. A row written by the previous versions is still
+ * read: it is not a JSON document until it is unescaped, so it is told apart by failing
+ * to parse. Unescaping is never applied to plain JSON, which it would corrupt &mdash; it
+ * strips the backslash JSON itself needs in front of a backslash or a double quote.
  */
 public class ArgumentService {
 
@@ -46,13 +48,18 @@ public class ArgumentService {
 	}
 
 	/**
-	 * Deserializes an escaped JSON string into an argument map.
-	 * @param args the escaped JSON representation of the arguments
+	 * Deserializes a stored JSON string into an argument map.
+	 * @param args the JSON representation of the arguments, plain or escaped
 	 * @return the arguments as a map
 	 */
 	@SuppressWarnings("unchecked")
 	public Map<String, String> jsonStringArgumentsToMap(String args) {
-		return this.objectMapper.readValue(StringEscapeUtils.unescapeJson(args), Map.class);
+		try {
+			return this.objectMapper.readValue(args, Map.class);
+		}
+		catch (JacksonException ex) {
+			return this.objectMapper.readValue(StringEscapeUtils.unescapeJson(args), Map.class);
+		}
 	}
 
 	/**

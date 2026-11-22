@@ -22,6 +22,7 @@ All properties are under `spring.cloud.gateway.server.webflux.routes-openapi`.
 spring.cloud.gateway.server.webflux.routes-openapi:
   enabled: true
   update-interval: 5m                   # omit to load once at startup
+  contract-ttl: 1h                      # a contract read is kept that long; omit to read it on every reload
   sources:
     - id: books
       uri: https://book-service.example.org  # backend target: only scheme/host/port is used
@@ -41,6 +42,7 @@ spring.cloud.gateway.server.webflux.routes-openapi:
 | --- | --- | --- |
 | `...routes-openapi.enabled` | `false` | Activates the source |
 | `...routes-openapi.update-interval` | — | Fixed delay between two reloads; unset loads once at startup |
+| `...routes-openapi.contract-ttl` | — | How long a contract is kept once read; unset or `0` reads every contract on every reload |
 | `...routes-openapi.sources` | — | Sources declared inline |
 | `...routes-openapi.sources-locations` | — | Documents declaring further sources |
 
@@ -63,7 +65,7 @@ Per source:
 
 | Mode | What it generates |
 | --- | --- |
-| `PER_OPERATION` | One route per operation, with `Path=<path>` and `Method=<verb>`. Route id is `<source-id>_<operationId>`, or a sanitised `<source-id>_<method>_<path>` when the contract declares no `operationId` |
+| `PER_OPERATION` | One route per operation, with `Path=<path>` and `Method=<verb>`. Route id is `<source-id>_<operationId>`, or a sanitised `<source-id>_<method>_<path>` when the contract declares no `operationId`. Concrete paths are routed ahead of templated ones, so `/users/me` is never served by the route of `/users/{id}` |
 | `AGGREGATED` | A single route per source, with a `Path` predicate listing every path and a `Method` predicate listing every verb |
 | `NO_ROUTE` | Nothing — the source is declared for its contract alone, see below |
 
@@ -224,12 +226,23 @@ route definitions, not sources, and would silently ignore a `sources:` document.
 A document is written exactly like the inline configuration — an array of sources, or an
 object with a `sources` array. Documents are re-read on every reload, and one that cannot be
 read or parsed is **skipped with a warning** rather than dropping the sources the others
-declared.
+declared. A document served over HTTP is given 30 s to accept the connection and 60 s to
+answer, the deadlines the contracts themselves are read with.
+
+The contracts are read up to four at a time, and their routes kept in the order of the
+sources.
 
 ## Reloading
 
 Besides `update-interval`, the routes are regenerated on `/actuator/refresh` and
 `/actuator/busrefresh` — see [Refreshing routes](../README.md#refreshing-routes).
+
+Every reload reads the list of sources again. With `contract-ttl` set, it fetches and parses a
+contract only once that time is up, and generates the routes from the contract it holds until
+then: a source added or removed is taken into account on the next reload, a contract changed
+at its address once its time is up. `/actuator/refresh` and `/actuator/busrefresh` read every
+contract again, whatever time it had left. A contract that could not be read is never kept, and
+is tried again on the next reload. Each contract kept stays in memory, parsed.
 
 A contract is read the way a resource is, not the way routed traffic is: the resource resolver
 and the OpenAPI parser fetch it with a blocking call, off the event loop, and no size limit

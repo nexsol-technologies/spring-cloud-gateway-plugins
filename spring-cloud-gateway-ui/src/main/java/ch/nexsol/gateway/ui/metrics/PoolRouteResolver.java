@@ -31,6 +31,7 @@ import ch.nexsol.gateway.ui.routes.RouteInventoryService;
 import ch.nexsol.gateway.ui.routes.RouteView;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -70,14 +71,25 @@ public class PoolRouteResolver {
 	private static final Map<String, Integer> DEFAULT_PORTS = Map.of("http", 80, "https", 443, "ws", 80, "wss", 443);
 
 	/**
-	 * Time the registry is given to answer. It is read on every poll of the view, so a
-	 * slow registry must cost an unnamed pool rather than a page that hangs.
+	 * Time the registry is given to answer: a slow registry must cost an unnamed pool
+	 * rather than a page that hangs.
 	 */
 	private static final Duration REGISTRY_TIMEOUT = Duration.ofSeconds(2);
+
+	/**
+	 * How long what the registry said is reused. A pool towards a load-balanced route is
+	 * reported under the address of an instance, which only the registry can name, so it
+	 * is needed on every poll of every open tab &mdash; and a registry answering over the
+	 * network would be asked for every service every five seconds. An instance that just
+	 * registered goes unnamed for that long at most.
+	 */
+	private static final Duration REGISTRY_TTL = Duration.ofSeconds(30);
 
 	private final RouteInventoryService inventory;
 
 	private final ObjectProvider<ReactiveDiscoveryClient> discoveryClient;
+
+	private volatile Mono<List<RegisteredAddress>> registered;
 
 	/**
 	 * Creates the resolver over the route inventory and the (optional) service registry.
@@ -135,22 +147,33 @@ public class PoolRouteResolver {
 
 	private Mono<Map<String, List<String>>> fromRegistry(ReactiveDiscoveryClient client,
 			Map<String, List<String>> byService, Set<String> wanted, Map<String, List<String>> named) {
-		return client.getServices()
-			.flatMap((service) -> client.getInstances(service).map((instance) -> entry(service, instance)))
-			.filter((entry) -> wanted.contains(entry.address()) && !named.containsKey(entry.address()))
-			.collectList()
-			.timeout(REGISTRY_TIMEOUT)
-			.map((entries) -> {
-				for (RegisteredAddress entry : entries) {
+		return registered(client).map((entries) -> {
+			for (RegisteredAddress entry : entries) {
+				if (wanted.contains(entry.address())) {
 					List<String> ids = byService.get(serviceKey(entry.serviceId()));
 					named.putIfAbsent(entry.address(), (ids != null) ? ids : List.of(entry.serviceId()));
 				}
-				return named;
-			})
-			.onErrorResume((ex) -> {
-				LOG.debug("Could not read the service registry to name the connection pools: {}", ex.getMessage());
-				return Mono.just(named);
-			});
+			}
+			return named;
+		}).onErrorResume((ex) -> {
+			LOG.debug("Could not read the service registry to name the connection pools: {}", ex.getMessage());
+			return Mono.just(named);
+		});
+	}
+
+	private Mono<List<RegisteredAddress>> registered(ReactiveDiscoveryClient client) {
+		Mono<List<RegisteredAddress>> known = this.registered;
+		if (known == null) {
+			known = Flux.defer(client::getServices)
+				.flatMap((service) -> client.getInstances(service).map((instance) -> entry(service, instance)))
+				.collectList()
+				.timeout(REGISTRY_TIMEOUT)
+				// Only an answer is kept: a registry that failed is asked again by the
+				// next poll.
+				.cache((entries) -> REGISTRY_TTL, (failure) -> Duration.ZERO, () -> Duration.ZERO);
+			this.registered = known;
+		}
+		return known;
 	}
 
 	private static RegisteredAddress entry(String serviceId, ServiceInstance instance) {

@@ -24,6 +24,7 @@ spring.cloud.gateway.server.webflux.audit:
   provider: kafka
   kafka:
     topic: gateway-audit
+    max-pending: 10000           # events waiting for the producer; past it they are dropped
 
 spring.kafka:
   bootstrap-servers: broker:9092
@@ -36,6 +37,26 @@ spring.kafka:
 | Property | Default | What it does |
 | --- | --- | --- |
 | `...audit.kafka.topic` | `gateway-audit` | Destination topic |
+| `...audit.kafka.max-pending` | `10000` | How many events may wait to be handed to the producer at once; past it an event is dropped and reported. `0` sets no limit |
+
+## When the broker does not keep up
+
+Publishing never waits, so a broker slower than the traffic does not slow a request down:
+the events pile up instead, each holding its payload. `max-pending` bounds them. Past it an
+event is **dropped**, and the gateway says so in the log — one `WARN` at most every 30
+seconds, carrying how many events were dropped and how many the broker did not take since
+startup:
+
+```
+audit events are being lost towards the kafka topic gateway-audit: 124 dropped over the limit of 10000 pending, 3 failed (totals since startup, reported at most every 30 s)
+```
+
+The events are handed to the producer on a thread of the plugin, never on the one serving the
+request: `KafkaProducer.send` waits for the metadata of the topic and for room in its buffer,
+up to `max.block.ms` — a minute by default — and with the broker out of reach that wait would
+otherwise park the event loops the whole gateway is served by. What waits for that thread is
+what `max-pending` bounds; the producer property `max.block.ms` sets how long one event may
+hold it.
 
 ## Authentication (SASL / SSL)
 

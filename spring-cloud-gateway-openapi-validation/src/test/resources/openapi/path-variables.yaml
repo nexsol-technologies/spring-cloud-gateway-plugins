@@ -1,0 +1,31 @@
+openapi: 3.0.3
+info:
+  title: Shelves
+  version: 1.0.0
+paths:
+  /shelves/{code}:
+    get:
+      operationId: getShelf
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z]{2,4}$'
+      responses:
+        '200':
+          description: The shelf
+  /files/{name}:
+    get:
+      operationId: getFile
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[^.]+$'
+      responses:
+        '200':
+          description: The file

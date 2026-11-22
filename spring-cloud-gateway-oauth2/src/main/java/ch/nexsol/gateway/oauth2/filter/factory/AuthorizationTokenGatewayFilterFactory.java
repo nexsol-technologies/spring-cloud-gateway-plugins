@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
 import jakarta.validation.Valid;
@@ -83,6 +84,10 @@ public class AuthorizationTokenGatewayFilterFactory
 	 * this module does not depend on.
 	 */
 	private static final String PUBLIC_METADATA_KEY = "public";
+
+	// Read with a configuration held once: JsonPath.read(Object, String) looks the path
+	// up in a cache shared by the whole JVM, behind a single lock, on every request.
+	private static final Configuration JSON_PATH_CONFIGURATION = Configuration.defaultConfiguration();
 
 	/**
 	 * Issuers key.
@@ -222,7 +227,7 @@ public class AuthorizationTokenGatewayFilterFactory
 	boolean hasAuthority(Map<String, Object> claims, GrantAccess grantAccess) {
 		Object claim;
 		try {
-			claim = JsonPath.read(claims, grantAccess.getJsonPath());
+			claim = grantAccess.compiledJsonPath().read(claims, JSON_PATH_CONFIGURATION);
 		}
 		catch (PathNotFoundException ex) {
 			claim = null;
@@ -389,6 +394,8 @@ public class AuthorizationTokenGatewayFilterFactory
 		@NotNull
 		private MatchMode match = MatchMode.ALL;
 
+		private volatile JsonPath compiledJsonPath;
+
 		/**
 		 * Return the JSON path locating the claim holding the roles.
 		 * @return the json path
@@ -403,6 +410,20 @@ public class AuthorizationTokenGatewayFilterFactory
 		 */
 		public void setJsonPath(@NotEmpty String jsonPath) {
 			this.jsonPath = jsonPath;
+			this.compiledJsonPath = null;
+		}
+
+		/*
+		 * Compiled on the first request that needs it and kept: an expression that does
+		 * not parse still fails where it used to, when a request is checked against it.
+		 */
+		JsonPath compiledJsonPath() {
+			JsonPath compiled = this.compiledJsonPath;
+			if (compiled == null) {
+				compiled = JsonPath.compile(this.jsonPath);
+				this.compiledJsonPath = compiled;
+			}
+			return compiled;
 		}
 
 		/**

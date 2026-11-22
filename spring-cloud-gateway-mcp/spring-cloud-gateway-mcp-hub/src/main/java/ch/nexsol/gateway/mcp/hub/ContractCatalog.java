@@ -17,11 +17,17 @@
 package ch.nexsol.gateway.mcp.hub;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
 import ch.nexsol.gateway.commons.routes.RouteDefinitionSources;
 import ch.nexsol.gateway.openapi.hub.discovery.HubDiscoveryRouteLocator;
@@ -50,6 +56,11 @@ import org.springframework.web.reactive.function.client.WebClient;
  * where its contract is and under which prefix the gateway serves it. The contract is
  * read from the service, as the hub reads it, and its operations become the tools of the
  * service.
+ * <p>
+ * The catalog is read on every refresh of the routes, and a registry refreshes them on
+ * every heartbeat, changed or not. A contract is therefore fetched each time but only
+ * parsed when what was fetched differs from what the tools of the service were last built
+ * from: parsing and resolving a contract is by far the larger part of the work.
  */
 public class ContractCatalog implements ApiToolSource {
 
@@ -61,6 +72,13 @@ public class ContractCatalog implements ApiToolSource {
 
 	private static final String ADVERTISED_PATH = "OpenapiModifyResponseBody";
 
+	/**
+	 * A reference to anything but the document itself. The parser fetches what such a
+	 * reference points at, so the tools then depend on a document whose changes the text
+	 * of the contract does not show.
+	 */
+	private static final Pattern EXTERNAL_REFERENCE = Pattern.compile("\\$ref[\"']?\\s*:\\s*[\"']?[^#\"'\\s]");
+
 	private final ObjectProvider<RouteDefinitionLocator> locators;
 
 	private final WebClient webClient;
@@ -68,6 +86,8 @@ public class ContractCatalog implements ApiToolSource {
 	private final URI gatewayUri;
 
 	private final McpHubProperties properties;
+
+	private final Map<DocumentedService, Parsed> parsed = new ConcurrentHashMap<>();
 
 	public ContractCatalog(ObjectProvider<RouteDefinitionLocator> locators, WebClient webClient, URI gatewayUri,
 			McpHubProperties properties) {
@@ -87,6 +107,7 @@ public class ContractCatalog implements ApiToolSource {
 		return Mono.defer(() -> {
 			AtomicBoolean sourcesRead = new AtomicBoolean(true);
 			Set<String> unread = ConcurrentHashMap.newKeySet();
+			Set<DocumentedService> documented = ConcurrentHashMap.newKeySet();
 			return Flux.fromIterable(RouteDefinitionSources.sources(this.locators))
 				.flatMap((locator) -> RouteDefinitionSources.read(locator, SOURCE_TIMEOUT).onErrorResume((ex) -> {
 					LOG.warn("Route definition source {} could not be read", RouteDefinitionSources.name(locator), ex);
@@ -95,6 +116,7 @@ public class ContractCatalog implements ApiToolSource {
 				}))
 				.flatMapIterable((definitions) -> definitions)
 				.mapNotNull((definition) -> service(definition, this.gatewayUri))
+				.doOnNext(documented::add)
 				.flatMap((service) -> tools(service).onErrorResume((ex) -> {
 					LOG.warn("The contract of {} could not be read from {}: {}", service.name(), service.contractUrl(),
 							ex.getMessage());
@@ -103,7 +125,10 @@ public class ContractCatalog implements ApiToolSource {
 				}), this.properties.getConcurrency())
 				.flatMapIterable((tools) -> tools)
 				.collectList()
-				.map((tools) -> new ApiCatalog(tools, unread, sourcesRead.get()));
+				.map((tools) -> new ApiCatalog(tools, unread, sourcesRead.get()))
+				// What is kept of a service no route documents any more would never be
+				// read again.
+				.doOnNext((catalog) -> this.parsed.keySet().retainAll(documented));
 		});
 	}
 
@@ -112,9 +137,41 @@ public class ContractCatalog implements ApiToolSource {
 			.uri(service.contractUrl())
 			.retrieve()
 			.bodyToMono(String.class)
+			// The client has no response timeout of its own, and the refreshes run one
+			// after the other: a service that accepts the connection and never answers
+			// would hold this one, and every later one behind it, for good.
+			.timeout(this.properties.getTimeout())
 			.publishOn(Schedulers.boundedElastic())
-			.map((contents) -> OperationTools.of(service.name(), parse(service, contents), service.base(),
-					this.properties.isWriteEnabled(), this.properties.isConfirmWrites()));
+			.map((contents) -> tools(service, contents));
+	}
+
+	private List<ApiTool> tools(DocumentedService service, String contents) {
+		boolean writeEnabled = this.properties.isWriteEnabled();
+		boolean confirmWrites = this.properties.isConfirmWrites();
+		// Everything the tools are built from is compared, not the text alone: the
+		// service is the key, and it carries the name and the prefix the gateway serves
+		// it under.
+		String digest = EXTERNAL_REFERENCE.matcher(contents).find() ? null : digest(contents);
+		Parsed known = this.parsed.get(service);
+		if (digest != null && known != null && known.builtFrom(digest, writeEnabled, confirmWrites)) {
+			return known.tools();
+		}
+		List<ApiTool> tools = OperationTools.of(service.name(), parse(service, contents), service.base(), writeEnabled,
+				confirmWrites);
+		if (digest != null) {
+			this.parsed.put(service, new Parsed(digest, writeEnabled, confirmWrites, tools));
+		}
+		return tools;
+	}
+
+	private static String digest(String contents) {
+		try {
+			return HexFormat.of()
+				.formatHex(MessageDigest.getInstance("SHA-256").digest(contents.getBytes(StandardCharsets.UTF_8)));
+		}
+		catch (NoSuchAlgorithmException ex) {
+			throw new IllegalStateException(ex);
+		}
 	}
 
 	private static OpenAPI parse(DocumentedService service, String contents) {
@@ -174,6 +231,23 @@ public class ContractCatalog implements ApiToolSource {
 	 * @param base the address the gateway serves its operations under
 	 */
 	record DocumentedService(String name, URI contractUrl, URI base) {
+	}
+
+	/**
+	 * The tools last built for a service, and what they were built from.
+	 *
+	 * @param digest the digest of the text of the contract
+	 * @param writeEnabled whether the operations changing state were turned into tools
+	 * @param confirmWrites whether those tools ask for a confirmation
+	 * @param tools the tools
+	 */
+	private record Parsed(String digest, boolean writeEnabled, boolean confirmWrites, List<ApiTool> tools) {
+
+		boolean builtFrom(String digest, boolean writeEnabled, boolean confirmWrites) {
+			return this.digest.equals(digest) && this.writeEnabled == writeEnabled
+					&& this.confirmWrites == confirmWrites;
+		}
+
 	}
 
 }

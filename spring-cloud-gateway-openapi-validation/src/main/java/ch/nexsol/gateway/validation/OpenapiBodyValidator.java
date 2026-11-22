@@ -16,7 +16,6 @@
 
 package ch.nexsol.gateway.validation;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.networknt.schema.Error;
@@ -87,11 +86,7 @@ class OpenapiBodyValidator {
 		if (messages.isEmpty()) {
 			return ValidationReport.empty();
 		}
-		List<String> errors = new ArrayList<>(messages.size());
-		for (Error message : messages) {
-			errors.add(role + " body " + describe(message));
-		}
-		return new ValidationReport(errors);
+		return new ValidationReport(Violations.describe(messages, (message) -> role + " body " + describe(message)));
 	}
 
 	/**

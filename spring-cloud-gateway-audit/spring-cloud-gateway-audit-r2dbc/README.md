@@ -24,6 +24,8 @@ spring.cloud.gateway.server.webflux.audit:
   provider: r2dbc
   r2dbc:
     table: audit_event
+    max-pending: 10000           # inserts held while the database does not keep up; past it they are dropped
+    send-timeout: 30s            # how long one insert may take
 
 spring.r2dbc:
   url: r2dbc:postgresql://localhost:5432/gateway
@@ -34,6 +36,25 @@ spring.r2dbc:
 | Property | Default | What it does |
 | --- | --- | --- |
 | `...audit.r2dbc.table` | `audit_event` | Destination table |
+| `...audit.r2dbc.max-pending` | `10000` | How many inserts may be pending at once; past it an event is dropped and reported. `0` sets no limit |
+| `...audit.r2dbc.send-timeout` | `30s` | How long one insert may take before it is given up and counted as failed. `0` sets no timeout |
+
+## When the database does not keep up
+
+Publishing never waits, so a database slower than the traffic does not slow a request down:
+the events pile up instead, each holding its payload. `max-pending` bounds them. Past it an
+event is **dropped**, and the gateway says so in the log — one `WARN` at most every 30
+seconds, carrying how many events were dropped and how many the database did not take since
+startup:
+
+```
+audit events are being lost towards the table audit_event: 124 dropped over the limit of 10000 pending, 3 failed (totals since startup, reported at most every 30 s)
+```
+
+Each event is one `INSERT`, waiting its turn for a connection of the pool — which has no
+acquisition timeout unless `spring.r2dbc.pool.max-acquire-time` sets one. `send-timeout` gives
+the place of an insert back when the database never answers, so the events that follow are
+not dropped for good.
 
 ## Schema
 

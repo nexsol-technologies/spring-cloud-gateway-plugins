@@ -67,8 +67,7 @@ public class RedisAuditAutoConfiguration {
 	@ConditionalOnSingleCandidate(ReactiveStringRedisTemplate.class)
 	AuditEventPublisher redisAuditEventPublisher(ReactiveStringRedisTemplate redisTemplate,
 			RedisAuditProperties properties, ObjectMapper objectMapper) {
-		return new RedisAuditEventPublisher(redisTemplate, properties.getChannel(),
-				new AuditEventSerializer(objectMapper));
+		return new RedisAuditEventPublisher(redisTemplate, new AuditEventSerializer(objectMapper), properties);
 	}
 
 }

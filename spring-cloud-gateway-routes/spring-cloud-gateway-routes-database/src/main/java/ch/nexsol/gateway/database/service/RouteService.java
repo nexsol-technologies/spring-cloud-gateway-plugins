@@ -98,15 +98,14 @@ public class RouteService {
 	 */
 	public Flux<RouteDefinition> loadSpringCloudGatewayRouteDefinition() {
 		return this.routeRepository.findAll().collectList().flatMapMany((routes) -> {
-			List<Long> routeIds = routes.stream().map(RouteEntity::getId).toList();
-
 			// Batch-load predicates and filters for every route in a single query each
-			// (3 queries total) instead of 1 + 2N on the route-resolution hot path.
+			// (3 queries total) instead of 1 + 2N on the route-resolution hot path. Every
+			// route is wanted, so the two tables are read whole rather than through a
+			// list naming each route.
 			Mono<Map<Long, List<PredicateDefinition>>> predicatesByRoute = this.predicateService
-				.loadPredicateDefinitionsByRouteIds(routeIds);
+				.loadAllPredicateDefinitions();
 
-			Mono<Map<Long, List<FilterDefinition>>> filtersByRoute = this.filterService
-				.loadFilterDefinitionsByRouteIds(routeIds);
+			Mono<Map<Long, List<FilterDefinition>>> filtersByRoute = this.filterService.loadAllFilterDefinitions();
 
 			return Mono.zip(predicatesByRoute, filtersByRoute).flatMapMany((tuple) -> {
 				Map<Long, List<PredicateDefinition>> predicateMap = tuple.getT1();
@@ -201,7 +200,7 @@ public class RouteService {
 					.zip(this.predicateService.validatePredicatesArgs(routeModel.predicates()),
 							this.filterService.validateFiltersArgs(routeModel.filters()))
 					.flatMap((tuple) -> {
-						// Crée l'entité après validation des arguments
+						// The entity is only created once the arguments are validated
 						RouteEntity routeEntity = new RouteEntity();
 						routeEntity.setRouteId(routeModel.routeId());
 						routeEntity.setUri(routeModel.uri().toASCIIString());

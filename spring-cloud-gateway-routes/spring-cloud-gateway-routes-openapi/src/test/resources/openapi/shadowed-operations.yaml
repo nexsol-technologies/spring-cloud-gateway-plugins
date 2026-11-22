@@ -1,0 +1,43 @@
+openapi: 3.0.1
+info:
+  title: Users
+  version: 1.0.0
+security:
+  - bearerAuth: []
+paths:
+  /users/{id}:
+    get:
+      operationId: getUser
+      security: []
+      responses:
+        '200':
+          description: ok
+  /users/me:
+    get:
+      operationId: getMe
+      responses:
+        '200':
+          description: ok
+  /teams/{team}/members/{member}:
+    get:
+      operationId: getMember
+      responses:
+        '200':
+          description: ok
+  /teams/{team}/members/owner:
+    get:
+      operationId: getOwner
+      responses:
+        '200':
+          description: ok
+  /status:
+    get:
+      operationId: status
+      responses:
+        '200':
+          description: ok
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer

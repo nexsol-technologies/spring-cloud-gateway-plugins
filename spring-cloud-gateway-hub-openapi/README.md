@@ -30,6 +30,7 @@ spring.cloud.gateway.server.webflux.hub-openapi:
     concurrency: 16          # services probed at the same time
     max-connections: 50      # size of the pool dedicated to the probes
     cache-ttl: 5m            # how long a probe result is remembered
+    failure-cache-ttl: 30s   # how long an unreachable service is left alone; 0 probes it on every refresh
   security:
     issuer: GATEWAY          # DOCUMENT (default) | GATEWAY
   max-document-size: 2MB     # largest contract the rewriting may hold in memory
@@ -44,6 +45,7 @@ spring.cloud.gateway.server.webflux.hub-openapi:
 | `...hub-openapi.discovery.concurrency` | `16` | Services probed at the same time, whatever the size of the registry |
 | `...hub-openapi.discovery.max-connections` | `50` | Connection pool dedicated to the probes, so they never compete with routed traffic |
 | `...hub-openapi.discovery.cache-ttl` | `5m` | How long a probe result is remembered; `0` probes on every refresh |
+| `...hub-openapi.discovery.failure-cache-ttl` | `30s` | How long a service that could not be reached is left alone before being probed again; `0` probes it on every refresh |
 | `...hub-openapi.security.issuer` | `DOCUMENT` | Which issuer the documents advertise: `DOCUMENT` or `GATEWAY` |
 | `...hub-openapi.max-document-size` | `2MB` | Largest contract the rewriting holds in memory; see [A contract too large to be rewritten](#a-contract-too-large-to-be-rewritten) |
 | `...hub-openapi.security-chain-enabled` | `true` | Whether the plugin contributes its own `SecurityWebFilterChain` |
@@ -111,14 +113,17 @@ the registry: on a registry holding hundreds of services, probing them all at on
 the connection pool, and the probes then fail with `PoolAcquirePendingLimitException` while the
 gateway stops routing.
 
-Only a service that answered **"not there"** has its result cached. A service that could not be
-reached, or refused to hand its document over, has said nothing about having one: it is probed
-again on the next refresh, so a service that was down when the gateway started appears as soon
-as it comes back, without waiting for `cache-ttl`.
+Only a service that answered **"not there"** has its result cached for `cache-ttl`. A service
+that answered a server error, or refused to hand its document over, has said nothing about
+having one: it is probed again on the next refresh. A service that could not be reached is left
+alone for `failure-cache-ttl`, then probed again: one that was down when the gateway started
+appears within that time of coming back, without waiting for `cache-ttl`.
 
 Probing an instance stops as soon as it turns out to be unreachable, instead of trying the
 remaining paths — they lead to the same instance and fail the same way. An unreachable service
-therefore costs one `timeout`, not one per candidate path. A *refusal* does not stop it:
+therefore costs one `timeout`, not one per candidate path, once per `failure-cache-ttl` for as
+long as it stays down; with `failure-cache-ttl: 0` it costs that on every refresh. A *refusal*
+does not stop the probing:
 authorization is granted path by path, so a rule permitting `/v3/api-docs/**` serves
 `/v3/api-docs` and answers `401` on `/v3/api-docs.json`, and the remaining paths are probed at
 the cost of an immediate answer each.

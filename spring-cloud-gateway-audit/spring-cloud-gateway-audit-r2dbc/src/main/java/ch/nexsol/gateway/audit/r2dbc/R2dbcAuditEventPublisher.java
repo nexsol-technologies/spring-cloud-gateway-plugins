@@ -16,15 +16,15 @@
 
 package ch.nexsol.gateway.audit.r2dbc;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.regex.Pattern;
 
+import ch.nexsol.gateway.audit.AuditBacklog;
 import ch.nexsol.gateway.audit.AuditEvent;
 import ch.nexsol.gateway.audit.AuditEventPublisher;
 import ch.nexsol.gateway.audit.AuditEventSerializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import org.springframework.r2dbc.core.DatabaseClient;
 
@@ -32,11 +32,10 @@ import org.springframework.r2dbc.core.DatabaseClient;
  * {@link AuditEventPublisher} inserting the audit event into a relational table through
  * R2DBC. The event timestamp is stored as a UTC {@link LocalDateTime} and the attributes
  * as a JSON string. Insertion is asynchronous and failures are logged without disrupting
- * the request.
+ * the request. The events pending for a database slower than the traffic are bounded
+ * &mdash; see {@link AuditBacklog}.
  */
 public class R2dbcAuditEventPublisher implements AuditEventPublisher {
-
-	private static final Logger LOG = LoggerFactory.getLogger(R2dbcAuditEventPublisher.class);
 
 	/**
 	 * A SQL identifier, quoted or not, optionally qualified by a schema. Quoted names are
@@ -53,14 +52,31 @@ public class R2dbcAuditEventPublisher implements AuditEventPublisher {
 
 	private final AuditEventSerializer serializer;
 
+	private final AuditBacklog backlog;
+
+	private final Duration sendTimeout;
+
 	/**
-	 * Create a new publisher.
+	 * Create a new publisher, bounded by the defaults of {@link R2dbcAuditProperties}.
 	 * @param databaseClient the R2DBC database client
 	 * @param table the destination table (must expose {@code event_timestamp} and
 	 * {@code attributes} columns)
 	 * @param serializer the audit event serializer
 	 */
 	public R2dbcAuditEventPublisher(DatabaseClient databaseClient, String table, AuditEventSerializer serializer) {
+		this(databaseClient, serializer, defaults(table));
+	}
+
+	/**
+	 * Create a new publisher.
+	 * @param databaseClient the R2DBC database client
+	 * @param serializer the audit event serializer
+	 * @param properties the destination table (must expose {@code event_timestamp} and
+	 * {@code attributes} columns), and the bounds on the events pending
+	 */
+	public R2dbcAuditEventPublisher(DatabaseClient databaseClient, AuditEventSerializer serializer,
+			R2dbcAuditProperties properties) {
+		String table = properties.getTable();
 		this.databaseClient = databaseClient;
 		// The table name is concatenated into the statement, since a bind marker cannot
 		// carry an identifier. It comes from the configuration rather than from a
@@ -75,17 +91,30 @@ public class R2dbcAuditEventPublisher implements AuditEventPublisher {
 		this.insertSql = "INSERT INTO " + table
 				+ " (event_timestamp, attributes) VALUES (:eventTimestamp, :attributes)";
 		this.serializer = serializer;
+		this.backlog = new AuditBacklog("the table " + table, properties.getMaxPending());
+		this.sendTimeout = properties.getSendTimeout();
+	}
+
+	private static R2dbcAuditProperties defaults(String table) {
+		R2dbcAuditProperties properties = new R2dbcAuditProperties();
+		properties.setTable(table);
+		return properties;
 	}
 
 	@Override
 	public void publish(AuditEvent event) {
-		String attributes = this.serializer.toJson(event);
-		this.databaseClient.sql(this.insertSql)
+		this.backlog.submit(() -> this.databaseClient.sql(this.insertSql)
 			.bind("eventTimestamp", LocalDateTime.ofInstant(event.timestamp(), ZoneOffset.UTC))
-			.bind("attributes", attributes)
+			.bind("attributes", this.serializer.toJson(event))
 			.fetch()
-			.rowsUpdated()
-			.subscribe(null, (ex) -> LOG.warn("failed to persist audit event through r2dbc", ex));
+			.rowsUpdated(), this.sendTimeout);
+	}
+
+	/**
+	 * @return the events pending, dropped and failed
+	 */
+	public AuditBacklog backlog() {
+		return this.backlog;
 	}
 
 }

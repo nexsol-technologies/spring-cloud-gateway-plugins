@@ -34,11 +34,14 @@
 	var nodes = [];
 	var edges = [];
 	// Positions the force layout settled on, kept so a refresh redraws the same picture
-	// instead of shuffling it. Cleared when the layout is unfrozen.
-	var positions = {};
+	// instead of shuffling it. Cleared when the layout is unfrozen. Keyed by node name,
+	// which is whatever a caller called itself: an object with a prototype would take
+	// '__proto__' or 'constructor' for one of its own members.
+	var positions = Object.create(null);
 	var sortKey = 'calls';
 	var sortDir = -1;
-	var timer = null;
+	// Set while a poll redraws the picture, so the zoom and the pan of the reader survive.
+	var keepRoam = false;
 
 	function sel(id) {
 		return document.getElementById(id);
@@ -98,7 +101,7 @@
 	 * calls, and the two classes of error the node's colour is taken from.
 	 */
 	function visibleNodes(shown) {
-		var totals = {};
+		var totals = Object.create(null);
 		shown.forEach(function (edge) {
 			collect(totals, edge.from, edge);
 			collect(totals, edge.to, edge);
@@ -161,11 +164,21 @@
 		var drawn = visibleNodes(shown);
 		if (!drawn.length) {
 			chart.clear();
+			// A remembered filter that hides everything must not read as a gateway
+			// without traffic.
+			sel('gg-empty').textContent = edges.length ? 'No call matches these filters.'
+				: 'Nothing to draw yet \u2014 send some traffic through the gateway, then refresh.';
 			sel('gg-empty').style.display = '';
 			sel('gg-legend').textContent = '';
 			return;
 		}
 		sel('gg-empty').style.display = 'none';
+		// Replacing the option is what resets the zoom and the pan, which a poll has no
+		// reason to do: they are carried over to the new picture.
+		var previous = keepRoam && chart.getOption();
+		var roamed = (previous && previous.series && previous.series[0]) || {};
+		// A tooltip is assigned as markup, and a caller is named by a request header.
+		var escape = window.gatewayUi.escape;
 		var maxNodeCalls = Math.max.apply(null, drawn.map(function (node) {
 			return node.calls;
 		}));
@@ -173,18 +186,21 @@
 			return edge.calls;
 		}));
 		chart.setOption({
+			// The bundled dark theme paints a canvas of its own, dropped so the picture
+			// keeps sitting on the card that hosts it.
+			backgroundColor: 'transparent',
 			tooltip: {
 				formatter: function (params) {
 					if (params.dataType === 'edge') {
 						var edge = params.data.edge;
-						return params.data.source + ' &rarr; ' + params.data.target
-							+ (edge.routeId ? '<br>route: ' + edge.routeId : '')
+						return escape(params.data.source) + ' &rarr; ' + escape(params.data.target)
+							+ (edge.routeId ? '<br>route: ' + escape(edge.routeId) : '')
 							+ '<br>calls: ' + edge.calls
 							+ '<br>4xx: ' + edge.clientErrors
 							+ '<br>5xx: ' + edge.errors
 							+ ' (' + (errorRate(edge) * 100).toFixed(1) + '%)';
 					}
-					return params.data.name + '<br>' + params.data.kind.toLowerCase()
+					return escape(params.data.name) + '<br>' + escape(params.data.kind).toLowerCase()
 						+ '<br>calls: ' + params.data.calls
 						+ '<br>4xx: ' + params.data.clientErrors
 						+ '<br>5xx: ' + params.data.errors;
@@ -198,6 +214,8 @@
 				// picture this tall would then trap the scroll of the page it sits in. The
 				// zoom is dispatched below instead.
 				roam: 'move',
+				zoom: roamed.zoom || 1,
+				center: roamed.center || null,
 				draggable: true,
 				layout: frozen() && hasPositions(drawn) ? 'none' : 'force',
 				force: { repulsion: 320, edgeLength: [90, 220], gravity: 0.08 },
@@ -360,10 +378,7 @@
 	}
 
 	function load() {
-		fetch(dataUrl, { headers: { Accept: 'application/json' } })
-			.then(function (response) {
-				return response.json();
-			})
+		window.gatewayUi.getJson(dataUrl)
 			.then(function (json) {
 				nodes = (json && json.nodes) || [];
 				edges = (json && json.edges) || [];
@@ -376,25 +391,25 @@
 				}
 				renderFocusOptions();
 				window.gatewayUi.read('gg-age');
-				render();
+				keepRoam = true;
+				try {
+					render();
+				}
+				finally {
+					keepRoam = false;
+				}
 			})
 			.catch(function () {
-				// The age is left where it was: a failed poll makes the picture on screen
-				// older, it does not make it younger.
-				nodes = [];
-				edges = [];
-				render();
+				// The picture on screen stays: a read that failed is not a gateway nobody
+				// calls.
+				window.gatewayUi.failed('gg-age');
 			});
 	}
 
+	var live = window.gatewayUi.poller(load, POLL_MS);
+
 	function schedule() {
-		if (timer) {
-			window.clearInterval(timer);
-			timer = null;
-		}
-		if (sel('gg-auto').checked) {
-			timer = window.setInterval(load, POLL_MS);
-		}
+		live(sel('gg-auto').checked);
 	}
 
 	// Clicking a node focuses it; clicking the focused one goes back to the whole graph.
@@ -417,20 +432,18 @@
 	});
 	sel('gg-freeze').addEventListener('change', function () {
 		if (!frozen()) {
-			positions = {};
+			positions = Object.create(null);
 		}
 		render();
 	});
 	sel('gg-auto').addEventListener('change', schedule);
 	sel('gg-refresh').addEventListener('click', load);
-	Array.prototype.forEach.call(document.querySelectorAll('.gw-sortable'), function (th) {
-		th.addEventListener('click', function () {
-			var key = th.getAttribute('data-sort');
-			sortDir = (key === sortKey) ? -sortDir : -1;
-			sortKey = key;
-			renderTable();
-		});
-	});
+	window.gatewayUi.sortable(document.querySelectorAll('.gw-sortable'), function (key) {
+		sortDir = (key === sortKey) ? -sortDir : -1;
+		sortKey = key;
+		renderTable();
+		return sortDir;
+	})(sortKey, sortDir);
 	// Ctrl + wheel zooms the picture; a wheel alone is left to the page it sits in. Ctrl is
 	// also what a browser zooms its own page with, hence the preventDefault.
 	chartEl.addEventListener('wheel', function (event) {
@@ -461,7 +474,9 @@
 		});
 	}
 
-	['gg-focus', 'gg-search', 'gg-min-calls', 'gg-4xx', 'gg-5xx', 'gg-freeze', 'gg-auto'].forEach(function (id) {
+	// The focus is not remembered: its options only exist once the graph has been read,
+	// long after a stored value would have been put back.
+	['gg-search', 'gg-min-calls', 'gg-4xx', 'gg-5xx', 'gg-freeze', 'gg-auto'].forEach(function (id) {
 		window.gatewayUi.remember(sel(id));
 	});
 

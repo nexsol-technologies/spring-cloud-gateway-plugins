@@ -84,6 +84,11 @@
 		// Replace the native window.confirm() (hx-confirm) with a Bootstrap modal.
 		(function () {
 			var modalElement = document.getElementById('confirm-modal');
+			// A gateway publishing its routes for reading only renders no dialog: there is
+			// nothing to confirm, and building a modal over nothing throws.
+			if (!modalElement) {
+				return;
+			}
 			var modal = new bootstrap.Modal(modalElement);
 			var messageElement = document.getElementById('confirm-modal-body');
 			var confirmButton = document.getElementById('confirm-modal-ok');

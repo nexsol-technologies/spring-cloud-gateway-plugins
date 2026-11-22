@@ -22,6 +22,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 import ch.nexsol.gateway.commons.CodecLimits;
 import ch.nexsol.gateway.validation.OpenapiContract;
@@ -45,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -52,7 +56,6 @@ import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFac
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferLimitException;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -94,6 +97,10 @@ public class OpenapiValidationGatewayFilterFactory
 
 	private static final byte[] NO_BODY = {};
 
+	private static final int INLINE_VALIDATION_LIMIT = 65536;
+
+	private static final int MAX_REPORTED_SKIPS = 1024;
+
 	private static final String REQUEST = "request";
 
 	private static final String RESPONSE = "response";
@@ -126,6 +133,13 @@ public class OpenapiValidationGatewayFilterFactory
 	private final OpenapiResponseValidator responseValidator = new OpenapiResponseValidator();
 
 	private final ObjectMapper mapper = new ObjectMapper();
+
+	/**
+	 * The routes, directions and reasons already said to have bodies left unvalidated.
+	 * Bounded, a route id being generated anew on every refresh for a route declared
+	 * without one.
+	 */
+	private final Set<String> reportedSkips = ConcurrentHashMap.newKeySet();
 
 	/**
 	 * Creates the factory.
@@ -184,8 +198,10 @@ public class OpenapiValidationGatewayFilterFactory
 	 */
 	private Mono<Optional<OpenapiContract>> contractOrEmpty(Config config, ServerWebExchange exchange) {
 		return this.registry.contract(config.getSpecUrl()).map(Optional::of).onErrorResume(Throwable.class, (ex) -> {
-			LOG.error("Forwarding without validating: the OpenAPI contract '{}' could not be read", config.getSpecUrl(),
-					ex);
+			// The registry logged the failure, once, when the read failed: this runs for
+			// every request it is replayed to.
+			LOG.debug("Forwarding without validating: the OpenAPI contract '{}' is not available: {}",
+					config.getSpecUrl(), ex.getMessage());
 			this.metrics.contractUnavailable(config.getSpecUrl());
 			Map<String, String> attributes = attributes(exchange);
 			attributes.put(ValidationAttributes.REQUEST_VALID, Boolean.FALSE.toString());
@@ -221,34 +237,52 @@ public class OpenapiValidationGatewayFilterFactory
 		}
 		SkipReason skip = (direction.isValidateBody()) ? bodySkipReason(headers, direction) : SkipReason.NOT_JSON;
 		if (skip != null) {
-			logSkip(REQUEST, skip, headers);
+			logSkip(REQUEST, routeId(exchange), skip, headers);
 			this.metrics.bodySkipped(REQUEST, routeId(exchange), skip);
 			return afterRequest(parameters, exchange, chain, contract, operationKey, found);
 		}
+		MediaType contentType = headers.getContentType();
+		// The gateway buffers the whole body to cache it, and nothing bounds that but the
+		// Content-Length the skip decision trusted. What it cached is read from the one
+		// buffer it handed back: joining it again would only copy it a second time.
 		return ServerWebExchangeUtils.cacheRequestBodyAndRequest(exchange,
-				// Bounded by the same maximum the skip decision used: that decision
-				// trusts
-				// the announced Content-Length, and a sender that under-announces it
-				// would
-				// otherwise be buffered without any limit.
-				(cachedRequest) -> DataBufferUtils
-					.join(cachedRequest.getBody(), CodecLimits.maxInMemoryBytes(direction.getMaxBodySize()))
-					// The body announced a length within the maximum and then exceeded
-					// it.
-					// Its buffers are gone, so it cannot be forwarded either: say what
-					// happened rather than answer the 500 an unmapped exception produces.
-					.onErrorMap(DataBufferLimitException.class::isInstance,
-							(ex) -> new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE,
+				(cachedRequest) -> cachedRequest.getBody().next().<byte[]>handle((buffer, sink) -> {
+					try {
+						if (buffer.readableByteCount() > direction.getMaxBodySize().toBytes()) {
+							// The body announced a length within the maximum and then
+							// exceeded it: say what happened rather than validate it.
+							sink.error(new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE,
 									"the request body exceeds the " + direction.getMaxBodySize()
-											+ " the gateway validates against"))
-					.map(OpenapiValidationGatewayFilterFactory::readAndRelease)
+											+ " the gateway validates against"));
+							return;
+						}
+						byte[] body = new byte[buffer.readableByteCount()];
+						buffer.read(body);
+						sink.next(body);
+					}
+					finally {
+						DataBufferUtils.release(buffer);
+					}
+				})
 					.defaultIfEmpty(NO_BODY)
-					.flatMap((body) -> {
-						ValidationReport report = parameters.and(this.requestValidator.validateBody(contract,
-								operationKey, found, headers.getContentType(), body));
-						ServerWebExchange mutated = exchange.mutate().request(cachedRequest).build();
-						return afterRequest(report, mutated, chain, contract, operationKey, found);
-					}));
+					.flatMap((body) -> validated(body.length,
+							() -> parameters.and(this.requestValidator.validateBody(contract, operationKey, found,
+									contentType, body))))
+					.flatMap((report) -> afterRequest(report, exchange.mutate().request(cachedRequest).build(), chain,
+							contract, operationKey, found)));
+	}
+
+	/**
+	 * Runs the validation of a body where its size says it belongs. Parsing a body and
+	 * holding it against its schema takes in the order of a millisecond per hundred
+	 * kilobytes, during which the calling thread &mdash; the one routing the traffic
+	 * &mdash; serves nothing else: past {@value #INLINE_VALIDATION_LIMIT} bytes that work
+	 * is handed to the bounded elastic scheduler, and what follows the validation runs
+	 * there too. Below, the hop would cost more than the validation.
+	 */
+	private static Mono<ValidationReport> validated(int bodyLength, Supplier<ValidationReport> validation) {
+		Mono<ValidationReport> report = Mono.fromSupplier(validation);
+		return (bodyLength > INLINE_VALIDATION_LIMIT) ? report.subscribeOn(Schedulers.boundedElastic()) : report;
 	}
 
 	private Mono<Void> afterRequest(ValidationReport report, ServerWebExchange exchange, GatewayFilterChain chain,
@@ -321,7 +355,7 @@ public class OpenapiValidationGatewayFilterFactory
 						: null;
 				if (!direction.isValidateBody() || !hasBody(headers) || skip != null) {
 					if (skip != null) {
-						logSkip(RESPONSE, skip, headers);
+						logSkip(RESPONSE, routeId(exchange), skip, headers);
 						OpenapiValidationGatewayFilterFactory.this.metrics.bodySkipped(RESPONSE, routeId(exchange),
 								skip);
 					}
@@ -335,11 +369,10 @@ public class OpenapiValidationGatewayFilterFactory
 				return DataBufferUtils.join(Flux.from(body), CodecLimits.maxInMemoryBytes(direction.getMaxBodySize()))
 					.map(OpenapiValidationGatewayFilterFactory::readAndRelease)
 					.defaultIfEmpty(NO_BODY)
-					.flatMap((bytes) -> {
-						ValidationReport report = OpenapiValidationGatewayFilterFactory.this.responseValidator
-							.validate(contract, operationKey, found, status, headers, bytes);
-						return handle(report, Mono.just(bufferFactory().wrap(bytes)));
-					});
+					.flatMap((bytes) -> validated(bytes.length,
+							() -> OpenapiValidationGatewayFilterFactory.this.responseValidator.validate(contract,
+									operationKey, found, status, headers, bytes))
+						.flatMap((report) -> handle(report, Mono.just(bufferFactory().wrap(bytes)))));
 			}
 
 			@Override
@@ -363,9 +396,21 @@ public class OpenapiValidationGatewayFilterFactory
 				// Nothing has reached the client yet, so the status and the body can
 				// still be
 				// replaced wholesale.
+				// The body being replaced is still owed a subscriber. The gateway
+				// releases
+				// the upstream connection only when writing this body is cancelled or
+				// fails, and a publisher nobody subscribes to does neither: the
+				// connection
+				// would never go back to the pool. It is cancelled rather than drained,
+				// because a stream never ends; Reactor Netty closes the connection of a
+				// body cancelled before its end.
+				Flux.from(body).doOnNext(DataBufferUtils::release).onErrorComplete().subscribe().dispose();
 				byte[] payload = problem(operationKey, report);
 				setStatusCode(HttpStatus.BAD_GATEWAY);
 				HttpHeaders headers = getHeaders();
+				// What the upstream said of its own body no longer holds for this one.
+				headers.remove(HttpHeaders.CONTENT_ENCODING);
+				headers.remove(HttpHeaders.TRANSFER_ENCODING);
 				headers.setContentType(MediaType.APPLICATION_JSON);
 				headers.setContentLength(payload.length);
 				return super.writeWith(Mono.just(bufferFactory().wrap(payload)));
@@ -423,14 +468,29 @@ public class OpenapiValidationGatewayFilterFactory
 		return (length > direction.getMaxBodySize().toBytes()) ? SkipReason.TOO_LARGE : null;
 	}
 
-	private static void logSkip(String direction, SkipReason reason, HttpHeaders headers) {
+	private void logSkip(String direction, String routeId, SkipReason reason, HttpHeaders headers) {
 		if (reason == SkipReason.NOT_JSON) {
 			// The common and expected case: an upload or a binary payload.
 			LOG.debug("Not validating the {} body: '{}' carries no JSON schema to hold it against", direction,
 					headers.getContentType());
 			return;
 		}
-		LOG.info("Not validating the {} body: {} (Content-Type {}, Content-Length {})", direction,
+		// A compressed or a chunked body is ordinary traffic, and this is written by the
+		// thread serving it: said once per route it tells the operator what is not being
+		// validated, said for every exchange it is a line per request. The counter keeps
+		// the count.
+		if (this.reportedSkips.size() >= MAX_REPORTED_SKIPS) {
+			this.reportedSkips.clear();
+		}
+		if (this.reportedSkips.add(direction + ' ' + routeId + ' ' + reason)) {
+			LOG.info(
+					"Not validating the {} bodies of route {} that are {} (first seen with Content-Type {}, "
+							+ "Content-Length {}); the next ones are only counted, in {}",
+					direction, routeId, reason.name().toLowerCase(), headers.getContentType(),
+					headers.getContentLength(), ValidationMetrics.BODIES_SKIPPED);
+			return;
+		}
+		LOG.debug("Not validating the {} body: {} (Content-Type {}, Content-Length {})", direction,
 				reason.name().toLowerCase(), headers.getContentType(), headers.getContentLength());
 	}
 

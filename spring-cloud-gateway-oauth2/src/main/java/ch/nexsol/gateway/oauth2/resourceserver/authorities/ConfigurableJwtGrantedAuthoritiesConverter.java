@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
 import jakarta.validation.constraints.NotEmpty;
@@ -36,14 +37,17 @@ import org.springframework.security.oauth2.core.oidc.StandardClaimNames;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
-import org.springframework.util.StringUtils;
 
 /**
  * Default JWT granted authorities converter.
  */
 public class ConfigurableJwtGrantedAuthoritiesConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
-	private final List<String> jsonPath;
+	// Read with a configuration held once: JsonPath.read(Object, String) looks the path
+	// up in a cache shared by the whole JVM, behind a single lock, on every request.
+	private static final Configuration CONFIGURATION = Configuration.defaultConfiguration();
+
+	private final List<JsonPath> jsonPath;
 
 	private final JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
 
@@ -52,8 +56,7 @@ public class ConfigurableJwtGrantedAuthoritiesConverter implements Converter<Jwt
 	 * @param jsonPaths the JSON path expressions locating the role claims
 	 */
 	public ConfigurableJwtGrantedAuthoritiesConverter(@NotEmpty List<@NotEmpty String> jsonPaths) {
-		this.jsonPath = (jsonPaths != null)
-				? jsonPaths.stream().map((jsonPath) -> JsonPath.compile(jsonPath).getPath()).toList()
+		this.jsonPath = (jsonPaths != null) ? jsonPaths.stream().map((jsonPath) -> JsonPath.compile(jsonPath)).toList()
 				: Collections.emptyList();
 	}
 
@@ -76,16 +79,16 @@ public class ConfigurableJwtGrantedAuthoritiesConverter implements Converter<Jwt
 	}
 
 	private Collection<? extends GrantedAuthority> extractResourceRoles(Jwt jwt) {
-		return this.getByJsonPath(jwt.getClaims(), this.jsonPath.toArray(new String[] {}));
+		return this.getByJsonPath(jwt.getClaims(), this.jsonPath);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	private Collection<GrantedAuthority> getByJsonPath(Map<String, Object> claims, String... jsonPath) {
-		return Stream.of(jsonPath).filter((path) -> StringUtils.hasText(path)).flatMap((path) -> {
+	private Collection<GrantedAuthority> getByJsonPath(Map<String, Object> claims, List<JsonPath> jsonPath) {
+		return jsonPath.stream().flatMap((path) -> {
 
 			Object claim;
 			try {
-				claim = JsonPath.read(claims, path);
+				claim = path.read(claims, CONFIGURATION);
 			}
 			catch (PathNotFoundException ex) {
 				claim = null;

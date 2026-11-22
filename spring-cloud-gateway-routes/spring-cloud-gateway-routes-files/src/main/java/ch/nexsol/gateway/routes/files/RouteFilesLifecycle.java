@@ -21,6 +21,7 @@ import java.nio.file.ClosedWatchServiceException;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.time.Duration;
@@ -56,6 +57,8 @@ public class RouteFilesLifecycle implements SmartLifecycle {
 
 	private volatile boolean running;
 
+	private volatile Set<Path> routeFiles = Set.of();
+
 	private WatchService watchService;
 
 	private Thread watchThread;
@@ -77,6 +80,7 @@ public class RouteFilesLifecycle implements SmartLifecycle {
 		this.running = true;
 		// Block on the initial load so routes are available before startup completes.
 		this.locator.refresh().block();
+		rememberRouteFiles();
 		if (this.watch) {
 			startWatching();
 		}
@@ -114,16 +118,14 @@ public class RouteFilesLifecycle implements SmartLifecycle {
 				Thread.currentThread().interrupt();
 				return;
 			}
-			boolean changed = !key.pollEvents().isEmpty();
-			key.reset();
-			if (!changed) {
+			if (!concernsRouteFiles(key)) {
 				continue;
 			}
 			if (!drainPendingEvents()) {
 				return;
 			}
 			LOG.debug("Route file change detected, refreshing route definitions");
-			this.locator.refresh().subscribe();
+			this.locator.refresh().doFinally((signal) -> rememberRouteFiles()).subscribe();
 		}
 	}
 
@@ -136,13 +138,63 @@ public class RouteFilesLifecycle implements SmartLifecycle {
 	 * them into one reload.
 	 * @return {@code false} when the wait was interrupted and the loop must stop
 	 */
+	/*
+	 * A file system reports on whole directories, so the watcher hears about every file
+	 * written next to the routes. Only a route file is worth a reload: one that was there
+	 * at the last read, which covers a change and a deletion, or one the locations
+	 * resolve to now, which covers a creation.
+	 */
+	boolean concerns(Path changed) {
+		if (this.routeFiles.contains(changed)) {
+			return true;
+		}
+		try {
+			return this.loader.routeFiles().contains(changed);
+		}
+		catch (RuntimeException ex) {
+			// Locations that no longer resolve are for the reload to report.
+			return true;
+		}
+	}
+
+	private boolean concernsRouteFiles(WatchKey key) {
+		Path directory = (Path) key.watchable();
+		boolean concerned = false;
+		for (WatchEvent<?> event : key.pollEvents()) {
+			// An overflow says events were lost, not which files they were about.
+			if (event.kind() == StandardWatchEventKinds.OVERFLOW
+					|| (event.context() instanceof Path name && concerns(directory.resolve(name)))) {
+				concerned = true;
+			}
+		}
+		key.reset();
+		return concerned;
+	}
+
+	private void rememberRouteFiles() {
+		try {
+			this.routeFiles = this.loader.routeFiles();
+		}
+		catch (RuntimeException ex) {
+			LOG.debug("Could not resolve the route files to watch", ex);
+		}
+	}
+
 	private boolean drainPendingEvents() {
 		try {
-			WatchKey pending = this.watchService.poll(QUIET_PERIOD.toMillis(), TimeUnit.MILLISECONDS);
-			while (pending != null) {
-				pending.pollEvents();
-				pending.reset();
-				pending = this.watchService.poll(QUIET_PERIOD.toMillis(), TimeUnit.MILLISECONDS);
+			// Only a route file prolongs the wait: a file written without pause next to
+			// the routes would otherwise keep a change from ever being applied.
+			long deadline = System.nanoTime() + QUIET_PERIOD.toNanos();
+			long remaining = QUIET_PERIOD.toNanos();
+			while (remaining > 0) {
+				WatchKey pending = this.watchService.poll(remaining, TimeUnit.NANOSECONDS);
+				if (pending == null) {
+					return true;
+				}
+				if (concernsRouteFiles(pending)) {
+					deadline = System.nanoTime() + QUIET_PERIOD.toNanos();
+				}
+				remaining = deadline - System.nanoTime();
 			}
 			return true;
 		}

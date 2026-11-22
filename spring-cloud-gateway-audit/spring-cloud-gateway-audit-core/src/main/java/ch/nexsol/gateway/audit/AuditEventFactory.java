@@ -30,6 +30,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import ch.nexsol.gateway.commons.ExchangeStatus;
+import ch.nexsol.gateway.commons.security.PrincipalJwt;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.handler.TracingObservationHandler.TracingContext;
 import reactor.core.publisher.Mono;
@@ -42,9 +44,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.http.server.reactive.observation.ServerRequestObservationContext;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.AbstractOAuth2TokenAuthenticationToken;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 
@@ -94,6 +94,8 @@ public class AuditEventFactory {
 	 */
 	private static final String VALIDATION_ATTRIBUTES_ATTR = "gatewayOpenapiValidationAttributes";
 
+	private static final int MAX_VALIDATION_VALUE_LENGTH = 2_000;
+
 	/**
 	 * What the value of a masked query parameter is audited as.
 	 */
@@ -128,12 +130,24 @@ public class AuditEventFactory {
 	 * @return a mono emitting the audit event
 	 */
 	public Mono<AuditEvent> create(ServerWebExchange exchange) {
+		return create(exchange, null);
+	}
+
+	/**
+	 * Build the audit event of an exchange that may have ended in a failure. The status
+	 * of a failed exchange is not on its response yet when the event is built, so it is
+	 * resolved from the failure &mdash; see {@link ExchangeStatus}.
+	 * @param exchange the current exchange
+	 * @param failure the failure the exchange ended with, {@code null} when it completed
+	 * @return the audit event
+	 */
+	public Mono<AuditEvent> create(ServerWebExchange exchange, Throwable failure) {
 		Map<String, String> attributes = new LinkedHashMap<>();
 		if (this.groups.isRequest()) {
 			collectRequest(exchange.getRequest(), attributes);
 		}
 		if (this.groups.isResponse()) {
-			collectResponse(exchange.getResponse(), attributes);
+			collectResponse(exchange.getResponse(), ExchangeStatus.of(exchange, failure), attributes);
 		}
 		if (this.groups.isTrace()) {
 			collectTrace(exchange, attributes);
@@ -168,11 +182,11 @@ public class AuditEventFactory {
 		attributes.put(REQUEST_PATH, request.getPath().value());
 	}
 
-	private void collectResponse(ServerHttpResponse response, Map<String, String> attributes) {
+	private void collectResponse(ServerHttpResponse response, HttpStatusCode status, Map<String, String> attributes) {
 		HttpHeaders headers = response.getHeaders();
 		attributes.put(RESPONSE_HEADER_CONTENT_LENGTH, String.valueOf(headers.getContentLength()));
 		attributes.put(RESPONSE_HEADER_CONTENT_TYPE, contentTypeOrUnknown(headers));
-		attributes.put(RESPONSE_STATUS, statusValue(response.getStatusCode()));
+		attributes.put(RESPONSE_STATUS, statusValue(status));
 	}
 
 	private void collectTrace(ServerWebExchange exchange, Map<String, String> attributes) {
@@ -213,7 +227,21 @@ public class AuditEventFactory {
 		if (!(published instanceof Map<?, ?> validation)) {
 			return;
 		}
-		validation.forEach((key, value) -> attributes.put(String.valueOf(key), stringValue(value)));
+		validation.forEach((key, value) -> attributes.put(String.valueOf(key), bounded(stringValue(value))));
+	}
+
+	/*
+	 * The error text of a validation grows with the number of violations, and one body
+	 * breaking the contract in every element makes megabytes of it. Copied whole it would
+	 * be megabytes in the event, in its JSON and in what is sent to the backend, for each
+	 * such request. What is cut is said, so the value is never taken for the whole of it.
+	 */
+	private static String bounded(String value) {
+		if (value.length() <= MAX_VALIDATION_VALUE_LENGTH) {
+			return value;
+		}
+		return value.substring(0, MAX_VALIDATION_VALUE_LENGTH) + "... ("
+				+ (value.length() - MAX_VALIDATION_VALUE_LENGTH) + " more characters)";
 	}
 
 	private void collectMetadata(Map<String, String> attributes) {
@@ -227,7 +255,7 @@ public class AuditEventFactory {
 		attributes.put(JWT_ISSUER_ID, NONE_VALUE);
 		attributes.put(JWT_USER_ID, NONE_VALUE);
 
-		Jwt jwt = extractJwt(principal);
+		Jwt jwt = PrincipalJwt.of(principal);
 		if (jwt != null) {
 			collectFromJwt(jwt, attributes);
 			return;
@@ -260,17 +288,6 @@ public class AuditEventFactory {
 				attributes.put(JWT_IMPERSONATOR_USER_NAME, impersonatorName.toString());
 			}
 		}
-	}
-
-	private Jwt extractJwt(Principal principal) {
-		if (principal instanceof AbstractOAuth2TokenAuthenticationToken<?> token
-				&& token.getToken() instanceof Jwt jwt) {
-			return jwt;
-		}
-		if (principal instanceof Authentication authentication && authentication.getPrincipal() instanceof Jwt jwt) {
-			return jwt;
-		}
-		return null;
 	}
 
 	private String basicAuthUser(ServerHttpRequest request) {

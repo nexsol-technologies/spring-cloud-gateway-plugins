@@ -61,9 +61,9 @@ spring.cloud.gateway.server.webflux.metrics:
 | `...redis.instance-uri` | — | Where this instance is reachable, published with its figures; guessed when unset |
 | `...redis.instance-scheme` | `http` | Scheme the guessed address is built with; ignored when `instance-uri` is set |
 
-> **The two prefixes must not nest.** The route source scans `key-prefix` with a wildcard, so
-> an instance prefix placed under it — `gateway:metrics:instance:` — comes back in that scan
-> and is discarded as unreadable, one warning per entry, on every refresh.
+> **The two prefixes must differ.** Each holds its own index, `<prefix>@index`: under one
+> prefix the two kinds of figures would be listed together, and each source would discard the
+> entries of the other as unreadable, one warning per entry, on every refresh.
 
 ## The address an instance publishes
 
@@ -106,8 +106,29 @@ touches the others'. That is what lets every instance write concurrently without
 
 Route figures are summed on read; instance figures are concatenated — one instance is one
 row. Keys carry a time to live, so an instance that stops publishing fades out on its own and
-a replaced pod stops being counted without anyone cleaning up after it. Reading uses `SCAN`,
-not `KEYS`, so a large keyspace is not blocked while a view refreshes.
+a replaced pod stops being counted without anyone cleaning up after it.
+
+## On a Redis shared with other uses
+
+Readers find the keys of the fleet in an **index**: a sorted set in which every instance
+registers its key each time it publishes, against the time it did. Reading it is one command
+and the values behind it a second one, whatever else Redis holds. Nothing walks the keyspace:
+a `SCAN` visits every key of the server whatever pattern it is given — the sessions, the rate
+limits and the tokens of a Redis shared with them included — and none is issued.
+
+* **The index lives under the key prefix**, at `<key-prefix>@index`: `gateway:metrics:@index`
+  and `gateway:instances:@index` by default, one for each of the two prefixes. The access rule
+  written for a prefix covers its index. The commands needed are `SET`, `MGET`, `ZADD`,
+  `ZREMRANGEBYSCORE`, `ZRANGEBYSCORE` and `EXPIRE`.
+* **A fleet is upgraded as a whole.** An instance of a version that does not register in the
+  index is not seen by this one, and such an instance reads every key under the prefix as a
+  string, so the index fails its own reads. Until every instance sharing a prefix runs this
+  version, the consolidated views are incomplete.
+* **An index that cannot be read is Redis being unavailable**: the view says `Redis unavailable`
+  rather than showing an empty fleet. An index that cannot be written never keeps an instance
+  from publishing; it is logged once, and the others do not see that instance.
+* **The clocks of the instances have to agree** to well within `time-to-live`: an entry is read
+  while the time it was registered at is younger than that, by the clock of whoever reads.
 
 ## What it costs
 

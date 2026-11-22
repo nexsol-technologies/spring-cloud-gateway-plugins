@@ -17,7 +17,6 @@
 package ch.nexsol.gateway.validation;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -43,6 +42,12 @@ import org.springframework.util.CollectionUtils;
 public class OpenapiRequestValidator {
 
 	private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
+
+	/**
+	 * The digits and the exponent a {@code number} parameter may carry: beyond what a
+	 * double holds, and small enough for any arithmetic on the value to be instant.
+	 */
+	private static final int MAX_DECIMAL_DIGITS = 1000;
 
 	private final OpenapiBodyValidator bodyValidator = new OpenapiBodyValidator();
 
@@ -116,11 +121,8 @@ public class OpenapiRequestValidator {
 		if (messages.isEmpty()) {
 			return ValidationReport.empty();
 		}
-		List<String> errors = new ArrayList<>(messages.size());
-		for (Error message : messages) {
-			errors.add(describe(parameter) + " " + message.getMessage());
-		}
-		return new ValidationReport(errors);
+		return new ValidationReport(
+				Violations.describe(messages, (message) -> describe(parameter) + " " + message.getMessage()));
 	}
 
 	private static List<String> values(Parameter parameter, Resolution.Found found, ServerHttpRequest request) {
@@ -183,10 +185,24 @@ public class OpenapiRequestValidator {
 		}
 		return switch (type) {
 			case "integer" -> NODES.numberNode(Long.parseLong(value));
-			case "number" -> NODES.numberNode(new BigDecimal(value));
+			case "number" -> NODES.numberNode(decimal(value));
 			case "boolean" -> booleanNode(value);
 			default -> NODES.stringNode(value);
 		};
+	}
+
+	/**
+	 * Reads a decimal number, refusing one whose magnitude no contract describes. A
+	 * {@code multipleOf} is checked by dividing the value: {@code 1e999999999} is eleven
+	 * characters on the wire and a division on a number of a billion digits, which keeps
+	 * the thread for minutes. Refused the way a malformed number is, by the caller.
+	 */
+	private static BigDecimal decimal(String value) {
+		BigDecimal decimal = new BigDecimal(value);
+		if (decimal.precision() > MAX_DECIMAL_DIGITS || Math.abs((long) decimal.scale()) > MAX_DECIMAL_DIGITS) {
+			throw new NumberFormatException(value);
+		}
+		return decimal;
 	}
 
 	private static JsonNode booleanNode(String value) {

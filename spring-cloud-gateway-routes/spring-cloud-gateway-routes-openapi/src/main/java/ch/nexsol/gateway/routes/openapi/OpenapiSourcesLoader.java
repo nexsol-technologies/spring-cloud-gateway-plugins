@@ -18,6 +18,8 @@ package ch.nexsol.gateway.routes.openapi;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URLConnection;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,6 +34,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.dataformat.yaml.YAMLMapper;
 
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.util.StringUtils;
 
@@ -53,6 +56,11 @@ public class OpenapiSourcesLoader {
 
 	private static final Logger LOG = LoggerFactory.getLogger(OpenapiSourcesLoader.class);
 
+	// The deadlines swagger-parser gives the contracts these documents point at.
+	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(30);
+
+	private static final Duration READ_TIMEOUT = Duration.ofSeconds(60);
+
 	private final ObjectMapper jsonMapper = JsonMapper.builder()
 		.propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
 		.build();
@@ -65,6 +73,10 @@ public class OpenapiSourcesLoader {
 
 	private final ResourcePatternResolver resolver;
 
+	private final Duration connectTimeout;
+
+	private final Duration readTimeout;
+
 	/**
 	 * Creates the loader.
 	 * @param properties the OpenAPI locator properties, holding the inline sources and
@@ -72,8 +84,15 @@ public class OpenapiSourcesLoader {
 	 * @param resolver the resolver used to reach the documents
 	 */
 	public OpenapiSourcesLoader(RoutesOpenapiProperties properties, ResourcePatternResolver resolver) {
+		this(properties, resolver, CONNECT_TIMEOUT, READ_TIMEOUT);
+	}
+
+	OpenapiSourcesLoader(RoutesOpenapiProperties properties, ResourcePatternResolver resolver, Duration connectTimeout,
+			Duration readTimeout) {
 		this.properties = properties;
 		this.resolver = resolver;
+		this.connectTimeout = connectTimeout;
+		this.readTimeout = readTimeout;
 	}
 
 	/**
@@ -102,11 +121,9 @@ public class OpenapiSourcesLoader {
 			return sources;
 		}
 		for (Resource resource : resources) {
-			if (!resource.exists()) {
-				LOG.warn("Skipping OpenAPI sources document '{}': it does not exist", resource);
-				continue;
-			}
-			try (InputStream input = resource.getInputStream()) {
+			// Opened without asking first whether it exists: over HTTP that question is a
+			// request of its own, and a document that is not there fails the read anyway.
+			try (InputStream input = open(resource)) {
 				sources.addAll(parse(resource.getFilename(), input));
 			}
 			catch (IOException | JacksonException | IllegalArgumentException ex) {
@@ -114,6 +131,19 @@ public class OpenapiSourcesLoader {
 			}
 		}
 		return sources;
+	}
+
+	private InputStream open(Resource resource) throws IOException {
+		if (!(resource instanceof UrlResource)) {
+			return resource.getInputStream();
+		}
+		// A UrlResource opens its connection with no timeout at all, and this read is
+		// repeated on every poll: a server that accepts the connection and says nothing
+		// would hold the polling, and the startup, for ever.
+		URLConnection connection = resource.getURL().openConnection();
+		connection.setConnectTimeout(Math.toIntExact(this.connectTimeout.toMillis()));
+		connection.setReadTimeout(Math.toIntExact(this.readTimeout.toMillis()));
+		return connection.getInputStream();
 	}
 
 	private List<Source> parse(String filename, InputStream input) {

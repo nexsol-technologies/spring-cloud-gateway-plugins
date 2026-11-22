@@ -81,6 +81,14 @@ public class PredicateService extends
 		return loadDefinitionsByRouteIds(routeIds);
 	}
 
+	/**
+	 * Loads the predicate definitions of every route in a single statement.
+	 * @return the predicate definitions of every route, by route reference id
+	 */
+	public Mono<Map<Long, List<PredicateDefinition>>> loadAllPredicateDefinitions() {
+		return loadAllDefinitions();
+	}
+
 	@Override
 	protected PredicateEntity newEntity() {
 		return new PredicateEntity();

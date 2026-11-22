@@ -55,8 +55,16 @@ public class RouteConfigServerLifecycle implements SmartLifecycle {
 		// Block on the initial load so routes are available before startup completes.
 		this.locator.refresh().block();
 		if (this.updateInterval != null && !this.updateInterval.isZero() && !this.updateInterval.isNegative()) {
+			// A tick that finds the previous read still pending is dropped. An interval
+			// fails with an overflow error on a tick nobody asked for, which ends the
+			// flux
+			// for good: a source that stops answering for a while would stop the polling
+			// until the gateway is restarted. The prefetch of one holds a single tick
+			// back
+			// while a read is pending, rather than a queue of them replayed in a burst.
 			this.poll = Flux.interval(this.updateInterval, this.updateInterval)
-				.concatMap((tick) -> this.locator.refresh())
+				.onBackpressureDrop()
+				.concatMap((tick) -> this.locator.refresh(), 1)
 				.subscribe();
 		}
 	}

@@ -16,6 +16,8 @@
 
 package ch.nexsol.gateway.database;
 
+import java.time.Duration;
+
 import ch.nexsol.gateway.commons.security.PluginSecurityProperties;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -82,6 +84,13 @@ public class RoutesDatabaseProperties {
 	private boolean securityChainEnabled = true;
 
 	/**
+	 * How long the database is given to hand over the routes when the gateway rebuilds
+	 * its route table. Past it the rebuild fails and the gateway keeps the table it has,
+	 * rather than every refresh waiting on a database that no longer answers.
+	 */
+	private Duration loadTimeout = Duration.ofSeconds(30);
+
+	/**
 	 * How that chain authenticates its callers on a gateway without a console: a local
 	 * user over HTTP Basic, an issuer for the Bearer tokens. Unset, the chain
 	 * authenticates against whatever the application declared, and is not contributed
@@ -143,6 +152,14 @@ public class RoutesDatabaseProperties {
 	 */
 	public PluginSecurityProperties getSecurity() {
 		return this.security;
+	}
+
+	public Duration getLoadTimeout() {
+		return this.loadTimeout;
+	}
+
+	public void setLoadTimeout(Duration loadTimeout) {
+		this.loadTimeout = loadTimeout;
 	}
 
 }

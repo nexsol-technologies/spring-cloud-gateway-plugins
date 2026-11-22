@@ -52,6 +52,9 @@ import org.springframework.web.server.ServerWebExchange;
 @RequestMapping("/ui/insights")
 public class InsightsController {
 
+	/** Instances read at once when a view covers the whole fleet. */
+	private static final int FLEET_CONCURRENCY = 4;
+
 	/**
 	 * The views, in the order they appear in the menu: the view id, the Actuator endpoint
 	 * behind it, the heading and the sentence under it.
@@ -146,9 +149,12 @@ public class InsightsController {
 	private Mono<ResponseEntity<Map<String, Object>>> readAll(ServerWebExchange exchange, View declared, String view) {
 		return this.instances.list()
 			.flatMap((known) -> Flux.fromIterable(known)
-				.concatMap((instance) -> this.client.read(exchange, instance, declared.endpoint())
+				// Together, in the order of the list: one after the other, the view waits
+				// for the sum of the answers, and for the sum of the timeouts of the
+				// instances that are down.
+				.flatMapSequential((instance) -> this.client.read(exchange, instance, declared.endpoint())
 					.map((payload) -> Map.entry(instance.id(), payload))
-					.onErrorResume((ex) -> Mono.empty()))
+					.onErrorResume((ex) -> Mono.empty()), FLEET_CONCURRENCY)
 				.collectList()
 				.flatMap((answers) -> {
 					if (answers.isEmpty()) {

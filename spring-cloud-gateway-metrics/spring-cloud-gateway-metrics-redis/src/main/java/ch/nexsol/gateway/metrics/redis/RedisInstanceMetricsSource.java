@@ -19,6 +19,7 @@ package ch.nexsol.gateway.metrics.redis;
 import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import ch.nexsol.gateway.commons.redis.InstanceIndex;
 import ch.nexsol.gateway.metrics.InstanceMetric;
 import ch.nexsol.gateway.metrics.InstanceMetricsSnapshot;
 import ch.nexsol.gateway.metrics.InstanceMetricsSource;
@@ -29,7 +30,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
-import org.springframework.data.redis.core.ScanOptions;
 
 /**
  * Reads the technical figures every instance published to Redis.
@@ -41,11 +41,9 @@ public class RedisInstanceMetricsSource implements InstanceMetricsSource {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RedisInstanceMetricsSource.class);
 
-	private final ReactiveStringRedisTemplate redisTemplate;
-
-	private final RedisMetricsProperties properties;
-
 	private final ObjectMapper objectMapper;
+
+	private final InstanceIndex index;
 
 	/**
 	 * Creates the source reading the published figures.
@@ -55,9 +53,8 @@ public class RedisInstanceMetricsSource implements InstanceMetricsSource {
 	 */
 	public RedisInstanceMetricsSource(ReactiveStringRedisTemplate redisTemplate, RedisMetricsProperties properties,
 			ObjectMapper objectMapper) {
-		this.redisTemplate = redisTemplate;
-		this.properties = properties;
 		this.objectMapper = objectMapper;
+		this.index = new InstanceIndex(redisTemplate, properties.getInstanceKeyPrefix(), properties.getTimeToLive());
 	}
 
 	@Override
@@ -67,12 +64,8 @@ public class RedisInstanceMetricsSource implements InstanceMetricsSource {
 		// would report twice the instances.
 		return Mono.defer(() -> {
 			AtomicInteger instances = new AtomicInteger();
-			ScanOptions options = ScanOptions.scanOptions()
-				.match(this.properties.getInstanceKeyPrefix() + "*")
-				.count(100)
-				.build();
-			return this.redisTemplate.scan(options)
-				.flatMap((key) -> this.redisTemplate.opsForValue().get(key))
+			return this.index.values()
+				.flatMapMany(Flux::fromIterable)
 				.flatMap((payload) -> read(payload).doOnNext((metric) -> instances.incrementAndGet()))
 				.sort(Comparator.comparing(InstanceMetric::instanceId))
 				.collectList()

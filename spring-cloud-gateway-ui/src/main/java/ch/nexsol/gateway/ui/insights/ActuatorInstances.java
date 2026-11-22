@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.ui.insights;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,9 +50,18 @@ public class ActuatorInstances {
 	 */
 	public static final String ALL = "*";
 
+	/**
+	 * How long a list is reused. Listing the instances takes ids and addresses out of a
+	 * reading of every figure of every instance, and a view asks for it twice in a row:
+	 * once to draw its picker, once to read its data.
+	 */
+	private static final Duration LISTING_TTL = Duration.ofSeconds(5);
+
 	private final ObjectProvider<InstanceMetricsSource> metricsSource;
 
 	private final InstanceIdentity identity;
+
+	private final Mono<List<Instance>> listing;
 
 	/**
 	 * Creates the directory over the (optional) instance metrics source.
@@ -61,6 +71,7 @@ public class ActuatorInstances {
 	public ActuatorInstances(ObjectProvider<InstanceMetricsSource> metricsSource, InstanceIdentity identity) {
 		this.metricsSource = metricsSource;
 		this.identity = identity;
+		this.listing = Mono.defer(this::collect).cache(LISTING_TTL);
 	}
 
 	/**
@@ -68,6 +79,10 @@ public class ActuatorInstances {
 	 * @return the known instances, never empty
 	 */
 	public Mono<List<Instance>> list() {
+		return this.listing;
+	}
+
+	private Mono<List<Instance>> collect() {
 		InstanceMetricsSource source = this.metricsSource.getIfAvailable();
 		if (source == null) {
 			return Mono.just(List.of(local()));

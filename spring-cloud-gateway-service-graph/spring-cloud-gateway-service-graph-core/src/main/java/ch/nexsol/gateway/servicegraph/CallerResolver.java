@@ -21,12 +21,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import ch.nexsol.gateway.commons.security.PrincipalJwt;
 import ch.nexsol.gateway.servicegraph.ServiceGraphProperties.Caller;
 import reactor.core.publisher.Mono;
 
-import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.AbstractOAuth2TokenAuthenticationToken;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 
@@ -84,7 +83,7 @@ public class CallerResolver {
 	}
 
 	private String fromPrincipal(Principal principal) {
-		Jwt jwt = extractJwt(principal);
+		Jwt jwt = PrincipalJwt.of(principal);
 		if (jwt == null) {
 			return null;
 		}
@@ -93,17 +92,6 @@ public class CallerResolver {
 			if (StringUtils.hasText(value)) {
 				return value;
 			}
-		}
-		return null;
-	}
-
-	private static Jwt extractJwt(Principal principal) {
-		if (principal instanceof AbstractOAuth2TokenAuthenticationToken<?> token
-				&& token.getToken() instanceof Jwt jwt) {
-			return jwt;
-		}
-		if (principal instanceof Authentication authentication && authentication.getPrincipal() instanceof Jwt jwt) {
-			return jwt;
 		}
 		return null;
 	}

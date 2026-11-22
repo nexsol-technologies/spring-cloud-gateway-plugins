@@ -53,6 +53,10 @@ carrying the calls of both its sides, not two half-nodes.
 around the whole chain. A `GlobalFilter` and not a `WebFilter` on purpose: an edge needs a
 route at its far end, and a request the gateway answered itself has none.
 
+A call that failed is counted with the outcome of the status the client is answered with: an
+upstream that refused the connection or timed out is a `server-error`, a request the gateway
+rejected a `client-error`.
+
 The far end is named after what the route targets. `targetService` reads the URI, so
 `lb://orders` is `orders` and `http://orders` is `orders` too — the gateway normalises a
 declared URI to an explicit default port, and a node named `orders:80` would be the same

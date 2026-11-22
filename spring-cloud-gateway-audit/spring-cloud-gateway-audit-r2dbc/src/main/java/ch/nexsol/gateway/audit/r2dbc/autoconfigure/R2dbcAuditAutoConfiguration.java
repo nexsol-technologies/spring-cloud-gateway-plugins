@@ -66,8 +66,7 @@ public class R2dbcAuditAutoConfiguration {
 	@ConditionalOnSingleCandidate(DatabaseClient.class)
 	AuditEventPublisher r2dbcAuditEventPublisher(DatabaseClient databaseClient, R2dbcAuditProperties properties,
 			ObjectMapper objectMapper) {
-		return new R2dbcAuditEventPublisher(databaseClient, properties.getTable(),
-				new AuditEventSerializer(objectMapper));
+		return new R2dbcAuditEventPublisher(databaseClient, new AuditEventSerializer(objectMapper), properties);
 	}
 
 }

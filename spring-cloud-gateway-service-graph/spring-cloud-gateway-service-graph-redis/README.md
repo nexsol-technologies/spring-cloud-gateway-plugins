@@ -44,8 +44,8 @@ others', which is what lets several writers publish at once with no locking. The
 a time to live, so an instance that stops publishing fades out on its own — a replaced pod
 stops being drawn without anything having to notice it left.
 
-Reading is a `SCAN`, not `KEYS` — which would block a large keyspace on every refresh —
-followed by a `GET` per key, and the edges are summed by `ServiceGraphSnapshot.of`. Nothing
+Reading takes the keys from the index, then their values in one `MGET`, and the edges are summed by
+`ServiceGraphSnapshot.of`. Nothing
 has to be reachable: an instance that is busy, or behind a closed network, still counts
 through what it last published. The graph lags by at most one publish interval, which is the
 trade for not calling anyone.
@@ -55,6 +55,28 @@ than costing the edges of every other instance.
 
 The instance id comes from `InstanceIdentity`: the configured `service-graph.instance-id`,
 then `HOSTNAME`, then the host name.
+
+## On a Redis shared with other uses
+
+Readers find the keys of the fleet in an **index**: a sorted set in which every instance
+registers its key each time it publishes, against the time it did. Reading it is one command
+and the values behind it a second one, whatever else Redis holds. Nothing walks the keyspace:
+a `SCAN` visits every key of the server whatever pattern it is given — the sessions, the rate
+limits and the tokens of a Redis shared with them included — and none is issued.
+
+* **The index lives under the key prefix**, at `<key-prefix>@index`:
+  `gateway:service-graph:@index` by default. The access rule written for the prefix covers it.
+  The commands needed are `SET`, `MGET`, `ZADD`, `ZREMRANGEBYSCORE`, `ZRANGEBYSCORE` and
+  `EXPIRE`.
+* **A fleet is upgraded as a whole.** An instance of a version that does not register in the
+  index is not seen by this one, and such an instance reads every key under the prefix as a
+  string, so the index fails its own reads. Until every instance sharing a prefix runs this
+  version, the consolidated views are incomplete.
+* **An index that cannot be read is Redis being unavailable**: the graph says `Redis unavailable`
+  rather than showing no instance. An index that cannot be written never keeps an instance
+  from publishing; it is logged once, and the others do not see that instance.
+* **The clocks of the instances have to agree** to well within `time-to-live`: an entry is read
+  while the time it was registered at is younger than that, by the clock of whoever reads.
 
 ## What it reports
 

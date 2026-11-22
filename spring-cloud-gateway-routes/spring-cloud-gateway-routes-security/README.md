@@ -66,6 +66,16 @@ Security serves a request with the **first** chain whose matcher matches, a publ
 handled by this permissive chain and never reaches the Basic-auth or OAuth 2.0 chains. Every
 other request falls through unchanged.
 
+A public route opens the requests it serves, and nothing else. A controller, a router function
+or an Actuator endpoint is dispatched ahead of the routes, so a request one of them answers is
+never matched, however well the predicate of a public route fits it: a public route declared
+over `Path=/**` leaves the console, the route management API and `/actuator` behind their own
+chains.
+
+The matcher is asked for every request, so it replays as little as it can: only the routes up
+to the last public one, and none at all while no route is public. That list is rebuilt each
+time the gateway refreshes its routes.
+
 ## Sample
 
 [gateway-secured](../../spring-cloud-gateway-samples/gateway/gateway-secured/README.md) — port

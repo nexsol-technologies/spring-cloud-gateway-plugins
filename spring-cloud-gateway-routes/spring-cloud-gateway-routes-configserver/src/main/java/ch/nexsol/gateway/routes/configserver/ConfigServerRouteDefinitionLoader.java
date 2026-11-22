@@ -91,6 +91,9 @@ public class ConfigServerRouteDefinitionLoader {
 			.uri(url)
 			.retrieve()
 			.bodyToMono(byte[].class)
+			// The client has no response timeout of its own unless the application gave
+			// it one, and a read that never ends is never retried either.
+			.timeout(this.properties.getTimeout())
 			.map((body) -> parse(url, body))
 			.flatMapMany(Flux::fromIterable)
 			.onErrorMap((ex) -> !(ex instanceof RouteConfigServerException),

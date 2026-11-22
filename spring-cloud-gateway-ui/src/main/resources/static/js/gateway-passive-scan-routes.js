@@ -14,19 +14,10 @@
 	var CIRCUMFERENCE = 2 * Math.PI * 50;
 	var POLL_MS = 3000;
 	var all = [];
-	var findingsByRoute = {};
-	var expanded = {};
-	var pollTimer = null;
-
-	function live(enabled) {
-		if (pollTimer) {
-			clearInterval(pollTimer);
-			pollTimer = null;
-		}
-		if (enabled) {
-			pollTimer = setInterval(load, POLL_MS);
-		}
-	}
+	// Keyed by route id, which is whatever a route was named: a plain object would take
+	// 'constructor' or '__proto__' for one of its own members.
+	var findingsByRoute = new Map();
+	var expanded = Object.create(null);
 
 	function sel(id) {
 		return document.getElementById(id);
@@ -108,7 +99,9 @@
 			scoreText.textContent = '–';
 			gradePill.textContent = '–';
 			gradePill.className = 'badge text-bg-secondary fs-6';
+			arc.setAttribute('class', 'text-secondary');
 			arc.setAttribute('stroke-dasharray', '0 ' + CIRCUMFERENCE);
+			sel('psr-gauge-note').textContent = 'No scored route to average.';
 			return;
 		}
 		var total = rows.reduce(function (sum, route) {
@@ -127,12 +120,11 @@
 
 	function detailRow(route) {
 		var row = document.createElement('tr');
-		row.style.display = expanded[route.routeId] ? '' : 'none';
 		var td = document.createElement('td');
 		td.colSpan = 9;
 		td.className = 'bg-body-tertiary';
 
-		var findings = findingsByRoute[route.routeId] || [];
+		var findings = findingsByRoute.get(route.routeId) || [];
 		if (!findings.length) {
 			td.className += ' text-secondary small';
 			td.textContent = 'No finding on this route — it keeps the full 100.';
@@ -192,11 +184,10 @@
 		sel('psr-empty').style.display = rows.length ? 'none' : '';
 		rows.forEach(function (route) {
 			var tr = document.createElement('tr');
-			tr.style.cursor = 'pointer';
 
 			var scoreCell = document.createElement('td');
 			var value = document.createElement('div');
-			value.className = 'fw-bold ' + gradeColor(route.grade);
+			value.className = 'fw-bold d-inline-block ' + gradeColor(route.grade);
 			value.textContent = route.score + ' / 100';
 			var bar = document.createElement('div');
 			bar.className = 'progress mt-1';
@@ -225,10 +216,7 @@
 			cell(tr, route.low);
 
 			var detail = detailRow(route);
-			tr.addEventListener('click', function () {
-				expanded[route.routeId] = !expanded[route.routeId];
-				detail.style.display = expanded[route.routeId] ? '' : 'none';
-			});
+			window.gatewayUi.expandable(tr, detail, String(route.routeId), expanded);
 
 			tbody.appendChild(tr);
 			tbody.appendChild(detail);
@@ -237,38 +225,40 @@
 	}
 
 	function groupFindings(findings) {
-		var grouped = {};
+		var grouped = new Map();
 		findings.forEach(function (finding) {
 			var key = finding.routeId || '(unrouted)';
-			(grouped[key] = grouped[key] || []).push(finding);
+			if (!grouped.has(key)) {
+				grouped.set(key, []);
+			}
+			grouped.get(key).push(finding);
 		});
 		return grouped;
 	}
 
-	function load() {
-		Promise.all([
-			fetch(dataUrl, { headers: { Accept: 'application/json' } }).then(function (r) {
-				return r.json();
-			}).catch(function () {
-				return null;
-			}),
-			fetch(findingsUrl + '?limit=1000', { headers: { Accept: 'application/json' } }).then(function (r) {
-				return r.json();
-			}).catch(function () {
-				return null;
-			})
-		]).then(function (results) {
-			all = results[0] || [];
-			findingsByRoute = groupFindings(results[1] || []);
-			if (results[0] && results[1]) {
-				window.gatewayUi.read('psr-age');
-			}
-			render();
-		});
+	function draw() {
+		window.gatewayUi.keepFocus(tbody, 'data-gw-expander', render);
 	}
 
-	sel('psr-grade').addEventListener('change', render);
-	sel('psr-query').addEventListener('input', render);
+	function load() {
+		// The scores and the findings behind them are one reading: a read that failed
+		// leaves on screen what the last one found.
+		Promise.all([window.gatewayUi.getJson(dataUrl), window.gatewayUi.getJson(findingsUrl + '?limit=1000')])
+			.then(function (results) {
+				all = results[0] || [];
+				findingsByRoute = groupFindings(results[1] || []);
+				window.gatewayUi.read('psr-age');
+				draw();
+			})
+			.catch(function () {
+				window.gatewayUi.failed('psr-age');
+			});
+	}
+
+	var live = window.gatewayUi.poller(load, POLL_MS);
+
+	sel('psr-grade').addEventListener('change', draw);
+	sel('psr-query').addEventListener('input', draw);
 	sel('psr-refresh').addEventListener('click', load);
 	sel('psr-auto').addEventListener('change', function () {
 		live(sel('psr-auto').checked);

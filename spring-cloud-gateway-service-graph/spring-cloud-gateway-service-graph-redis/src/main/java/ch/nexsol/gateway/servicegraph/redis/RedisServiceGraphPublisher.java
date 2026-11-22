@@ -17,6 +17,7 @@
 package ch.nexsol.gateway.servicegraph.redis;
 
 import ch.nexsol.gateway.commons.InstanceIdentity;
+import ch.nexsol.gateway.commons.redis.InstanceIndex;
 import ch.nexsol.gateway.servicegraph.LocalServiceGraphSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -51,6 +52,8 @@ public class RedisServiceGraphPublisher implements SmartLifecycle {
 
 	private final String key;
 
+	private final InstanceIndex index;
+
 	private volatile Disposable subscription;
 
 	/**
@@ -68,12 +71,21 @@ public class RedisServiceGraphPublisher implements SmartLifecycle {
 		this.properties = properties;
 		this.objectMapper = objectMapper;
 		this.key = properties.getKeyPrefix() + identity.id();
+		this.index = new InstanceIndex(redisTemplate, properties.getKeyPrefix(), properties.getTimeToLive());
 	}
 
 	@Override
 	public void start() {
+		// A tick that finds the previous publication still pending is dropped. An
+		// interval
+		// fails with an overflow error on a tick nobody asked for, which ends the flux
+		// for
+		// good: a Redis that stops answering for a while would stop the publication until
+		// the gateway is restarted. The prefetch of one holds a single tick back while a
+		// publication is pending, rather than a queue of them replayed in a burst.
 		this.subscription = Flux.interval(this.properties.getPublishInterval())
-			.concatMap((tick) -> publish())
+			.onBackpressureDrop()
+			.concatMap((tick) -> publish(), 1)
 			.subscribe();
 	}
 
@@ -102,6 +114,7 @@ public class RedisServiceGraphPublisher implements SmartLifecycle {
 		return Mono.fromCallable(() -> this.objectMapper.writeValueAsString(this.localSource.read()))
 			.flatMap((payload) -> this.redisTemplate.opsForValue()
 				.set(this.key, payload, this.properties.getTimeToLive()))
+			.then(Mono.defer(() -> this.index.register(this.key)))
 			.onErrorResume((ex) -> {
 				LOG.warn("Could not publish the service graph of this instance to Redis: {}", ex.getMessage());
 				return Mono.empty();

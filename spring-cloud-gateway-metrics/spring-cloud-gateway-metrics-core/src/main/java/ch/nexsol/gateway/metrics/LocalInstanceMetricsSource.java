@@ -20,9 +20,12 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryType;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import ch.nexsol.gateway.commons.InstanceIdentity;
@@ -34,6 +37,7 @@ import ch.nexsol.gateway.metrics.InstanceMetric.SystemStats;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.TimeGauge;
 import io.micrometer.core.instrument.Timer;
@@ -86,6 +90,12 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 
 	private static final long MISSING = -1L;
 
+	private static final Set<String> FIXED_METER_NAMES = Set.of("process.uptime", "jvm.gc.pause", "jvm.gc.overhead",
+			"jvm.threads.live", "jvm.threads.peak", "jvm.threads.daemon", "system.cpu.usage", "system.load.average.1m",
+			"process.files.open", "process.files.max", EVENT_LOOP_PENDING_TASKS, POOL_PREFIX + "active.connections",
+			POOL_PREFIX + "idle.connections", POOL_PREFIX + "pending.connections", POOL_PREFIX + "max.connections",
+			POOL_PREFIX + "max.pending.connections", POOL_PREFIX + "pending.connections.time");
+
 	private final ObjectProvider<MeterRegistry> meterRegistry;
 
 	private final ObjectProvider<HttpClientProperties> httpClientProperties;
@@ -103,6 +113,8 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 	private final String instanceId;
 
 	private final String coverage;
+
+	private final Set<String> meterNames;
 
 	/**
 	 * Creates the source reading from the (optional) meter registry.
@@ -139,6 +151,12 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 		this.httpClientInstrumented = properties.getInstance().isInstrumentHttpClient();
 		this.instanceId = identity.id();
 		this.coverage = "this instance only (" + identity.id() + ")";
+		Set<String> names = new HashSet<>(FIXED_METER_NAMES);
+		this.memoryUsed.forEach((convention) -> names.add(convention.getName()));
+		this.memoryMax.forEach((convention) -> names.add(convention.getName()));
+		names.addAll(this.processCpuLoad);
+		names.addAll(this.cpuCount);
+		this.meterNames = Set.copyOf(names);
 	}
 
 	@Override
@@ -157,8 +175,9 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 			return new InstanceMetric(this.instanceId, null, 0, emptyJvm(), emptySystem(), new NettyStats(0, 0),
 					List.of(), instrumentation());
 		}
-		return new InstanceMetric(this.instanceId, null, uptimeSeconds(registry), jvm(registry), system(registry),
-				netty(registry), pools(registry), instrumentation());
+		Meters meters = Meters.of(registry, this.meterNames);
+		return new InstanceMetric(this.instanceId, null, uptimeSeconds(meters), jvm(meters), system(meters),
+				netty(meters), pools(meters), instrumentation());
 	}
 
 	private InstanceInstrumentation instrumentation() {
@@ -167,31 +186,29 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 		return new InstanceInstrumentation(pool, this.httpClientInstrumented);
 	}
 
-	private static long uptimeSeconds(MeterRegistry registry) {
-		TimeGauge uptime = registry.find("process.uptime").timeGauge();
+	private static long uptimeSeconds(Meters meters) {
+		TimeGauge uptime = meters.first("process.uptime", TimeGauge.class);
 		return (uptime != null) ? (long) uptime.value(TimeUnit.SECONDS) : 0;
 	}
 
-	private JvmStats jvm(MeterRegistry registry) {
+	private JvmStats jvm(Meters meters) {
 		double pauseTotalMs = 0.0;
 		long pauseCount = 0;
-		for (Timer timer : registry.find("jvm.gc.pause").timers()) {
+		for (Timer timer : meters.all("jvm.gc.pause", Timer.class)) {
 			pauseTotalMs += timer.totalTime(TimeUnit.MILLISECONDS);
 			pauseCount += timer.count();
 		}
-		return new JvmStats(bytes(memory(registry, this.memoryUsed, MemoryType.HEAP)),
-				bytes(memory(registry, this.memoryMax, MemoryType.HEAP)),
-				bytes(memory(registry, this.memoryUsed, MemoryType.NON_HEAP)),
-				orZero(gauge(registry, "jvm.gc.overhead")), pauseTotalMs, pauseCount,
-				(int) orZero(gauge(registry, "jvm.threads.live")), (int) orZero(gauge(registry, "jvm.threads.peak")),
-				(int) orZero(gauge(registry, "jvm.threads.daemon")));
+		return new JvmStats(bytes(memory(meters, this.memoryUsed, MemoryType.HEAP)),
+				bytes(memory(meters, this.memoryMax, MemoryType.HEAP)),
+				bytes(memory(meters, this.memoryUsed, MemoryType.NON_HEAP)), orZero(gauge(meters, "jvm.gc.overhead")),
+				pauseTotalMs, pauseCount, (int) orZero(gauge(meters, "jvm.threads.live")),
+				(int) orZero(gauge(meters, "jvm.threads.peak")), (int) orZero(gauge(meters, "jvm.threads.daemon")));
 	}
 
-	private SystemStats system(MeterRegistry registry) {
-		return new SystemStats(orZero(gauge(registry, this.processCpuLoad)),
-				orZero(gauge(registry, "system.cpu.usage")), orMissing(gauge(registry, "system.load.average.1m")),
-				(int) orZero(gauge(registry, this.cpuCount)), bytes(gauge(registry, "process.files.open")),
-				bytes(gauge(registry, "process.files.max")));
+	private SystemStats system(Meters meters) {
+		return new SystemStats(orZero(gauge(meters, this.processCpuLoad)), orZero(gauge(meters, "system.cpu.usage")),
+				orMissing(gauge(meters, "system.load.average.1m")), (int) orZero(gauge(meters, this.cpuCount)),
+				bytes(gauge(meters, "process.files.open")), bytes(gauge(meters, "process.files.max")));
 	}
 
 	/**
@@ -202,10 +219,9 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 	 * @param type the memory area to sum over
 	 * @return the total bytes, or {@code NaN} when no convention found the figure
 	 */
-	private static double memory(MeterRegistry registry, List<MeterConvention<MemoryPoolMXBean>> conventions,
-			MemoryType type) {
+	private static double memory(Meters meters, List<MeterConvention<MemoryPoolMXBean>> conventions, MemoryType type) {
 		for (MeterConvention<MemoryPoolMXBean> convention : conventions) {
-			double total = memory(registry, convention, type);
+			double total = memory(meters, convention, type);
 			if (!Double.isNaN(total)) {
 				return total;
 			}
@@ -225,14 +241,13 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 	 * @param type the memory area to sum over
 	 * @return the total bytes, or {@code NaN} when no pool published the figure
 	 */
-	private static double memory(MeterRegistry registry, MeterConvention<MemoryPoolMXBean> convention,
-			MemoryType type) {
+	private static double memory(Meters meters, MeterConvention<MemoryPoolMXBean> convention, MemoryType type) {
 		double total = Double.NaN;
 		for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
 			if (pool.getType() != type) {
 				continue;
 			}
-			Gauge gauge = registry.find(convention.getName()).tags(convention.getTags(pool)).gauge();
+			Gauge gauge = meters.gauge(convention.getName(), convention.getTags(pool));
 			if (gauge != null && gauge.value() >= 0) {
 				total = Double.isNaN(total) ? gauge.value() : total + gauge.value();
 			}
@@ -240,10 +255,10 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 		return total;
 	}
 
-	private static NettyStats netty(MeterRegistry registry) {
+	private static NettyStats netty(Meters meters) {
 		long pending = 0;
 		int loops = 0;
-		for (Gauge loop : registry.find(EVENT_LOOP_PENDING_TASKS).gauges()) {
+		for (Gauge loop : meters.all(EVENT_LOOP_PENDING_TASKS, Gauge.class)) {
 			pending += (long) loop.value();
 			loops++;
 		}
@@ -259,24 +274,24 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 	 * pool towards service-a is full", so the rows are keyed on the name and the address
 	 * and the instances behind them are summed.
 	 */
-	private static List<PoolStats> pools(MeterRegistry registry) {
+	private static List<PoolStats> pools(Meters meters) {
 		Map<String, PoolAccumulator> byPool = new LinkedHashMap<>();
-		for (Gauge value : registry.find(POOL_PREFIX + "active.connections").gauges()) {
+		for (Gauge value : meters.all(POOL_PREFIX + "active.connections", Gauge.class)) {
 			accumulator(byPool, value).active += value.value();
 		}
-		for (Gauge value : registry.find(POOL_PREFIX + "idle.connections").gauges()) {
+		for (Gauge value : meters.all(POOL_PREFIX + "idle.connections", Gauge.class)) {
 			accumulator(byPool, value).idle += value.value();
 		}
-		for (Gauge value : registry.find(POOL_PREFIX + "pending.connections").gauges()) {
+		for (Gauge value : meters.all(POOL_PREFIX + "pending.connections", Gauge.class)) {
 			accumulator(byPool, value).pending += value.value();
 		}
-		for (Gauge value : registry.find(POOL_PREFIX + "max.connections").gauges()) {
+		for (Gauge value : meters.all(POOL_PREFIX + "max.connections", Gauge.class)) {
 			accumulator(byPool, value).max += value.value();
 		}
-		for (Gauge value : registry.find(POOL_PREFIX + "max.pending.connections").gauges()) {
+		for (Gauge value : meters.all(POOL_PREFIX + "max.pending.connections", Gauge.class)) {
 			accumulator(byPool, value).maxPending += value.value();
 		}
-		for (Timer wait : registry.find(POOL_PREFIX + "pending.connections.time").timers()) {
+		for (Timer wait : meters.all(POOL_PREFIX + "pending.connections.time", Timer.class)) {
 			PoolAccumulator pool = accumulator(byPool, wait);
 			pool.pendingTimeMs += wait.totalTime(TimeUnit.MILLISECONDS);
 			pool.pendingTimeCount += wait.count();
@@ -299,15 +314,15 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 		return (value != null) ? value : "";
 	}
 
-	private static double gauge(MeterRegistry registry, String name) {
-		Gauge gauge = registry.find(name).gauge();
+	private static double gauge(Meters meters, String name) {
+		Gauge gauge = meters.first(name, Gauge.class);
 		return (gauge != null) ? gauge.value() : Double.NaN;
 	}
 
 	/** Reads a gauge under the first of the candidate names that carries it. */
-	private static double gauge(MeterRegistry registry, List<String> names) {
+	private static double gauge(Meters meters, List<String> names) {
 		for (String name : names) {
-			double value = gauge(registry, name);
+			double value = gauge(meters, name);
 			if (!Double.isNaN(value)) {
 				return value;
 			}
@@ -336,6 +351,72 @@ public class LocalInstanceMetricsSource implements InstanceMetricsSource {
 	}
 
 	/** Mutable per-pool accumulator, folding the counters of every pool instance. */
+	/**
+	 * The meters one reading needs, gathered in a single walk of the registry.
+	 * <p>
+	 * A search of the registry copies and filters every meter it holds, and a gateway
+	 * holds one timer per route, status and outcome: searching once per figure made some
+	 * thirty walks over all of them for each reading, on every publication and on every
+	 * poll of the console.
+	 */
+	private static final class Meters {
+
+		private final Map<String, List<Meter>> byName;
+
+		private Meters(Map<String, List<Meter>> byName) {
+			this.byName = byName;
+		}
+
+		static Meters of(MeterRegistry registry, Set<String> names) {
+			Map<String, List<Meter>> byName = new HashMap<>();
+			for (Meter meter : registry.getMeters()) {
+				String name = meter.getId().getName();
+				if (names.contains(name)) {
+					byName.computeIfAbsent(name, (key) -> new ArrayList<>(4)).add(meter);
+				}
+			}
+			return new Meters(byName);
+		}
+
+		<M extends Meter> List<M> all(String name, Class<M> type) {
+			List<M> matching = new ArrayList<>();
+			for (Meter meter : this.byName.getOrDefault(name, List.of())) {
+				if (type.isInstance(meter)) {
+					matching.add(type.cast(meter));
+				}
+			}
+			return matching;
+		}
+
+		<M extends Meter> M first(String name, Class<M> type) {
+			for (Meter meter : this.byName.getOrDefault(name, List.of())) {
+				if (type.isInstance(meter)) {
+					return type.cast(meter);
+				}
+			}
+			return null;
+		}
+
+		Gauge gauge(String name, Iterable<Tag> tags) {
+			for (Gauge gauge : all(name, Gauge.class)) {
+				if (carries(gauge, tags)) {
+					return gauge;
+				}
+			}
+			return null;
+		}
+
+		private static boolean carries(Meter meter, Iterable<Tag> tags) {
+			for (Tag tag : tags) {
+				if (!tag.getValue().equals(meter.getId().getTag(tag.getKey()))) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+	}
+
 	private static final class PoolAccumulator {
 
 		private final String name;

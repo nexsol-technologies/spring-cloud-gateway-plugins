@@ -25,6 +25,7 @@
 	var LEVELS = ['OFF', 'ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'];
 
 	var payload = null;
+	var request = window.gatewayUi.sequence();
 
 	function sel(id) {
 		return document.getElementById(id);
@@ -589,11 +590,25 @@
 		if (!silent) {
 			busy(true);
 		}
+		var latest = request();
 		fetch(dataUrl + query(), { headers: { Accept: 'application/json' } })
 			.then(function (response) {
+				if (response.status === 401) {
+					window.gatewayUi.signIn();
+				}
+				// A 502 is read like an answer: it carries the reason the endpoint could
+				// not be read on that instance, which is what the view then says.
+				if (!response.ok && response.status !== 502) {
+					throw new Error('HTTP ' + response.status);
+				}
 				return response.json();
 			})
 			.then(function (json) {
+				// The answer of an instance the picker has since left is not drawn under
+				// the one it now names.
+				if (!latest()) {
+					return;
+				}
 				payload = json;
 				afterPaint(function () {
 					render();
@@ -601,6 +616,9 @@
 				});
 			})
 			.catch(function () {
+				if (!latest()) {
+					return;
+				}
 				payload = null;
 				render();
 				fail('The gateway could not be reached.');
@@ -648,13 +666,19 @@
 		busy(true);
 		afterPaint(render);
 	}));
-	sel('gi-refresh').addEventListener('click', load);
+	// Never the listener itself: it would be handed the event, which reads as a silent
+	// load and leaves the rows of the previous instance standing, buttons enabled.
+	sel('gi-refresh').addEventListener('click', function () {
+		load(false);
+	});
 	if (sel('gi-outcome')) {
 		sel('gi-outcome').addEventListener('change', render);
 		window.gatewayUi.remember(sel('gi-outcome'));
 	}
 	if (sel('gi-instance')) {
-		sel('gi-instance').addEventListener('change', load);
+		sel('gi-instance').addEventListener('change', function () {
+			load(false);
+		});
 		window.gatewayUi.remember(sel('gi-instance'));
 	}
 	load();

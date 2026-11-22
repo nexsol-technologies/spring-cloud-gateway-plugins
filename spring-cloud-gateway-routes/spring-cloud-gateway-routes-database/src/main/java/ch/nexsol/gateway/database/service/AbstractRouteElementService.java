@@ -76,6 +76,14 @@ public abstract class AbstractRouteElementService<E extends RouteElementEntity, 
 	}
 
 	/**
+	 * Finds the elements of every route.
+	 * @return all the elements
+	 */
+	public Flux<E> findAll() {
+		return this.repository.findAll();
+	}
+
+	/**
 	 * Deletes all elements attached to the given route.
 	 * @param id the route reference id
 	 * @return a completion signal
@@ -141,9 +149,22 @@ public abstract class AbstractRouteElementService<E extends RouteElementEntity, 
 		if (routeIds == null || routeIds.isEmpty()) {
 			return Mono.just(Map.of());
 		}
-		return this.repository.findByRouteRefIdIn(routeIds)
-			.collectList()
-			.map((entities) -> entities.stream()
+		return byRoute(this.repository.findByRouteRefIdIn(routeIds));
+	}
+
+	/**
+	 * Loads the definitions of every route, grouped by route reference id, in a single
+	 * statement that names no route: the one to use when all of them are wanted, since a
+	 * list of ids grows with the table up to what the driver accepts as parameters.
+	 * @return the definitions of every route, by route reference id
+	 */
+	protected Mono<Map<Long, List<D>>> loadAllDefinitions() {
+		return byRoute(this.repository.findAll());
+	}
+
+	private Mono<Map<Long, List<D>>> byRoute(Flux<E> entities) {
+		return entities.collectList()
+			.map((all) -> all.stream()
 				.collect(Collectors.groupingBy(RouteElementEntity::getRouteRefId,
 						Collectors.mapping(toDefinitionFunction(), Collectors.toList()))));
 	}

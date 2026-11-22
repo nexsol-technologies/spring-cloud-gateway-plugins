@@ -50,4 +50,15 @@ public class OpenApiRouteDefinitionLocator extends AbstractRefreshableRouteDefin
 			.flatMapMany(Flux::fromIterable);
 	}
 
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * The contracts kept are let go of first, so each is fetched and parsed again
+	 * whatever time it had left.
+	 */
+	@Override
+	public Mono<Void> reload() {
+		return Mono.fromRunnable(this.loader::forget).then(refresh());
+	}
+
 }

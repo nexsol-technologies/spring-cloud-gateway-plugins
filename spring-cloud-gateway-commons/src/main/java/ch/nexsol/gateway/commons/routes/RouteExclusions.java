@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ch.nexsol.gateway.servicegraph;
+package ch.nexsol.gateway.commons.routes;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,11 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The route ids left out of the graph, compiled once.
- * <p>
- * Applied where the calls are counted rather than where they are read, so an excluded
- * route never becomes a series at all: what is not counted costs nothing in the registry,
- * in Redis, or in whatever scrapes it.
+ * The route ids a plugin leaves out of what it reports, compiled once.
  */
 public class RouteExclusions {
 
@@ -40,35 +36,44 @@ public class RouteExclusions {
 	/**
 	 * Compile the configured expressions.
 	 * <p>
-	 * An unusable expression is dropped rather than failing the application: the graph is
-	 * a read-only page, and losing a filter is a lesser evil than a gateway that does not
-	 * start.
+	 * An unusable expression is dropped rather than failing the application: what these
+	 * exclusions filter is a read-only view, and losing a filter is a lesser evil than a
+	 * gateway that does not start.
+	 * @param view what the exclusions are applied to, named in the warning an unusable
+	 * expression raises
 	 * @param expressions the configured regular expressions
 	 */
-	public RouteExclusions(List<String> expressions) {
+	public RouteExclusions(String view, List<String> expressions) {
 		List<Pattern> compiled = new ArrayList<>();
 		for (String expression : expressions) {
 			try {
 				compiled.add(Pattern.compile(expression));
 			}
 			catch (PatternSyntaxException ex) {
-				LOG.warn("Ignoring the service graph route exclusion '{}': {}", expression, ex.getMessage());
+				LOG.warn("Ignoring the {} route exclusion '{}': {}", view, expression, ex.getMessage());
 			}
 		}
 		this.patterns = List.copyOf(compiled);
 	}
 
 	/**
-	 * Whether the given route is left out of the graph. The whole id must match, so
-	 * {@code docs} excludes {@code docs} but not {@code docs-public}.
+	 * Whether the given route is left out. The whole id must match, so {@code docs}
+	 * excludes {@code docs} but not {@code docs-public}.
 	 * @param routeId the route id, possibly {@code null} or blank
-	 * @return {@code true} when the route must not be drawn
+	 * @return {@code true} when the route must not be reported
 	 */
 	public boolean excludes(String routeId) {
 		if (routeId == null || routeId.isBlank()) {
 			return true;
 		}
-		return this.patterns.stream().anyMatch((pattern) -> pattern.matcher(routeId).matches());
+		// A plain loop: this runs for every routed request, and with no exclusion
+		// configured — the usual case — it has to cost nothing.
+		for (Pattern pattern : this.patterns) {
+			if (pattern.matcher(routeId).matches()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 }

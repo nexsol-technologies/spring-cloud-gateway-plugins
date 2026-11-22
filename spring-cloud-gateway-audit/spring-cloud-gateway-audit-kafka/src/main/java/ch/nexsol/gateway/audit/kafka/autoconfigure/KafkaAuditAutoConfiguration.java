@@ -66,8 +66,7 @@ public class KafkaAuditAutoConfiguration {
 	@ConditionalOnSingleCandidate(KafkaTemplate.class)
 	AuditEventPublisher kafkaAuditEventPublisher(KafkaTemplate<Object, Object> kafkaTemplate,
 			KafkaAuditProperties properties, ObjectMapper objectMapper) {
-		return new KafkaAuditEventPublisher(kafkaTemplate, properties.getTopic(),
-				new AuditEventSerializer(objectMapper));
+		return new KafkaAuditEventPublisher(kafkaTemplate, new AuditEventSerializer(objectMapper), properties);
 	}
 
 }

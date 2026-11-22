@@ -16,6 +16,7 @@
 
 package ch.nexsol.gateway.metrics.redis;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,9 +33,10 @@ import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import org.springframework.data.domain.Range;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.data.redis.core.ReactiveValueOperations;
-import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.ReactiveZSetOperations;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,18 +55,23 @@ class RedisInstanceMetricsSourceTests {
 
 	private ReactiveValueOperations<String, String> valueOperations;
 
+	private ReactiveZSetOperations<String, String> zSetOperations;
+
 	@BeforeEach
 	@SuppressWarnings("unchecked")
 	void setUp() {
 		this.redisTemplate = mock(ReactiveStringRedisTemplate.class);
 		this.valueOperations = mock(ReactiveValueOperations.class);
 		when(this.redisTemplate.opsForValue()).thenReturn(this.valueOperations);
+		this.zSetOperations = mock(ReactiveZSetOperations.class);
+		when(this.redisTemplate.opsForZSet()).thenReturn(this.zSetOperations);
 	}
 
 	private void published(Map<String, String> byKey) {
-		when(this.redisTemplate.scan(any(ScanOptions.class))).thenReturn(Flux.fromIterable(byKey.keySet()));
-		when(this.valueOperations.get(anyString()))
-			.thenAnswer((invocation) -> Mono.justOrEmpty(byKey.get(invocation.getArgument(0, String.class))));
+		when(this.zSetOperations.rangeByScore(anyString(), any(Range.class)))
+			.thenReturn(Flux.fromIterable(byKey.keySet()));
+		when(this.valueOperations.multiGet(any())).thenAnswer((invocation) -> Mono
+			.just(invocation.<Collection<String>>getArgument(0).stream().map(byKey::get).toList()));
 	}
 
 	private String payload(InstanceMetric metric) throws Exception {
@@ -133,7 +140,8 @@ class RedisInstanceMetricsSourceTests {
 
 	@Test
 	void reportsRedisBeingUnreachableRatherThanFailing() {
-		when(this.redisTemplate.scan(any(ScanOptions.class))).thenReturn(Flux.error(new IllegalStateException("down")));
+		when(this.zSetOperations.rangeByScore(anyString(), any(Range.class)))
+			.thenReturn(Flux.error(new IllegalStateException("down")));
 
 		InstanceMetricsSnapshot snapshot = source().collect().block();
 
@@ -145,9 +153,9 @@ class RedisInstanceMetricsSourceTests {
 	void doesNotShareANamespaceWithTheRouteFigures() {
 		RedisMetricsProperties properties = new RedisMetricsProperties();
 
-		// The route source scans keyPrefix + "*". An instance prefix nested under it
-		// would come back in that scan and be discarded, one warning per entry, on every
-		// single refresh.
+		// Each prefix names its own index. Under one prefix the two kinds of figures
+		// would be listed together, and each source would discard the entries of the
+		// other, one warning per entry, on every single refresh.
 		assertThat(properties.getInstanceKeyPrefix()).doesNotStartWith(properties.getKeyPrefix());
 		assertThat(properties.getKeyPrefix()).doesNotStartWith(properties.getInstanceKeyPrefix());
 	}
