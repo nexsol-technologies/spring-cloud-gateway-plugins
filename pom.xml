@@ -236,6 +236,9 @@
             <plugin>
                 <groupId>org.cyclonedx</groupId>
                 <artifactId>cyclonedx-maven-plugin</artifactId>
+                <configuration>
+                    <outputFormat>json</outputFormat>
+                </configuration>
                 <executions>
                     <execution>
                         <id>sbom</id>
@@ -475,6 +478,7 @@
 							<publishingServerId>ossrh</publishingServerId>
 							<autoPublish>true</autoPublish>
 							<waitUntil>validated</waitUntil>
+							<checksums>required</checksums>
 						</configuration>
 					</plugin>
 				</plugins>
